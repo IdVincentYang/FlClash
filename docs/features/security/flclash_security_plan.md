@@ -4,7 +4,7 @@
 
 | Loop | 子计划入口 | 状态 | 前置依赖 |
 | --- | --- | --- | --- |
-| 1 | [loop1_plan.md](loop1/loop1_plan.md) | 未开始 | 无 |
+| 1 | [loop1_plan.md](loop1/loop1_plan.md) | 任务规划待评审 | 无 |
 | 2 | [loop2_plan.md](loop2/loop2_plan.md) | 未开始 | Loop 1 |
 | 3 | [loop3_plan.md](loop3/loop3_plan.md) | 未开始 | 无 |
 | 4 | [loop4_plan.md](loop4/loop4_plan.md) | 未开始 | 无 |

@@ -4,9 +4,9 @@
 
 | 编号 | 发现 | 已确认边界与待核实部分 |
 | --- | --- | --- |
-| A-01 | 默认仪表盘触发第三方 IP 查询，普通 Dio 请求不等于应用代理路径，含明文 HTTP；隐藏 IP 只影响显示 | 源码路径已确认；实际出口需运行验证 |
+| A-01 | 默认仪表盘触发第三方 IP/质量查询，质量请求可传入被查询 IP，来源含明文 HTTP；隐藏 IP 只影响显示 | 普通 Dio 可继承主入口的全局 HttpOverrides；出口取决于初始化、运行状态及核心出站，实际路径需验证 |
 | A-02 | Android 集成 Firebase Analytics，CI 注入的正式发布 Firebase 项目不能从公开仓库核验 | 依赖与披露已确认；发布包外发待核实 |
-| A-03 | 更新和订阅自动刷新产生外部请求，订阅 URL 可能含令牌 | 静态路径已确认；核心停止时出口和日志脱敏待核实 |
+| A-03 | 更新和订阅自动刷新早于首次免责声明；订阅 URL 可能含令牌，代理选择日志打印完整 URL | 未 attach、核心未启动/暂停时返回 DIRECT 的源码分支已确认；Android 实际出口、竞态与日志传播需验证 |
 | A-04 | 导入配置决定路由、DNS、节点和 DIRECT 选择 | 不可信配置可改变网络信任与流量去向 |
 | A-05 | Go 1.26.4、x/net 0.35.0 命中 HTTP/2 公告，核心包含相关调用 | 版本与调用线索已确认；Android 可达性及配置影响待验证 |
 | A-06 | Rust 锁定依赖版本命中 OSV 公告 | 需结合 Android 目标、feature、符号和调用路径判断 |
@@ -18,6 +18,7 @@
 | A-12 | 源 manifest 没有显式 backup/data extraction 策略，应用保存订阅与代理凭据 | 合并后的 release manifest、备份范围与凭据保护待核实 |
 | A-13 | 默认 DNS 使用第三方服务，其能看到收到的查询 | 默认配置已确认；系统 DNS/TUN/DoH 的实际 Android 路径待验证 |
 | A-14 | 默认核心构建标签未禁用 EasyTier/ZeroTier，因此 Android 也引入 EasyTier 预编译 WASM 和 ZeroTier 根节点信任数据 | 与锁定模块字节一致；EasyTier provenance 的源码提交未能解析，生成来源未闭环；根节点数据需说明信任与更新边界 |
+| A-15 | Android 扫码依赖 mobile_scanner/ML Kit；厂商[数据披露](https://developers.google.com/ml-kit/android-data-disclosure)说明存在设备、应用、安装标识及诊断采集 | 依赖及合并 manifest 的 ML Kit 初始化组件已确认；当前版本外发待核实，尚未证实二维码图片或内容被上传；归 Loop 1 |
 
 主要源码入口：[请求路径](../../../lib/common/request.dart)、[IP 查询](../../../lib/common/ip_quality.dart)、[配置与 DNS](../../../lib/models/clash_config.dart)、[Android 应用配置](../../../android/app/build.gradle.kts)、[Gradle 配置](../../../android/settings.gradle.kts)、[发布工作流](../../../.github/workflows/build.yaml)、[核心默认构建标签](../../../plugins/setup/setup_hooks/lib/src/options.dart)、[EasyTier 构建条件](../../../core/Clash.Meta/adapter/outbound/easytier.go)、[ZeroTier 构建条件](../../../core/Clash.Meta/adapter/outbound/zerotier.go)。
 
