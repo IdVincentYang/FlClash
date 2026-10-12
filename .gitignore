@@ -46,6 +46,7 @@ app.*.map.json
 .claude/worktrees/
 
 # Android Studio will place build artifacts here
+/android/.kotlin/
 /android/app/debug
 /android/app/profile
 /android/app/release
