@@ -12,7 +12,7 @@
 | A-06 | Rust 锁定依赖版本命中 OSV 公告 | 需结合 Android 目标、feature、符号和调用路径判断 |
 | A-07 | GEOIP、GEOSITE、ASN 与审查日官方 rolling latest 不同，客户端缺少发布者签名或固定摘要校验 | 新旧不同已确认，篡改未证实；旧文件历史来源未闭环 |
 | A-08 | Gradle Wrapper 无发行包 SHA-256，缺 Gradle 依赖验证元数据，CI actions 使用可移动标签；Wrapper JAR 匹配官方 2.10，而发行包配置为 9.8.0 | 构建配置已确认；实际下载的 9.8.0 ZIP 与官方摘要匹配，Wrapper JAR 版本差异仍需在 Loop 5 处理 |
-| A-09 | Flutter Engine、NDK、Gradle 插件及 Maven AAR/JAR 属于源码外的预编译平台依赖 | Native Assets 构建实际选择 NDK 29.0.14206865，而 Gradle 声明 28.2.13676358；来源、实际工具选择和发布物对应关系需核实 |
+| A-09 | Flutter Engine、NDK、Gradle 插件及 Maven AAR/JAR/随包 JNI 库属于源码外的预编译工具或运行依赖 | Native Assets 构建实际选择 NDK 29.0.14206865，而 Gradle 声明 28.2.13676358；来源、实际工具选择和发布物对应关系需核实 |
 | A-10 | Android loopback 代理默认无认证，同设备其它应用可能访问 | 架构行为已确认；影响取决于应用、权限和运行模式 |
 | A-11 | QuickActionActivity 与 MainActivity 接受外部 action/URI | 导出声明已确认；输入校验与实际可利用影响待核实 |
 | A-12 | 源 manifest 没有显式 backup/data extraction 策略，应用保存订阅与代理凭据 | 合并后的 release manifest、备份范围与凭据保护待核实 |
