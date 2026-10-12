@@ -21,6 +21,14 @@ Read these only when the task touches their area:
 - [.agents/flutter-upgrade.md](.agents/flutter-upgrade.md): SDK-pinned workarounds to recheck before changing the
   Flutter version.
 - [.agents/skills.md](.agents/skills.md): index of repo-scoped skills in `.agents/skills/`.
+- [CONTRIBUTING.md](CONTRIBUTING.md): personal-fork workflow and required upstream sync/conflict process.
+- [docs/features/security/flclash_security_plan.md](docs/features/security/flclash_security_plan.md): Android security loop plan index.
+
+## Fork and Upstream Sync
+
+This checkout is a personal fork. Before changing branches or syncing official changes, follow
+[CONTRIBUTING.md](CONTRIBUTING.md); keep security changes on focused branches so they remain easy to
+review and carry forward.
 
 ## Highest Priority Rules
 

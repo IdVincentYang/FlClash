@@ -13,7 +13,7 @@ A multi-platform proxy client based on ClashMeta. Simple to use, open source and
 [![License](https://img.shields.io/github/license/chen08209/FlClash?style=flat-square)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-channel-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://t.me/FlClash)
 
-[Website](https://chen08209.github.io/FlClash) · [Download](#download) · [Changelog](CHANGELOG.md) · [Build from source](#build-from-source)
+[Website](https://chen08209.github.io/FlClash) · [Download](#download) · [Changelog](CHANGELOG.md) · [Build from source](#build-from-source) · [Contributing and upstream sync](CONTRIBUTING.md)
 
 </div>
 

@@ -11,6 +11,7 @@ match a task against the skill `name` and `description`, then load the full inst
 - `core-platform`: Core lifecycle/process ownership, Android services, Go event delivery, desktop IPC, platform managers,
   VPN/TUN, and Windows Helper flow.
 - `pre-commit-quality-review`: lightweight triage before commits, with scoped structural review and user decisions on concrete regressions.
+- `engineering-delivery`: coordinate design, implementation, review, and delivery for multi-stage engineering work.
 
 ## Authoring Notes
 
