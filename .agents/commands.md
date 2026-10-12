@@ -17,8 +17,8 @@ dart setup.dart windows
 dart setup.dart android
 ```
 
-The verified ARM64 local APK workflow, including Rust compiler selection and disabled upload tasks, is recorded in
-[docs/development/android_build_result.md](../docs/development/android_build_result.md).
+The ARM64 local APK build guide covers tool versions, Rust compiler selection, disabled upload tasks, and troubleshooting:
+[docs/development/android_build_guide.md](../docs/development/android_build_guide.md).
 
 The Go core and the Rust helper build automatically: Flutter runs
 `plugins/setup/hook/build.dart` on every `flutter build` and `flutter test`,
