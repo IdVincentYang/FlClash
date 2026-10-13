@@ -4,7 +4,7 @@
 
 | Loop | 子计划入口 | 状态 | 前置依赖 |
 | --- | --- | --- | --- |
-| 1 | [loop1_plan.md](loop1/loop1_plan.md) | 执行中：L1-T01 | 无 |
+| 1 | [loop1_plan.md](loop1/loop1_plan.md) | 部分完成，后续待指派 | 无 |
 | 2 | [loop2_plan.md](loop2/loop2_plan.md) | 计划待评审，未实施 | Loop 1 的下载与请求边界 |
 | 3 | [loop3_plan.md](loop3/loop3_plan.md) | 计划待评审，未实施 | 无；与 Loop 1 对齐本地报告边界 |
 | 4 | [loop4_plan.md](loop4/loop4_plan.md) | 计划待评审，未实施 | 可先审基线；完整范围接收 Loop 5 清单 |
