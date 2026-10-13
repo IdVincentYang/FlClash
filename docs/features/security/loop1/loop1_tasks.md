@@ -1,6 +1,6 @@
 # Loop 1 任务清单：先删除，再修改，最后增加
 
-本清单细化 [Loop 1 plan](loop1_plan.md)，按删除、修改、增加安排交付。L1-T01 已结束，L1-T02 已获准推进，其余任务待指派；具体执行状态见下表。共同需求见[安全目标](../security_requirements.md)，功能决定以 [plan 中的决定表](loop1_plan.md#功能决定与待细化事项)为准。
+本清单细化 [Loop 1 plan](loop1_plan.md)，按删除、修改、增加安排交付。L1-T01、L1-T02 已结束，其余任务待指派；具体执行状态见下表。共同需求见[安全目标](../security_requirements.md)，功能决定以 [plan 中的决定表](loop1_plan.md#功能决定与待细化事项)为准。
 
 ## 执行顺序与记录约定
 
@@ -18,7 +18,7 @@
 | 编号 | 类型 | 任务与验收入口 | 前置依赖 | 当前状态 |
 | --- | --- | --- | --- | --- |
 | L1-T01 | 删除 | [自动应用更新检查](#l1-t01-删除自动应用更新检查) | 无 | 已本地合入，任务结束 |
-| L1-T02 | 删除 | [Firebase 及上传路径](#l1-t02-删除-firebase-及上传路径) | 无 | 已指派，待设计 |
+| L1-T02 | 删除 | [Firebase 及上传路径](#l1-t02-删除-firebase-及上传路径) | 无 | 已本地合入，任务结束 |
 | L1-T03 | 修改 | [请求出口与生命周期](#l1-t03-修改请求出口与生命周期处理) | L1-T01、L1-T02 | 待设计，未实施 |
 | L1-T04 | 修改 | [服务身份、认证与跳转](#l1-t04-修改服务身份认证与跳转处理) | L1-T03 | 待设计，未实施 |
 | L1-T05 | 修改 | [日志与错误信息脱敏](#l1-t05-修改日志与错误信息脱敏) | L1-T01、L1-T02 | 待设计，未实施 |
@@ -50,9 +50,14 @@
 
 ## L1-T02 删除 Firebase 及上传路径
 
-- 协作交接：由 D-02 接手，源码起点为 `2d96343`。先提交设计供 M 评审，通过后连续完成实施、验收和本地合入 `security/android`；远端推送未授权。保留现有本地恢复、错误处理与排障所需符号，新报告/dump 保存仍由 L1-T11/L1-T12 接续。
+- 协作交接：由 D-02 接手，源码起点为 `2d96343`。M 的设计与实现评审均已通过，源码提交 `200e2ff` 已本地快进合入 `security/android`，临时任务分支已删除；共享 checkout、缓存、本地证据和独立聊天保留。远端推送未授权。保留现有本地恢复、错误处理与排障所需符号，新报告/dump 保存仍由 L1-T11/L1-T12 接续。
 - 目标与范围：移除 Android Analytics/Crashlytics 依赖、自动初始化、调用、设置/提示、Gradle 插件及上传路径，清理对应共享状态字段和旧配置兼容。保留必要的本地错误处理、系统退出信息和启动恢复。
-- 设计入口：[删除采集方向](loop1_plan.md#删除已拒绝采集保留可用的本地证据)、[Android 应用构建](../../../../android/app/build.gradle.kts)、[公共依赖](../../../../android/common/build.gradle.kts)、[原生全局状态](../../../../android/common/src/main/java/com/follow/clash/common/GlobalState.kt)、[启动恢复](../../../../lib/common/boot_guard.dart)。
+- 设计入口：[L1-T02 删除方案与验收安排](l1_t02_plan.md)，依据[删除采集方向](loop1_plan.md#删除已拒绝采集保留可用的本地证据)。
+- 实施与自验：已清理专用 SDK、初始化/接口、旧配置字段、文案与上传构建链；保留本地启动记录、系统退出信息、恢复选择及 Go/JNI 符号和 R8 mapping。生成、格式、分析、锁定依赖解析与当前 ARM64 release 构建通过。R1 修正构建指南的任务禁用表述后获评通过；最终源码的构建输入与受检快照一致，沿用既有产物和验证。
+- 受检对象：任务分支基线 `ea27239` 加[构建输入快照](../../../../build/verification/l1-t02/prebuild_source.patch)，快照 SHA-256 为 `eee52ba24fca5ff7480073a64dd760eb551457a25ee6bc6615f6f67080125f0a`，构建前后相同；范围为 `.github`、`android`、`lib`、`arb`、`plugins` 与根构建/依赖文件。工具使用构建指南组合，Native Assets NDK 29.0.14206865、JNI NDK 28.2.13676358；环境 `dev`、release、ARM64，Android Debug 签名，包名 `com.follow.clash.dev`，实际版本 `0.8.99` / `2026102301`。
+- 产物核对：实际 release 依赖图与合并/最终 manifest、DEX 原名和 R8 原始类来源、APK 资源/原生库均无目标 Firebase App、Analytics、Crashlytics、Installations 或 measurement 收集链；release assemble/bundle 任务图无对应上传任务。剩余 annotations 16.0.0、components 16.1.0、encoders 16.1.0、encoders-json 17.1.0 均来自扫码 ML Kit，共享组件及三个扫码 registrar 保留。
+- 本地证据与复现：原始材料留在忽略目录，通过[构建命令脚本](../../../../build/verification/l1-t02/android_command.sh)的 `build` / `gradle` 动作及[产物检查脚本](../../../../build/verification/l1-t02/inspect_artifacts.py)生成；构建时的摘要、命令和校验值见冻结[证据清单](../../../../build/verification/l1-t02/evidence_manifest.json)，[产物检查结果](../../../../build/verification/l1-t02/artifact_inspection.json)记录 APK 和符号对应关系，获审对象与最终版本的关联见[交付绑定](../../../../build/verification/l1-t02/final/delivery_binding.json)。[保留 APK](../../../../build/verification/l1-t02/artifacts/FlClash-0.8.99-android-arm64-v8a.apk) SHA-256 为 `24fe5209548a1e9128067775908baaaca087ba2d355f304d400413cfe54f5138`；Go/JNI 未剥离库含 debug sections，与 APK 中对应库的 Build ID 一致，R8 mapping 同目录保留。
+- 未验证：未新增/运行自动化测试，未安装或启动应用，未进行设备恢复、扫码功能和实际网络外发观察；ML Kit DataTransport/运行时采集继续由 L1-T09 处理。工具来源与跨 NDK 差异沿用 Loop 5，不据静态结果宣称全应用无外发。
 - 验收出口：实际 Android 依赖图/合并 manifest/最终包不含相关 SDK 和初始化组件，构建任务图无对应上传任务；旧开关不能重新启用；不依赖 Firebase 仍能使用现有本地恢复路径。
 - 交付：依赖、原生/Dart 接口和上传调用的完整清理及产物核对；保留合法的其它权限/SDK，不仅凭文本中出现 `firebase` 就删除无关功能。
 
@@ -136,7 +141,7 @@
 
 ## 验证、跨轮接续与官方同步
 
-- 每项任务在实施阶段选择覆盖自身行为的源码/静态检查、针对性回归、产物核对或受控观察，记录真实版本和条件。文中的验收是计划，当前未编译或运行应用测试。
+- 每项任务在实施阶段选择覆盖自身行为的源码/静态检查、针对性回归、产物核对或受控观察，记录真实版本和条件。文中的验收出口是计划，实际结果与未执行项见各任务交付记录。
 - 验证使用合成秘密、配置、二维码和报告，优先本地/受控目标；原始证据留在忽略目录或既有本地材料位置。必要公共检索不携带本地私有内容，对外发送按已有授权边界执行。
 - 配置接受、业务路由/DNS 归 [Loop 2](../loop2/loop2_plan.md)，完整本机权限/数据生命周期归 [Loop 3](../loop3/loop3_plan.md)，可利用缺陷归 [Loop 4](../loop4/loop4_plan.md)，构建/符号/来源归 [Loop 5](../loop5/loop5_plan.md)，Geo 内容归 [Loop 6](../loop6/loop6_plan.md)。新增问题明确落点，不能因跨轮而漏掉应用联网路径。
 - 每项交付按风险或行为保留窄提交、生成方式和验证入口，遵循[官方同步约定](../../../../CONTRIBUTING.md)。同步后复核已删除依赖、出口/认证、调度及报告行为；冲突处理理由写入对应任务设计/已有评审记录。
