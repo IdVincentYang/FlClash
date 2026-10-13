@@ -36,7 +36,8 @@ Native Assets 曾选用本机 NDK 29.0.14206865，与 Gradle 声明不同。每�
 
 ### 限定 Gradle 目录并关闭上传任务
 
-当前 Crashlytics 插件会把 mapping 上传加入 release 任务图；正式签名配置还会加入原生符号上传。先创建本项目专用的 Gradle init script：
+本地构建禁止上传或发布。Firebase 构建上传插件已移除；仍使用本项目专用的 Gradle init script，
+在任务图生成后禁用名称以 `upload` 或 `publish` 开头的任务执行。创建或核对以下脚本：
 
 ```bash
 mkdir -p .buildlog/android-build/gradle-home/init.d
@@ -54,7 +55,10 @@ gradle.taskGraph.whenReady { graph ->
 GRADLE
 ```
 
-使用前缀匹配；按名称包含 publish 来匹配会误停 `prepareLintJarForPublish` 等本地准备任务。此规则覆盖上述 Gradle 任务，不提供构建脚本的网络隔离；依赖下载仍使用网络。变更构建插件时重新检查其传输行为和任务图。
+使用前缀匹配；按名称包含 publish 来匹配会误停 `prepareLintJarForPublish` 等本地准备任务。
+此规则仅限制匹配名称的任务执行，任务仍可注册或进入任务图。
+它不提供构建脚本的网络隔离；其它名称的任务、插件及依赖下载仍可联网。
+变更构建插件时重新检查其传输行为和任务图。
 
 ## 构建 ARM64 APK
 
@@ -88,7 +92,7 @@ env -i \
 
 最小环境减少构建脚本继承的无关环境变量。Dart 禁用 analytics 会保存本机工具偏好；Flutter 的环境变量和命令参数同时禁止构建遥测。HOME 和缓存仍是本机原有目录，脚本访问本地文件的权限维持当前用户权限。
 
-项目入口默认构建 release，`--env dev` 选择应用环境。没有完整的正式 keystore 配置时，Gradle 使用 Android Debug 签名和 `.dev` 应用 ID。正式签名由 [app/build.gradle.kts](../../android/app/build.gradle.kts) 决定；正式密钥、google-services 配置和 local.properties 留在本地。
+项目入口默认构建 release，`--env dev` 选择应用环境。没有完整的正式 keystore 配置时，Gradle 使用 Android Debug 签名和 `.dev` 应用 ID。正式签名由 [app/build.gradle.kts](../../android/app/build.gradle.kts) 决定；签名密钥和 local.properties 留在本地。
 
 ## 判断是否成功
 
@@ -110,6 +114,25 @@ unzip -t "$build_apk"
 ```
 
 这些检查说明受检 APK 的包信息、签名和 ZIP 完整性；运行兼容性、SDK 外发和实际网络出口还需要 Android 验收。SDK、Flutter Engine 和 Maven 中的预编译运行依赖仍属于来源审查范围。
+
+## 本地符号与 APK 对应
+
+当前构建保留 Go 的调试信息和 JNI 的 `-g`，app release 打包仍剥离 APK 中的库。
+用于本地排障的未剥离库来自
+`build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/`
+中的 `libclash.so`、`libcore.so`；Java/Kotlin 的 R8 映射为
+`build/app/outputs/mapping/release/mapping.txt`。
+
+需要保留时，在下一次构建或清理前将上述文件与对应 APK 复制到本地忽略证据目录，
+记录源码快照、ABI、工具/环境与各文件 SHA-256。
+使用已安装 NDK 的 `toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-readelf -S` 核对
+未剥离库的 `.debug_*` sections；用 `llvm-readelf -n` 比较它与 APK 中同名库的 GNU Build ID，
+Go 库还可用 `go tool buildid` 比较 Go Build ID。
+APK 中的库可用 `unzip -p <apk> lib/arm64-v8a/<库名>` 写入本地证据目录再检查。
+剥离后文件摘要可以不同，Build ID 应对应；仅文件名相同不能证明符号匹配。
+
+这些路径覆盖现有 Go/JNI 和 R8 本地排障材料，不保证完整 Dart、Rust 或 Flutter 符号。
+符号、mapping 与 APK 均不自动上传；长期留存及工具来源审查继续由 Loop 5 处理。
 
 ## 排查与维护
 

@@ -110,7 +110,6 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
     val toasts = mutableListOf<String>()
     val logs = mutableListOf<String>()
     val notificationParams = mutableListOf<NotificationParams>()
-    val crashlytics = mutableListOf<Boolean>()
     var setupCalls = 0
     var startCalls = 0
     var stopCalls = 0
@@ -123,10 +122,6 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
 
     override fun showToast(message: String) {
         toasts += message
-    }
-
-    override fun setCrashlytics(enabled: Boolean) {
-        crashlytics += enabled
     }
 
     override fun updateNotificationParams(params: NotificationParams) {
@@ -595,20 +590,18 @@ class ServiceStateMachineTest {
     }
 
     @Test
-    fun `syncSharedState pushes crashlytics and the notification straight through`() = runTest {
+    fun `syncSharedState pushes the notification straight through`() = runTest {
         val host = FakeHost(backgroundScope)
         val machine = ServiceStateMachine(host)
 
         machine.syncSharedState(
             SharedState(
-                crashlytics = false,
                 currentProfileName = "Work",
                 stopText = "Disconnect",
                 onlyStatisticsProxy = true,
             ),
         )
 
-        assertEquals(listOf(false), host.crashlytics)
         assertEquals(listOf(NotificationParams("Work", "Disconnect", true)), host.notificationParams)
     }
 

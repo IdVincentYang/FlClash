@@ -33,7 +33,7 @@ android {
         }
     }
 
-    // :app strips what it packages; Crashlytics symbolication needs the unstripped libraries to reach its merge.
+    // Preserve local crash-debugging inputs until :app strips the packaged copy.
     packaging {
         jniLibs {
             keepDebugSymbols += "**/*.so"

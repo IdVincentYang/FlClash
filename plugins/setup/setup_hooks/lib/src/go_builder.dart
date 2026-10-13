@@ -124,8 +124,7 @@ class GoBuilder {
     return env;
   }
 
-  // AGP strips the copy it packages into the APK, and Crashlytics reads the
-  // unstripped one from the merged native libs, so Android keeps its symbols.
+  // Android keeps local crash-debugging symbols; AGP strips the packaged copy.
   String _ldflags(Target target) => target.isLib
       ? config.goLdflags
             .split(' ')

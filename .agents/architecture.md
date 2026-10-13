@@ -801,7 +801,7 @@ Build configuration defaults live in `plugins/setup/setup_hooks/lib/src/options.
 
 Architecture detection is automatic. The `--description` flag passed to `flutter_distributor` adds arch suffixes to artifact names, such as `FlClash-0.8.93-macos-arm64.dmg`.
 
-#### Android Native Task Ordering
+### Android Native Task Ordering
 
 `:core` consumes `libclash.so` and its headers as files the setup build hook writes into `android/core/src/main`, not
 as an asset the hook hands back, so nothing in Gradle's model links the two. AGP's configure fingerprint tracks only
@@ -827,22 +827,18 @@ artifacts under `src/main` are whatever the last hook run left behind, which is 
 detect. Verify a change here with `./gradlew ":core:buildCMakeDebug[arm64-v8a]" :app:compileFlutterBuildDebug
 --dry-run`: the Flutter task must be listed first even though the CMake task was requested first.
 
-#### Android Crash Symbols
+### Android Crash Symbols
 
-Crashlytics NDK symbolicates a native crash only from libraries that still carry their symbols, and AGP strips every
-`.so` it packages, so the Android build keeps symbols until `:app`'s own strip step and the APK does not grow:
+Local native crash debugging needs the matching unstripped libraries. The Android build keeps symbols until
+`:app`'s own strip step, while the APK uses the normal stripped copies:
 
 - The hook drops `-s` and `-w` from `go_ldflags` for the `c-shared` Android targets only; the desktop Cores stay
   stripped because nothing consumes their symbols.
 - `:core` compiles with `-g`, does not `--strip-all`, and sets `packaging.jniLibs.keepDebugSymbols` so its own strip
-  task leaves `libclash.so` and `libcore.so` intact on the way into `:app`'s merged native libs, which is where the
-  Crashlytics plugin reads them.
-- `:app` turns on `nativeSymbolUploadEnabled` and finalizes `assembleRelease` and `bundleRelease` with
-  `uploadCrashlyticsSymbolFileRelease` only when release signing is configured, the same condition that marks a real
-  release build; the checked-in `google-services.json` is a placeholder, so a local upload is noise at best, and CI
-  supplies both files together. The Crashlytics plugin wires the R8 mapping upload itself but leaves the native symbol
-  upload to the caller, so nothing else triggers it. `generateCrashlyticsSymbolFileRelease` runs `dump_syms` over the
-  Go Core for every ABI, which is the other reason it stays off for unsigned builds.
+  task leaves `libclash.so` and `libcore.so` intact on the way into `:app`'s merged native libs.
+- `:app` keeps release minification and its local R8 mapping. Native libraries and mappings needed as bug evidence
+  stay in local ignored storage and must be bound to the APK's version, ABI, Build ID and file digest.
+  The build has no Firebase symbol or mapping upload plugin; signing remains independent of diagnostics.
 
 ## Local Plugins
 
