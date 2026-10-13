@@ -2,7 +2,7 @@
 
 This checkout is a personal fork of FlClash. Keep security work easy to review and straightforward to carry forward when the official repository changes. Read this guide before creating a change branch or syncing upstream.
 
-The [Android security plan](docs/features/security/flclash_security_plan.md) is the entry point for iteration status and goals.
+The [Android security plan](docs/features/security/flclash_security_plan.md) is the entry point for iteration status and dependencies. The [security requirements](docs/features/security/security_requirements.md) define shared goals and decision criteria; preserve these requirements when syncing or resolving conflicts.
 
 ## Remote roles
 
@@ -41,7 +41,7 @@ This workflow keeps the security delta visible during every sync and gives revie
 
 ## 中文说明：个人 fork 与官方同步
 
-本仓库是 FlClash 的个人 fork。开始改动或同步官方更新前，请按本节操作；这样安全修复可以持续跟进官方新代码，也便于审查和解决冲突。[Android 安全总计划](docs/features/security/flclash_security_plan.md)管理阶段入口与状态。
+本仓库是 FlClash 的个人 fork。开始改动或同步官方更新前，请按本节操作；这样安全修复可以持续跟进官方新代码，也便于审查和解决冲突。[Android 安全总计划](docs/features/security/flclash_security_plan.md)管理阶段入口、状态与依赖，**[共同安全目标](docs/features/security/security_requirements.md)是同步和解决冲突时必须保留的需求依据**。
 
 - `origin` 是个人仓库 `IdVincentYang/FlClash`；`upstream` 是官方仓库 `chen08209/FlClash`。
 - 两个 remote 都使用本机 SSH 配置中的 `github-vincent` 别名；当前地址分别为 `git@github-vincent:IdVincentYang/FlClash.git` 和 `git@github-vincent:chen08209/FlClash.git`。

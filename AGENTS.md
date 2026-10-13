@@ -23,6 +23,7 @@ Read these only when the task touches their area:
 - [.agents/skills.md](.agents/skills.md): index of repo-scoped skills in `.agents/skills/`.
 - [CONTRIBUTING.md](CONTRIBUTING.md): personal-fork workflow and required upstream sync/conflict process.
 - [docs/features/security/flclash_security_plan.md](docs/features/security/flclash_security_plan.md): Android security loop plan index.
+- [docs/features/security/security_requirements.md](docs/features/security/security_requirements.md): shared security goals and decision criteria; read before security work.
 
 ## Fork and Upstream Sync
 
