@@ -505,16 +505,6 @@ class AppLocalizations {
     );
   }
 
-  /// `Auto check for updates`
-  String get autoCheckUpdate {
-    return Intl.message(
-      'Auto check for updates',
-      name: 'autoCheckUpdate',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Verify TLS certificates`
   String get checkCertificate {
     return Intl.message(
@@ -4123,16 +4113,6 @@ class AppLocalizations {
   /// `Just now`
   String get justNow {
     return Intl.message('Just now', name: 'justNow', desc: '', args: []);
-  }
-
-  /// `Don't remind me again`
-  String get noLongerRemind {
-    return Intl.message(
-      'Don\'t remind me again',
-      name: 'noLongerRemind',
-      desc: '',
-      args: [],
-    );
   }
 
   /// `Access control settings`

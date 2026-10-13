@@ -34,7 +34,7 @@ class AboutView extends ConsumerWidget {
       title: context.appLocalizations.checkUpdate,
       tag: LoadingTag.checkUpdate,
     );
-    unawaited(commonAction.checkUpdateResultHandle(data: data, isUser: true));
+    unawaited(commonAction.checkUpdateResultHandle(data: data));
   }
 
   Widget _buildLinkItem({

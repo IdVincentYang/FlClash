@@ -125,35 +125,17 @@ void main() {
     await shown;
   });
 
-  testWidgets('stops reminding when an automatic check is dismissed', (
-    tester,
-  ) async {
+  testWidgets('a manual check reports a failure', (tester) async {
     final container = await pumpApp(tester);
 
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bodyWith(_payload)));
-    await tester.pumpAndSettle();
-    await tapCancel(tester);
-    await shown;
-
-    expect(container.read(appSettingProvider).autoCheckUpdate, isFalse);
-  });
-
-  testWidgets('a manual check keeps the setting and reports a failure', (
-    tester,
-  ) async {
-    final container = await pumpApp(tester);
-
-    final shown = container
-        .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(isUser: true);
+        .checkUpdateResultHandle();
     await tester.pumpAndSettle();
 
     expect(find.text('Check for updates'), findsOneWidget);
 
     await tapCancel(tester);
     await shown;
-    expect(container.read(appSettingProvider).autoCheckUpdate, isTrue);
   });
 }

@@ -73,13 +73,6 @@ class CommonAction extends _$CommonAction {
     }
   }
 
-  Future<bool> autoCheckUpdate() async {
-    if (!ref.read(appSettingProvider).autoCheckUpdate) return false;
-    final res = await request.checkForUpdate();
-    await checkUpdateResultHandle(data: res);
-    return res != null;
-  }
-
   TextSpan _releaseSpan(BuildContext context, String tagName, String? body) {
     final textTheme = context.textTheme;
     final version = parseReleaseChangelog(body);
@@ -118,10 +111,7 @@ class CommonAction extends _$CommonAction {
     ];
   }
 
-  Future<void> checkUpdateResultHandle({
-    Map<String, dynamic>? data,
-    bool isUser = false,
-  }) async {
+  Future<void> checkUpdateResultHandle({Map<String, dynamic>? data}) async {
     if (data != null) {
       final context = globalState.navigatorKey.currentContext!;
       final res = await dialogs.showMessage(
@@ -132,7 +122,6 @@ class CommonAction extends _$CommonAction {
           data['body'] as String?,
         ),
         confirmText: currentAppLocalizations.goDownload,
-        cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
       );
       if (res == true) {
         unawaited(
@@ -140,12 +129,8 @@ class CommonAction extends _$CommonAction {
             Uri.parse('https://github.com/$repository/releases/latest'),
           ),
         );
-      } else if (!isUser && res == false) {
-        ref
-            .read(appSettingProvider.notifier)
-            .update((state) => state.copyWith(autoCheckUpdate: false));
       }
-    } else if (isUser) {
+    } else {
       unawaited(
         dialogs.showMessage(
           title: currentAppLocalizations.checkUpdate,
