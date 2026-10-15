@@ -1,10 +1,10 @@
 # L1-T03 本地实现与验证结果
 
-第三轮四点已获 M 复审关闭；第四轮已修订 R6-b-parent：失效 Geo 父范围不能登记绑定新 native 状态的子请求。窄回归与新 ARM64 绑定已获 M 实现复审通过，当前提交前整理/本地集成中；历史版本和结论分轮保留。尚未完成本地提交或合入 `security/android`。首轮版本与结论单独保留为历史事实。范围与失败语义以[设计](l1_t03_plan.md)为准，任务状态见[任务清单](loop1_tasks.md#l1-t03-修改请求出口与生命周期处理)。
+第三轮四点已获 M 复审关闭；第四轮已修订 R6-b-parent：失效 Geo 父范围不能登记绑定新 native 状态的子请求。窄回归与新 ARM64 绑定已获 M 实现复审通过，已完成本地提交、快进合入 `security/android` 及临时分支清理，待 M 核对并执行父分支远端交付；历史版本和结论分轮保留。首轮版本与结论单独保留为历史事实。范围与失败语义以[设计](l1_t03_plan.md)为准，任务状态见[任务清单](loop1_tasks.md#l1-t03-修改请求出口与生命周期处理)。
 
 ## 当前修订状态与接续
 
-D-02 在 `security/l1-t03-requests`、父基线 `75ef510` 上继续首轮反馈；设计与本地合成网络、生成、分析、构建授权持续有效。M 负责获评通过且本地合入后的父仓库普通推送；最终集成须保留 `security/android` 的 `0ce19bf` 及其父 `0551f20`。未安装或启动应用，不改宿主网络，不使用真实订阅或外部测试目标，核心仓库无远端写授权。
+D-02 已在 `security/android` 完成本地交付；原实施分支 `security/l1-t03-requests`、父基线 `75ef510`，设计与实现已获评通过，临时分支已清理。M 负责获评通过且本地合入后的父仓库普通推送；最终集成须保留 `security/android` 的 `0ce19bf` 及其父 `0551f20`。未安装或启动应用，不改宿主网络，不使用真实订阅或外部测试目标，核心仓库无远端写授权。
 
 | 项目 | 当前处理与结论 | 验证入口 |
 | --- | --- | --- |
@@ -16,18 +16,28 @@ D-02 在 `security/l1-t03-requests`、父基线 `75ef510` 上继续首轮反馈�
 
 R1–R5、R7、R8、Q1、R6-c、R9 来源/局部字段和 R10 已获审部分沿用；本轮组合回归保留了这些受影响入口。没有宣称设备或全部矩阵通过。
 
-R6-b-parent 已获 M 实现复审关闭，其余已闭合项沿用；当前按收尾规范整理、提交与本地集成。无需要用户决定的阻塞，设备限制保持不变。
+R6-b-parent 已获 M 实现复审关闭，其余已闭合项沿用；本地整理、提交、集成及清理已完成，M 接续核对和父分支推送。无需要用户决定的阻塞，设备限制保持不变。
 
 本次压缩后误答历史问题并结束，未达到完整交评或真实阻塞出口。已在项目 `AGENTS.md` 及 `.agents/rules.md` 加入恢复时核对任务/交接/实际 checkout、回答插话后续做及结束前检查；未改通用 skill。预防效果须待自然恢复观察，当前尚未验证，不保证模型永不偏离。
 
 ## 收尾与本地集成
 
-第四轮冻结父 tree `bf011e434af20d70166cbf9e05cb5f76b144710d`、源码 patch SHA-256 `bcef2e8b0c6a295618b4bd074930c4e2a9a918c829843ad367ec0fcc415ee731` 已获 M 实现复审通过。收尾不改变获审生产代码或生成结果；补充贡献指南的任务专用父推送约定，清理本记录多余空行，并在既有 .gitattributes 对该精确 source.patch 路径关闭源码空白检查（原始 diff 的 context 前缀不是代码缩进，载体字节保持不变）。最终提交、集成结果和源码/制品等价关系在本节接续记录，历史各轮结果保持原对象。
+第四轮冻结父 tree `bf011e434af20d70166cbf9e05cb5f76b144710d`、源码 patch SHA-256 `bcef2e8b0c6a295618b4bd074930c4e2a9a918c829843ad367ec0fcc415ee731` 已获 M 实现复审通过。收尾不改变获审生产代码或生成结果；补充贡献指南的任务专用父推送约定，清理本记录多余空行，并在既有 .gitattributes 对该精确 source.patch 路径关闭源码空白检查（原始 diff 的 context 前缀不是代码缩进，载体字节保持不变）。源码提交 `5fd4adab4d52926c7c034915d46b797268e5472d` 已在保留 `0ce19bf`/`0551f20` 的前提下快进合入本地 `security/android`；最终文档记录与提交对应见本地[交付绑定](../../../../build/verification/l1-t03/final/delivery_binding.json)。构建输入与获审 revision4 完全相同，直接复用该轮 APK/符号；历史各轮结果保持原对象。
 
 - 结构核对：围绕 Dart Request/Session 与数据提交、Go registry/lease/dialer、Android 网络事实与 ServiceState/socket gate 的职责及调用关系，未发现本任务引入、需要阻止提交的结构问题；没有借收尾增加生产 refactor。
 - 格式：Dart 700 文件零改动，注释密度和差异空白检查通过。Markdown 初检有 564 项 MD013 行宽提示及 3 项多空行；多空行已修，保留既有长表格/中文段落行宽，在本地配置排除 MD013 后 7 份手写文档其它规则零问题。不声称默认全规则通过。
-- 集成准备：目标 `0ce19bf` 仅新增 `0551f20` 的持续父仓库推送政策及两份 skill 同步文件；贡献指南三方合并保留默认 `--recurse-submodules=check`，并记录本任务完整 carrier/公开基线恢复核验后的 `--recurse-submodules=no` 普通父推送例外。仅 M 推送，核心远端写权限未扩大；两份 skill 与 Meteor 源字节一致。
+- 集成：目标 `0ce19bf` 仅新增 `0551f20` 的持续父仓库推送政策及两份 skill 同步文件；贡献指南三方合并保留默认 `--recurse-submodules=check`，并记录本任务完整 carrier/公开基线恢复核验后的 `--recurse-submodules=no` 普通父推送例外。仅 M 推送，核心远端写权限未扩大；两份 skill 与 Meteor 源字节一致。
 - 证据保留：正式 carrier/恢复脚本与最小合成 TLS 回归夹具随源码纳入；各轮原始证据、APK、未剥离符号、mapping 和收尾材料继续保存在本地忽略目录 `build/verification/l1-t03/`，不入库。
+- 清理：父仓库及核心仓库的 `security/l1-t03-requests` 临时分支均已删除；核心停在已审候选的 detached HEAD，父 gitlink 与之相同。只有共享主 checkout，没有本任务独立 worktree 可删除；共享目录、缓存、独立 D-02 聊天及必要本地证据保留。
+- 后续：仅 M 核对最终交付并按贡献指南推送父分支；D 未执行远端写，不能将本地完成表述为远端已更新。
+
+### 实际入口与体验边界
+
+| 入口 | 已实现的行为与验证入口 |
+| --- | --- |
+| 订阅/脚本新增与编辑 | [编辑页](../../../../lib/views/profiles/edit.dart)、[脚本入口](../../../../lib/views/config/scripts.dart)使用[出口字段](../../../../lib/widgets/request_route.dart)保存 Auto/Direct/Proxy；延迟刷新仍绑定确认时来源与原生版本，过期不发请求；首次无可用代理的导入按已审提示取得一次 Direct 资格。见第四轮 Dart 请求范围和历史 UI/SQLite 组合结果 |
+| WebDAV 设置与备份/恢复 | [DAV 设置页](../../../../lib/views/backup_and_restore.dart)保存相同出口选择；隐藏/恢复只重开 ping，同来源并发备份上传/恢复下载保留原范围。见第四轮 request_scope 内的真实 loopback DAV 用例 |
+| 可安装产物与原生限制 | [第四轮 dev ARM64 APK](../../../../build/verification/l1-t03/revision4/artifacts/FlClash-0.8.99-android-arm64-v8a.apk)可由用户在自己的设备上安装体验，包名 `com.follow.clash.dev`；D 未安装/启动。这里只证明受控夹具与编译/包绑定，真实设备/JNI、系统网络回调和外部出口仍未验证 |
 
 ## 第四轮验证与产物（revision4）
 
