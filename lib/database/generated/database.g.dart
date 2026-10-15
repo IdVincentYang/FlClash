@@ -142,6 +142,29 @@ class $ProfilesTable extends Profiles
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       ).withConverter<Set<String>>($ProfilesTable.$converterunfoldSet);
+  static const VerificationMeta _requestModeMeta = const VerificationMeta(
+    'requestMode',
+  );
+  @override
+  late final GeneratedColumn<String> requestMode = GeneratedColumn<String>(
+    'request_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('auto'),
+  );
+  static const VerificationMeta _requestProxyMeta = const VerificationMeta(
+    'requestProxy',
+  );
+  @override
+  late final GeneratedColumn<String> requestProxy = GeneratedColumn<String>(
+    'request_proxy',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _orderMeta = const VerificationMeta('order');
   @override
   late final GeneratedColumn<int> order = GeneratedColumn<int>(
@@ -166,6 +189,8 @@ class $ProfilesTable extends Profiles
     autoUpdate,
     selectedMap,
     unfoldSet,
+    requestMode,
+    requestProxy,
     order,
   ];
   @override
@@ -251,6 +276,24 @@ class $ProfilesTable extends Profiles
     } else if (isInserting) {
       context.missing(_autoUpdateMeta);
     }
+    if (data.containsKey('request_mode')) {
+      context.handle(
+        _requestModeMeta,
+        requestMode.isAcceptableOrUnknown(
+          data['request_mode']!,
+          _requestModeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('request_proxy')) {
+      context.handle(
+        _requestProxyMeta,
+        requestProxy.isAcceptableOrUnknown(
+          data['request_proxy']!,
+          _requestProxyMeta,
+        ),
+      );
+    }
     if (data.containsKey('order')) {
       context.handle(
         _orderMeta,
@@ -326,6 +369,14 @@ class $ProfilesTable extends Profiles
           data['${effectivePrefix}unfold_set'],
         )!,
       ),
+      requestMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}request_mode'],
+      )!,
+      requestProxy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}request_proxy'],
+      ),
       order: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}order'],
@@ -364,6 +415,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
   final bool autoUpdate;
   final Map<String, String> selectedMap;
   final Set<String> unfoldSet;
+  final String requestMode;
+  final String? requestProxy;
   final int? order;
   const RawProfile({
     required this.id,
@@ -379,6 +432,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     required this.autoUpdate,
     required this.selectedMap,
     required this.unfoldSet,
+    required this.requestMode,
+    this.requestProxy,
     this.order,
   });
   @override
@@ -423,6 +478,10 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
         $ProfilesTable.$converterunfoldSet.toSql(unfoldSet),
       );
     }
+    map['request_mode'] = Variable<String>(requestMode);
+    if (!nullToAbsent || requestProxy != null) {
+      map['request_proxy'] = Variable<String>(requestProxy);
+    }
     if (!nullToAbsent || order != null) {
       map['order'] = Variable<int>(order);
     }
@@ -454,6 +513,10 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
       autoUpdate: Value(autoUpdate),
       selectedMap: Value(selectedMap),
       unfoldSet: Value(unfoldSet),
+      requestMode: Value(requestMode),
+      requestProxy: requestProxy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(requestProxy),
       order: order == null && nullToAbsent
           ? const Value.absent()
           : Value(order),
@@ -487,6 +550,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
         json['selectedMap'],
       ),
       unfoldSet: serializer.fromJson<Set<String>>(json['unfoldSet']),
+      requestMode: serializer.fromJson<String>(json['requestMode']),
+      requestProxy: serializer.fromJson<String?>(json['requestProxy']),
       order: serializer.fromJson<int?>(json['order']),
     );
   }
@@ -513,6 +578,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
       'autoUpdate': serializer.toJson<bool>(autoUpdate),
       'selectedMap': serializer.toJson<Map<String, String>>(selectedMap),
       'unfoldSet': serializer.toJson<Set<String>>(unfoldSet),
+      'requestMode': serializer.toJson<String>(requestMode),
+      'requestProxy': serializer.toJson<String?>(requestProxy),
       'order': serializer.toJson<int?>(order),
     };
   }
@@ -531,6 +598,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     bool? autoUpdate,
     Map<String, String>? selectedMap,
     Set<String>? unfoldSet,
+    String? requestMode,
+    Value<String?> requestProxy = const Value.absent(),
     Value<int?> order = const Value.absent(),
   }) => RawProfile(
     id: id ?? this.id,
@@ -553,6 +622,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     autoUpdate: autoUpdate ?? this.autoUpdate,
     selectedMap: selectedMap ?? this.selectedMap,
     unfoldSet: unfoldSet ?? this.unfoldSet,
+    requestMode: requestMode ?? this.requestMode,
+    requestProxy: requestProxy.present ? requestProxy.value : this.requestProxy,
     order: order.present ? order.value : this.order,
   );
   RawProfile copyWithCompanion(ProfilesCompanion data) {
@@ -586,6 +657,12 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
           ? data.selectedMap.value
           : this.selectedMap,
       unfoldSet: data.unfoldSet.present ? data.unfoldSet.value : this.unfoldSet,
+      requestMode: data.requestMode.present
+          ? data.requestMode.value
+          : this.requestMode,
+      requestProxy: data.requestProxy.present
+          ? data.requestProxy.value
+          : this.requestProxy,
       order: data.order.present ? data.order.value : this.order,
     );
   }
@@ -606,6 +683,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
           ..write('autoUpdate: $autoUpdate, ')
           ..write('selectedMap: $selectedMap, ')
           ..write('unfoldSet: $unfoldSet, ')
+          ..write('requestMode: $requestMode, ')
+          ..write('requestProxy: $requestProxy, ')
           ..write('order: $order')
           ..write(')'))
         .toString();
@@ -626,6 +705,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     autoUpdate,
     selectedMap,
     unfoldSet,
+    requestMode,
+    requestProxy,
     order,
   );
   @override
@@ -645,6 +726,8 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
           other.autoUpdate == this.autoUpdate &&
           other.selectedMap == this.selectedMap &&
           other.unfoldSet == this.unfoldSet &&
+          other.requestMode == this.requestMode &&
+          other.requestProxy == this.requestProxy &&
           other.order == this.order);
 }
 
@@ -662,6 +745,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
   final Value<bool> autoUpdate;
   final Value<Map<String, String>> selectedMap;
   final Value<Set<String>> unfoldSet;
+  final Value<String> requestMode;
+  final Value<String?> requestProxy;
   final Value<int?> order;
   const ProfilesCompanion({
     this.id = const Value.absent(),
@@ -677,6 +762,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     this.autoUpdate = const Value.absent(),
     this.selectedMap = const Value.absent(),
     this.unfoldSet = const Value.absent(),
+    this.requestMode = const Value.absent(),
+    this.requestProxy = const Value.absent(),
     this.order = const Value.absent(),
   });
   ProfilesCompanion.insert({
@@ -693,6 +780,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     required bool autoUpdate,
     required Map<String, String> selectedMap,
     required Set<String> unfoldSet,
+    this.requestMode = const Value.absent(),
+    this.requestProxy = const Value.absent(),
     this.order = const Value.absent(),
   }) : label = Value(label),
        url = Value(url),
@@ -715,6 +804,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     Expression<bool>? autoUpdate,
     Expression<String>? selectedMap,
     Expression<String>? unfoldSet,
+    Expression<String>? requestMode,
+    Expression<String>? requestProxy,
     Expression<int>? order,
   }) {
     return RawValuesInsertable({
@@ -732,6 +823,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
       if (autoUpdate != null) 'auto_update': autoUpdate,
       if (selectedMap != null) 'selected_map': selectedMap,
       if (unfoldSet != null) 'unfold_set': unfoldSet,
+      if (requestMode != null) 'request_mode': requestMode,
+      if (requestProxy != null) 'request_proxy': requestProxy,
       if (order != null) 'order': order,
     });
   }
@@ -750,6 +843,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     Value<bool>? autoUpdate,
     Value<Map<String, String>>? selectedMap,
     Value<Set<String>>? unfoldSet,
+    Value<String>? requestMode,
+    Value<String?>? requestProxy,
     Value<int?>? order,
   }) {
     return ProfilesCompanion(
@@ -767,6 +862,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
       autoUpdate: autoUpdate ?? this.autoUpdate,
       selectedMap: selectedMap ?? this.selectedMap,
       unfoldSet: unfoldSet ?? this.unfoldSet,
+      requestMode: requestMode ?? this.requestMode,
+      requestProxy: requestProxy ?? this.requestProxy,
       order: order ?? this.order,
     );
   }
@@ -823,6 +920,12 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
         $ProfilesTable.$converterunfoldSet.toSql(unfoldSet.value),
       );
     }
+    if (requestMode.present) {
+      map['request_mode'] = Variable<String>(requestMode.value);
+    }
+    if (requestProxy.present) {
+      map['request_proxy'] = Variable<String>(requestProxy.value);
+    }
     if (order.present) {
       map['order'] = Variable<int>(order.value);
     }
@@ -845,6 +948,8 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
           ..write('autoUpdate: $autoUpdate, ')
           ..write('selectedMap: $selectedMap, ')
           ..write('unfoldSet: $unfoldSet, ')
+          ..write('requestMode: $requestMode, ')
+          ..write('requestProxy: $requestProxy, ')
           ..write('order: $order')
           ..write(')'))
         .toString();
@@ -895,6 +1000,29 @@ class $ScriptsTable extends Scripts with TableInfo<$ScriptsTable, RawScript> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _requestModeMeta = const VerificationMeta(
+    'requestMode',
+  );
+  @override
+  late final GeneratedColumn<String> requestMode = GeneratedColumn<String>(
+    'request_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('auto'),
+  );
+  static const VerificationMeta _requestProxyMeta = const VerificationMeta(
+    'requestProxy',
+  );
+  @override
+  late final GeneratedColumn<String> requestProxy = GeneratedColumn<String>(
+    'request_proxy',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _orderMeta = const VerificationMeta('order');
   @override
   late final GeneratedColumn<int> order = GeneratedColumn<int>(
@@ -905,7 +1033,15 @@ class $ScriptsTable extends Scripts with TableInfo<$ScriptsTable, RawScript> {
     requiredDuringInsert: false,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, label, lastUpdateTime, url, order];
+  List<GeneratedColumn> get $columns => [
+    id,
+    label,
+    lastUpdateTime,
+    url,
+    requestMode,
+    requestProxy,
+    order,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -946,6 +1082,24 @@ class $ScriptsTable extends Scripts with TableInfo<$ScriptsTable, RawScript> {
         url.isAcceptableOrUnknown(data['url']!, _urlMeta),
       );
     }
+    if (data.containsKey('request_mode')) {
+      context.handle(
+        _requestModeMeta,
+        requestMode.isAcceptableOrUnknown(
+          data['request_mode']!,
+          _requestModeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('request_proxy')) {
+      context.handle(
+        _requestProxyMeta,
+        requestProxy.isAcceptableOrUnknown(
+          data['request_proxy']!,
+          _requestProxyMeta,
+        ),
+      );
+    }
     if (data.containsKey('order')) {
       context.handle(
         _orderMeta,
@@ -977,6 +1131,14 @@ class $ScriptsTable extends Scripts with TableInfo<$ScriptsTable, RawScript> {
         DriftSqlType.string,
         data['${effectivePrefix}url'],
       ),
+      requestMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}request_mode'],
+      )!,
+      requestProxy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}request_proxy'],
+      ),
       order: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}order'],
@@ -995,12 +1157,16 @@ class RawScript extends DataClass implements Insertable<RawScript> {
   final String label;
   final DateTime lastUpdateTime;
   final String? url;
+  final String requestMode;
+  final String? requestProxy;
   final int? order;
   const RawScript({
     required this.id,
     required this.label,
     required this.lastUpdateTime,
     this.url,
+    required this.requestMode,
+    this.requestProxy,
     this.order,
   });
   @override
@@ -1011,6 +1177,10 @@ class RawScript extends DataClass implements Insertable<RawScript> {
     map['last_update_time'] = Variable<DateTime>(lastUpdateTime);
     if (!nullToAbsent || url != null) {
       map['url'] = Variable<String>(url);
+    }
+    map['request_mode'] = Variable<String>(requestMode);
+    if (!nullToAbsent || requestProxy != null) {
+      map['request_proxy'] = Variable<String>(requestProxy);
     }
     if (!nullToAbsent || order != null) {
       map['order'] = Variable<int>(order);
@@ -1024,6 +1194,10 @@ class RawScript extends DataClass implements Insertable<RawScript> {
       label: Value(label),
       lastUpdateTime: Value(lastUpdateTime),
       url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      requestMode: Value(requestMode),
+      requestProxy: requestProxy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(requestProxy),
       order: order == null && nullToAbsent
           ? const Value.absent()
           : Value(order),
@@ -1040,6 +1214,8 @@ class RawScript extends DataClass implements Insertable<RawScript> {
       label: serializer.fromJson<String>(json['label']),
       lastUpdateTime: serializer.fromJson<DateTime>(json['lastUpdateTime']),
       url: serializer.fromJson<String?>(json['url']),
+      requestMode: serializer.fromJson<String>(json['requestMode']),
+      requestProxy: serializer.fromJson<String?>(json['requestProxy']),
       order: serializer.fromJson<int?>(json['order']),
     );
   }
@@ -1051,6 +1227,8 @@ class RawScript extends DataClass implements Insertable<RawScript> {
       'label': serializer.toJson<String>(label),
       'lastUpdateTime': serializer.toJson<DateTime>(lastUpdateTime),
       'url': serializer.toJson<String?>(url),
+      'requestMode': serializer.toJson<String>(requestMode),
+      'requestProxy': serializer.toJson<String?>(requestProxy),
       'order': serializer.toJson<int?>(order),
     };
   }
@@ -1060,12 +1238,16 @@ class RawScript extends DataClass implements Insertable<RawScript> {
     String? label,
     DateTime? lastUpdateTime,
     Value<String?> url = const Value.absent(),
+    String? requestMode,
+    Value<String?> requestProxy = const Value.absent(),
     Value<int?> order = const Value.absent(),
   }) => RawScript(
     id: id ?? this.id,
     label: label ?? this.label,
     lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
     url: url.present ? url.value : this.url,
+    requestMode: requestMode ?? this.requestMode,
+    requestProxy: requestProxy.present ? requestProxy.value : this.requestProxy,
     order: order.present ? order.value : this.order,
   );
   RawScript copyWithCompanion(ScriptsCompanion data) {
@@ -1076,6 +1258,12 @@ class RawScript extends DataClass implements Insertable<RawScript> {
           ? data.lastUpdateTime.value
           : this.lastUpdateTime,
       url: data.url.present ? data.url.value : this.url,
+      requestMode: data.requestMode.present
+          ? data.requestMode.value
+          : this.requestMode,
+      requestProxy: data.requestProxy.present
+          ? data.requestProxy.value
+          : this.requestProxy,
       order: data.order.present ? data.order.value : this.order,
     );
   }
@@ -1087,13 +1275,23 @@ class RawScript extends DataClass implements Insertable<RawScript> {
           ..write('label: $label, ')
           ..write('lastUpdateTime: $lastUpdateTime, ')
           ..write('url: $url, ')
+          ..write('requestMode: $requestMode, ')
+          ..write('requestProxy: $requestProxy, ')
           ..write('order: $order')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, label, lastUpdateTime, url, order);
+  int get hashCode => Object.hash(
+    id,
+    label,
+    lastUpdateTime,
+    url,
+    requestMode,
+    requestProxy,
+    order,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1102,6 +1300,8 @@ class RawScript extends DataClass implements Insertable<RawScript> {
           other.label == this.label &&
           other.lastUpdateTime == this.lastUpdateTime &&
           other.url == this.url &&
+          other.requestMode == this.requestMode &&
+          other.requestProxy == this.requestProxy &&
           other.order == this.order);
 }
 
@@ -1110,12 +1310,16 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
   final Value<String> label;
   final Value<DateTime> lastUpdateTime;
   final Value<String?> url;
+  final Value<String> requestMode;
+  final Value<String?> requestProxy;
   final Value<int?> order;
   const ScriptsCompanion({
     this.id = const Value.absent(),
     this.label = const Value.absent(),
     this.lastUpdateTime = const Value.absent(),
     this.url = const Value.absent(),
+    this.requestMode = const Value.absent(),
+    this.requestProxy = const Value.absent(),
     this.order = const Value.absent(),
   });
   ScriptsCompanion.insert({
@@ -1123,6 +1327,8 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
     required String label,
     required DateTime lastUpdateTime,
     this.url = const Value.absent(),
+    this.requestMode = const Value.absent(),
+    this.requestProxy = const Value.absent(),
     this.order = const Value.absent(),
   }) : label = Value(label),
        lastUpdateTime = Value(lastUpdateTime);
@@ -1131,6 +1337,8 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
     Expression<String>? label,
     Expression<DateTime>? lastUpdateTime,
     Expression<String>? url,
+    Expression<String>? requestMode,
+    Expression<String>? requestProxy,
     Expression<int>? order,
   }) {
     return RawValuesInsertable({
@@ -1138,6 +1346,8 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
       if (label != null) 'label': label,
       if (lastUpdateTime != null) 'last_update_time': lastUpdateTime,
       if (url != null) 'url': url,
+      if (requestMode != null) 'request_mode': requestMode,
+      if (requestProxy != null) 'request_proxy': requestProxy,
       if (order != null) 'order': order,
     });
   }
@@ -1147,6 +1357,8 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
     Value<String>? label,
     Value<DateTime>? lastUpdateTime,
     Value<String?>? url,
+    Value<String>? requestMode,
+    Value<String?>? requestProxy,
     Value<int?>? order,
   }) {
     return ScriptsCompanion(
@@ -1154,6 +1366,8 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
       label: label ?? this.label,
       lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
       url: url ?? this.url,
+      requestMode: requestMode ?? this.requestMode,
+      requestProxy: requestProxy ?? this.requestProxy,
       order: order ?? this.order,
     );
   }
@@ -1173,6 +1387,12 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
     if (url.present) {
       map['url'] = Variable<String>(url.value);
     }
+    if (requestMode.present) {
+      map['request_mode'] = Variable<String>(requestMode.value);
+    }
+    if (requestProxy.present) {
+      map['request_proxy'] = Variable<String>(requestProxy.value);
+    }
     if (order.present) {
       map['order'] = Variable<int>(order.value);
     }
@@ -1186,6 +1406,8 @@ class ScriptsCompanion extends UpdateCompanion<RawScript> {
           ..write('label: $label, ')
           ..write('lastUpdateTime: $lastUpdateTime, ')
           ..write('url: $url, ')
+          ..write('requestMode: $requestMode, ')
+          ..write('requestProxy: $requestProxy, ')
           ..write('order: $order')
           ..write(')'))
         .toString();
@@ -4515,6 +4737,8 @@ typedef $$ProfilesTableCreateCompanionBuilder =
       required bool autoUpdate,
       required Map<String, String> selectedMap,
       required Set<String> unfoldSet,
+      Value<String> requestMode,
+      Value<String?> requestProxy,
       Value<int?> order,
     });
 typedef $$ProfilesTableUpdateCompanionBuilder =
@@ -4532,6 +4756,8 @@ typedef $$ProfilesTableUpdateCompanionBuilder =
       Value<bool> autoUpdate,
       Value<Map<String, String>> selectedMap,
       Value<Set<String>> unfoldSet,
+      Value<String> requestMode,
+      Value<String?> requestProxy,
       Value<int?> order,
     });
 
@@ -4676,6 +4902,16 @@ class $$ProfilesTableFilterComposer
   get unfoldSet => $composableBuilder(
     column: $table.unfoldSet,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get requestMode => $composableBuilder(
+    column: $table.requestMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get requestProxy => $composableBuilder(
+    column: $table.requestProxy,
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<int> get order => $composableBuilder(
@@ -4833,6 +5069,16 @@ class $$ProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get requestMode => $composableBuilder(
+    column: $table.requestMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get requestProxy => $composableBuilder(
+    column: $table.requestProxy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get order => $composableBuilder(
     column: $table.order,
     builder: (column) => ColumnOrderings(column),
@@ -4905,6 +5151,16 @@ class $$ProfilesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<Set<String>, String> get unfoldSet =>
       $composableBuilder(column: $table.unfoldSet, builder: (column) => column);
+
+  GeneratedColumn<String> get requestMode => $composableBuilder(
+    column: $table.requestMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get requestProxy => $composableBuilder(
+    column: $table.requestProxy,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get order =>
       $composableBuilder(column: $table.order, builder: (column) => column);
@@ -5031,6 +5287,8 @@ class $$ProfilesTableTableManager
                 Value<bool> autoUpdate = const Value.absent(),
                 Value<Map<String, String>> selectedMap = const Value.absent(),
                 Value<Set<String>> unfoldSet = const Value.absent(),
+                Value<String> requestMode = const Value.absent(),
+                Value<String?> requestProxy = const Value.absent(),
                 Value<int?> order = const Value.absent(),
               }) => ProfilesCompanion(
                 id: id,
@@ -5046,6 +5304,8 @@ class $$ProfilesTableTableManager
                 autoUpdate: autoUpdate,
                 selectedMap: selectedMap,
                 unfoldSet: unfoldSet,
+                requestMode: requestMode,
+                requestProxy: requestProxy,
                 order: order,
               ),
           createCompanionCallback:
@@ -5064,6 +5324,8 @@ class $$ProfilesTableTableManager
                 required bool autoUpdate,
                 required Map<String, String> selectedMap,
                 required Set<String> unfoldSet,
+                Value<String> requestMode = const Value.absent(),
+                Value<String?> requestProxy = const Value.absent(),
                 Value<int?> order = const Value.absent(),
               }) => ProfilesCompanion.insert(
                 id: id,
@@ -5079,6 +5341,8 @@ class $$ProfilesTableTableManager
                 autoUpdate: autoUpdate,
                 selectedMap: selectedMap,
                 unfoldSet: unfoldSet,
+                requestMode: requestMode,
+                requestProxy: requestProxy,
                 order: order,
               ),
           withReferenceMapper: (p0) => p0
@@ -5200,6 +5464,8 @@ typedef $$ScriptsTableCreateCompanionBuilder =
       required String label,
       required DateTime lastUpdateTime,
       Value<String?> url,
+      Value<String> requestMode,
+      Value<String?> requestProxy,
       Value<int?> order,
     });
 typedef $$ScriptsTableUpdateCompanionBuilder =
@@ -5208,6 +5474,8 @@ typedef $$ScriptsTableUpdateCompanionBuilder =
       Value<String> label,
       Value<DateTime> lastUpdateTime,
       Value<String?> url,
+      Value<String> requestMode,
+      Value<String?> requestProxy,
       Value<int?> order,
     });
 
@@ -5236,6 +5504,16 @@ class $$ScriptsTableFilterComposer extends Composer<_$Database, $ScriptsTable> {
 
   ColumnFilters<String> get url => $composableBuilder(
     column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get requestMode => $composableBuilder(
+    column: $table.requestMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get requestProxy => $composableBuilder(
+    column: $table.requestProxy,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5274,6 +5552,16 @@ class $$ScriptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get requestMode => $composableBuilder(
+    column: $table.requestMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get requestProxy => $composableBuilder(
+    column: $table.requestProxy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get order => $composableBuilder(
     column: $table.order,
     builder: (column) => ColumnOrderings(column),
@@ -5302,6 +5590,16 @@ class $$ScriptsTableAnnotationComposer
 
   GeneratedColumn<String> get url =>
       $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get requestMode => $composableBuilder(
+    column: $table.requestMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get requestProxy => $composableBuilder(
+    column: $table.requestProxy,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get order =>
       $composableBuilder(column: $table.order, builder: (column) => column);
@@ -5339,12 +5637,16 @@ class $$ScriptsTableTableManager
                 Value<String> label = const Value.absent(),
                 Value<DateTime> lastUpdateTime = const Value.absent(),
                 Value<String?> url = const Value.absent(),
+                Value<String> requestMode = const Value.absent(),
+                Value<String?> requestProxy = const Value.absent(),
                 Value<int?> order = const Value.absent(),
               }) => ScriptsCompanion(
                 id: id,
                 label: label,
                 lastUpdateTime: lastUpdateTime,
                 url: url,
+                requestMode: requestMode,
+                requestProxy: requestProxy,
                 order: order,
               ),
           createCompanionCallback:
@@ -5353,12 +5655,16 @@ class $$ScriptsTableTableManager
                 required String label,
                 required DateTime lastUpdateTime,
                 Value<String?> url = const Value.absent(),
+                Value<String> requestMode = const Value.absent(),
+                Value<String?> requestProxy = const Value.absent(),
                 Value<int?> order = const Value.absent(),
               }) => ScriptsCompanion.insert(
                 id: id,
                 label: label,
                 lastUpdateTime: lastUpdateTime,
                 url: url,
+                requestMode: requestMode,
+                requestProxy: requestProxy,
                 order: order,
               ),
           withReferenceMapper: (p0) => p0

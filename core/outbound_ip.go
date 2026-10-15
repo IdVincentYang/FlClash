@@ -21,6 +21,7 @@ const (
 )
 
 type OutboundIpParams struct {
+	ScopeID   string   `json:"scopeId"`
 	ProxyName string   `json:"proxy-name"`
 	Urls      []string `json:"urls"`
 	Timeout   int64    `json:"timeout"`
@@ -49,7 +50,11 @@ func handleOutboundIp(params *OutboundIpParams) *OutboundIpResult {
 	}
 
 	timeout := probeTimeout(params.Timeout)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	parent, _, requestErr := requestOperationContext(params.ScopeID, params.ProxyName)
+	if requestErr != nil {
+		return failure(probeErrorFailed)
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	answers := make(chan *OutboundIpResult, len(params.Urls))

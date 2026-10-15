@@ -19,12 +19,12 @@ class TilePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel.setMethodCallHandler(null)
     }
 
-    fun handleStart() {
-        channel.invokeMethodOnMainThread("start")
+    fun handleStart(requestId: Long? = null) {
+        channel.invokeMethodOnMainThread("start", requestId)
     }
 
-    fun handleStop() {
-        channel.invokeMethodOnMainThread("stop")
+    fun handleStop(requestId: Long? = null) {
+        channel.invokeMethodOnMainThread("stop", requestId)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

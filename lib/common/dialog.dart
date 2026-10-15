@@ -138,6 +138,9 @@ class Dialogs {
     String url = '',
     FormFieldValidator<String>? labelValidator,
     FormFieldValidator<String>? urlValidator,
+    RequestMode requestMode = RequestMode.auto,
+    String? requestProxy,
+    ValueChanged<(RequestMode, String?)>? onRequestRouteChanged,
   }) {
     return showCommonDialog<({String label, String url})>(
       child: NamedUrlDialog(
@@ -146,6 +149,9 @@ class Dialogs {
         url: url,
         labelValidator: labelValidator,
         urlValidator: urlValidator,
+        requestMode: requestMode,
+        requestProxy: requestProxy,
+        onRequestRouteChanged: onRequestRouteChanged,
       ),
     );
   }

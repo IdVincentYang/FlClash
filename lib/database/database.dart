@@ -46,7 +46,7 @@ class Database extends _$Database {
   Database([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -92,6 +92,12 @@ class Database extends _$Database {
         }
         if (from < 9) {
           await _purgeOrphans();
+        }
+        if (from < 11) {
+          await _addColumnIfMissing(m, profiles, profiles.requestMode);
+          await _addColumnIfMissing(m, profiles, profiles.requestProxy);
+          await _addColumnIfMissing(m, scripts, scripts.requestMode);
+          await _addColumnIfMissing(m, scripts, scripts.requestProxy);
         }
       },
       beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
@@ -188,6 +194,7 @@ class Database extends _$Database {
     List<ClashProvider> clashProviders = const [],
     List<CustomProxy> customProxies = const [],
     bool isOverride = false,
+    Future<void> Function()? beforeCommit,
   }) async {
     if (profiles.isEmpty &&
         scripts.isEmpty &&
@@ -196,6 +203,7 @@ class Database extends _$Database {
         proxyGroups.isEmpty &&
         clashProviders.isEmpty &&
         customProxies.isEmpty) {
+      await beforeCommit?.call();
       return;
     }
     await transaction(() async {
@@ -222,6 +230,7 @@ class Database extends _$Database {
         clashProvidersDao.putAllWithBatch(b, clashProviders);
       });
       await _purgeOrphans();
+      await beforeCommit?.call();
     });
   }
 

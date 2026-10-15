@@ -10,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'app.dart';
 import 'core.dart';
 import 'state.dart';
+import 'request_state.dart';
 
 part 'generated/route_state.g.dart';
 
@@ -171,7 +172,14 @@ class RouteTracker extends _$RouteTracker {
   @override
   RouteState build() {
     ref.onDispose(_cancelRetry);
-    ref.listen(isStartProvider, (_, _) => _syncProxied());
+    if (system.isAndroid) {
+      ref.listen(nativeRequestStateProvider, (_, _) {
+        _syncProxied();
+        bumpHostEpoch();
+      });
+    } else {
+      ref.listen(isStartProvider, (_, _) => _syncProxied());
+    }
     ref.listen(suspendProvider, (_, _) => _syncProxied());
     ref.listen(initProvider, (_, _) => _subscribe());
     ref.listen(appVisibleProvider, (_, visible) {
@@ -191,7 +199,15 @@ class RouteTracker extends _$RouteTracker {
     return RouteState(proxied: _proxied);
   }
 
-  bool get _proxied => ref.read(isStartProvider) && !ref.read(suspendProvider);
+  bool get _proxied {
+    if (!system.isAndroid) {
+      return ref.read(isStartProvider) && !ref.read(suspendProvider);
+    }
+    final native = ref.read(nativeRequestStateProvider);
+    return native['intentRunning'] == true &&
+        native['phase'] == 'started' &&
+        native['paused'] != true;
+  }
 
   bool get _ready =>
       _watchers > 0 &&

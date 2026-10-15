@@ -116,9 +116,8 @@ Stream<Uint8List> _loadRemoteIcon(String src) {
   return _cacheMange
       .getFileStreamV2(
         src,
-        onRemoteNewLoaded: () {
-          commonPrint.log('The icon has been recorded: $src');
-          database.iconRecordsDao.putIfAbsent(src);
+        onRemoteNewLoaded: () async {
+          await database.iconRecordsDao.putIfAbsent(src);
         },
       )
       .asyncMap((data) => data.file.readAsBytes())

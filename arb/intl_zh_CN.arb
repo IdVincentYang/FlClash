@@ -763,5 +763,16 @@
   "large": "大",
   "extraLarge": "超大",
   "switchProfile": "切换配置",
-  "lastUpdated": "上次更新"
+  "lastUpdated": "上次更新",
+  "requestDirectRecoveryTitle": "本次通过直连恢复？",
+  "requestDirectRecoveryMessage": "当前配置无法获取此对象。是否允许本次操作直连 {host}？许可在操作结束或来源变化后失效。",
+  "requestMode": "请求出口",
+  "requestModeAuto": "自动",
+  "requestModeProxy": "代理",
+  "requestModeDirect": "直连",
+  "requestProxyTarget": "代理目标",
+  "requestProxyDefault": "GLOBAL（当前选择：{target}）",
+  "requestModeHelp": "用于此对象自身的联网请求。代理需要有效代理节点；直连需要可用的非 VPN 网络。",
+  "requestRouteUnavailable": "所选请求出口当前不可用。",
+  "requestPartialCommit": "部分本地修改未能恢复。已保留恢复文件，并阻止自动更新。"
 }

@@ -10,7 +10,7 @@ class TestProfiles extends Profiles {
   List<Profile> build() => initial;
 
   @override
-  void put(Profile profile, {Iterable<int> renameIn = const []}) {
+  Future<void> put(Profile profile, {Iterable<int> renameIn = const []}) async {
     final next = List<Profile>.from(state);
     final index = next.indexWhere((item) => item.id == profile.id);
     if (index == -1) {
@@ -27,12 +27,15 @@ class TestProfiles extends Profiles {
   }
 
   @override
-  void reorder(List<Profile> profiles) {
+  Future<void> reorder(List<Profile> profiles) async {
     state = List.of(profiles);
   }
 
   @override
-  void updateProfile(int profileId, Profile Function(Profile profile) builder) {
+  Future<void> updateProfile(
+    int profileId,
+    Profile Function(Profile profile) builder,
+  ) async {
     final index = state.indexWhere((item) => item.id == profileId);
     if (index == -1) return;
     final next = List<Profile>.from(state);

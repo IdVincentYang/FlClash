@@ -10,6 +10,10 @@ abstract mixin class TileListener {
 
   void onStop() {}
 
+  void onPreparedStart(int requestId) => onStart();
+
+  void onPreparedStop(int requestId) => onStop();
+
   void onDetached() {}
 }
 
@@ -29,10 +33,20 @@ class Tile {
       try {
         switch (call.method) {
           case 'start':
-            listener.onStart();
+            final id = call.arguments as int?;
+            if (id == null) {
+              listener.onStart();
+            } else {
+              listener.onPreparedStart(id);
+            }
             break;
           case 'stop':
-            listener.onStop();
+            final id = call.arguments as int?;
+            if (id == null) {
+              listener.onStop();
+            } else {
+              listener.onPreparedStop(id);
+            }
             break;
           case 'detached':
             listener.onDetached();

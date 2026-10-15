@@ -764,3 +764,5 @@ enum ItemPosition {
     return ItemPosition.get(visualIndex, visualLength);
   }
 }
+
+enum RequestMode { auto, proxy, direct }

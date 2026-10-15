@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:drift/native.dart';
+import 'package:fl_clash/database/database.dart' as db;
 
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/desktop/model.dart';
@@ -20,9 +22,19 @@ import '../helpers/test_profiles.dart';
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late db.Database testDatabase;
+  setUp(() {
+    testDatabase = db.Database(NativeDatabase.memory());
+    db.database = testDatabase;
+  });
+  tearDown(() async {
+    await testDatabase.close();
+  });
   group('ProfilesAction', () {
     test('keeps edited profile data when remote update fails', () async {
       final original = Profile.normal(label: 'old label', url: 'bad-url');
+      await testDatabase.profiles.put(original.toCompanion());
       final edited = original.copyWith(
         label: 'new label',
         url: 'still-bad-url',
@@ -33,6 +45,7 @@ void main() {
           profilesProvider.overrideWith(() => TestProfiles([original])),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
 
       expect(
@@ -41,7 +54,9 @@ void main() {
       );
 
       await expectLater(
-        container.read(profilesActionProvider.notifier).updateProfile(edited),
+        container
+            .read(profilesActionProvider.notifier)
+            .updateProfile(edited, sourceEdit: true),
         throwsA(anything),
       );
 
@@ -50,33 +65,41 @@ void main() {
       expect(profile?.url, edited.url);
     });
 
-    test('updates selection, inserts first profile, and reorders profiles', () {
-      final first = Profile.normal(label: 'First');
-      final second = Profile.normal(label: 'Second');
-      final container = ProviderContainer(
-        overrides: [
-          currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
-          profilesProvider.overrideWith(() => TestProfiles([first])),
-        ],
-      );
-      addTearDown(container.dispose);
-      final action = container.read(profilesActionProvider.notifier);
+    test(
+      'updates selection, inserts first profile, and reorders profiles',
+      () async {
+        final first = Profile.normal(label: 'First');
+        final second = Profile.normal(label: 'Second');
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+            profilesProvider.overrideWith(() => TestProfiles([first])),
+          ],
+        );
+        container.listen(configProvider, (_, _) {});
+        addTearDown(container.dispose);
+        final action = container.read(profilesActionProvider.notifier);
 
-      action.updateCurrentSelectedMap('Group', 'Proxy');
-      final updatedFirst = container.read(profilesProvider).single;
-      expect(updatedFirst.selectedMap['Group'], 'Proxy');
+        action.updateCurrentSelectedMap('Group', 'Proxy');
+        final updatedFirst = container.read(profilesProvider).single;
+        await testDatabase.profiles.put(updatedFirst.toCompanion());
+        expect(updatedFirst.selectedMap['Group'], 'Proxy');
 
-      action.updateCurrentSelectedMap('Group', 'Proxy');
-      expect(container.read(profilesProvider), hasLength(1));
+        action.updateCurrentSelectedMap('Group', 'Proxy');
+        expect(container.read(profilesProvider), hasLength(1));
 
-      container.read(currentProfileIdProvider.notifier).value = null;
-      action.putProfile(second);
-      expect(container.read(currentProfileIdProvider), second.id);
-      expect(container.read(profilesProvider), [updatedFirst, second]);
+        container.read(currentProfileIdProvider.notifier).value = null;
+        await action.putProfile(second);
+        expect(container.read(currentProfileIdProvider), second.id);
+        expect(
+          container.read(profilesProvider),
+          unorderedEquals([updatedFirst, second]),
+        );
 
-      action.reorder([second, updatedFirst]);
-      expect(container.read(profilesProvider), [second, updatedFirst]);
-    });
+        action.reorder([second, updatedFirst]);
+        expect(container.read(profilesProvider), [second, updatedFirst]);
+      },
+    );
 
     test(
       'skips profile updates that are disabled, fresh, or file-based',
@@ -98,6 +121,7 @@ void main() {
             profilesProvider.overrideWith(() => TestProfiles(profiles)),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final action = container.read(profilesActionProvider.notifier);
 
@@ -108,22 +132,27 @@ void main() {
       },
     );
 
-    test('setProfileAndAutoApply stores a non-current profile', () {
+    test('setProfileAndAutoApply stores a non-current profile', () async {
       final current = Profile.normal(label: 'Current');
       final other = Profile.normal(label: 'Other');
+      await testDatabase.profiles.put(current.toCompanion());
       final container = ProviderContainer(
         overrides: [
           currentProfileIdProvider.overrideWithBuild((_, _) => current.id),
           profilesProvider.overrideWith(() => TestProfiles([current])),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
 
-      container
+      await container
           .read(profilesActionProvider.notifier)
           .setProfileAndAutoApply(other);
 
-      expect(container.read(profilesProvider), [current, other]);
+      expect(
+        container.read(profilesProvider),
+        unorderedEquals([current, other]),
+      );
       expect(container.read(currentProfileIdProvider), current.id);
     });
   });
@@ -141,6 +170,7 @@ void main() {
           setupActionProvider.overrideWith(() => setupAction),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       container.listen(scriptsProvider, (_, _) {});
       return container;
@@ -153,31 +183,35 @@ void main() {
       url: url,
     );
 
-    test('putScript re-applies only a current profile running that script', () {
-      final profile = Profile.normal().copyWith(
-        overwriteType: OverwriteType.script,
-        scriptId: 1,
-      );
-      final setupAction = _ApplyRecordingSetupAction();
-      final container = scriptsContainer(profile, setupAction);
-      final action = container.read(scriptsActionProvider.notifier);
+    test(
+      'putScript re-applies only a current profile running that script',
+      () async {
+        final profile = Profile.normal().copyWith(
+          overwriteType: OverwriteType.script,
+          scriptId: 1,
+        );
+        final setupAction = _ApplyRecordingSetupAction();
+        final container = scriptsContainer(profile, setupAction);
+        final action = container.read(scriptsActionProvider.notifier);
+        await container.read(scriptsProvider.future);
 
-      action.putScript(script(2));
-      expect(setupAction.applyCount, 0);
+        await action.putScript(script(2));
+        expect(setupAction.applyCount, 0);
 
-      action.putScript(script(1));
-      expect(setupAction.applyCount, 1);
-      expect(container.read(scriptsProvider).value?.map((item) => item.id), [
-        2,
-        1,
-      ]);
+        await action.putScript(script(1));
+        expect(setupAction.applyCount, 1);
+        expect(container.read(scriptsProvider).value?.map((item) => item.id), [
+          2,
+          1,
+        ]);
 
-      container
-          .read(profilesProvider.notifier)
-          .put(profile.copyWith(overwriteType: OverwriteType.standard));
-      action.putScript(script(1));
-      expect(setupAction.applyCount, 1);
-    });
+        container
+            .read(profilesProvider.notifier)
+            .put(profile.copyWith(overwriteType: OverwriteType.standard));
+        await action.putScript(script(1));
+        expect(setupAction.applyCount, 1);
+      },
+    );
 
     test(
       'updateScript releases the updating key when the download fails',
@@ -212,6 +246,7 @@ void main() {
 
     test('IsUpdating provider works with geo resource key', () async {
       final container = ProviderContainer();
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
 
       final key = GeoResource.MMDB.updatingKey;
@@ -234,6 +269,7 @@ void main() {
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final action = container.read(geoResourceActionProvider.notifier);
 
@@ -252,6 +288,7 @@ void main() {
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final action = container.read(geoResourceActionProvider.notifier);
 
@@ -262,18 +299,19 @@ void main() {
       verify(() => core.updateGeoData('MMDB')).called(1);
     });
 
-    test('updates valid resource URLs and rejects malformed URLs', () {
+    test('updates valid resource URLs and rejects malformed URLs', () async {
       final container = ProviderContainer();
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final action = container.read(geoResourceActionProvider.notifier);
 
-      expect(
-        () => action.updateGeoResourceUrl(GeoResource.MMDB, 'not-a-url'),
+      await expectLater(
+        action.updateGeoResourceUrl(GeoResource.MMDB, 'not-a-url'),
         throwsA(isA<ArgumentError>()),
       );
 
       const url = 'https://example.com/Country.mmdb';
-      action.updateGeoResourceUrl(GeoResource.MMDB, url);
+      await action.updateGeoResourceUrl(GeoResource.MMDB, url);
       expect(
         container.read(patchClashConfigProvider).geoXUrl[GeoResource.MMDB],
         url,
@@ -289,6 +327,7 @@ void main() {
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final coreAction =
           container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -311,6 +350,7 @@ void main() {
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         container.read(runTimeProvider.notifier).value = 0;
         final coreAction =
@@ -335,6 +375,7 @@ void main() {
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         container.read(runTimeProvider.notifier).value = 0;
         final coreAction =
@@ -359,6 +400,7 @@ void main() {
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final coreAction =
             container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -386,6 +428,7 @@ void main() {
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final coreAction =
           container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -418,6 +461,7 @@ void main() {
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final coreAction =
           container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -443,6 +487,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [coreActionProvider.overrideWith(_TestCoreAction.new)],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final coreAction =
             container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -462,6 +507,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [coreActionProvider.overrideWith(_TestCoreAction.new)],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final coreAction =
           container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -485,6 +531,7 @@ void main() {
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final coreAction =
             container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -515,6 +562,7 @@ void main() {
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       final coreAction =
           container.read(coreActionProvider.notifier) as _TestCoreAction;
@@ -544,6 +592,7 @@ void main() {
             setupActionProvider.overrideWith(_RaceSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final action =
             container.read(setupActionProvider.notifier) as _RaceSetupAction;
@@ -574,6 +623,7 @@ void main() {
             setupActionProvider.overrideWith(_RaceSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final action =
             container.read(setupActionProvider.notifier) as _RaceSetupAction;
@@ -611,6 +661,7 @@ void main() {
             setupActionProvider.overrideWith(_RaceSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final action =
             container.read(setupActionProvider.notifier) as _RaceSetupAction;
@@ -642,6 +693,7 @@ void main() {
             setupActionProvider.overrideWith(_RaceSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final action =
             container.read(setupActionProvider.notifier) as _RaceSetupAction;
@@ -671,6 +723,7 @@ void main() {
             setupActionProvider.overrideWith(_InitializingSetupAction.new),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         final action =
             container.read(setupActionProvider.notifier)
@@ -701,6 +754,7 @@ void main() {
               setupActionProvider.overrideWith(_RaceSetupAction.new),
             ],
           );
+          container.listen(configProvider, (_, _) {});
           addTearDown(container.dispose);
           final action =
               container.read(setupActionProvider.notifier) as _RaceSetupAction;
@@ -734,6 +788,7 @@ void main() {
             }),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         container
             .read(patchClashConfigProvider.notifier)
@@ -770,6 +825,7 @@ void main() {
             }),
           ],
         );
+        container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
         container
             .read(patchClashConfigProvider.notifier)
@@ -796,6 +852,7 @@ void main() {
           coreActionProvider.overrideWith(_FailingRestartCoreAction.new),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       container
           .read(patchClashConfigProvider.notifier)
@@ -827,6 +884,7 @@ void main() {
           }),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       container.read(setupActionProvider);
 
@@ -854,6 +912,7 @@ void main() {
           }),
         ],
       );
+      container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
       container
           .read(patchClashConfigProvider.notifier)
@@ -895,7 +954,11 @@ class _ApplyRecordingSetupAction extends SetupAction {
   int applyCount = 0;
 
   @override
-  void applyProfileDebounce({bool silence = false, bool force = false}) {
+  void applyProfileDebounce({
+    bool silence = false,
+    bool force = false,
+    Future<bool> Function()? isCurrent,
+  }) {
     applyCount++;
   }
 }
@@ -905,7 +968,7 @@ class _MemoryScripts extends Scripts {
   Stream<List<Script>> build() => Stream.value(const []);
 
   @override
-  void put(Script script) {
+  Future<void> put(Script script) async {
     state = AsyncData([...value.where((item) => item.id != script.id), script]);
   }
 }
@@ -918,7 +981,13 @@ class _TestSetupAction extends SetupAction {
   Completer<void>? firstApplyCompleter;
 
   @override
-  Future<bool> setRunning(bool running, {bool initialize = false}) async {
+  Future<bool> setRunning(
+    bool running, {
+    bool initialize = false,
+    int? preparedRequestId,
+    String source = 'ui',
+    bool? paused,
+  }) async {
     setRunningCount++;
     return setRunningResult;
   }
@@ -983,7 +1052,11 @@ class _RaceSetupAction extends SetupAction {
   Completer<bool>? stopCompleter;
 
   @override
-  void applyProfileDebounce({bool silence = false, bool force = false}) {
+  void applyProfileDebounce({
+    bool silence = false,
+    bool force = false,
+    Future<bool> Function()? isCurrent,
+  }) {
     applyProfileDebounceCount++;
   }
 

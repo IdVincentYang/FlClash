@@ -39,6 +39,7 @@ class ProxiesAction extends _$ProxiesAction {
   Timer? _delayFlushTimer;
 
   final Map<String, String> _pendingSelectedRollback = {};
+  final _delaySessions = <RequestSession>{};
 
   @override
   void build() {
@@ -51,6 +52,9 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   void cancelDelayTests() {
+    for (final session in List.of(_delaySessions)) {
+      session.close();
+    }
     for (final job in _delayTestJobs) {
       job.cancelled = true;
       job.held.clear();
@@ -157,17 +161,27 @@ class ProxiesAction extends _$ProxiesAction {
   void updateCurrentGroupName(String groupName) {
     final profile = ref.read(currentProfileProvider);
     if (profile == null || profile.currentGroupName == groupName) return;
-    ref
-        .read(profilesProvider.notifier)
-        .put(profile.copyWith(currentGroupName: groupName));
+    unawaited(
+      ref
+          .read(profilesProvider.notifier)
+          .updateProfile(
+            profile.id,
+            (current) => current.copyWith(currentGroupName: groupName),
+          ),
+    );
   }
 
   void updateCurrentUnfoldSet(Set<String> value) {
     final currentProfile = ref.read(currentProfileProvider);
     if (currentProfile == null) return;
-    ref
-        .read(profilesProvider.notifier)
-        .put(currentProfile.copyWith(unfoldSet: value));
+    unawaited(
+      ref
+          .read(profilesProvider.notifier)
+          .updateProfile(
+            currentProfile.id,
+            (current) => current.copyWith(unfoldSet: value),
+          ),
+    );
   }
 
   void setDelay(Delay delay) {
@@ -393,8 +407,22 @@ class ProxiesAction extends _$ProxiesAction {
       _bufferedStarts.add(target.key);
       _scheduleDelayFlush();
     }
+    RequestSession? session;
     try {
-      final delay = await _core.getDelay(target.testUrl, target.proxyName);
+      session = await request.begin(
+        key: 'delay:${target.key}',
+        url: target.testUrl,
+        explicitTarget: target.proxyName,
+      );
+      _delaySessions.add(session);
+      if (job.cancelled) {
+        session.close();
+        return;
+      }
+      final delay = await session.run(
+        () => _core.getDelay(target.testUrl, target.proxyName),
+      );
+      await session.check();
       if (delay != null && !job.cancelled) {
         setDelay(delay);
       }
@@ -407,6 +435,8 @@ class ProxiesAction extends _$ProxiesAction {
         logLevel: coreFailureLogLevel(error),
       );
     } finally {
+      session?.close();
+      _delaySessions.remove(session);
       if (job.held.remove(target.key)) {
         _bufferedFinishes.add(target.key);
         _scheduleDelayFlush();

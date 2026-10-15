@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import com.follow.clash.common.GlobalState
+import com.follow.clash.common.RequestServiceIdentity
 import com.follow.clash.common.intent
 import com.follow.clash.core.Core
 import com.follow.clash.service.ManagedService
@@ -29,7 +30,7 @@ import kotlin.coroutines.resume
 
 object ServiceController {
     private val lock = Mutex()
-    private var binding: ManagedServiceBinding? = null
+    @Volatile private var binding: ManagedServiceBinding? = null
     @Volatile
     private var runTimeMillis = 0L
 
@@ -63,7 +64,7 @@ object ServiceController {
         Core.updateEventListener(callback)
     }
 
-    suspend fun start(options: VpnOptions): Long = lock.withLock {
+    suspend fun start(options: VpnOptions, requestId: Long): Long = lock.withLock {
         ServiceConfig.updateVpnOptions(options)
         val nextIntent = if (options.enable) {
             VpnService::class.intent
@@ -76,8 +77,8 @@ object ServiceController {
                 tearDownServices()
             }
             lateinit var nextBinding: ManagedServiceBinding
-            nextBinding = ManagedServiceBinding(nextIntent) { message ->
-                handleServiceDisconnected(nextBinding, message)
+            nextBinding = ManagedServiceBinding(nextIntent, requestId) { message, identity ->
+                handleServiceDisconnected(nextBinding, message, identity)
             }
             binding = nextBinding
             nextBinding.bind().onFailure { error ->
@@ -89,7 +90,13 @@ object ServiceController {
         }
 
         val currentBinding = binding ?: return@withLock 0L
-        val result = currentBinding.useService { service -> service.start() }
+        val result = currentBinding.useService { service ->
+            check(ServiceState.bindService(service.requestIdentity.serviceId, requestId)) { "Service request was superseded" }
+            service.attachRequest(requestId)
+            currentBinding.requestIdentity = service.requestIdentity
+            service.start()
+            currentBinding.requestIdentity = service.requestIdentity
+        }
         if (result.isFailure) {
             GlobalState.log("Unable to start background service: ${result.exceptionOrNull()}")
             currentBinding.stopIfConnected()
@@ -110,6 +117,15 @@ object ServiceController {
     suspend fun stop() = lock.withLock {
         tearDownServices()
         runTimeMillis = 0L
+    }
+
+    suspend fun adoptRequest(requestId: Long) = lock.withLock {
+        val current = binding ?: return@withLock
+        current.useService { service ->
+            check(ServiceState.bindService(service.requestIdentity.serviceId, requestId)) { "Service request was superseded" }
+            service.attachRequest(requestId)
+            current.requestIdentity = service.requestIdentity
+        }.getOrThrow()
     }
 
     private suspend fun tearDownServices() {
@@ -142,20 +158,20 @@ object ServiceController {
     private fun handleServiceDisconnected(
         disconnectedBinding: ManagedServiceBinding,
         message: String,
+        identity: RequestServiceIdentity?,
     ) {
-        val token = ServiceState.captureRequestToken()
+        if (binding === disconnectedBinding) {
+            if (identity != null) ServiceState.observeServiceLost(identity.serviceId, identity.requestId)
+            else ServiceState.observeBindingLost(disconnectedBinding.requestId)
+        }
         GlobalState.launch {
-            val wasCurrent = lock.withLock {
+            lock.withLock {
                 if (binding !== disconnectedBinding) {
-                    return@withLock false
+                    return@withLock
                 }
                 GlobalState.log("Background service disconnected: $message")
                 clearBinding()
                 runTimeMillis = 0L
-                true
-            }
-            if (wasCurrent) {
-                ServiceState.handleServiceLost(token)
             }
         }
     }
@@ -163,8 +179,10 @@ object ServiceController {
 
 private class ManagedServiceBinding(
     private val intent: Intent,
-    private val onDisconnected: (String) -> Unit,
+    val requestId: Long,
+    private val onDisconnected: (String, RequestServiceIdentity?) -> Unit,
 ) : ServiceConnection {
+    @Volatile var requestIdentity: RequestServiceIdentity? = null
     val component: ComponentName?
         get() = intent.component
 
@@ -246,6 +264,6 @@ private class ManagedServiceBinding(
 
     private fun disconnect(message: String) {
         serviceState.value = Result.failure(IllegalStateException(message))
-        onDisconnected(message)
+        onDisconnected(message, requestIdentity)
     }
 }

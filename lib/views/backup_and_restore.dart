@@ -17,6 +17,7 @@ import 'package:fl_clash/widgets/list.dart';
 import 'package:fl_clash/widgets/loading.dart';
 import 'package:fl_clash/widgets/scaffold.dart';
 import 'package:fl_clash/widgets/text.dart';
+import 'package:fl_clash/widgets/request_route.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,6 +35,9 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
   @override
   void initState() {
     super.initState();
+    ref.listenManual(appVisibleProvider, (_, visible) {
+      unawaited(_davConnection.setVisible(visible));
+    }, fireImmediately: true);
     ref.listenManual(davSettingProvider, (_, _) {
       _updateDAVClient();
     }, fireImmediately: true);
@@ -66,6 +70,8 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
       title: title,
     );
     if (res != true) return;
+    final session = RequestSession.current;
+    if (session != null && !session.committed) await session.check();
     unawaited(
       dialogs.showMessage(
         title: title,
@@ -102,10 +108,13 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
   Future<void> _backupOnWebDAV() async {
     final client = _davConnection.client;
     if (client == null) return;
-    await _backup((archivePath) async {
-      await client.upload(archivePath);
-      return true;
-    });
+    await client.operation(
+      'backup',
+      (_) => _backup((archivePath) async {
+        await client.upload(archivePath);
+        return true;
+      }),
+    );
   }
 
   Future<void> _restoreOnWebDAV() async {
@@ -113,10 +122,13 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     if (client == null) return;
     final option = await _pickRestoreOption();
     if (option == null || !mounted) return;
-    await _restore(option, (downloadPath) async {
-      await client.download(downloadPath);
-      return downloadPath;
-    });
+    await client.operation(
+      'restore',
+      (_) => _restore(option, (downloadPath) async {
+        await client.download(downloadPath);
+        return downloadPath;
+      }),
+    );
   }
 
   Future<void> _backupOnLocal() {
@@ -138,13 +150,11 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     await _restore(option, (_) async => path);
   }
 
-  void _handleChange(String? value, WidgetRef ref) {
-    if (value == null) {
-      return;
-    }
-    ref
-        .read(davSettingProvider.notifier)
-        .update((state) => state?.copyWith(fileName: value));
+  Future<void> _handleChange(String? value, WidgetRef ref) async {
+    if (value == null) return;
+    await ref
+        .read(backupActionProvider.notifier)
+        .updateDAV(ref.read(davSettingProvider)?.copyWith(fileName: value));
   }
 
   Future<void> _handleUpdateRestoreStrategy() async {
@@ -394,32 +404,39 @@ class _WebDAVFormDialogState extends ConsumerState<WebDAVFormDialog> {
   final _obscureController = ValueNotifier<bool>(true);
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  late RequestMode _requestMode;
+  String? _requestProxy;
+
   @override
   void initState() {
     super.initState();
+    _requestMode = widget.dav?.requestMode ?? RequestMode.auto;
+    _requestProxy = widget.dav?.requestProxy;
     _uriController = TextEditingController(text: widget.dav?.uri);
     _userController = TextEditingController(text: widget.dav?.user);
     _passwordController = TextEditingController(text: widget.dav?.password);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    ref
-        .read(davSettingProvider.notifier)
-        .update(
-          (_) => DAVProps(
+    await ref
+        .read(backupActionProvider.notifier)
+        .updateDAV(
+          DAVProps(
+            requestMode: _requestMode,
+            requestProxy: _requestProxy,
             uri: _uriController.text,
             user: _userController.text,
             password: _passwordController.text,
             fileName: widget.dav?.fileName ?? defaultDavFileName,
           ),
         );
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
-  void _delete() {
-    ref.read(davSettingProvider.notifier).update((_) => null);
-    Navigator.pop(context);
+  Future<void> _delete() async {
+    await ref.read(backupActionProvider.notifier).updateDAV(null);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -478,6 +495,14 @@ class _WebDAVFormDialogState extends ConsumerState<WebDAVFormDialog> {
                 }
                 return null;
               },
+            ),
+            RequestRouteFields(
+              mode: _requestMode,
+              proxy: _requestProxy,
+              onChanged: (value) => setState(() {
+                _requestMode = value.$1;
+                _requestProxy = value.$2;
+              }),
             ),
             ValueListenableBuilder(
               valueListenable: _obscureController,

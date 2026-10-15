@@ -113,22 +113,29 @@ class CommonAction extends _$CommonAction {
 
   Future<void> checkUpdateResultHandle({Map<String, dynamic>? data}) async {
     if (data != null) {
-      final context = globalState.navigatorKey.currentContext!;
-      final res = await dialogs.showMessage(
-        title: currentAppLocalizations.discoverNewVersion,
-        message: _releaseSpan(
-          context,
-          data['tag_name'] as String,
-          data['body'] as String?,
-        ),
-        confirmText: currentAppLocalizations.goDownload,
-      );
-      if (res == true) {
-        unawaited(
-          launchUrl(
-            Uri.parse('https://github.com/$repository/releases/latest'),
+      await request.validateVersionResult(data);
+      try {
+        final context = globalState.navigatorKey.currentContext!;
+        if (!context.mounted) return;
+        final res = await dialogs.showMessage(
+          title: currentAppLocalizations.discoverNewVersion,
+          message: _releaseSpan(
+            context,
+            data['tag_name'] as String,
+            data['body'] as String?,
           ),
+          confirmText: currentAppLocalizations.goDownload,
         );
+        if (res == true) {
+          await request.validateVersionResult(data);
+          unawaited(
+            launchUrl(
+              Uri.parse('https://github.com/$repository/releases/latest'),
+            ),
+          );
+        }
+      } finally {
+        request.releaseVersionResult(data);
       }
     } else {
       unawaited(

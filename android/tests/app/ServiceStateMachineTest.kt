@@ -1,6 +1,10 @@
 package com.follow.clash
 
 import com.follow.clash.common.AccessControlMode
+import com.follow.clash.common.ApplicationRequestState
+import com.follow.clash.common.RequestNetworkFacts
+import com.follow.clash.common.RequestProtection
+import com.follow.clash.common.RequestServiceIdentity
 import com.follow.clash.models.SetupParams
 import com.follow.clash.models.SharedState
 import com.follow.clash.service.models.AccessControlProps
@@ -115,6 +119,14 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
     var stopCalls = 0
     var lastInitParams: String? = null
     var lastSetupParams: String? = null
+    val requestPublications = mutableListOf<ApplicationRequestState>()
+    var publishAccepted = true
+    var blockedRequests = 0
+    override fun publishRequestState(state: ApplicationRequestState): Boolean {
+        requestPublications += state
+        return publishAccepted
+    }
+    override fun blockRequestState() { blockedRequests++ }
 
     override fun log(message: String) {
         logs += message
@@ -165,6 +177,66 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
 class ServiceStateMachineTest {
 
     @Test
+    fun `intent is published before setup or permission waits and reads are inert`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        val request = machine.prepareRunIntent(true)
+        val state = machine.getRequestState()
+        assertEquals(request, state.intentRevision)
+        assertEquals("preparing", state.phase)
+        assertTrue(state.intentRunning)
+        assertEquals(0, host.setupCalls)
+        assertEquals(0, host.startCalls)
+        assertEquals(state, machine.getRequestState())
+        assertEquals(1, host.requestPublications.size)
+    }
+
+    @Test
+    fun `SSID pause preserves intent and manual stop prevents resume`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        val start = machine.prepareRunIntent(true)
+        assertTrue(machine.requestStart(start).await())
+        val pause = machine.prepareRunIntent(true, "ssid", true)
+        assertTrue(machine.getRequestState().intentRunning)
+        assertEquals("excludedSsid", machine.getRequestState().reason)
+        machine.requestStop(pause).await()
+        val stop = machine.prepareRunIntent(false)
+        machine.requestStop(stop).await()
+        val resume = machine.prepareRunIntent(machine.getRequestState().intentRunning, "ssid", false)
+        machine.requestStop(resume).await()
+        assertFalse(machine.getRequestState().intentRunning)
+        assertEquals(1, host.startCalls)
+    }
+
+    @Test
+    fun `old instance and pending binding loss cannot replace a newer intent`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        val old = machine.prepareRunIntent(true)
+        assertTrue(machine.bindService("old-service", old))
+        val current = machine.prepareRunIntent(true)
+        assertTrue(machine.bindService("new-service", current))
+        val before = machine.getRequestState()
+        machine.observeServiceLost("old-service", old)
+        machine.observeBindingLost(old)
+        assertEquals(before, machine.getRequestState())
+    }
+
+    @Test
+    fun `publication failure blocks prepared starts`() = runTest {
+        val host = FakeHost(backgroundScope)
+        host.publishAccepted = false
+        val machine = ServiceStateMachine(host)
+        val request = machine.prepareRunIntent(true)
+        assertEquals("failed", machine.getRequestState().phase)
+        assertEquals(1, host.blockedRequests)
+        assertFalse(machine.requestStart(request).await())
+        assertEquals(0, host.startCalls)
+    }
+
+    @Test
     fun `initParams spells the keys the Go wrapper expects`() {
         val json = ServiceStateMachine.initParams("/files", 34)
 
@@ -194,7 +266,7 @@ class ServiceStateMachineTest {
     }
 
     @Test
-    fun `refresh reports STARTED only while the service has a run time`() = runTest {
+    fun `refresh reads runtime without changing authoritative state`() = runTest {
         val host = FakeHost(backgroundScope)
         val machine = ServiceStateMachine(host)
 
@@ -202,8 +274,10 @@ class ServiceStateMachineTest {
         assertEquals(RunState.STOPPED, machine.runState.value)
 
         host.runTimeMillis = 42L
+        val before = machine.getRequestState()
         assertEquals(42L, machine.refresh())
-        assertEquals(RunState.STARTED, machine.runState.value)
+        assertEquals(RunState.STOPPED, machine.runState.value)
+        assertEquals(before, machine.getRequestState())
     }
 
     @Test
@@ -583,9 +657,18 @@ class ServiceStateMachineTest {
         val machine = ServiceStateMachine(host)
         machine.syncSharedState(configuredState())
         machine.requestStart().await()
-
+        val requestId = machine.captureRequestToken().id
+        val identity = RequestServiceIdentity("synthetic-vpn", requestId)
+        val protection = object : RequestProtection {
+            override val requestIdentity = identity
+            override fun protectRequestSocket(fd: Int, expected: RequestServiceIdentity) = true
+            override fun isRequestLockdownEnabled() = false
+        }
+        assertTrue(machine.bindService(identity.serviceId, requestId))
+        val generation = machine.observeProtection(protection, identity, "starting", "none")
+        machine.observeProtection(protection, identity.copy(generation = generation), "ready", "none")
+        machine.observeProtection(protection, identity.copy(generation = generation), "retiring", "vpnRevoked")
         machine.handleVpnRevokeAction()
-
         assertEquals(1, host.stopCalls)
     }
 
@@ -711,4 +794,43 @@ class ServiceStateMachineTest {
         assertTrue(host.logs.any { it.contains("binder died") })
         assertFalse(machine.captureRequestToken().running)
     }
+    @Test
+    fun `network source gaps reordering and reconstruction reach the real socket gate`() = runTest {
+        val host = FakeHost(backgroundScope)
+        var activeEpoch = "first"
+        val machine = ServiceStateMachine(object : ServiceStateHost by host {
+            override fun isNetworkSourceCurrent(epoch: String) = epoch == activeEpoch
+        })
+        machine.initializeRequestState(machine.getRequestState().revision, false)
+        var selected = RequestNetworkFacts()
+        var bindings = 0
+        val access = object : RequestSocketAccess {
+            override val selection get() = selected
+            override fun currentState() = machine.getRequestState()
+            override fun networkInput() = machine.getNetworkInput()
+            override fun isSelectionCurrent() = true
+            override fun ownsDefaultVpn() = false
+            override fun protect(fd: Int, expected: ApplicationRequestState) = false
+            override fun bind(fd: Int) { bindings++ }
+        }
+        for (revision in listOf(1L, 3L, 2L, 4L)) {
+            val facts = RequestNetworkFacts(activeEpoch, revision, "nonVpn", "physical", "physical", true)
+            if (revision > selected.revision) selected = facts
+            machine.observeNetwork(facts)
+            assertEquals(selected.revision, machine.getRequestState().networkRevision)
+            assertTrue(prepareRequestSocket(access, machine.getRequestState(), 42))
+        }
+        val prior = machine.getRequestState()
+        activeEpoch = "second"
+        selected = RequestNetworkFacts(activeEpoch, 1, "nonVpn", "new physical", "new physical", true)
+        machine.observeNetwork(selected)
+        assertTrue(machine.getRequestState().revision > prior.revision)
+        assertEquals(1L, machine.getRequestState().networkRevision)
+        machine.observeNetwork(RequestNetworkFacts("first", 99, "unknown"))
+        assertEquals("second", machine.getRequestState().networkSourceEpoch)
+        assertTrue(prepareRequestSocket(access, machine.getRequestState(), 42))
+        assertFalse(prepareRequestSocket(access, prior, 42))
+        assertEquals(5, bindings)
+    }
+
 }

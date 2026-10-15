@@ -1,0 +1,3011 @@
+diff --git a/adapter/adapter.go b/adapter/adapter.go
+index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c558539852dfd 100644
+--- a/adapter/adapter.go
++++ b/adapter/adapter.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/metacubex/mihomo/common/utils"
+ 	"github.com/metacubex/mihomo/common/xsync"
+ 	"github.com/metacubex/mihomo/component/ca"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ 
+@@ -33,6 +34,7 @@ type internalProxyState struct {
+ 
+ type Proxy struct {
+ 	C.ProxyAdapter
++	owner   requestscope.Owner
+ 	alive   atomic.Bool
+ 	history *queue.Queue[C.DelayHistory]
+ 	extra   xsync.Map[string, *internalProxyState]
+@@ -165,42 +167,61 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
+ // implements C.Proxy
+ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.IntRanges[uint16]) (t uint16, err error) {
+ 	var satisfied bool
+-
+-	defer func() {
+-		if UrlTestHook != nil {
+-			UrlTestHook(url, p.Name(), t)
++	lease := requestscope.FromContext(ctx)
++	if lease == nil && requestscope.BeginHook != nil {
++		proxy := p.Name()
++		if p.Type() == C.Direct {
++			proxy = "DIRECT"
+ 		}
+-
+-		alive := err == nil
+-		record := C.DelayHistory{Time: time.Now()}
+-		if alive {
+-			record.Delay = t
++		lease, err = requestscope.Begin(ctx, requestscope.Spec{Owner: p.owner, Kind: "urltest", Trigger: "manual", Key: fmt.Sprintf("urltest:%p:%s", p, url), Resource: fmt.Sprintf("urltest:%p", p), Proxy: proxy, URL: url})
++		if err != nil {
++			return 0, err
+ 		}
++		defer lease.Close()
++		ctx = requestscope.WithLease(lease.Context(), lease)
++	}
+ 
+-		p.alive.Store(alive)
+-		p.history.Put(record)
+-		if p.history.Len() > defaultHistoriesNum {
+-			p.history.Pop()
++	defer func() {
++		if requestscope.Check(lease) != nil {
++			return
+ 		}
++		_ = requestscope.Commit(lease, func() error {
++			if UrlTestHook != nil {
++				UrlTestHook(url, p.Name(), t)
++			}
+ 
+-		state, _ := p.extra.LoadOrStoreFn(url, func() *internalProxyState {
+-			return &internalProxyState{
+-				history: queue.New[C.DelayHistory](defaultHistoriesNum),
+-				alive:   atomic.NewBool(true),
++			alive := err == nil
++			record := C.DelayHistory{Time: time.Now()}
++			if alive {
++				record.Delay = t
+ 			}
+-		})
+ 
+-		if !satisfied {
+-			record.Delay = 0
+-			alive = false
+-		}
++			p.alive.Store(alive)
++			p.history.Put(record)
++			if p.history.Len() > defaultHistoriesNum {
++				p.history.Pop()
++			}
+ 
+-		state.alive.Store(alive)
+-		state.history.Put(record)
+-		if state.history.Len() > defaultHistoriesNum {
+-			state.history.Pop()
+-		}
++			state, _ := p.extra.LoadOrStoreFn(url, func() *internalProxyState {
++				return &internalProxyState{
++					history: queue.New[C.DelayHistory](defaultHistoriesNum),
++					alive:   atomic.NewBool(true),
++				}
++			})
++
++			if !satisfied {
++				record.Delay = 0
++				alive = false
++			}
++
++			state.alive.Store(alive)
++			state.history.Put(record)
++			if state.history.Len() > defaultHistoriesNum {
++				state.history.Pop()
++			}
+ 
++			return nil
++		})
+ 	}()
+ 
+ 	unifiedDelay := UnifiedDelay.Load()
+@@ -211,13 +232,29 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
+ 	}
+ 
+ 	start := time.Now()
+-	instance, err := p.DialContext(ctx, &addr)
++	if err = requestscope.Check(lease); err != nil {
++		return
++	}
++	selected, selectErr := requestscope.SelectProxy(lease, p, &addr)
++	if selectErr != nil {
++		err = selectErr
++		return
++	}
++	if err = requestscope.BeforeDial(lease, &addr); err != nil {
++		return
++	}
++	instance, err := selected.DialContext(ctx, &addr)
+ 	if err != nil {
+ 		return
+ 	}
+-	defer func() {
+-		_ = instance.Close()
+-	}()
++	defer func() { _ = instance.Close() }()
++	if lease != nil {
++		if err = lease.TrackConn(instance); err != nil {
++			return
++		}
++	}
++	stopClose := context.AfterFunc(ctx, func() { _ = instance.Close() })
++	defer stopClose()
+ 
+ 	req, err := http.NewRequest(http.MethodHead, url, nil)
+ 	if err != nil {
+@@ -282,9 +319,14 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
+ 	return
+ }
+ 
+-func NewProxy(adapter C.ProxyAdapter) *Proxy {
++func NewProxy(adapter C.ProxyAdapter, owners ...requestscope.Owner) *Proxy {
++	owner := requestscope.CurrentOwner()
++	if len(owners) > 0 {
++		owner = owners[0]
++	}
+ 	return &Proxy{
+ 		ProxyAdapter: adapter,
++		owner:        owner,
+ 		history:      queue.New[C.DelayHistory](defaultHistoriesNum),
+ 		alive:        atomic.NewBool(true),
+ 	}
+diff --git a/adapter/outboundgroup/fallback.go b/adapter/outboundgroup/fallback.go
+index 98aaf20a9d98522da3086e39064128ff5c89440e..bde3877d215d9c1877dcbbbb4c8223ccce85a9eb 100644
+--- a/adapter/outboundgroup/fallback.go
++++ b/adapter/outboundgroup/fallback.go
+@@ -124,6 +124,14 @@ func (f *Fallback) findAliveProxy(touch bool) C.Proxy {
+ }
+ 
+ func (f *Fallback) Set(name string) error {
++	probe, err := f.SetWithProbe(name)
++	if err == nil {
++		probe()
++	}
++	return err
++}
++
++func (f *Fallback) SetWithProbe(name string) (func(), error) {
+ 	var p C.Proxy
+ 	for _, proxy := range f.GetProxies(false) {
+ 		if proxy.Name() == name {
+@@ -133,18 +141,19 @@ func (f *Fallback) Set(name string) error {
+ 	}
+ 
+ 	if p == nil {
+-		return errors.New("proxy not exist")
++		return nil, errors.New("proxy not exist")
+ 	}
+ 
+ 	f.selected = name
+-	if !p.AliveForTestUrl(f.testUrl) {
+-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(5000))
+-		defer cancel()
+-		expectedStatus, _ := utils.NewUnsignedRanges[uint16](f.expectedStatus)
+-		_, _ = p.URLTest(ctx, f.testUrl, expectedStatus)
+-	}
++	return func() {
++		if !p.AliveForTestUrl(f.testUrl) {
++			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(5000))
++			defer cancel()
++			expectedStatus, _ := utils.NewUnsignedRanges[uint16](f.expectedStatus)
++			_, _ = p.URLTest(ctx, f.testUrl, expectedStatus)
++		}
+ 
+-	return nil
++	}, nil
+ }
+ 
+ func (f *Fallback) ForceSet(name string) {
+diff --git a/adapter/parser.go b/adapter/parser.go
+index 68bccdbf283cdf54fcf54a8016cabbf89d736c6c..0ee6165512ef5b9c23a0e05a7c18831c8680b9cc 100644
+--- a/adapter/parser.go
++++ b/adapter/parser.go
+@@ -5,6 +5,7 @@ import (
+ 
+ 	"github.com/metacubex/mihomo/adapter/outbound"
+ 	"github.com/metacubex/mihomo/common/structure"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ )
+ 
+@@ -246,17 +247,18 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
+ 	}
+ 
+ 	proxy = outbound.NewAutoCloseProxyAdapter(proxy)
+-	return NewProxy(proxy), nil
++	return NewProxy(proxy, opt.RequestOwner), nil
+ }
+ 
+ type proxyOption struct {
++	RequestOwner requestscope.Owner
+ 	DialerForAPI C.Dialer
+ 	TunnelForAPI C.Tunnel
+ 	ProviderName string
+ }
+ 
+ func applyProxyOptions(options ...ProxyOption) proxyOption {
+-	opt := proxyOption{}
++	opt := proxyOption{RequestOwner: requestscope.CurrentOwner()}
+ 	for _, o := range options {
+ 		o(&opt)
+ 	}
+@@ -282,3 +284,7 @@ func WithProviderName(name string) ProxyOption {
+ 		opt.ProviderName = name
+ 	}
+ }
++
++func WithRequestOwner(owner requestscope.Owner) ProxyOption {
++	return func(opt *proxyOption) { opt.RequestOwner = owner }
++}
+diff --git a/adapter/provider/healthcheck.go b/adapter/provider/healthcheck.go
+index 822a00d518c2e7d6ea83486a492fe925de4ae180..12923655a4f223058349ac81887214b986541e69 100644
+--- a/adapter/provider/healthcheck.go
++++ b/adapter/provider/healthcheck.go
+@@ -6,9 +6,12 @@ import (
+ 	"sync"
+ 	"time"
+ 
++	"fmt"
++	"github.com/metacubex/mihomo/adapter/outbound"
+ 	"github.com/metacubex/mihomo/common/atomic"
+ 	"github.com/metacubex/mihomo/common/singledo"
+ 	"github.com/metacubex/mihomo/common/utils"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ 
+@@ -28,6 +31,8 @@ type extraOption struct {
+ 
+ type HealthCheck struct {
+ 	ctx            context.Context
++	owner          requestscope.Owner
++	processOnce    sync.Once
+ 	ctxCancel      context.CancelFunc
+ 	url            string
+ 	extra          map[string]*extraOption
+@@ -41,15 +46,23 @@ type HealthCheck struct {
+ 	timeout        time.Duration
+ }
+ 
+-func (hc *HealthCheck) process() {
+-	ticker := time.NewTicker(hc.interval)
++func (hc *HealthCheck) process() { hc.processOnce.Do(hc.processLoop) }
++
++func (hc *HealthCheck) processLoop() {
++	hc.mu.Lock()
++	interval := hc.interval
++	hc.mu.Unlock()
++	if interval <= 0 {
++		return
++	}
++	ticker := time.NewTicker(interval)
+ 	go hc.check()
+ 	for {
+ 		select {
+ 		case <-ticker.C:
+ 			lastTouch := hc.lastTouch.Load()
+ 			since := time.Since(lastTouch)
+-			if !hc.lazy || since < hc.interval {
++			if !hc.lazy || since < interval {
+ 				hc.check()
+ 			} else {
+ 				log.Debugln("Skip once health check because we are lazy")
+@@ -62,6 +75,8 @@ func (hc *HealthCheck) process() {
+ }
+ 
+ func (hc *HealthCheck) setProxies(proxies []C.Proxy) {
++	hc.mu.Lock()
++	defer hc.mu.Unlock()
+ 	hc.proxies = proxies
+ }
+ 
+@@ -113,6 +128,8 @@ func splitAndAddFiltersToExtra(filter string, option *extraOption) {
+ }
+ 
+ func (hc *HealthCheck) auto() bool {
++	hc.mu.Lock()
++	defer hc.mu.Unlock()
+ 	return hc.interval != 0
+ }
+ 
+@@ -121,7 +138,21 @@ func (hc *HealthCheck) touch() {
+ }
+ 
+ func (hc *HealthCheck) check() {
+-	if len(hc.proxies) == 0 {
++	if requestscope.WaitReady(hc.ctx, hc.owner) != nil {
++		return
++	}
++	hc.mu.Lock()
++	proxies := append([]C.Proxy(nil), hc.proxies...)
++	extra := make(map[string]*extraOption, len(hc.extra))
++	for url, original := range hc.extra {
++		copy := &extraOption{expectedStatus: original.expectedStatus, filters: map[string]struct{}{}}
++		for filter := range original.filters {
++			copy.filters[filter] = struct{}{}
++		}
++		extra[url] = copy
++	}
++	hc.mu.Unlock()
++	if len(proxies) == 0 {
+ 		return
+ 	}
+ 
+@@ -133,12 +164,12 @@ func (hc *HealthCheck) check() {
+ 
+ 		// execute default health check
+ 		option := &extraOption{filters: nil, expectedStatus: hc.expectedStatus}
+-		hc.execute(b, hc.url, id, option)
++		hc.execute(b, proxies, hc.url, id, option)
+ 
+ 		// execute extra health check
+-		if len(hc.extra) != 0 {
+-			for url, option := range hc.extra {
+-				hc.execute(b, url, id, option)
++		if len(extra) != 0 {
++			for url, option := range extra {
++				hc.execute(b, proxies, url, id, option)
+ 			}
+ 		}
+ 		_ = b.Wait()
+@@ -147,7 +178,7 @@ func (hc *HealthCheck) check() {
+ 	})
+ }
+ 
+-func (hc *HealthCheck) execute(b *errgroup.Group, url, uid string, option *extraOption) {
++func (hc *HealthCheck) execute(b *errgroup.Group, proxies []C.Proxy, url, uid string, option *extraOption) {
+ 	url = strings.TrimSpace(url)
+ 	if len(url) == 0 {
+ 		log.Debugln("Health Check has been skipped due to testUrl is empty, {%s}", uid)
+@@ -168,7 +199,7 @@ func (hc *HealthCheck) execute(b *errgroup.Group, url, uid string, option *extra
+ 		}
+ 	}
+ 
+-	for _, proxy := range hc.proxies {
++	for _, proxy := range proxies {
+ 		// skip proxies that do not require health check
+ 		if filterReg != nil {
+ 			if match, _ := filterReg.MatchString(proxy.Name()); !match {
+@@ -178,7 +209,20 @@ func (hc *HealthCheck) execute(b *errgroup.Group, url, uid string, option *extra
+ 
+ 		p := proxy
+ 		b.Go(func() error {
+-			ctx, cancel := context.WithTimeout(hc.ctx, hc.timeout)
++			ctx := hc.ctx
++			proxyName := p.Name()
++			if _, direct := p.Adapter().(*outbound.Direct); direct {
++				proxyName = "DIRECT"
++			}
++			lease, err := requestscope.Begin(ctx, requestscope.Spec{Owner: hc.owner, Kind: "health", Trigger: "automatic", Key: fmt.Sprintf("%p:%s", p, url), Resource: fmt.Sprintf("proxy:%p", p), URL: url, Proxy: proxyName})
++			if err != nil {
++				return nil
++			}
++			if lease != nil {
++				defer lease.Close()
++				ctx = lease.Context()
++			}
++			ctx, cancel := context.WithTimeout(ctx, hc.timeout)
+ 			defer cancel()
+ 			log.Debugln("Health Checking, proxy: %s, url: %s, id: {%s}", p.Name(), url, uid)
+ 			_, _ = p.URLTest(ctx, url, expectedStatus)
+@@ -204,6 +248,7 @@ func NewHealthCheck(proxies []C.Proxy, url string, timeout uint, interval uint,
+ 
+ 	return &HealthCheck{
+ 		ctx:            ctx,
++		owner:          requestscope.CurrentOwner(),
+ 		ctxCancel:      cancel,
+ 		proxies:        proxies,
+ 		url:            url,
+diff --git a/adapter/provider/provider.go b/adapter/provider/provider.go
+index fa7d56bc21af615c715ac09737449fa45559b809..0301b66d00e8a868f6d92f99b50a8b2ffaaab294 100644
+--- a/adapter/provider/provider.go
++++ b/adapter/provider/provider.go
+@@ -15,6 +15,7 @@ import (
+ 	"github.com/metacubex/mihomo/common/yaml"
+ 	"github.com/metacubex/mihomo/component/age"
+ 	"github.com/metacubex/mihomo/component/profile/cachefile"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/component/resource"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	P "github.com/metacubex/mihomo/constant/provider"
+@@ -101,13 +102,20 @@ func (bp *baseProvider) RegisterHealthCheckTask(url string, expectedStatus utils
+ }
+ 
+ func (bp *baseProvider) setProxies(proxies []C.Proxy) {
+-	bp.mutex.Lock()
+-	defer bp.mutex.Unlock()
+-	bp.proxies = proxies
+-	bp.version += 1
+-	bp.healthCheck.setProxies(proxies)
+-	if bp.healthCheck.auto() {
+-		go bp.healthCheck.check()
++	update := func() {
++		bp.mutex.Lock()
++		defer bp.mutex.Unlock()
++		bp.proxies = proxies
++		bp.version++
++		bp.healthCheck.setProxies(proxies)
++		if bp.healthCheck.auto() {
++			go bp.healthCheck.check()
++		}
++	}
++	if requestscope.ProxyUpdateHook != nil {
++		requestscope.ProxyUpdateHook(bp.healthCheck.owner, update)
++	} else {
++		update()
+ 	}
+ }
+ 
+@@ -341,6 +349,7 @@ func (cp *CompatibleProvider) Close() error {
+ }
+ 
+ func NewProxiesParser(pdName string, tunnel C.Tunnel, filter string, excludeFilter string, excludeType string, dialerProxy string, override overrideSchema, ageSecretKey string) (resource.Parser[[]C.Proxy], error) {
++	owner := requestscope.CurrentOwner()
+ 	var excludeTypeArray []string
+ 	if excludeType != "" {
+ 		excludeTypeArray = strings.Split(excludeType, "|")
+@@ -446,7 +455,7 @@ func NewProxiesParser(pdName string, tunnel C.Tunnel, filter string, excludeFilt
+ 					return nil, fmt.Errorf("proxy %d override error: %w", idx, err)
+ 				}
+ 
+-				proxy, err := adapter.ParseProxy(mapping, adapter.WithTunnelForAPI(tunnel), adapter.WithProviderName(pdName))
++				proxy, err := adapter.ParseProxy(mapping, adapter.WithTunnelForAPI(tunnel), adapter.WithProviderName(pdName), adapter.WithRequestOwner(owner))
+ 				if err != nil {
+ 					return nil, fmt.Errorf("proxy %d error: %w", idx, err)
+ 				}
+diff --git a/adapter/provider/request_owner_test.go b/adapter/provider/request_owner_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..c28b1fff69e4ebe79db20f4a143604a013bf72a0
+--- /dev/null
++++ b/adapter/provider/request_owner_test.go
+@@ -0,0 +1,33 @@
++package provider
++
++import (
++	"context"
++	"testing"
++
++	"github.com/metacubex/mihomo/component/requestscope"
++)
++
++func TestRequestOwnerCapturedByProviderParser(t *testing.T) {
++	owner := requestscope.Owner{ID: 1}
++	oldOwner, oldBegin := requestscope.OwnerHook, requestscope.BeginHook
++	defer func() { requestscope.OwnerHook, requestscope.BeginHook = oldOwner, oldBegin }()
++	requestscope.OwnerHook = func() requestscope.Owner { return owner }
++	parser, err := NewProxiesParser("synthetic", nil, "", "", "", "", overrideSchema{}, "")
++	if err != nil {
++		t.Fatal(err)
++	}
++	owner = requestscope.Owner{ID: 2}
++	proxies, err := parser([]byte("proxies:\n  - name: old node\n    type: http\n    server: 127.0.0.1\n    port: 1\n"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	requestscope.BeginHook = func(_ context.Context, spec requestscope.Spec) (requestscope.Lease, error) {
++		if spec.Owner.ID != 1 {
++			t.Errorf("old parser borrowed new owner %v", spec.Owner)
++		}
++		return nil, requestscope.ErrCancelled
++	}
++	if _, err := proxies[0].URLTest(context.Background(), "http://127.0.0.1/", nil); err == nil {
++		t.Fatal("retired parser request was not rejected")
++	}
++}
+diff --git a/component/dialer/dialer.go b/component/dialer/dialer.go
+index 24ab67f13f88e00e7e7799e31d53186ee4db70fe..65be12968ac8e1e7a773ca7d51dce285484b4d5d 100644
+--- a/component/dialer/dialer.go
++++ b/component/dialer/dialer.go
+@@ -79,7 +79,7 @@ func DialContext(ctx context.Context, network, address string, options ...Option
+ func ListenPacket(ctx context.Context, network, address string, rAddrPort netip.AddrPort, options ...Option) (net.PacketConn, error) {
+ 	opt := applyOptions(options...)
+ 
+-	lc, address, err := listenConfig(network, address, rAddrPort, opt)
++	lc, address, err := listenConfig(ctx, network, address, rAddrPort, opt)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -88,19 +88,21 @@ func ListenPacket(ctx context.Context, network, address string, rAddrPort netip.
+ 
+ // Listen creates a TCP listener with the same socket policy as ListenPacket.
+ func Listen(ctx context.Context, network, address string, options ...Option) (net.Listener, error) {
+-	lc, address, err := listenConfig(network, address, netip.AddrPort{}, applyOptions(options...))
++	lc, address, err := listenConfig(ctx, network, address, netip.AddrPort{}, applyOptions(options...))
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	return lc.Listen(ctx, network, address)
+ }
+ 
+-func listenConfig(network, address string, rAddrPort netip.AddrPort, opt option) (*net.ListenConfig, string, error) {
++func listenConfig(ctx context.Context, network, address string, rAddrPort netip.AddrPort, opt option) (*net.ListenConfig, string, error) {
+ 	lc := &net.ListenConfig{}
+ 	if opt.addrReuse {
+ 		addrReuseToListenConfig(lc)
+ 	}
+-	if DefaultSocketHook != nil { // ignore interfaceName, routingMark when DefaultSocketHook not null (in CMFA)
++	if control := scopedSocketControl(ctx); control != nil {
++		lc.Control = func(network, address string, raw syscall.RawConn) error { return control(ctx, network, address, raw) }
++	} else if DefaultSocketHook != nil { // ignore interfaceName, routingMark when DefaultSocketHook not null (in CMFA)
+ 		socketHookToListenConfig(lc)
+ 	} else {
+ 		if opt.interfaceName == "" {
+@@ -150,6 +152,9 @@ func dialContext(ctx context.Context, network string, destination netip.Addr, po
+ 		_netDialer := *netDialer.(*net.Dialer)
+ 		netDialer = &_netDialer // make a copy
+ 	default:
++		if scopedSocketControl(ctx) != nil {
++			return nil, errors.New("scoped socket control requires a standard dialer")
++		}
+ 		return netDialer.DialContext(ctx, network, address)
+ 	}
+ 
+@@ -157,7 +162,7 @@ func dialContext(ctx context.Context, network string, destination netip.Addr, po
+ 	keepalive.SetNetDialer(dialer)
+ 	mptcp.SetNetDialer(dialer, opt.mpTcp)
+ 
+-	if DefaultSocketHook != nil { // ignore interfaceName, routingMark and tfo when DefaultSocketHook not null (in CMFA)
++	if DefaultSocketHook != nil || scopedSocketControl(ctx) != nil { // ignore interfaceName, routingMark and tfo when DefaultSocketHook not null (in CMFA)
+ 		socketHookToToDialer(dialer)
+ 	} else {
+ 		if opt.interfaceName == "" {
+diff --git a/component/dialer/socket_hook.go b/component/dialer/socket_hook.go
+index f860552579f5d0e6eeee3c7cb9baeeccc33634bf..8f951512f215e60174c7d0a2aedaf9c089879266 100644
+--- a/component/dialer/socket_hook.go
++++ b/component/dialer/socket_hook.go
+@@ -14,8 +14,23 @@ type SocketControl func(network, address string, conn syscall.RawConn) error
+ // never change type traits because it's used in CMFA
+ var DefaultSocketHook SocketControl
+ 
++type ScopedSocketControl func(context.Context, string, string, syscall.RawConn) error
++type socketControlKey struct{}
++
++func WithSocketControl(ctx context.Context, control ScopedSocketControl) context.Context {
++	return context.WithValue(ctx, socketControlKey{}, control)
++}
++
++func scopedSocketControl(ctx context.Context) ScopedSocketControl {
++	control, _ := ctx.Value(socketControlKey{}).(ScopedSocketControl)
++	return control
++}
++
+ func socketHookToToDialer(dialer *net.Dialer) {
+ 	addControlToDialer(dialer, func(ctx context.Context, network, address string, c syscall.RawConn) error {
++		if control := scopedSocketControl(ctx); control != nil {
++			return control(ctx, network, address, c)
++		}
+ 		return DefaultSocketHook(network, address, c)
+ 	})
+ }
+diff --git a/component/geodata/init.go b/component/geodata/init.go
+index 7b87844249afb4b103be31e4bf3698dabb0ac843..4027d404a238c3af31520a82ae27818db6784015 100644
+--- a/component/geodata/init.go
++++ b/component/geodata/init.go
+@@ -11,6 +11,7 @@ import (
+ 	"github.com/metacubex/mihomo/common/atomic"
+ 	mihomoHttp "github.com/metacubex/mihomo/component/http"
+ 	"github.com/metacubex/mihomo/component/mmdb"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ 
+@@ -18,6 +19,7 @@ import (
+ )
+ 
+ var (
++	urlMutex    sync.RWMutex
+ 	initGeoSite bool
+ 	initGeoIP   int
+ 	initASN     bool
+@@ -37,38 +39,57 @@ var (
+ )
+ 
+ func GeoIpUrl() string {
++	urlMutex.RLock()
++	defer urlMutex.RUnlock()
+ 	return geoIpUrl
+ }
+ 
+ func SetGeoIpUrl(url string) {
++	urlMutex.Lock()
++	defer urlMutex.Unlock()
+ 	geoIpUrl = url
+ }
+ 
+ func MmdbUrl() string {
++	urlMutex.RLock()
++	defer urlMutex.RUnlock()
+ 	return mmdbUrl
+ }
+ 
+ func SetMmdbUrl(url string) {
++	urlMutex.Lock()
++	defer urlMutex.Unlock()
+ 	mmdbUrl = url
+ }
+ 
+ func GeoSiteUrl() string {
++	urlMutex.RLock()
++	defer urlMutex.RUnlock()
+ 	return geoSiteUrl
+ }
+ 
+ func SetGeoSiteUrl(url string) {
++	urlMutex.Lock()
++	defer urlMutex.Unlock()
+ 	geoSiteUrl = url
+ }
+ 
+ func ASNUrl() string {
++	urlMutex.RLock()
++	defer urlMutex.RUnlock()
+ 	return asnUrl
+ }
+ 
+ func SetASNUrl(url string) {
++	urlMutex.Lock()
++	defer urlMutex.Unlock()
+ 	asnUrl = url
+ }
+ 
+ func downloadToPath(url string, path string) (err error) {
++	if requestscope.BeginHook != nil {
++		return requestscope.NeedBootstrap(geoResourceName(path), url, path)
++	}
+ 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*90)
+ 	defer cancel()
+ 	resp, err := mihomoHttp.HttpRequest(ctx, url, http.MethodGet, nil, nil)
+@@ -91,6 +112,13 @@ func InitGeoSite() error {
+ 	geoSiteEnable.Store(true)
+ 	initGeoSiteMutex.Lock()
+ 	defer initGeoSiteMutex.Unlock()
++	path := C.Path.GeoSite()
++	unlock, err := requestscope.LockResource(context.Background(), path)
++	if err != nil {
++		return err
++	}
++	defer unlock()
++
+ 	if _, err := os.Stat(C.Path.GeoSite()); os.IsNotExist(err) {
+ 		log.Infoln("Can't find GeoSite.dat, start download")
+ 		if err := downloadToPath(GeoSiteUrl(), C.Path.GeoSite()); err != nil {
+@@ -102,6 +130,9 @@ func InitGeoSite() error {
+ 	if !initGeoSite {
+ 		if err := Verify(C.GeositeName); err != nil {
+ 			log.Warnln("GeoSite.dat invalid, remove and download: %s", err)
++			if requestscope.BeginHook != nil {
++				return requestscope.NeedBootstrap("GEOSITE", GeoSiteUrl(), C.Path.GeoSite())
++			}
+ 			if err := os.Remove(C.Path.GeoSite()); err != nil {
+ 				return fmt.Errorf("can't remove invalid GeoSite.dat: %s", err.Error())
+ 			}
+@@ -118,6 +149,16 @@ func InitGeoIP() error {
+ 	geoIpEnable.Store(true)
+ 	initGeoIPMutex.Lock()
+ 	defer initGeoIPMutex.Unlock()
++	path := C.Path.MMDB()
++	if GeodataMode() {
++		path = C.Path.GeoIP()
++	}
++	unlock, err := requestscope.LockResource(context.Background(), path)
++	if err != nil {
++		return err
++	}
++	defer unlock()
++
+ 	if GeodataMode() {
+ 		if _, err := os.Stat(C.Path.GeoIP()); os.IsNotExist(err) {
+ 			log.Infoln("Can't find GeoIP.dat, start download")
+@@ -131,6 +172,9 @@ func InitGeoIP() error {
+ 		if initGeoIP != 1 {
+ 			if err := Verify(C.GeoipName); err != nil {
+ 				log.Warnln("GeoIP.dat invalid, remove and download: %s", err)
++				if requestscope.BeginHook != nil {
++					return requestscope.NeedBootstrap("GEOIP", GeoIpUrl(), C.Path.GeoIP())
++				}
+ 				if err := os.Remove(C.Path.GeoIP()); err != nil {
+ 					return fmt.Errorf("can't remove invalid GeoIP.dat: %s", err.Error())
+ 				}
+@@ -153,6 +197,9 @@ func InitGeoIP() error {
+ 	if initGeoIP != 2 {
+ 		if !mmdb.Verify(C.Path.MMDB()) {
+ 			log.Warnln("MMDB invalid, remove and download")
++			if requestscope.BeginHook != nil {
++				return requestscope.NeedBootstrap("MMDB", MmdbUrl(), C.Path.MMDB())
++			}
+ 			if err := os.Remove(C.Path.MMDB()); err != nil {
+ 				return fmt.Errorf("can't remove invalid MMDB: %s", err.Error())
+ 			}
+@@ -169,6 +216,13 @@ func InitASN() error {
+ 	asnEnable.Store(true)
+ 	initASNMutex.Lock()
+ 	defer initASNMutex.Unlock()
++	path := C.Path.ASN()
++	unlock, err := requestscope.LockResource(context.Background(), path)
++	if err != nil {
++		return err
++	}
++	defer unlock()
++
+ 	if _, err := os.Stat(C.Path.ASN()); os.IsNotExist(err) {
+ 		log.Infoln("Can't find ASN.mmdb, start download")
+ 		if err := downloadToPath(ASNUrl(), C.Path.ASN()); err != nil {
+@@ -180,6 +234,9 @@ func InitASN() error {
+ 	if !initASN {
+ 		if !mmdb.Verify(C.Path.ASN()) {
+ 			log.Warnln("ASN invalid, remove and download")
++			if requestscope.BeginHook != nil {
++				return requestscope.NeedBootstrap("ASN", ASNUrl(), C.Path.ASN())
++			}
+ 			if err := os.Remove(C.Path.ASN()); err != nil {
+ 				return fmt.Errorf("can't remove invalid ASN: %s", err.Error())
+ 			}
+@@ -203,3 +260,16 @@ func GeoSiteEnable() bool {
+ func ASNEnable() bool {
+ 	return asnEnable.Load()
+ }
++
++func geoResourceName(path string) string {
++	switch path {
++	case C.Path.GeoSite():
++		return "GEOSITE"
++	case C.Path.GeoIP():
++		return "GEOIP"
++	case C.Path.ASN():
++		return "ASN"
++	default:
++		return "MMDB"
++	}
++}
+diff --git a/component/http/http.go b/component/http/http.go
+index af6ffeaa45ca52e69e7237493e6a1438e87964fc..3efc5a03391f0dbec20706e64f0c9eea0da82ef3 100644
+--- a/component/http/http.go
++++ b/component/http/http.go
+@@ -2,6 +2,7 @@ package http
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"io"
+ 	"net"
+ 	URL "net/url"
+@@ -11,6 +12,7 @@ import (
+ 
+ 	"github.com/metacubex/mihomo/component/ca"
+ 	"github.com/metacubex/mihomo/component/dialer"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/listener/inner"
+ 
+@@ -34,6 +36,16 @@ func HttpRequest(ctx context.Context, url, method string, header map[string][]st
+ 	for _, o := range options {
+ 		o(&opt)
+ 	}
++	if opt.scope != nil {
++		if err := opt.scope.Check(); err != nil {
++			return nil, err
++		}
++		ctx = requestscope.WithLease(ctx, opt.scope)
++		opt.dialer = opt.scope.Dialer()
++	}
++	if requestscope.BeginHook != nil && opt.scope == nil {
++		return nil, requestscope.ErrBlocked
++	}
+ 	method = strings.ToUpper(method)
+ 	urlRes, err := URL.Parse(url)
+ 	if err != nil {
+@@ -87,12 +99,39 @@ func HttpRequest(ctx context.Context, url, method string, header map[string][]st
+ 	}
+ 
+ 	client := http.Client{Transport: transport}
+-	return client.Do(req)
++	if opt.scope != nil {
++		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
++			if len(via) >= 10 {
++				return errors.New("stopped after 10 redirects")
++			}
++			return requestscope.CheckURL(opt.scope, req.URL.String())
++		}
++		if err = requestscope.CheckURL(opt.scope, req.URL.String()); err != nil {
++			transport.CloseIdleConnections()
++			return nil, err
++		}
++	}
++	if opt.scope == nil {
++		return client.Do(req)
++	}
++	requestCtx, cancel := context.WithCancel(ctx)
++	stop := context.AfterFunc(opt.scope.Context(), cancel)
++	req = req.WithContext(requestCtx)
++	response, err := client.Do(req)
++	if err != nil {
++		stop()
++		cancel()
++		transport.CloseIdleConnections()
++		return nil, err
++	}
++	response.Body = &scopeBody{ReadCloser: response.Body, close: func() { stop(); cancel(); transport.CloseIdleConnections() }}
++	return response, nil
+ }
+ 
+ type Option func(opt *option)
+ 
+ type option struct {
++	scope        requestscope.Lease
+ 	specialProxy string
+ 	dialer       C.Dialer
+ 	caOption     ca.Option
+@@ -115,3 +154,14 @@ func WithCAOption(caOption ca.Option) Option {
+ 		opt.caOption = caOption
+ 	}
+ }
++
++func WithScope(scope requestscope.Lease) Option {
++	return func(opt *option) { opt.scope = scope }
++}
++
++type scopeBody struct {
++	io.ReadCloser
++	close func()
++}
++
++func (b *scopeBody) Close() error { err := b.ReadCloser.Close(); b.close(); return err }
+diff --git a/component/mmdb/mmdb.go b/component/mmdb/mmdb.go
+index 81644b007620a1c9917105d3545a9135051b33a3..4930ca4c7a20465ad5b3dfeccfc637a82b9a14ec 100644
+--- a/component/mmdb/mmdb.go
++++ b/component/mmdb/mmdb.go
+@@ -1,9 +1,11 @@
+ package mmdb
+ 
+ import (
++	"context"
+ 	"sync"
+ 
+ 	mihomoOnce "github.com/metacubex/mihomo/common/once"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ 
+@@ -52,6 +54,8 @@ func Verify(path string) bool {
+ }
+ 
+ func IPInstance() IPReader {
++	unlock, _ := requestscope.LockResource(context.Background(), C.Path.MMDB())
++	defer unlock()
+ 	ipOnce.Do(func() {
+ 		mmdbPath := C.Path.MMDB()
+ 		log.Infoln("Load MMDB file: %s", mmdbPath)
+@@ -74,6 +78,8 @@ func IPInstance() IPReader {
+ }
+ 
+ func ASNInstance() ASNReader {
++	unlock, _ := requestscope.LockResource(context.Background(), C.Path.ASN())
++	defer unlock()
+ 	asnOnce.Do(func() {
+ 		ASNPath := C.Path.ASN()
+ 		log.Infoln("Load ASN file: %s", ASNPath)
+@@ -94,3 +100,14 @@ func ReloadIP() {
+ func ReloadASN() {
+ 	mihomoOnce.Reset(&asnOnce)
+ }
++
++func CloseIPForUpdate() {
++	if ipReader.Reader != nil {
++		_ = ipReader.Reader.Close()
++	}
++}
++func CloseASNForUpdate() {
++	if asnReader.Reader != nil {
++		_ = asnReader.Reader.Close()
++	}
++}
+diff --git a/component/requestscope/scope.go b/component/requestscope/scope.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..5df9f351f05591a5d337b185d0dab73cce462bb3
+--- /dev/null
++++ b/component/requestscope/scope.go
+@@ -0,0 +1,277 @@
++package requestscope
++
++import (
++	"context"
++	"errors"
++	"net"
++	"sync"
++
++	C "github.com/metacubex/mihomo/constant"
++)
++
++var (
++	ErrBlocked   = errors.New("application request blocked")
++	ErrCancelled = errors.New("application request cancelled")
++	ErrBootstrap = errors.New("application request needs bootstrap permission")
++)
++
++type Owner struct{ ID uint64 }
++
++type Spec struct {
++	Owner                                Owner
++	Kind, Trigger, Key, URL, Proxy, Mode string
++	Resource, Client, Permit             string
++	Dataset, SourceRevision, Operation   uint64
++	ExpectedState                        *StateVersion
++}
++
++type StateVersion struct {
++	Epoch    string
++	Revision uint64
++}
++
++type Completion struct {
++	Spec  Spec
++	State StateVersion
++}
++
++func CompletionOf(lease Lease) *Completion {
++	if captured, ok := lease.(interface{ CompletionVersion() Completion }); ok {
++		value := captured.CompletionVersion()
++		return &value
++	}
++	return nil
++}
++
++type Receipt interface {
++	Complete()
++	Fail(error)
++}
++
++type Lease interface {
++	Context() context.Context
++	Dialer() C.Dialer
++	Check() error
++	TrackConn(net.Conn) error
++	LockCommit(context.Context) (func(), error)
++	GrantCommit() (Receipt, error)
++	Close()
++}
++
++type ProxyBinding struct {
++	Lease Lease
++	User  string
++}
++
++type RoutingLease interface {
++	ProxyName() string
++	SelectProxy(C.Proxy, *C.Metadata) (C.Proxy, error)
++}
++
++func Route(lease Lease, metadata *C.Metadata) {
++	if routing, ok := lease.(RoutingLease); ok {
++		metadata.SpecialProxy = routing.ProxyName()
++	}
++}
++
++func SelectProxy(lease Lease, proxy C.Proxy, metadata *C.Metadata) (C.Proxy, error) {
++	if routing, ok := lease.(RoutingLease); ok {
++		return routing.SelectProxy(proxy, metadata)
++	}
++	return proxy, nil
++}
++
++func FixedProxy(lease Lease) (C.Proxy, bool) {
++	if routing, ok := lease.(interface{ FixedProxy() (C.Proxy, bool) }); ok {
++		return routing.FixedProxy()
++	}
++	return nil, false
++}
++
++var (
++	BeginHook       func(context.Context, Spec) (Lease, error)
++	ProxyHook       func(net.Conn, string, string) (ProxyBinding, bool, error)
++	PhaseHook       func(Owner, string)
++	OwnerHook       func() Owner
++	OwnerActiveHook func(Owner) bool
++	ReadyHook       func(context.Context, Owner, string) error
++	BootstrapHook   func(string, string, string) error
++	ResourceHook    func(context.Context, string) (func(), error)
++	ProxyUpdateHook func(Owner, func())
++)
++
++type contextKey struct{}
++
++func WithLease(ctx context.Context, lease Lease) context.Context {
++	return context.WithValue(ctx, contextKey{}, lease)
++}
++
++func FromContext(ctx context.Context) Lease {
++	lease, _ := ctx.Value(contextKey{}).(Lease)
++	return lease
++}
++
++func Begin(ctx context.Context, spec Spec) (Lease, error) {
++	if BeginHook == nil {
++		return nil, nil
++	}
++	return BeginHook(ctx, spec)
++}
++
++func Check(lease Lease) error {
++	if lease == nil {
++		return nil
++	}
++	return lease.Check()
++}
++
++func Commit(lease Lease, action func() error) error {
++	if lease == nil {
++		return action()
++	}
++	unlock, err := lease.LockCommit(lease.Context())
++	if err != nil {
++		return err
++	}
++	defer unlock()
++	receipt, err := lease.GrantCommit()
++	if err != nil {
++		return err
++	}
++	if err = action(); err != nil {
++		receipt.Fail(err)
++		return err
++	}
++	receipt.Complete()
++	return nil
++}
++
++func Phase(owner Owner, phase string) {
++	if PhaseHook != nil {
++		PhaseHook(owner, phase)
++	}
++}
++
++func CurrentOwner() Owner {
++	if OwnerHook == nil {
++		return Owner{}
++	}
++	return OwnerHook()
++}
++
++func WaitReady(ctx context.Context, owner Owner, proxies ...string) error {
++	if ReadyHook == nil {
++		return nil
++	}
++	proxy := ""
++	if len(proxies) > 0 {
++		proxy = proxies[0]
++	}
++	return ReadyHook(ctx, owner, proxy)
++}
++
++type AppTunnel interface {
++	HandleAppTCPConn(context.Context, net.Conn, *C.Metadata, Lease)
++}
++
++func HandleTCP(ctx context.Context, tunnel C.Tunnel, conn net.Conn, metadata *C.Metadata, lease Lease) {
++	if lease == nil {
++		tunnel.HandleTCPConn(conn, metadata)
++		return
++	}
++	scoped, ok := tunnel.(AppTunnel)
++	if !ok || lease.Check() != nil {
++		_ = conn.Close()
++		return
++	}
++	scoped.HandleAppTCPConn(ctx, conn, metadata, lease)
++}
++
++func BindProxy(conn net.Conn, user, password string) (ProxyBinding, bool, error) {
++	if ProxyHook == nil {
++		return ProxyBinding{}, false, nil
++	}
++	return ProxyHook(conn, user, password)
++}
++
++type trackedConn struct {
++	net.Conn
++	once sync.Once
++	stop func() bool
++}
++
++func Track(ctx context.Context, conn net.Conn, lease Lease) (net.Conn, error) {
++	if lease != nil {
++		if err := lease.TrackConn(conn); err != nil {
++			_ = conn.Close()
++			return nil, err
++		}
++	}
++	wrapped := &trackedConn{Conn: conn}
++	wrapped.stop = context.AfterFunc(ctx, func() { _ = conn.Close() })
++	if err := ctx.Err(); err != nil {
++		_ = wrapped.Close()
++		return nil, err
++	}
++	return wrapped, nil
++}
++
++func (c *trackedConn) Close() error {
++	var err error
++	c.once.Do(func() {
++		if c.stop != nil {
++			c.stop()
++		}
++		err = c.Conn.Close()
++	})
++	return err
++}
++
++func BeforeDial(lease Lease, metadata *C.Metadata) error {
++	if verifier, ok := lease.(interface{ BeforeDial(*C.Metadata) error }); ok {
++		return verifier.BeforeDial(metadata)
++	}
++	return Check(lease)
++}
++
++func NeedBootstrap(kind, url, path string) error {
++	if BootstrapHook != nil {
++		return BootstrapHook(kind, url, path)
++	}
++	return ErrBootstrap
++}
++
++func LockResource(ctx context.Context, key string) (func(), error) {
++	if ResourceHook != nil {
++		return ResourceHook(ctx, key)
++	}
++	return func() {}, nil
++}
++
++type ownerContextKey struct{}
++
++func WithOwner(ctx context.Context, owner Owner) context.Context {
++	return context.WithValue(ctx, ownerContextKey{}, owner)
++}
++func OwnerFromContext(ctx context.Context) Owner {
++	if owner, ok := ctx.Value(ownerContextKey{}).(Owner); ok {
++		return owner
++	}
++	return CurrentOwner()
++}
++
++func CheckTarget(lease Lease, url string) error {
++	if target, ok := lease.(interface{ CheckTarget(string) error }); ok {
++		return target.CheckTarget(url)
++	}
++	return Check(lease)
++}
++
++func CheckURL(lease Lease, target string) error {
++	if scoped, ok := lease.(interface{ CheckURL(string) error }); ok {
++		return scoped.CheckURL(target)
++	}
++	return Check(lease)
++}
++
++func OwnerActive(owner Owner) bool { return OwnerActiveHook == nil || OwnerActiveHook(owner) }
+diff --git a/component/resource/fetcher.go b/component/resource/fetcher.go
+index 6d671c815861e83d8e404522acf6a7953d019cd7..08983558905d30298958e850ef1399618744ca62 100644
+--- a/component/resource/fetcher.go
++++ b/component/resource/fetcher.go
+@@ -2,6 +2,8 @@ package resource
+ 
+ import (
+ 	"context"
++	"errors"
++	"fmt"
+ 	"io"
+ 	"io/fs"
+ 	"os"
+@@ -9,6 +11,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/metacubex/mihomo/common/utils"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/component/slowdown"
+ 	P "github.com/metacubex/mihomo/constant/provider"
+ 	"github.com/metacubex/mihomo/log"
+@@ -26,15 +29,19 @@ type Fetcher[V any] struct {
+ 	resourceType string
+ 	name         string
+ 	vehicle      P.Vehicle
++	owner        requestscope.Owner
+ 	bundleFile   BundleFile
+ 	updatedAt    time.Time
+ 	hash         utils.HashType
+ 	parser       Parser[V]
+ 	interval     time.Duration
+ 	onUpdate     func(V)
++	afterUpdate  func()
+ 	watcher      *fswatch.Watcher
+ 	loadBufMutex sync.Mutex
+ 	backoff      slowdown.Backoff
++	pullOnce     sync.Once
++	pullError    error
+ }
+ 
+ func (f *Fetcher[V]) Name() string {
+@@ -50,24 +57,48 @@ func (f *Fetcher[V]) VehicleType() P.VehicleType {
+ }
+ 
+ func (f *Fetcher[V]) UpdatedAt() time.Time {
++	f.loadBufMutex.Lock()
++	defer f.loadBufMutex.Unlock()
+ 	return f.updatedAt
+ }
+ 
++func (f *Fetcher[V]) SetAfterUpdate(callback func()) { f.afterUpdate = callback }
++
++func (f *Fetcher[V]) RequestOwner() requestscope.Owner { return f.owner }
++func (f *Fetcher[V]) RequestContext() context.Context  { return f.ctx }
++func (f *Fetcher[V]) RequestProxy() string             { return f.vehicle.Proxy() }
++
+ func (f *Fetcher[V]) Initial() (V, error) {
+-	if stat, fErr := os.Stat(f.vehicle.Path()); fErr == nil {
+-		// local file exists, use it first
+-		buf, err := os.ReadFile(f.vehicle.Path())
++	lease, scopeErr := f.begin("provider-local")
++	if scopeErr != nil {
++		return lo.Empty[V](), scopeErr
++	}
++	if lease != nil {
++		defer lease.Close()
++	}
++	unlock, lockErr := requestscope.LockResource(f.ctx, f.vehicle.Path())
++	if lockErr != nil {
++		return lo.Empty[V](), lockErr
++	}
++	stat, statErr := os.Stat(f.vehicle.Path())
++	var buf []byte
++	var readErr error
++	if statErr == nil {
++		buf, readErr = os.ReadFile(f.vehicle.Path())
++	}
++	unlock()
++	if statErr == nil && readErr == nil {
+ 		modTime := stat.ModTime()
+-		contents, _, err := f.loadBuf(buf, utils.MakeHash(buf), false)
+-		f.updatedAt = modTime // reset updatedAt to file's modTime
+-
++		contents, _, err := f.loadBufScoped(buf, utils.MakeHash(buf), false, lease, nil, &modTime)
+ 		if err == nil {
+-			err = f.startPullLoop(time.Since(modTime) > f.interval)
+-			if err != nil {
++			if err = f.startPullLoop(time.Since(modTime) > f.interval); err != nil {
+ 				return lo.Empty[V](), err
+ 			}
+ 			return contents, nil
+ 		}
++		if errors.Is(err, requestscope.ErrCancelled) || errors.Is(err, requestscope.ErrBlocked) {
++			return lo.Empty[V](), err
++		}
+ 	}
+ 
+ 	// parse local file error, fallback to bundle file
+@@ -80,8 +111,7 @@ func (f *Fetcher[V]) Initial() (V, error) {
+ 			if stat, sErr := file.Stat(); sErr == nil {
+ 				modTime = stat.ModTime()
+ 			}
+-			contents, _, err := f.loadBuf(buf, utils.MakeHash(buf), true)
+-			f.updatedAt = modTime // reset updatedAt to file's modTime
++			contents, _, err := f.loadLocal(buf, true, &modTime)
+ 
+ 			if err == nil {
+ 				log.Infoln("[Provider] %s extract successful from bundle file", f.Name())
+@@ -98,7 +128,11 @@ func (f *Fetcher[V]) Initial() (V, error) {
+ 	}
+ 
+ 	// parse local file error, fallback to remote
+-	contents, _, updateErr := f.Update()
++	contents, _, updateErr := f.update(true)
++
++	if updateErr != nil && (errors.Is(updateErr, requestscope.ErrCancelled) || errors.Is(updateErr, requestscope.ErrBlocked) || f.ctx.Err() != nil) {
++		return lo.Empty[V](), updateErr
++	}
+ 
+ 	// start the pull loop even if f.Update() failed
+ 	err := f.startPullLoop(false)
+@@ -113,57 +147,138 @@ func (f *Fetcher[V]) Initial() (V, error) {
+ 	return contents, nil
+ }
+ 
+-func (f *Fetcher[V]) Update() (V, bool, error) {
+-	buf, hash, err := f.vehicle.Read(f.ctx, f.hash)
++func (f *Fetcher[V]) begin(kind string) (requestscope.Lease, error) {
++	return requestscope.Begin(f.ctx, requestscope.Spec{Owner: f.owner, Kind: kind, Trigger: "automatic", Key: f.resourceType + ":" + f.name, Resource: f.vehicle.Path(), URL: f.vehicle.Url(), Proxy: f.vehicle.Proxy()})
++}
++
++func (f *Fetcher[V]) Update() (V, bool, error) { return f.update(false) }
++
++func (f *Fetcher[V]) update(initial bool) (V, bool, error) {
++	kind := "provider"
++	if initial {
++		kind = "provider-initial"
++	}
++	if f.vehicle.Type() == P.File {
++		kind = "provider-local"
++	}
++	lease, err := f.begin(kind)
+ 	if err != nil {
+-		f.backoff.AddAttempt() // add a failed attempt to backoff
+ 		return lo.Empty[V](), false, err
+ 	}
+-	return f.loadBuf(buf, hash, f.vehicle.Type() != P.File)
++	if lease != nil {
++		defer lease.Close()
++	}
++	f.loadBufMutex.Lock()
++	oldHash := f.hash
++	f.loadBufMutex.Unlock()
++	var buf []byte
++	var hash utils.HashType
++	var commitMetadata func() error
++	if vehicle, ok := f.vehicle.(*HTTPVehicle); ok {
++		var result HTTPReadResult
++		result, err = vehicle.ScopedRead(f.ctx, oldHash, lease)
++		buf, hash, commitMetadata = result.Bytes, result.Hash, result.CommitMetadata
++	} else {
++		buf, hash, err = f.vehicle.Read(f.ctx, oldHash)
++	}
++	if err != nil {
++		f.loadBufMutex.Lock()
++		commitErr := requestscope.Commit(lease, func() error { f.backoff.AddAttempt(); return nil })
++		f.loadBufMutex.Unlock()
++		if commitErr != nil {
++			return lo.Empty[V](), false, commitErr
++		}
++		return lo.Empty[V](), false, err
++	}
++	return f.loadBufScoped(buf, hash, f.vehicle.Type() != P.File, lease, commitMetadata, nil)
+ }
+ 
+ func (f *Fetcher[V]) SideUpdate(buf []byte) (V, bool, error) {
+-	return f.loadBuf(buf, utils.MakeHash(buf), true)
++	return f.loadLocal(buf, true, nil)
+ }
+ 
+ func (f *Fetcher[V]) loadBuf(buf []byte, hash utils.HashType, updateFile bool) (V, bool, error) {
+-	f.loadBufMutex.Lock()
+-	defer f.loadBufMutex.Unlock()
+-
+-	now := time.Now()
+-	if f.hash.Equal(hash) {
+-		if updateFile {
+-			_ = os.Chtimes(f.vehicle.Path(), now, now)
+-		}
+-		f.updatedAt = now
+-		f.backoff.Reset() // no error, reset backoff
+-		return lo.Empty[V](), true, nil
++	lease, err := f.begin("provider-local")
++	if err != nil {
++		return lo.Empty[V](), false, err
+ 	}
+-
+-	if buf == nil { // f.hash has been changed between f.vehicle.Read but should not happen (cause by concurrent)
+-		return lo.Empty[V](), true, nil
++	if lease != nil {
++		defer lease.Close()
+ 	}
++	return f.loadBufScoped(buf, hash, updateFile, lease, nil, nil)
++}
+ 
+-	contents, err := f.parser(buf)
++func (f *Fetcher[V]) loadLocal(buf []byte, updateFile bool, modTime *time.Time) (V, bool, error) {
++	lease, err := f.begin("provider-local")
+ 	if err != nil {
+-		f.backoff.AddAttempt() // add a failed attempt to backoff
+ 		return lo.Empty[V](), false, err
+ 	}
+-	f.backoff.Reset() // no error, reset backoff
++	if lease != nil {
++		defer lease.Close()
++	}
++	return f.loadBufScoped(buf, utils.MakeHash(buf), updateFile, lease, nil, modTime)
++}
+ 
+-	if updateFile {
+-		if err = f.vehicle.Write(buf); err != nil {
++func (f *Fetcher[V]) loadBufScoped(buf []byte, hash utils.HashType, updateFile bool, lease requestscope.Lease, metadata func() error, modTime *time.Time) (value V, unchanged bool, failure error) {
++	f.loadBufMutex.Lock()
++	notify := false
++	defer func() {
++		f.loadBufMutex.Unlock()
++		if notify && failure == nil && f.afterUpdate != nil && requestscope.Check(lease) == nil {
++			f.afterUpdate()
++		}
++	}()
++	if err := requestscope.Check(lease); err != nil {
++		return lo.Empty[V](), false, err
++	}
++	same := f.hash.Equal(hash)
++	var contents V
++	if !same && buf != nil {
++		var err error
++		contents, err = f.parser(buf)
++		if err != nil {
++			if commitErr := requestscope.Commit(lease, func() error { f.backoff.AddAttempt(); return nil }); commitErr != nil {
++				return lo.Empty[V](), false, commitErr
++			}
+ 			return lo.Empty[V](), false, err
+ 		}
+ 	}
+-	f.updatedAt = now
+-	f.hash = hash
+-
+-	if f.onUpdate != nil {
+-		f.onUpdate(contents)
++	err := requestscope.Commit(lease, func() error {
++		now := time.Now()
++		if modTime != nil {
++			now = *modTime
++		}
++		if same {
++			if updateFile {
++				if err := os.Chtimes(f.vehicle.Path(), now, now); err != nil {
++					return err
++				}
++			}
++		} else if buf != nil {
++			if updateFile {
++				if err := f.vehicle.Write(buf); err != nil {
++					return err
++				}
++			}
++			f.hash = hash
++			if f.onUpdate != nil {
++				f.onUpdate(contents)
++			}
++		}
++		if metadata != nil {
++			if err := metadata(); err != nil {
++				return err
++			}
++		}
++		f.updatedAt = now
++		f.backoff.Reset()
++		return nil
++	})
++	if err != nil {
++		return lo.Empty[V](), false, err
+ 	}
+-
+-	return contents, false, nil
++	notify = !same && buf != nil
++	return contents, same || buf == nil, nil
+ }
+ 
+ func (f *Fetcher[V]) Close() error {
+@@ -175,7 +290,7 @@ func (f *Fetcher[V]) Close() error {
+ }
+ 
+ func (f *Fetcher[V]) pullLoop(forceUpdate bool) {
+-	initialInterval := f.interval - time.Since(f.updatedAt)
++	initialInterval := f.interval - time.Since(f.UpdatedAt())
+ 	if initialInterval > f.interval {
+ 		initialInterval = f.interval
+ 	}
+@@ -184,11 +299,7 @@ func (f *Fetcher[V]) pullLoop(forceUpdate bool) {
+ 		log.Warnln("[Provider] %s not updated for a long time, force refresh", f.Name())
+ 		f.updateWithLog()
+ 	}
+-	if attempt := f.backoff.Attempt(); attempt > 0 { // f.Update() was failed, decrease the interval from backoff to achieve fast retry
+-		if duration := f.backoff.ForAttempt(attempt); duration < initialInterval {
+-			initialInterval = duration
+-		}
+-	}
++	initialInterval = f.retryInterval(initialInterval)
+ 
+ 	timer := time.NewTimer(initialInterval)
+ 	defer timer.Stop()
+@@ -196,12 +307,7 @@ func (f *Fetcher[V]) pullLoop(forceUpdate bool) {
+ 		select {
+ 		case <-timer.C:
+ 			f.updateWithLog()
+-			interval := f.interval
+-			if attempt := f.backoff.Attempt(); attempt > 0 { // f.Update() was failed, decrease the interval from backoff to achieve fast retry
+-				if duration := f.backoff.ForAttempt(attempt); duration < interval {
+-					interval = duration
+-				}
+-			}
++			interval := f.retryInterval(f.interval)
+ 			timer.Reset(interval)
+ 		case <-f.ctx.Done():
+ 			return
+@@ -209,7 +315,23 @@ func (f *Fetcher[V]) pullLoop(forceUpdate bool) {
+ 	}
+ }
+ 
+-func (f *Fetcher[V]) startPullLoop(forceUpdate bool) (err error) {
++func (f *Fetcher[V]) retryInterval(interval time.Duration) time.Duration {
++	f.loadBufMutex.Lock()
++	defer f.loadBufMutex.Unlock()
++	if attempt := f.backoff.Attempt(); attempt > 0 {
++		if retry := f.backoff.ForAttempt(attempt); retry < interval {
++			return retry
++		}
++	}
++	return interval
++}
++
++func (f *Fetcher[V]) startPullLoop(forceUpdate bool) error {
++	f.pullOnce.Do(func() { f.pullError = f.startPullLoopOnce(forceUpdate) })
++	return f.pullError
++}
++
++func (f *Fetcher[V]) startPullLoopOnce(forceUpdate bool) (err error) {
+ 	// pull contents automatically
+ 	if f.vehicle.Type() == P.File {
+ 		f.watcher, err = fswatch.NewWatcher(fswatch.Options{
+@@ -234,6 +356,9 @@ func (f *Fetcher[V]) updateCallback(path string) {
+ }
+ 
+ func (f *Fetcher[V]) updateWithLog() {
++	if err := requestscope.WaitReady(f.ctx, f.owner, f.vehicle.Proxy()); err != nil {
++		return
++	}
+ 	_, same, err := f.Update()
+ 	if err != nil {
+ 		log.Warnln("[Provider] %s pull error: %s", f.Name(), err.Error())
+@@ -256,14 +381,16 @@ func NewFetcher[V any](name string, interval time.Duration, vehicle P.Vehicle, b
+ 		minBackoff = interval
+ 	}
+ 	return &Fetcher[V]{
+-		ctx:        ctx,
+-		ctxCancel:  cancel,
+-		name:       name,
+-		bundleFile: bundleFile,
+-		vehicle:    vehicle,
+-		parser:     parser,
+-		onUpdate:   onUpdate,
+-		interval:   interval,
++		ctx:          ctx,
++		ctxCancel:    cancel,
++		name:         name,
++		resourceType: fmt.Sprintf("%T", (*V)(nil)),
++		bundleFile:   bundleFile,
++		vehicle:      vehicle,
++		owner:        requestscope.CurrentOwner(),
++		parser:       parser,
++		onUpdate:     onUpdate,
++		interval:     interval,
+ 		backoff: slowdown.Backoff{
+ 			Factor: 2,
+ 			Jitter: false,
+diff --git a/component/resource/vehicle.go b/component/resource/vehicle.go
+index 86fb3948fea9ffece37658a241cc89c674aa288f..81e4d56f9a402b611f79fa6322fda9e42488c821 100644
+--- a/component/resource/vehicle.go
++++ b/component/resource/vehicle.go
+@@ -11,6 +11,7 @@ import (
+ 	"github.com/metacubex/mihomo/common/utils"
+ 	mihomoHttp "github.com/metacubex/mihomo/component/http"
+ 	"github.com/metacubex/mihomo/component/profile/cachefile"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	P "github.com/metacubex/mihomo/constant/provider"
+ 
+ 	"github.com/metacubex/http"
+@@ -84,7 +85,15 @@ func NewFileVehicle(path string) *FileVehicle {
+ 	return &FileVehicle{path: path}
+ }
+ 
++type HTTPReadResult struct {
++	Bytes          []byte
++	Hash           utils.HashType
++	Lease          requestscope.Lease
++	CommitMetadata func() error
++}
++
+ type HTTPVehicle struct {
++	owner     requestscope.Owner
+ 	url       string
+ 	path      string
+ 	proxy     string
+@@ -112,14 +121,63 @@ func (h *HTTPVehicle) Proxy() string {
+ }
+ 
+ func (h *HTTPVehicle) Write(buf []byte) error {
++	if requestscope.BeginHook != nil {
++		return atomicWrite(h.path, buf)
++	}
+ 	return safeWrite(h.path, buf)
+ }
+ 
++func atomicWrite(path string, buf []byte) error {
++	if err := os.MkdirAll(filepath.Dir(path), dirMode); err != nil {
++		return err
++	}
++	file, err := os.CreateTemp(filepath.Dir(path), ".request-")
++	if err != nil {
++		return err
++	}
++	defer os.Remove(file.Name())
++	if stat, statErr := os.Stat(path); statErr == nil {
++		if err = file.Chmod(stat.Mode().Perm()); err != nil {
++			_ = file.Close()
++			return err
++		}
++	}
++	if _, err = file.Write(buf); err != nil {
++		_ = file.Close()
++		return err
++	}
++	if err = file.Sync(); err != nil {
++		_ = file.Close()
++		return err
++	}
++	if err = file.Close(); err != nil {
++		return err
++	}
++	return os.Rename(file.Name(), path)
++}
++
+ func (h *HTTPVehicle) SetInRead(fn func(response *http.Response)) {
+ 	h.inRead = fn
+ }
+ 
+ func (h *HTTPVehicle) Read(ctx context.Context, oldHash utils.HashType) (buf []byte, hash utils.HashType, err error) {
++	if requestscope.BeginHook != nil {
++		return nil, utils.HashType{}, requestscope.ErrBlocked
++	}
++	result, err := h.ScopedRead(ctx, oldHash, nil)
++	if err == nil && result.CommitMetadata != nil {
++		err = result.CommitMetadata()
++	}
++	return result.Bytes, result.Hash, err
++}
++
++func (h *HTTPVehicle) RequestOwner() requestscope.Owner { return h.owner }
++
++func (h *HTTPVehicle) ScopedRead(ctx context.Context, oldHash utils.HashType, lease requestscope.Lease) (result HTTPReadResult, err error) {
++	result.Lease = lease
++	if err = requestscope.Check(lease); err != nil {
++		return
++	}
+ 	ctx, cancel := context.WithTimeout(ctx, h.timeout)
+ 	defer cancel()
+ 	header := h.header
+@@ -136,44 +194,70 @@ func (h *HTTPVehicle) Read(ctx context.Context, oldHash utils.HashType) (buf []b
+ 			setIfNoneMatch = true
+ 		}
+ 	}
+-	resp, err := mihomoHttp.HttpRequest(ctx, h.url, http.MethodGet, header, nil, mihomoHttp.WithSpecialProxy(h.proxy))
++	resp, err := mihomoHttp.HttpRequest(ctx, h.url, http.MethodGet, header, nil, mihomoHttp.WithSpecialProxy(h.proxy), mihomoHttp.WithScope(lease))
+ 	if err != nil {
++		if cancelErr := requestscope.Check(lease); cancelErr != nil {
++			err = cancelErr
++		}
+ 		return
+ 	}
+ 	defer resp.Body.Close()
+-
+-	if h.inRead != nil {
++	legacy := lease == nil && requestscope.BeginHook == nil
++	if legacy && h.inRead != nil {
+ 		h.inRead(resp)
+ 	}
+ 
+ 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+ 		if setIfNoneMatch && resp.StatusCode == http.StatusNotModified {
+-			return nil, oldHash, nil
++			result.Hash = oldHash
++		} else {
++			err = errors.New(resp.Status)
++			return
+ 		}
+-		err = errors.New(resp.Status)
+-		return
+-	}
+-	var reader io.Reader = resp.Body
+-	if h.sizeLimit > 0 {
+-		reader = io.LimitReader(reader, h.sizeLimit)
++	} else {
++		var reader io.Reader = resp.Body
++		if h.sizeLimit > 0 {
++			reader = io.LimitReader(reader, h.sizeLimit)
++		}
++		result.Bytes, err = io.ReadAll(reader)
++		if err != nil {
++			if cancelErr := requestscope.Check(lease); cancelErr != nil {
++				err = cancelErr
++			}
++			return
++		}
++		result.Hash = utils.MakeHash(result.Bytes)
+ 	}
+-	buf, err = io.ReadAll(reader)
+-	if err != nil {
++	if err = requestscope.Check(lease); err != nil {
+ 		return
+ 	}
+-	hash = utils.MakeHash(buf)
+-	if etag {
+-		cachefile.Cache().SetETagWithHash(h.url, cachefile.EtagWithHash{
+-			Hash: hash,
+-			ETag: resp.Header.Get("ETag"),
+-			Time: time.Now(),
+-		})
++	metadata := *resp
++	metadata.Header = resp.Header.Clone()
++	metadata.Body = nil
++	candidate := cachefile.EtagWithHash{Hash: result.Hash, ETag: metadata.Header.Get("ETag"), Time: time.Now()}
++	storeETag := etag && resp.StatusCode != http.StatusNotModified
++	if legacy && storeETag {
++		cachefile.Cache().SetETagWithHash(h.url, candidate)
++	}
++	result.CommitMetadata = func() error {
++		if !legacy && h.inRead != nil {
++			h.inRead(&metadata)
++		}
++		if !legacy && storeETag {
++			cachefile.Cache().SetETagWithHash(h.url, candidate)
++		}
++		return nil
+ 	}
+ 	return
+ }
+ 
+-func NewHTTPVehicle(url string, path string, proxy string, header http.Header, timeout time.Duration, sizeLimit int64) *HTTPVehicle {
++func NewHTTPVehicle(url string, path string, proxy string, header http.Header, timeout time.Duration, sizeLimit int64, owners ...requestscope.Owner) *HTTPVehicle {
++	owner := requestscope.CurrentOwner()
++	if len(owners) > 0 {
++		owner = owners[0]
++	}
+ 	return &HTTPVehicle{
++		owner:     owner,
+ 		url:       url,
+ 		path:      path,
+ 		proxy:     proxy,
+diff --git a/component/updater/patch.go b/component/updater/patch.go
+index 02096ab45f44f09f092ebc8414bee48c3e5bc756..5cf37536878fc4ae92745e6a1d6663f640367bdb 100644
+--- a/component/updater/patch.go
++++ b/component/updater/patch.go
+@@ -4,11 +4,13 @@ import (
+ 	"context"
+ 	"sync"
+ 
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/log"
+ )
+ 
+ var (
+-	GeoUpdateHook func(geoType string, updating bool, skipped bool, updateErr error)
++	GeoUpdateHook  func(geoType string, updating bool, skipped bool, updateErr error)
++	GeoUpdatedHook func(*requestscope.Completion, map[string]string)
+ )
+ 
+ func sendGeoUpdateStatus(geoType string, updating bool, skipped bool, updateErr error) {
+diff --git a/component/updater/request_scope_test.go b/component/updater/request_scope_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..d4dac0b0b23e834d90ed67e68461592f43e998f8
+--- /dev/null
++++ b/component/updater/request_scope_test.go
+@@ -0,0 +1,68 @@
++package updater
++
++import (
++	"context"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/metacubex/mihomo/component/geodata"
++	C "github.com/metacubex/mihomo/constant"
++)
++
++func TestRequestGeoInitialFailureKeepsPeriodicUpdater(t *testing.T) {
++	originalHome, originalURL := C.Path.HomeDir(), geodata.ASNUrl()
++	defer C.SetHomeDir(originalHome)
++	defer geodata.SetASNUrl(originalURL)
++	C.SetHomeDir(t.TempDir())
++	data, err := os.ReadFile("../../../../assets/data/ASN.mmdb")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = os.WriteFile(C.Path.ASN(), data, 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err = geodata.InitASN(); err != nil {
++		t.Fatal(err)
++	}
++	_ = os.Chtimes(C.Path.ASN(), time.Unix(0, 0), time.Unix(0, 0))
++	done := make(chan struct{})
++	var requests atomic.Int32
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if requests.Add(1) == 1 {
++			w.WriteHeader(503)
++			return
++		}
++		_, _ = w.Write(data)
++	}))
++	defer server.Close()
++	geodata.SetASNUrl(server.URL)
++	prior := GeoUpdateHook
++	GeoUpdateHook = func(_ string, updating, skipped bool, err error) {
++		if !updating && err == nil {
++			select {
++			case <-done:
++			default:
++				close(done)
++			}
++		}
++	}
++	defer func() { GeoUpdateHook = prior }()
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	stopped := registerGeoUpdaterPeriod(ctx, 10*time.Millisecond)
++	defer func() { cancel(); <-stopped }()
++	select {
++	case <-done:
++	case <-time.After(2 * time.Second):
++		t.Fatal("initial failure terminated the updater")
++	}
++	cancel()
++	<-stopped
++	if requests.Load() < 2 {
++		t.Fatal("periodic retry did not use the real HTTP consumer")
++	}
++}
+diff --git a/component/updater/update_geo.go b/component/updater/update_geo.go
+index 229833859f0806c427fb877dc0ea9542b7a92dfb..47a26b7624a70d12387669b686842a33f2081315 100644
+--- a/component/updater/update_geo.go
++++ b/component/updater/update_geo.go
+@@ -13,6 +13,7 @@ import (
+ 	"github.com/metacubex/mihomo/component/geodata"
+ 	_ "github.com/metacubex/mihomo/component/geodata/standard"
+ 	"github.com/metacubex/mihomo/component/mmdb"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/component/resource"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+@@ -28,6 +29,9 @@ var (
+ 	updatingGeo atomic.Bool
+ )
+ 
++type geoBatchKey struct{}
++type geoBatch struct{ changed atomic.Bool }
++
+ func GeoAutoUpdate() bool {
+ 	return autoUpdate
+ }
+@@ -44,171 +48,201 @@ func SetGeoUpdateInterval(newGeoUpdateInterval int) {
+ 	updateInterval = newGeoUpdateInterval
+ }
+ 
+-func UpdateMMDB() (err error) {
+-	sendGeoUpdateStatus("MMDB", true, false, nil)
+-	var skipped bool
+-	defer func() { sendGeoUpdateStatus("MMDB", false, skipped, err) }()
++func UpdateMMDB() error    { return updateGeo(context.Background(), "MMDB", nil, true) }
++func UpdateASN() error     { return updateGeo(context.Background(), "ASN", nil, true) }
++func UpdateGeoIp() error   { return updateGeo(context.Background(), "GEOIP", nil, true) }
++func UpdateGeoSite() error { return updateGeo(context.Background(), "GEOSITE", nil, true) }
+ 
+-	vehicle := resource.NewHTTPVehicle(geodata.MmdbUrl(), C.Path.MMDB(), "", nil, defaultHttpTimeout, 0)
+-	var oldHash utils.HashType
+-	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
+-		oldHash = utils.MakeHash(buf)
+-	}
+-	data, hash, err := vehicle.Read(context.Background(), oldHash)
+-	if err != nil {
+-		return fmt.Errorf("can't download MMDB database file: %w", err)
+-	}
+-	if oldHash.Equal(hash) { // same hash, ignored
+-		skipped = true
+-		_ = os.Chtimes(vehicle.Path(), time.Now(), time.Now())
+-		return nil
+-	}
+-	if len(data) == 0 {
+-		return fmt.Errorf("can't download MMDB database file: no data")
+-	}
+-
+-	instance, err := maxminddb.FromBytes(data)
+-	if err != nil {
+-		return fmt.Errorf("invalid MMDB database file: %s", err)
+-	}
+-	_ = instance.Close()
++func UpdateGeoResource(ctx context.Context, name string, lease requestscope.Lease) error {
++	return updateGeo(ctx, name, lease, false)
++}
+ 
+-	defer mmdb.ReloadIP()
+-	mmdb.IPInstance().Reader.Close() //  mmdb is loaded with mmap, so it needs to be closed before overwriting the file
+-	if err = vehicle.Write(data); err != nil {
+-		return fmt.Errorf("can't save MMDB database file: %w", err)
++func geoTarget(name string) (url, path string, err error) {
++	switch name {
++	case "MMDB":
++		return geodata.MmdbUrl(), C.Path.MMDB(), nil
++	case "ASN":
++		return geodata.ASNUrl(), C.Path.ASN(), nil
++	case "GEOIP":
++		return geodata.GeoIpUrl(), C.Path.GeoIP(), nil
++	case "GEOSITE":
++		return geodata.GeoSiteUrl(), C.Path.GeoSite(), nil
++	default:
++		return "", "", fmt.Errorf("unknown Geo resource")
+ 	}
+-	return nil
+ }
+ 
+-func UpdateASN() (err error) {
+-	sendGeoUpdateStatus("ASN", true, false, nil)
+-	var skipped bool
+-	defer func() { sendGeoUpdateStatus("ASN", false, skipped, err) }()
+-
+-	vehicle := resource.NewHTTPVehicle(geodata.ASNUrl(), C.Path.ASN(), "", nil, defaultHttpTimeout, 0)
+-	var oldHash utils.HashType
+-	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
+-		oldHash = utils.MakeHash(buf)
+-	}
+-	data, hash, err := vehicle.Read(context.Background(), oldHash)
+-	if err != nil {
+-		return fmt.Errorf("can't download ASN database file: %w", err)
+-	}
+-	if oldHash.Equal(hash) { // same hash, ignored
+-		skipped = true
+-		_ = os.Chtimes(vehicle.Path(), time.Now(), time.Now())
+-		return nil
+-	}
++func validateGeo(name string, data []byte) error {
+ 	if len(data) == 0 {
+-		return fmt.Errorf("can't download ASN database file: no data")
++		return fmt.Errorf("empty Geo resource")
+ 	}
+-
+-	instance, err := maxminddb.FromBytes(data)
++	if name == "MMDB" || name == "ASN" {
++		reader, err := maxminddb.FromBytes(data)
++		if err != nil {
++			return err
++		}
++		return reader.Close()
++	}
++	loader, err := geodata.GetGeoDataLoader("standard")
+ 	if err != nil {
+-		return fmt.Errorf("invalid ASN database file: %s", err)
++		return err
+ 	}
+-	_ = instance.Close()
+-
+-	defer mmdb.ReloadASN()
+-	mmdb.ASNInstance().Reader.Close() //  mmdb is loaded with mmap, so it needs to be closed before overwriting the file
+-	if err = vehicle.Write(data); err != nil {
+-		return fmt.Errorf("can't save ASN database file: %w", err)
++	if name == "GEOIP" {
++		_, err = loader.LoadIPByBytes(data, "cn")
++	} else {
++		_, err = loader.LoadSiteByBytes(data, "cn")
+ 	}
+-	return nil
++	return err
+ }
+ 
+-func UpdateGeoIp() (err error) {
+-	sendGeoUpdateStatus("GEOIP", true, false, nil)
+-	var skipped bool
+-	defer func() { sendGeoUpdateStatus("GEOIP", false, skipped, err) }()
+-
+-	geoLoader, err := geodata.GetGeoDataLoader("standard")
+-
+-	vehicle := resource.NewHTTPVehicle(geodata.GeoIpUrl(), C.Path.GeoIP(), "", nil, defaultHttpTimeout, 0)
+-	var oldHash utils.HashType
+-	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
+-		oldHash = utils.MakeHash(buf)
+-	}
+-	data, hash, err := vehicle.Read(context.Background(), oldHash)
++func updateGeo(ctx context.Context, name string, lease requestscope.Lease, notify bool) (err error) {
++	url, path, err := geoTarget(name)
+ 	if err != nil {
+-		return fmt.Errorf("can't download GeoIP database file: %w", err)
++		return err
+ 	}
+-	if oldHash.Equal(hash) { // same hash, ignored
+-		skipped = true
+-		_ = os.Chtimes(vehicle.Path(), time.Now(), time.Now())
+-		return nil
++	if lease == nil {
++		lease, err = requestscope.Begin(ctx, requestscope.Spec{Owner: requestscope.OwnerFromContext(ctx), Kind: "geo", Trigger: "automatic", Key: "geo:" + name, Resource: path, URL: url})
++		if err != nil {
++			return err
++		}
++		if lease != nil {
++			defer lease.Close()
++		}
+ 	}
+-	if len(data) == 0 {
+-		return fmt.Errorf("can't download GeoIP database file: no data")
++	if err = requestscope.CheckTarget(lease, url); err != nil {
++		return err
+ 	}
+-
+-	if _, err = geoLoader.LoadIPByBytes(data, "cn"); err != nil {
+-		return fmt.Errorf("invalid GeoIP database file: %s", err)
++	completion := requestscope.CompletionOf(lease)
++	skipped := false
++	defer func() {
++		if err == nil && !skipped && requestscope.Check(lease) == nil {
++			if batch, ok := ctx.Value(geoBatchKey{}).(*geoBatch); ok {
++				batch.changed.Store(true)
++			} else if GeoUpdatedHook != nil {
++				GeoUpdatedHook(completion, map[string]string{name: url})
++			}
++		}
++	}()
++	if notify {
++		sendGeoUpdateStatus(name, true, false, nil)
++		defer func() {
++			final := err
++			if check := requestscope.Check(lease); check != nil {
++				final = check
++			}
++			sendGeoUpdateStatus(name, false, skipped, final)
++		}()
+ 	}
+-
+-	defer geodata.ClearGeoIPCache()
+-	if err = vehicle.Write(data); err != nil {
+-		return fmt.Errorf("can't save GeoIP database file: %w", err)
++	unlock, err := requestscope.LockResource(ctx, path)
++	if err != nil {
++		return err
+ 	}
+-	return nil
+-}
+-
+-func UpdateGeoSite() (err error) {
+-	sendGeoUpdateStatus("GEOSITE", true, false, nil)
+-	var skipped bool
+-	defer func() { sendGeoUpdateStatus("GEOSITE", false, skipped, err) }()
+-
+-	geoLoader, err := geodata.GetGeoDataLoader("standard")
+-
+-	vehicle := resource.NewHTTPVehicle(geodata.GeoSiteUrl(), C.Path.GeoSite(), "", nil, defaultHttpTimeout, 0)
+ 	var oldHash utils.HashType
+-	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
++	if buf, readErr := os.ReadFile(path); readErr == nil {
+ 		oldHash = utils.MakeHash(buf)
+ 	}
+-	data, hash, err := vehicle.Read(context.Background(), oldHash)
++	unlock()
++	vehicle := resource.NewHTTPVehicle(url, path, "", nil, defaultHttpTimeout, 0)
++	result, err := vehicle.ScopedRead(ctx, oldHash, lease)
+ 	if err != nil {
+-		return fmt.Errorf("can't download GeoSite database file: %w", err)
++		return err
+ 	}
+-	if oldHash.Equal(hash) { // same hash, ignored
+-		skipped = true
+-		_ = os.Chtimes(vehicle.Path(), time.Now(), time.Now())
+-		return nil
++	if len(result.Bytes) != 0 {
++		if err = validateGeo(name, result.Bytes); err != nil {
++			return err
++		}
+ 	}
+-	if len(data) == 0 {
+-		return fmt.Errorf("can't download GeoSite database file: no data")
++	unlock, err = requestscope.LockResource(ctx, path)
++	if err != nil {
++		return err
+ 	}
+-
+-	if _, err = geoLoader.LoadSiteByBytes(data, "cn"); err != nil {
+-		return fmt.Errorf("invalid GeoSite database file: %s", err)
++	defer unlock()
++	var currentHash utils.HashType
++	if current, readErr := os.ReadFile(path); readErr == nil {
++		currentHash = utils.MakeHash(current)
+ 	}
+-
+-	defer geodata.ClearGeoSiteCache()
+-	if err = vehicle.Write(data); err != nil {
+-		return fmt.Errorf("can't save GeoSite database file: %w", err)
++	skipped = currentHash.IsValid() && currentHash.Equal(result.Hash)
++	if !skipped && len(result.Bytes) == 0 {
++		return requestscope.ErrCancelled
+ 	}
+-	return nil
++	var receipt requestscope.Receipt
++	if lease != nil {
++		receipt, err = lease.GrantCommit()
++		if err != nil {
++			return err
++		}
++		defer func() {
++			if err != nil {
++				receipt.Fail(err)
++			} else {
++				receipt.Complete()
++			}
++		}()
++	}
++	if skipped {
++		err = os.Chtimes(path, time.Now(), time.Now())
++	} else {
++		switch name {
++		case "MMDB":
++			mmdb.CloseIPForUpdate()
++			defer mmdb.ReloadIP()
++		case "ASN":
++			mmdb.CloseASNForUpdate()
++			defer mmdb.ReloadASN()
++		}
++		if err = vehicle.Write(result.Bytes); err != nil {
++			return err
++		}
++		switch name {
++		case "GEOIP":
++			geodata.ClearGeoIPCache()
++		case "GEOSITE":
++			geodata.ClearGeoSiteCache()
++		}
++	}
++	if err == nil && result.CommitMetadata != nil {
++		err = result.CommitMetadata()
++	}
++	return err
+ }
+ 
+-func updateGeoDatabases() error {
++func updateGeoDatabases(ctx context.Context) error {
+ 	defer runtime.GC()
++	ctx = requestscope.WithOwner(ctx, requestscope.OwnerFromContext(ctx))
++	parent, err := requestscope.Begin(ctx, requestscope.Spec{Owner: requestscope.OwnerFromContext(ctx), Kind: "geo-batch", Trigger: "automatic", Key: "geo-batch"})
++	if err != nil {
++		return err
++	}
++	if parent != nil {
++		defer parent.Close()
++		ctx = parent.Context()
++	}
++	completion := requestscope.CompletionOf(parent)
++	sources := map[string]string{"MMDB": geodata.MmdbUrl(), "ASN": geodata.ASNUrl(), "GEOIP": geodata.GeoIpUrl(), "GEOSITE": geodata.GeoSiteUrl()}
++	batch := &geoBatch{}
++	ctx = context.WithValue(ctx, geoBatchKey{}, batch)
++	defer func() {
++		if batch.changed.Load() && GeoUpdatedHook != nil {
++			GeoUpdatedHook(completion, sources)
++		}
++	}()
+ 
+ 	b := errgroup.Group{}
+ 
+ 	if geodata.GeoIpEnable() {
+ 		if geodata.GeodataMode() {
+-			b.Go(UpdateGeoIp)
++			b.Go(func() error { return updateGeo(ctx, "GEOIP", nil, true) })
+ 		} else {
+-			b.Go(UpdateMMDB)
++			b.Go(func() error { return updateGeo(ctx, "MMDB", nil, true) })
+ 		}
+ 	}
+ 
+ 	if geodata.ASNEnable() {
+-		b.Go(UpdateASN)
++		b.Go(func() error { return updateGeo(ctx, "ASN", nil, true) })
+ 	}
+ 
+ 	if geodata.GeoSiteEnable() {
+-		b.Go(UpdateGeoSite)
++		b.Go(func() error { return updateGeo(ctx, "GEOSITE", nil, true) })
+ 	}
+ 
+ 	return b.Wait()
+@@ -216,7 +250,9 @@ func updateGeoDatabases() error {
+ 
+ var ErrGetDatabaseUpdateSkip = errors.New("GEO database is updating, skip")
+ 
+-func UpdateGeoDatabases() error {
++func UpdateGeoDatabases() error { return updateGeoDatabasesWithContext(context.Background()) }
++
++func updateGeoDatabasesWithContext(ctx context.Context) error {
+ 	log.Infoln("[GEO] Start updating GEO database")
+ 
+ 	if updatingGeo.Load() {
+@@ -228,7 +264,7 @@ func UpdateGeoDatabases() error {
+ 
+ 	log.Infoln("[GEO] Updating GEO database")
+ 
+-	if err := updateGeoDatabases(); err != nil {
++	if err := updateGeoDatabases(ctx); err != nil {
+ 		log.Infoln("[GEO] update GEO database error: %s", err.Error())
+ 		return err
+ 	}
+@@ -260,28 +296,42 @@ func RegisterGeoUpdater() {
+ }
+ 
+ func registerGeoUpdater(ctx context.Context) {
+-	if updateInterval <= 0 {
+-		log.Infoln("[GEO] Invalid update interval: %d", updateInterval)
+-		return
++	registerGeoUpdaterPeriod(ctx, time.Duration(updateInterval)*time.Hour)
++}
++
++func registerGeoUpdaterPeriod(ctx context.Context, period time.Duration) <-chan struct{} {
++	done := make(chan struct{})
++	owner := requestscope.CurrentOwner()
++	ctx = requestscope.WithOwner(ctx, owner)
++	interval := period
++	if interval <= 0 {
++		log.Infoln("[GEO] Invalid update interval: %s", period)
++		close(done)
++		return done
+ 	}
+ 
+ 	go func() {
+-		ticker := time.NewTicker(time.Duration(updateInterval) * time.Hour)
++		defer close(done)
++		ticker := time.NewTicker(interval)
+ 		defer ticker.Stop()
+ 
+ 		lastUpdate, err := getUpdateTime()
+ 		if err != nil {
+ 			log.Infoln("[GEO] Get GEO database update time error: %s", err.Error())
+-			return
+ 		}
+ 
+ 		log.Infoln("[GEO] last update time %s", lastUpdate)
+-		if lastUpdate.Add(time.Duration(updateInterval) * time.Hour).Before(time.Now()) {
+-			log.Infoln("[GEO] Database has not been updated for %v, update now", time.Duration(updateInterval)*time.Hour)
+-			if err := UpdateGeoDatabases(); err != nil {
+-				log.Infoln("[GEO] Failed to update GEO database: %s", err.Error())
++		if lastUpdate.Add(interval).Before(time.Now()) {
++			log.Infoln("[GEO] Database has not been updated for %v, update now", period)
++			if err := requestscope.WaitReady(ctx, owner); err != nil {
+ 				return
+ 			}
++			if err := updateGeoDatabasesWithContext(ctx); err != nil {
++				log.Infoln("[GEO] Failed to update GEO database: %s", err.Error())
++				if !requestscope.OwnerActive(owner) {
++					return
++				}
++			}
+ 		}
+ 
+ 		for {
+@@ -290,11 +340,15 @@ func registerGeoUpdater(ctx context.Context) {
+ 				log.Infoln("[GEO] Geo updater stopped")
+ 				return
+ 			case <-ticker.C:
+-				log.Infoln("[GEO] updating database every %d hours", updateInterval)
+-				if err := UpdateGeoDatabases(); err != nil {
++				log.Infoln("[GEO] updating database every %s", interval)
++				if err := requestscope.WaitReady(ctx, owner); err != nil {
++					return
++				}
++				if err := updateGeoDatabasesWithContext(ctx); err != nil {
+ 					log.Infoln("[GEO] Failed to update GEO database: %s", err.Error())
+ 				}
+ 			}
+ 		}
+ 	}()
++	return done
+ }
+diff --git a/config/config.go b/config/config.go
+index 99648bcde2a679f651ee6a20744d71ab657eea96..dce2bee08213a5105c902cf2adff5fe107a67169 100644
+--- a/config/config.go
++++ b/config/config.go
+@@ -24,6 +24,7 @@ import (
+ 	"github.com/metacubex/mihomo/component/fakeip"
+ 	"github.com/metacubex/mihomo/component/geodata"
+ 	"github.com/metacubex/mihomo/component/process"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/component/resolver"
+ 	"github.com/metacubex/mihomo/component/sniffer"
+ 	"github.com/metacubex/mihomo/component/trie"
+@@ -193,6 +194,7 @@ type TLS struct {
+ 
+ // Config is mihomo config manager
+ type Config struct {
++	RequestOwner  requestscope.Owner
+ 	General       *General
+ 	Controller    *Controller
+ 	Experimental  *Experimental
+@@ -622,7 +624,7 @@ func UnmarshalRawConfig(buf []byte) (*RawConfig, error) {
+ }
+ 
+ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
+-	config := &Config{}
++	config := &Config{RequestOwner: requestscope.CurrentOwner()}
+ 	log.Infoln("Start initial configuration in progress") //Segment finished in xxm
+ 	startTime := time.Now()
+ 
+diff --git a/hub/executor/executor.go b/hub/executor/executor.go
+index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae09fb73dcb 100644
+--- a/hub/executor/executor.go
++++ b/hub/executor/executor.go
+@@ -1,6 +1,8 @@
+ package executor
+ 
+ import (
++	"context"
++	"errors"
+ 	"fmt"
+ 	"net"
+ 	"net/netip"
+@@ -23,6 +25,7 @@ import (
+ 	"github.com/metacubex/mihomo/component/keepalive"
+ 	"github.com/metacubex/mihomo/component/profile"
+ 	"github.com/metacubex/mihomo/component/profile/cachefile"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/component/resolver"
+ 	"github.com/metacubex/mihomo/component/resource"
+ 	"github.com/metacubex/mihomo/component/sniffer"
+@@ -112,6 +115,7 @@ func ApplyConfig(cfg *config.Config, force bool) {
+ 	tunnel.OnInnerLoading()
+ 
+ 	initInnerTcp()
++	requestscope.Phase(cfg.RequestOwner, "inner")
+ 	loadProvider(cfg.Providers)
+ 	updateProfile(cfg)
+ 	loadProvider(cfg.RuleProviders)
+@@ -325,6 +329,30 @@ func loadProvider[T P.Provider](providers map[string]T) {
+ 		}
+ 
+ 		if err := pv.Initial(); err != nil {
++			if requestscope.BeginHook != nil && (errors.Is(err, requestscope.ErrCancelled) || errors.Is(err, requestscope.ErrBlocked)) {
++				if owned, ok := any(pv).(interface {
++					RequestOwner() requestscope.Owner
++					RequestContext() context.Context
++					RequestProxy() string
++				}); ok {
++					go func() {
++						for {
++							if requestscope.WaitReady(owned.RequestContext(), owned.RequestOwner(), owned.RequestProxy()) != nil {
++								return
++							}
++							err := pv.Initial()
++							if errors.Is(err, requestscope.ErrCancelled) || errors.Is(err, requestscope.ErrBlocked) {
++								continue
++							}
++							if err == nil && cfgOwnerCurrent(pv) && DefaultProviderLoadedHook != nil {
++								DefaultProviderLoadedHook(name)
++							}
++							return
++						}
++					}()
++					return
++				}
++			}
+ 			switch pv.Type() {
+ 			case P.Proxy:
+ 				{
+@@ -336,7 +364,7 @@ func loadProvider[T P.Provider](providers map[string]T) {
+ 				}
+ 			}
+ 		} else {
+-			if DefaultProviderLoadedHook != nil {
++			if DefaultProviderLoadedHook != nil && (requestscope.BeginHook == nil || cfgOwnerCurrent(pv)) {
+ 				DefaultProviderLoadedHook(name)
+ 			}
+ 		}
+@@ -539,3 +567,8 @@ func Shutdown() {
+ 
+ 	log.Warnln("Mihomo shutting down")
+ }
++
++func cfgOwnerCurrent(p P.Provider) bool {
++	owned, ok := p.(interface{ RequestOwner() requestscope.Owner })
++	return ok && requestscope.OwnerActive(owned.RequestOwner())
++}
+diff --git a/listener/http/client.go b/listener/http/client.go
+index 9f5c37f8bda729d178605bcb1a297b1b26fcc3fc..494d9df67d42275984faadfc70147a7e57b17e24 100644
+--- a/listener/http/client.go
++++ b/listener/http/client.go
+@@ -8,13 +8,18 @@ import (
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	N "github.com/metacubex/mihomo/common/net"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/transport/socks5"
+ 
+ 	"github.com/metacubex/http"
+ )
+ 
+-func newClient(srcConn net.Conn, tunnel C.Tunnel, additions []inbound.Addition) *http.Client { // additions using slice let caller can change its value (without size) after newClient return
++func newClient(srcConn net.Conn, tunnel C.Tunnel, additions []inbound.Addition, scopes ...requestscope.Lease) *http.Client { // additions using slice let caller can change its value (without size) after newClient return
++	var scope requestscope.Lease
++	if len(scopes) > 0 {
++		scope = scopes[0]
++	}
+ 	return &http.Client{
+ 		Transport: &http.Transport{
+ 			// from http.DefaultTransport
+@@ -35,7 +40,13 @@ func newClient(srcConn net.Conn, tunnel C.Tunnel, additions []inbound.Addition)
+ 
+ 				left, right := N.Pipe()
+ 
+-				go tunnel.HandleTCPConn(inbound.NewHTTP(dstAddr, srcConn, right, additions...))
++				if err := requestscope.Check(scope); err != nil {
++					_ = left.Close()
++					_ = right.Close()
++					return nil, err
++				}
++				adapter, metadata := inbound.NewHTTP(dstAddr, srcConn, right, additions...)
++				go requestscope.HandleTCP(context, tunnel, adapter, metadata, scope)
+ 
+ 				return left, nil
+ 			},
+diff --git a/listener/http/proxy.go b/listener/http/proxy.go
+index 4cc03f49c6a2f5e168e62cb5457a343ba40fad84..7d60569ffbab29d4156c4b482b66aa87160fba8c 100644
+--- a/listener/http/proxy.go
++++ b/listener/http/proxy.go
+@@ -7,10 +7,12 @@ import (
+ 	"net"
+ 	"strings"
+ 	"sync"
++	"time"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	N "github.com/metacubex/mihomo/common/net"
+ 	"github.com/metacubex/mihomo/component/auth"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ 
+@@ -32,10 +34,18 @@ func (b *bodyWrapper) Read(p []byte) (n int, err error) {
+ }
+ 
+ func HandleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...inbound.Addition) {
++	handleConn(c, tunnel, store, false, additions...)
++}
++
++func HandleScopedConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...inbound.Addition) {
++	handleConn(c, tunnel, store, true, additions...)
++}
++
++func handleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, scopeOnly bool, additions ...inbound.Addition) {
+ 	additions = append(additions, inbound.Placeholder) // Add a placeholder for InUser
+ 	inUserIdx := len(additions) - 1
+ 	client := newClient(c, tunnel, additions)
+-	defer client.CloseIdleConnections()
++	defer func() { client.CloseIdleConnections() }()
+ 	ctx, cancel := context.WithCancel(context.Background())
+ 	defer cancel()
+ 	peekMutex := sync.Mutex{}
+@@ -45,10 +55,18 @@ func HandleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...
+ 	authenticator := store.Authenticator()
+ 	trusted := authenticator == nil // disable authenticate if lru is nil
+ 	lastUser := ""
++	var boundScope requestscope.Lease
++	var clientScope requestscope.Lease
+ 
+ 	for {
+ 		peekMutex.Lock()
++		if scopeOnly {
++			_ = c.SetReadDeadline(time.Now().Add(30 * time.Second))
++		}
+ 		request, err := ReadRequest(conn.Reader())
++		if scopeOnly {
++			_ = c.SetReadDeadline(time.Time{})
++		}
+ 		peekMutex.Unlock()
+ 		if err != nil {
+ 			break
+@@ -58,9 +76,41 @@ func HandleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...
+ 
+ 		keepAlive := strings.TrimSpace(strings.ToLower(request.Header.Get("Proxy-Connection"))) == "keep-alive"
+ 
+-		resp, user := authenticate(request, authenticator) // always call authenticate function to get user
+-		if resp == nil {
++		credential := parseBasicProxyAuthorization(request)
++		proxyUser, proxyPassword, decodeErr := decodeBasicProxyAuthorization(credential)
++		binding, internal, bindErr := requestscope.BindProxy(c, proxyUser, proxyPassword)
++		if scopeOnly && (!internal || bindErr != nil || decodeErr != nil) || boundScope != nil && (!internal || decodeErr != nil || binding.Lease != boundScope) || internal && (bindErr != nil || decodeErr != nil) {
++			_ = responseWith(request, http.StatusForbidden).Write(conn)
++			break
++		}
++		var resp *http.Response
++		var user string
++		if internal {
++			boundScope = binding.Lease
++			if boundScope.Check() != nil || boundScope.TrackConn(c) != nil {
++				break
++			}
++			target := request.URL.String()
++			if request.Method == http.MethodConnect {
++				target = "https://" + request.Host
++			}
++			if requestscope.CheckURL(boundScope, target) != nil {
++				_ = responseWith(request, http.StatusForbidden).Write(conn)
++				break
++			}
++			user = binding.User
++			request = request.WithContext(boundScope.Context())
+ 			trusted = true
++		} else {
++			resp, user = authenticate(request, authenticator)
++			if resp == nil {
++				trusted = true
++			}
++		}
++		if clientScope != boundScope {
++			client.CloseIdleConnections()
++			client = newClient(c, tunnel, additions, boundScope)
++			clientScope = boundScope
+ 		}
+ 		additions[inUserIdx] = inbound.WithInUser(user)
+ 
+@@ -71,7 +121,8 @@ func HandleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...
+ 					break // close connection
+ 				}
+ 
+-				tunnel.HandleTCPConn(inbound.NewHTTPS(request, conn, additions...))
++				adapter, metadata := inbound.NewHTTPS(request, conn, additions...)
++				requestscope.HandleTCP(request.Context(), tunnel, adapter, metadata, boundScope)
+ 
+ 				return // hijack connection
+ 			}
+@@ -84,7 +135,7 @@ func HandleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...
+ 			request.RequestURI = ""
+ 
+ 			if isUpgradeRequest(request) {
+-				handleUpgrade(conn, request, tunnel, additions...)
++				handleScopedUpgrade(conn, request, tunnel, boundScope, additions...)
+ 
+ 				return // hijack connection
+ 			}
+@@ -102,7 +153,9 @@ func HandleConn(c net.Conn, tunnel C.Tunnel, store auth.AuthStore, additions ...
+ 			if request.URL.Scheme == "" || request.URL.Host == "" {
+ 				resp = responseWith(request, http.StatusBadRequest)
+ 			} else {
+-				request = request.WithContext(ctx)
++				if boundScope == nil {
++					request = request.WithContext(ctx)
++				}
+ 
+ 				startBackgroundRead := func() {
+ 					go func() {
+diff --git a/listener/http/upgrade.go b/listener/http/upgrade.go
+index b65891792568ab44d350a99c0319993482b99787..f5c6969228afdfcdd84f9009f5bf200232c68d79 100644
+--- a/listener/http/upgrade.go
++++ b/listener/http/upgrade.go
+@@ -7,6 +7,7 @@ import (
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	N "github.com/metacubex/mihomo/common/net"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/transport/socks5"
+ 
+@@ -27,6 +28,10 @@ func isUpgradeRequest(req *http.Request) bool {
+ }
+ 
+ func handleUpgrade(conn net.Conn, request *http.Request, tunnel C.Tunnel, additions ...inbound.Addition) {
++	handleScopedUpgrade(conn, request, tunnel, nil, additions...)
++}
++
++func handleScopedUpgrade(conn net.Conn, request *http.Request, tunnel C.Tunnel, scope requestscope.Lease, additions ...inbound.Addition) {
+ 	defer conn.Close()
+ 
+ 	removeProxyHeaders(request.Header)
+@@ -44,7 +49,8 @@ func handleUpgrade(conn net.Conn, request *http.Request, tunnel C.Tunnel, additi
+ 
+ 	left, right := N.Pipe()
+ 
+-	go tunnel.HandleTCPConn(inbound.NewHTTP(dstAddr, conn, right, additions...))
++	adapter, metadata := inbound.NewHTTP(dstAddr, conn, right, additions...)
++	go requestscope.HandleTCP(request.Context(), tunnel, adapter, metadata, scope)
+ 
+ 	var bufferedLeft *N.BufferedConn
+ 	if request.TLS != nil {
+@@ -52,7 +58,7 @@ func handleUpgrade(conn net.Conn, request *http.Request, tunnel C.Tunnel, additi
+ 			ServerName: request.URL.Hostname(),
+ 		})
+ 
+-		ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTLSTimeout)
++		ctx, cancel := context.WithTimeout(request.Context(), C.DefaultTLSTimeout)
+ 		defer cancel()
+ 		if tlsConn.HandshakeContext(ctx) != nil {
+ 			_ = left.Close()
+diff --git a/listener/inner/tcp.go b/listener/inner/tcp.go
+index 95753fe9c42543413643f8d164a18e385a790dfb..7007505106ca933aa62a62d9dffaba640ddeebc9 100644
+--- a/listener/inner/tcp.go
++++ b/listener/inner/tcp.go
+@@ -1,10 +1,12 @@
+ package inner
+ 
+ import (
++	"context"
+ 	"errors"
+ 	"net"
+ 
+ 	N "github.com/metacubex/mihomo/common/net"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ )
+ 
+@@ -19,6 +21,13 @@ func GetTunnel() C.Tunnel {
+ }
+ 
+ func HandleTcp(tunnel C.Tunnel, address string, proxy string) (conn net.Conn, err error) {
++	return HandleTcpWithScope(context.Background(), tunnel, address, proxy, nil)
++}
++
++func HandleTcpWithScope(ctx context.Context, tunnel C.Tunnel, address, proxy string, lease requestscope.Lease) (conn net.Conn, err error) {
++	if err = requestscope.Check(lease); err != nil {
++		return nil, err
++	}
+ 	if tunnel == nil {
+ 		return nil, errors.New("tunnel uninitialized")
+ 	}
+@@ -37,6 +46,6 @@ func HandleTcp(tunnel C.Tunnel, address string, proxy string) (conn net.Conn, er
+ 		return nil, err
+ 	}
+ 
+-	go tunnel.HandleTCPConn(conn2, metadata)
++	go requestscope.HandleTCP(ctx, tunnel, conn2, metadata, lease)
+ 	return conn1, nil
+ }
+diff --git a/listener/sing_tun/server.go b/listener/sing_tun/server.go
+index ca4d0b8ad1e3c5c7f77fb24801ef78ea7fc45526..c1a4e0c9f6e80846fce5831af6c43f6b70b5da28 100644
+--- a/listener/sing_tun/server.go
++++ b/listener/sing_tun/server.go
+@@ -3,6 +3,7 @@ package sing_tun
+ import (
+ 	"context"
+ 	"fmt"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"io"
+ 	"net"
+ 	"net/netip"
+@@ -543,6 +544,12 @@ func New(options LC.Tun, tunnel C.Tunnel, additions ...inbound.Addition) (l *Lis
+ }
+ 
+ func (l *Listener) ruleUpdateCallback(ruleProvider P.RuleProvider) {
++	if requestscope.BeginHook != nil {
++		owned, ok := ruleProvider.(interface{ RequestOwner() requestscope.Owner })
++		if !ok || !requestscope.OwnerActive(owned.RequestOwner()) {
++			return
++		}
++	}
+ 	name := ruleProvider.Name()
+ 	if slices.Contains(l.options.RouteAddressSet, name) {
+ 		l.updateRule(ruleProvider, false, true)
+diff --git a/ntp/ntp/service.go b/ntp/ntp/service.go
+index a629c626a34eb845f53180f742bc83023367a3a6..652bc292b966953f4822b920376fc8c3b42fd600 100644
+--- a/ntp/ntp/service.go
++++ b/ntp/ntp/service.go
+@@ -7,6 +7,7 @@ import (
+ 
+ 	"github.com/metacubex/mihomo/component/dialer"
+ 	"github.com/metacubex/mihomo/component/proxydialer"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ 	mihomoNtp "github.com/metacubex/mihomo/ntp"
+@@ -20,6 +21,8 @@ var globalMu sync.Mutex
+ 
+ type Service struct {
+ 	server         M.Socksaddr
++	owner          requestscope.Owner
++	proxy          string
+ 	dialer         proxydialer.SingDialer
+ 	ticker         *time.Ticker
+ 	ctx            context.Context
+@@ -33,7 +36,9 @@ func ReCreateNTPService(server string, interval time.Duration, dialerProxy strin
+ 	if globalSrv != nil {
+ 		globalSrv.Stop()
+ 	}
++	mihomoNtp.SetOffset(0)
+ 	if server == "" || interval <= 0 {
++		globalSrv = nil
+ 		return
+ 	}
+ 	ctx, cancel := context.WithCancel(context.Background())
+@@ -43,6 +48,8 @@ func ReCreateNTPService(server string, interval time.Duration, dialerProxy strin
+ 	}
+ 	globalSrv = &Service{
+ 		server:         M.ParseSocksaddr(server),
++		owner:          requestscope.CurrentOwner(),
++		proxy:          dialerProxy,
+ 		dialer:         proxydialer.NewSingDialer(cDialer),
+ 		ticker:         time.NewTicker(interval * time.Minute),
+ 		ctx:            ctx,
+@@ -63,10 +70,28 @@ func (srv *Service) Stop() {
+ }
+ 
+ func (srv *Service) update() error {
++	proxy := srv.proxy
++	if proxy == "" {
++		proxy = "DIRECT"
++	}
++	if err := requestscope.WaitReady(srv.ctx, srv.owner, proxy); err != nil {
++		return err
++	}
++	lease, beginErr := requestscope.Begin(srv.ctx, requestscope.Spec{Owner: srv.owner, Kind: "ntp", Trigger: "automatic", Key: "ntp", URL: srv.server.String(), Proxy: proxy})
++	if beginErr != nil {
++		return beginErr
++	}
++	ctx := srv.ctx
++	selectedDialer := srv.dialer
++	if lease != nil {
++		defer lease.Close()
++		ctx = lease.Context()
++		selectedDialer = proxydialer.NewSingDialer(lease.Dialer())
++	}
+ 	var response *ntp.Response
+ 	var err error
+ 	for i := 0; i < 3; i++ {
+-		response, err = ntp.Exchange(srv.ctx, srv.dialer, srv.server)
++		response, err = ntp.Exchange(ctx, selectedDialer, srv.server)
+ 		if err != nil {
+ 			if srv.ctx.Err() != nil {
+ 				return nil
+@@ -79,24 +104,37 @@ func (srv *Service) update() error {
+ 		} else if offset < time.Duration(0) {
+ 			log.Infoln("System clock is behind NTP time by %s", -offset)
+ 		}
+-		mihomoNtp.SetOffset(offset)
+-		if srv.syncSystemTime {
+-			timeNow := response.Time
+-			syncErr := setSystemTime(timeNow)
+-			if syncErr == nil {
+-				log.Infoln("Sync system time success: %s", timeNow.Local().Format(ntp.TimeLayout))
+-			} else {
+-				log.Errorln("Write time to system: %s", syncErr)
+-				srv.syncSystemTime = false
++		return requestscope.Commit(lease, func() error {
++			globalMu.Lock()
++			defer globalMu.Unlock()
++			if globalSrv != srv || srv.ctx.Err() != nil {
++				return requestscope.ErrCancelled
+ 			}
+-		}
+-		return nil
++			mihomoNtp.SetOffset(offset)
++			if srv.syncSystemTime {
++				timeNow := response.Time
++				syncErr := setSystemTime(timeNow)
++				if syncErr == nil {
++					log.Infoln("Sync system time success: %s", timeNow.Local().Format(ntp.TimeLayout))
++				} else {
++					log.Errorln("Write time to system: %s", syncErr)
++					srv.syncSystemTime = false
++				}
++			}
++			return nil
++		})
+ 	}
+ 	return err
+ }
+ 
+ func (srv *Service) loopUpdate() {
+-	defer mihomoNtp.SetOffset(0)
++	defer func() {
++		globalMu.Lock()
++		defer globalMu.Unlock()
++		if globalSrv == srv {
++			mihomoNtp.SetOffset(0)
++		}
++	}()
+ 	defer srv.ticker.Stop()
+ 	for {
+ 		err := srv.update()
+diff --git a/rules/provider/provider.go b/rules/provider/provider.go
+index 2e7829ae71af03449f6ec134157402deff914aac..689d3efd956f8bef82f549052633eecb9a64dcbb 100644
+--- a/rules/provider/provider.go
++++ b/rules/provider/provider.go
+@@ -4,6 +4,7 @@ import (
+ 	"bytes"
+ 	"encoding/json"
+ 	"errors"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"io"
+ 	"runtime"
+ 	"strings"
+@@ -132,7 +133,9 @@ func NewRuleSetProvider(name string, behavior P.RuleBehavior, format P.RuleForma
+ 
+ 	onUpdate := func(strategy ruleStrategy) {
+ 		rp.strategy = strategy
+-		tunnel.RuleUpdateCallback().Emit(rp)
++		if requestscope.BeginHook == nil {
++			tunnel.RuleUpdateCallback().Emit(rp)
++		}
+ 	}
+ 
+ 	rp.strategy = newStrategy(behavior, parse)
+@@ -142,6 +145,9 @@ func NewRuleSetProvider(name string, behavior P.RuleBehavior, format P.RuleForma
+ 	rp.Fetcher = resource.NewFetcher(name, interval, vehicle, bundleFile, func(bytes []byte) (ruleStrategy, error) {
+ 		return rulesParse(bytes, newStrategy(behavior, parse), format)
+ 	}, onUpdate)
++	if requestscope.BeginHook != nil {
++		rp.Fetcher.SetAfterUpdate(func() { tunnel.RuleUpdateCallback().Emit(rp) })
++	}
+ 
+ 	wrapper := &RuleSetProvider{
+ 		rp,
+diff --git a/tunnel/tunnel.go b/tunnel/tunnel.go
+index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4b2976494 100644
+--- a/tunnel/tunnel.go
++++ b/tunnel/tunnel.go
+@@ -19,6 +19,7 @@ import (
+ 	"github.com/metacubex/mihomo/component/nat"
+ 	"github.com/metacubex/mihomo/component/process"
+ 	"github.com/metacubex/mihomo/component/proxydialer"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"github.com/metacubex/mihomo/component/resolver"
+ 	"github.com/metacubex/mihomo/component/slowdown"
+ 	"github.com/metacubex/mihomo/component/sniffer"
+@@ -77,6 +78,11 @@ var _ C.Tunnel = Tunnel
+ var _ P.Tunnel = Tunnel
+ var _ proxydialer.Tunnel = Tunnel
+ 
++func (t tunnel) HandleAppTCPConn(ctx context.Context, conn net.Conn, metadata *C.Metadata, lease requestscope.Lease) {
++	connCtx := icontext.NewConnContext(conn, metadata)
++	handleTCPConnScoped(connCtx, ctx, lease)
++}
++
+ func (t tunnel) HandleTCPConn(conn net.Conn, metadata *C.Metadata) {
+ 	connCtx := icontext.NewConnContext(conn, metadata)
+ 	handleTCPConn(connCtx)
+@@ -315,10 +321,19 @@ func preHandleMetadata(metadata *C.Metadata) error {
+ 	return nil
+ }
+ 
+-func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err error) {
++func resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
++	return resolveMetadataScoped(context.Background(), metadata, nil)
++}
++
++func resolveMetadataScoped(parent context.Context, metadata *C.Metadata, lease requestscope.Lease) (proxy C.Proxy, rule C.Rule, err error) {
++	if err = requestscope.Check(lease); err != nil {
++		return
++	}
+ 	if metadata.SpecialProxy != "" {
+ 		var exist bool
++		configMux.RLock()
+ 		proxy, exist = proxies[metadata.SpecialProxy]
++		configMux.RUnlock()
+ 		if !exist {
+ 			err = fmt.Errorf("proxy %s not found", metadata.SpecialProxy)
+ 		}
+@@ -337,7 +352,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+ 	helper := C.RuleMatchHelper{
+ 		ResolveIP: func() {
+ 			if !resolved && metadata.Host != "" && !metadata.Resolved() {
+-				ctx, cancel := context.WithTimeout(resolver.WithInitiator(context.Background(), resolver.InitiatorRule), resolver.DefaultDNSTimeout)
++				ctx, cancel := context.WithTimeout(resolver.WithInitiator(parent, resolver.InitiatorRule), resolver.DefaultDNSTimeout)
+ 				defer cancel()
+ 				ip, err := resolver.ResolveIP(ctx, metadata.Host)
+ 				if err != nil {
+@@ -401,12 +416,16 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+ 
+ 	switch mode {
+ 	case Direct:
++		configMux.RLock()
+ 		proxy = proxies["DIRECT"]
++		configMux.RUnlock()
+ 	case Global:
++		configMux.RLock()
+ 		proxy = proxies["GLOBAL"]
++		configMux.RUnlock()
+ 	// Rule
+ 	default:
+-		proxy, rule, err = match(metadata, helper)
++		proxy, rule, err = matchScoped(parent, metadata, helper, lease)
+ 	}
+ 	return
+ }
+@@ -501,7 +520,22 @@ func handleUDPConn(packet C.PacketAdapter) {
+ }
+ 
+ func handleTCPConn(connCtx C.ConnContext) {
+-	if !isHandle(connCtx.Metadata().Type) {
++	handleTCPConnScoped(connCtx, context.Background(), nil)
++}
++
++func handleTCPConnScoped(connCtx C.ConnContext, parent context.Context, lease requestscope.Lease) {
++	if requestscope.Check(lease) != nil {
++		_ = connCtx.Conn().Close()
++		return
++	}
++	if lease != nil {
++		if lease.TrackConn(connCtx.Conn()) != nil {
++			return
++		}
++	}
++	stopInbound := context.AfterFunc(parent, func() { _ = connCtx.Conn().Close() })
++	defer stopInbound()
++	if lease == nil && !isHandle(connCtx.Metadata().Type) {
+ 		_ = connCtx.Conn().Close()
+ 		return
+ 	}
+@@ -552,7 +586,21 @@ func handleTCPConn(connCtx C.ConnContext) {
+ 		}()
+ 	}
+ 
+-	proxy, rule, err := resolveMetadata(metadata)
++	requestscope.Route(lease, metadata)
++	var proxy C.Proxy
++	var rule C.Rule
++	var err error
++	if fixed, ok := requestscope.FixedProxy(lease); ok {
++		proxy = fixed
++	} else {
++		proxy, rule, err = resolveMetadataScoped(parent, metadata, lease)
++	}
++	if err == nil {
++		proxy, err = requestscope.SelectProxy(lease, proxy, metadata)
++	}
++	if err == nil {
++		err = requestscope.Check(lease)
++	}
+ 	if err != nil {
+ 		log.Warnln("[Metadata] parse failed: %s", err.Error())
+ 		return
+@@ -572,14 +620,29 @@ func handleTCPConn(connCtx C.ConnContext) {
+ 	var peekBytes []byte
+ 	var peekLen int
+ 
+-	ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTCPTimeout)
++	ctx, cancel := context.WithTimeout(parent, C.DefaultTCPTimeout)
+ 	defer cancel()
+ 	remoteConn, err := retry(ctx, func(ctx context.Context) (remoteConn C.Conn, err error) {
++		if err = requestscope.BeforeDial(lease, dialMetadata); err != nil {
++			return
++		}
+ 		remoteConn, err = proxy.DialContext(ctx, dialMetadata)
+ 		if err != nil {
+ 			return
+ 		}
+ 
++		if err = requestscope.Check(lease); err != nil {
++			_ = remoteConn.Close()
++			return
++		}
++		if lease != nil {
++			if err = lease.TrackConn(remoteConn); err != nil {
++				_ = remoteConn.Close()
++				return
++			}
++		}
++		physicalConn := remoteConn
++		context.AfterFunc(parent, func() { _ = physicalConn.Close() })
+ 		if N.NeedHandshake(remoteConn) {
+ 			defer func() {
+ 				if err != nil {
+@@ -653,8 +716,15 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
+ }
+ 
+ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, error) {
++	return matchScoped(context.Background(), metadata, helper, nil)
++}
++
++func matchScoped(ctx context.Context, metadata *C.Metadata, helper C.RuleMatchHelper, lease requestscope.Lease) (C.Proxy, C.Rule, error) {
+ 	configMux.RLock()
+ 	defer configMux.RUnlock()
++	if err := requestscope.Check(lease); err != nil {
++		return nil, nil, err
++	}
+ 
+ 	var rematchChain []string
+ 	for {
+@@ -662,6 +732,9 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
+ 		var rematchRule C.Rule
+ 	GetRules:
+ 		for _, rule := range getRules(metadata) {
++			if err := requestscope.Check(lease); err != nil {
++				return nil, nil, err
++			}
+ 			if matched, ada := rule.Match(metadata, helper); matched {
+ 				adapter, ok := proxies[ada]
+ 				if !ok {
+@@ -696,7 +769,7 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
+ 				return rematchProxy, rematchRule, nil
+ 			}
+ 			rematchChain = append(rematchChain, rematchProxy.Name())
+-			conn, err := rematchProxy.DialContext(context.Background(), metadata) // not a real connection, just for metadata update
++			conn, err := rematchProxy.DialContext(ctx, metadata) // not a real connection, just for metadata update
+ 			if conn != nil {
+ 				_ = conn.Close()
+ 			}

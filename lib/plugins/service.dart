@@ -22,6 +22,8 @@ Future<Object?> _decodeResponse(Uint8List data) async {
 
 abstract mixin class ServiceListener {
   void onServiceEvent(CoreEvent event) {}
+
+  void onRequestState(Map<String, Object?> state) {}
 }
 
 class Service {
@@ -40,6 +42,16 @@ class Service {
     methodChannel = const MethodChannel('$packageName/service');
     methodChannel.setMethodCallHandler((call) async {
       switch (call.method) {
+        case 'requestState':
+          final state = Map<String, Object?>.unmodifiable(
+            Map<String, Object?>.from(
+              json.decode(call.arguments as String) as Map,
+            ),
+          );
+          for (final listener in List.of(_listeners)) {
+            listener.onRequestState(state);
+          }
+          break;
         case 'event':
           final data = call.arguments as String? ?? '';
           final methodCall = CoreMethodCall.fromJson(
@@ -83,6 +95,59 @@ class Service {
 
   Future<bool> stop() async {
     return await methodChannel.invokeMethod<bool>('stop') ?? false;
+  }
+
+  Future<bool> startPrepared(int requestId) async {
+    return await methodChannel.invokeMethod<bool>('start', requestId) ?? false;
+  }
+
+  Future<bool> stopPrepared(int requestId) async {
+    return await methodChannel.invokeMethod<bool>('stop', requestId) ?? false;
+  }
+
+  Future<int> prepareRunIntent({
+    required bool running,
+    String source = 'ui',
+    bool? paused,
+  }) async {
+    final result = await methodChannel.invokeMethod<int>('prepareRunIntent', {
+      'running': running,
+      'source': source,
+      'paused': ?paused,
+    });
+    if (result == null) throw StateError('Request state unavailable');
+    return result;
+  }
+
+  Future<bool> failRunIntent(int requestId) async {
+    return await methodChannel.invokeMethod<bool>('failRunIntent', requestId) ??
+        false;
+  }
+
+  Future<Map<String, Object?>> getRequestState() async {
+    final result = await methodChannel.invokeMethod<String>('getRequestState');
+    if (result == null) throw StateError('Request state unavailable');
+    return Map<String, Object?>.from(json.decode(result) as Map);
+  }
+
+  Future<bool> initializeRequestState(
+    int revision, {
+    bool recovery = false,
+  }) async {
+    return await methodChannel.invokeMethod<bool>('initializeRequestState', {
+          'revision': revision,
+          'recovery': recovery,
+        }) ??
+        false;
+  }
+
+  Future<Map<String, Object?>> requestControl(Map<String, Object?> data) async {
+    final result = await methodChannel.invokeMethod<String>(
+      'requestControl',
+      json.encode(data),
+    );
+    if (result == null) throw StateError('Request control unavailable');
+    return Map<String, Object?>.from(json.decode(result) as Map);
   }
 
   Future<String> init() async {

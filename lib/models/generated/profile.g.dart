@@ -27,6 +27,10 @@ _Profile _$ProfileFromJson(Map<String, dynamic> json) => _Profile(
   label: json['label'] as String? ?? '',
   currentGroupName: json['currentGroupName'] as String?,
   url: json['url'] as String? ?? '',
+  requestMode:
+      $enumDecodeNullable(_$RequestModeEnumMap, json['requestMode']) ??
+      RequestMode.auto,
+  requestProxy: json['requestProxy'] as String?,
   lastUpdateDate: json['lastUpdateDate'] == null
       ? null
       : DateTime.parse(json['lastUpdateDate'] as String),
@@ -60,6 +64,8 @@ Map<String, dynamic> _$ProfileToJson(_Profile instance) => <String, dynamic>{
   'label': instance.label,
   'currentGroupName': instance.currentGroupName,
   'url': instance.url,
+  'requestMode': _$RequestModeEnumMap[instance.requestMode]!,
+  'requestProxy': instance.requestProxy,
   'lastUpdateDate': instance.lastUpdateDate?.toIso8601String(),
   'autoUpdateDuration': instance.autoUpdateDuration.inMicroseconds,
   'subscriptionInfo': instance.subscriptionInfo,
@@ -70,6 +76,12 @@ Map<String, dynamic> _$ProfileToJson(_Profile instance) => <String, dynamic>{
   'scriptId': instance.scriptId,
   'matchTarget': instance.matchTarget,
   'order': instance.order,
+};
+
+const _$RequestModeEnumMap = {
+  RequestMode.auto: 'auto',
+  RequestMode.proxy: 'proxy',
+  RequestMode.direct: 'direct',
 };
 
 const _$OverwriteTypeEnumMap = {

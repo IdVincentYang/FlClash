@@ -36,7 +36,14 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
     ref.listenManual(sharedStateProvider, (prev, next) {
       if (prev != next) {
         debouncer.call(FunctionTag.saveSharedFile, () async {
-          await preferences.saveShareState(next);
+          await request.mutate(() async {
+            if (!mounted) return;
+            if (!await preferences.saveShareState(
+              ref.read(sharedStateProvider),
+            )) {
+              throw const RequestUnavailable('preferences_save_failed');
+            }
+          });
         }, duration: const Duration(seconds: 1));
         if (prev?.needSyncSharedState != next.needSyncSharedState) {
           service?.syncState(next.needSyncSharedState);
@@ -62,6 +69,7 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
 
   @override
   void dispose() {
+    debouncer.cancel(FunctionTag.saveSharedFile);
     debouncer.cancel(FunctionTag.reloadPackages);
     if (app?.onPackagesChanged == _reloadPackages) {
       app?.onPackagesChanged = null;

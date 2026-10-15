@@ -57,7 +57,7 @@ class _TestScripts extends Scripts {
   Stream<List<Script>> build() => Stream.value(initial);
 
   @override
-  void order(int oldIndex, int newIndex) {
+  Future<void> order(int oldIndex, int newIndex) async {
     orders.add((oldIndex, newIndex));
   }
 }
@@ -66,7 +66,7 @@ class _RecordingScriptsAction extends ScriptsAction {
   final updated = <Script>[];
 
   @override
-  Future<void> updateScript(Script script) async {
+  Future<void> updateScript(Script script, {bool sourceEdit = false}) async {
     updated.add(script);
   }
 }
@@ -89,7 +89,7 @@ class _TestProfileAddedRules extends ProfileAddedRules {
   Stream<List<Rule>> build(int profileId) => Stream.value(initial);
 
   @override
-  void order(int oldIndex, int newIndex) {}
+  Future<void> order(int oldIndex, int newIndex) async {}
 }
 
 class _TestProfileDisabledRuleIds extends ProfileDisabledRuleIds {

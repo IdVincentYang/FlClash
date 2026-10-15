@@ -8,12 +8,33 @@ typedef BackupFetch = Future<String?> Function(String downloadPath);
 
 @Riverpod(keepAlive: true)
 class BackupAction extends _$BackupAction {
+  @protected
+  Request get requestClient => request;
   @override
   void build() {}
 
+  Future<void> updateDAV(DAVProps? value) => requestClient.mutate(() async {
+    final previous = ref.read(davSettingProvider);
+    await requestClient.invalidate('dav');
+    ref.read(davSettingProvider.notifier).update((_) => value);
+    try {
+      if (!await preferences.saveConfig(ref.read(configProvider))) {
+        throw const RequestUnavailable('preferences_save_failed');
+      }
+    } catch (_) {
+      ref.read(davSettingProvider.notifier).update((_) => previous);
+      if (!await preferences.saveConfig(ref.read(configProvider))) {
+        await requestClient.markPartialCommit();
+      }
+      rethrow;
+    }
+  });
+
   Future<bool> backup(BackupDelivery deliver) {
     return _withWorkDir((workDir) async {
-      return deliver(await _createArchive(workDir));
+      final archive = await requestClient.mutate(() => _createArchive(workDir));
+      await RequestSession.current?.check();
+      return deliver(archive);
     });
   }
 
@@ -45,10 +66,14 @@ class BackupAction extends _$BackupAction {
   Future<bool> _withWorkDir(Future<bool> Function(String workDir) run) async {
     final workDir = Directory(join(await appPath.tempPath, 'backup$uniqueId'));
     await workDir.create(recursive: true);
+    var retained = false;
     try {
       return await run(workDir.path);
+    } on RequestUnavailable catch (error) {
+      retained = error.code == 'request_partial_commit';
+      rethrow;
     } finally {
-      await workDir.safeDelete(recursive: true);
+      if (!retained) await workDir.safeDelete(recursive: true);
       await _discardLegacyStaging();
     }
   }
@@ -91,6 +116,19 @@ class BackupAction extends _$BackupAction {
     MigrationData data,
     RestoreOption option, {
     String? stagingDirPath,
+  }) {
+    final session = RequestSession.current;
+    Future<void> apply() =>
+        _applyRestore(data, option, stagingDirPath: stagingDirPath);
+    return session == null
+        ? requestClient.mutate(apply)
+        : session.commit(apply);
+  }
+
+  Future<void> _applyRestore(
+    MigrationData data,
+    RestoreOption option, {
+    String? stagingDirPath,
   }) async {
     final configMap = data.configMap;
     final config = option == RestoreOption.onlyProfiles || configMap == null
@@ -99,10 +137,14 @@ class BackupAction extends _$BackupAction {
     final isOverride =
         ref.read(appSettingProvider).restoreStrategy ==
         RestoreStrategy.override;
+    await requestClient.invalidateDataset();
+    final previousConfig = ref.read(configProvider);
     final previousProviders = await database.clashProvidersDao.queryAll().get();
-    final putBack = stagingDirPath == null
-        ? null
-        : await _copyStagedFiles(data, stagingDirPath);
+    Future<void> Function()? putBack;
+    var preferencesChanged = false;
+    final nextConfig = config?.copyWith(
+      davProps: config.davProps ?? ref.read(davSettingProvider),
+    );
     try {
       await database.restore(
         data.profiles,
@@ -113,21 +155,34 @@ class BackupAction extends _$BackupAction {
         clashProviders: data.clashProviders,
         customProxies: data.customProxies,
         isOverride: isOverride,
+        beforeCommit: () async {
+          if (stagingDirPath != null) {
+            putBack = await _copyStagedFiles(data, stagingDirPath);
+          }
+          if (nextConfig != null) {
+            preferencesChanged = true;
+            if (!await preferences.saveConfig(nextConfig)) {
+              throw const RequestUnavailable('preferences_save_failed');
+            }
+          }
+        },
       );
-    } catch (_) {
-      await putBack?.call();
-      rethrow;
+    } catch (error, stack) {
+      try {
+        await putBack?.call();
+        if (preferencesChanged &&
+            !await preferences.saveConfig(previousConfig)) {
+          throw StateError('Preferences compensation failed');
+        }
+      } catch (_) {
+        await requestClient.markPartialCommit();
+        throw const RequestUnavailable('request_partial_commit');
+      }
+      Error.throwWithStackTrace(error, stack);
     }
+    if (nextConfig != null) writeConfig(ref, nextConfig);
     await _clearReplacedProviderCaches(previousProviders);
-    if (config == null) {
-      return;
-    }
-    writeConfig(
-      ref,
-      config.copyWith(
-        davProps: config.davProps ?? ref.read(davSettingProvider),
-      ),
-    );
+    await requestClient.clearPartialCommit();
   }
 
   /// The files go in before the rows that name them, so the returned callback
@@ -166,9 +221,14 @@ class BackupAction extends _$BackupAction {
         copied[entry] = replaced;
         await staged.safeCopy(target.path);
       }
-    } catch (_) {
-      await putBack();
-      rethrow;
+    } catch (error, stack) {
+      try {
+        await putBack();
+      } catch (_) {
+        await requestClient.markPartialCommit();
+        throw const RequestUnavailable('request_partial_commit');
+      }
+      Error.throwWithStackTrace(error, stack);
     }
     return putBack;
   }

@@ -24,9 +24,11 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/adapter"
+	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"github.com/metacubex/mihomo/common/observable"
 	"github.com/metacubex/mihomo/common/utils"
 	"github.com/metacubex/mihomo/component/geodata"
+	"github.com/metacubex/mihomo/component/requestscope"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
@@ -37,6 +39,7 @@ import (
 	"github.com/metacubex/mihomo/hub/executor"
 	"github.com/metacubex/mihomo/listener"
 	"github.com/metacubex/mihomo/log"
+	coreNtp "github.com/metacubex/mihomo/ntp/ntp"
 	rp "github.com/metacubex/mihomo/rules/provider"
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
@@ -91,6 +94,8 @@ func handleForceGC() {
 }
 
 func handleShutdown() bool {
+	requestscope.Phase(appRequests.currentOwner(), "retired")
+	appRequests.closePrivate()
 	handleStopLog()
 	stopRouteWatch()
 
@@ -98,6 +103,7 @@ func handleShutdown() bool {
 	isRunning.Store(false)
 	listener.StopListener()
 	updater.StopGeoUpdater()
+	coreNtp.ReCreateNTPService("", 0, "", nil, false)
 	executor.Shutdown()
 	currentConfig = nil
 	isInit.Store(false)
@@ -251,15 +257,33 @@ func selectableGroup(groupName string) (pickableGroup, error) {
 
 func handleChangeProxy(params *ChangeProxyParams) *ChangeProxyResult {
 	selectMu.Lock()
-	defer selectMu.Unlock()
+	locked := true
+	defer func() {
+		if locked {
+			selectMu.Unlock()
+		}
+	}()
 
 	selector, err := selectableGroup(params.GroupName)
 	if err != nil {
 		return &ChangeProxyResult{Message: err.Error()}
 	}
 	before := selector.Now()
+	if before != params.ProxyName {
+		invalidateAppRequestGroup(params.GroupName)
+	}
 	if params.ProxyName == "" {
 		selector.ForceSet(params.ProxyName)
+	} else if fallback, ok := selector.(*outboundgroup.Fallback); ok {
+		probe, err := fallback.SetWithProbe(params.ProxyName)
+		if err != nil {
+			return &ChangeProxyResult{Message: err.Error()}
+		}
+		selectMu.Unlock()
+		locked = false
+		probe()
+		selectMu.Lock()
+		locked = true
 	} else if err := selector.Set(params.ProxyName); err != nil {
 		return &ChangeProxyResult{Message: err.Error()}
 	}
@@ -333,7 +357,14 @@ func handleTestDelay(params *TestDelayParams) *Delay {
 		Value: -1,
 	}
 
+	parent, lease, requestErr := requestOperationContext(params.ScopeID, params.ProxyName)
+	if requestErr != nil {
+		return nil
+	}
 	proxy := lookupProxy(params.ProxyName)
+	if chosen, fixed := requestscope.FixedProxy(lease); fixed {
+		proxy = chosen
+	}
 	if proxy == nil {
 		reportMissingDelayTestProxy(params.ProxyName)
 		return delayData
@@ -346,7 +377,7 @@ func handleTestDelay(params *TestDelayParams) *Delay {
 	// saturated semaphore had one second left to connect, so a bulk test of a
 	// large subscription reported Timeout for whatever happened to be at the
 	// back of the queue.
-	queueCtx, cancelQueue := context.WithTimeout(context.Background(), timeout)
+	queueCtx, cancelQueue := context.WithTimeout(parent, timeout)
 	granted := acquireDelayTestSlot(queueCtx)
 	cancelQueue()
 	if !granted {
@@ -354,7 +385,7 @@ func handleTestDelay(params *TestDelayParams) *Delay {
 	}
 	defer releaseDelayTestSlot()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	delay, err := proxy.URLTest(ctx, url, anyDelayTestStatus)
@@ -362,6 +393,9 @@ func handleTestDelay(params *TestDelayParams) *Delay {
 		return delayData
 	}
 
+	if requestscope.Check(lease) != nil {
+		return nil
+	}
 	delayData.Value = delayValue(delay)
 	return delayData
 }
@@ -510,6 +544,44 @@ func releaseGeoUpdateFromHook(geoType string) {
 	}
 	delete(geoHookClaims, key)
 	delete(updateInFlight, key)
+}
+
+type geoUpdateRequest struct {
+	Type    string `json:"type"`
+	ScopeID string `json:"scopeId"`
+}
+
+func (p *geoUpdateRequest) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		return json.Unmarshal(data, &p.Type)
+	}
+	type raw geoUpdateRequest
+	return json.Unmarshal(data, (*raw)(p))
+}
+
+func handleScopedGeoUpdate(params geoUpdateRequest) string {
+	lease, err := requestLease(params.ScopeID)
+	if err != nil || lease == nil {
+		return "request_blocked"
+	}
+	target, ok := geoResources[params.Type]
+	if !ok {
+		return "unknown Geo resource"
+	}
+	if err = requestscope.CheckTarget(lease, target.url()); err != nil {
+		return "request_cancelled"
+	}
+	if !claimGeoUpdate(params.Type) {
+		return "geo update already in progress"
+	}
+	defer releaseGeoUpdate(params.Type)
+	if err = updater.UpdateGeoResource(lease.Context(), params.Type, lease); err != nil {
+		return err.Error()
+	}
+	if lease.Check() == nil {
+		bumpRouteEpoch()
+	}
+	return ""
 }
 
 func handleUpdateGeoData(geoType string) string {
@@ -747,6 +819,11 @@ func handleGetMemoryStats() MemoryStats {
 }
 
 func handleGetConfig(path string) (*config.RawConfig, error) {
+	id, err := beginRequestDataRead()
+	if err != nil {
+		return nil, err
+	}
+	defer appRequests.endDataRead(id)
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -821,6 +898,7 @@ func handleSetupConfig(params *SetupParams) string {
 }
 
 func init() {
+	installAppRequests()
 	adapter.UrlTestHook = func(url string, name string, delay uint16) {
 		sendMessage(Message{
 			Type: DelayMessage,
@@ -851,15 +929,39 @@ func init() {
 			Data: providerName,
 		})
 	}
+	updater.GeoUpdatedHook = func(completion *requestscope.Completion, sources map[string]string) {
+		selectMu.Lock()
+		defer selectMu.Unlock()
+		if requestscope.BeginHook == nil {
+			refreshRouteLocked(true)
+			return
+		}
+		if completion == nil {
+			return
+		}
+		for name, source := range sources {
+			resource, exists := geoResources[name]
+			if !exists || resource.url() != source {
+				return
+			}
+		}
+		refreshRouteQualifiedLocked(true, completion)
+	}
+	requestscope.ProxyUpdateHook = func(owner requestscope.Owner, update func()) {
+		selectMu.Lock()
+		defer selectMu.Unlock()
+		update()
+		if appRequests.ownerActive(owner) {
+			refreshRouteLocked(true)
+		}
+	}
 	updater.GeoUpdateHook = func(geoType string, updating bool, skipped bool, updateErr error) {
 		if updating {
 			claimGeoUpdateFromHook(geoType)
 		} else {
 			releaseGeoUpdateFromHook(geoType)
 			scheduleReclaimOwnership()
-			if !skipped && updateErr == nil {
-				bumpRouteEpoch()
-			}
+
 		}
 		status := GeoUpdateStatus{
 			Type:     geoType,

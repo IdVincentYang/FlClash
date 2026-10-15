@@ -9,6 +9,7 @@ import 'build_cache.dart';
 import 'error.dart';
 import 'fingerprint.dart';
 import 'options.dart';
+import 'source_restore.dart';
 import 'target.dart';
 import 'util.dart';
 
@@ -50,6 +51,7 @@ class GoBuilder {
   }
 
   Future<BuildExecution> build(Target target) async {
+    final sourceInputs = requestCoreSourceInputs(rootDir);
     final outDir = target.isLib
         ? p.join(_outputPath, target.platformDir, target.abi!)
         : p.join(_outputPath, target.platformDir);
@@ -62,7 +64,7 @@ class GoBuilder {
 
     return cache.run(
       key: '${target.platformDir}-${target.goarch}-core',
-      fingerprint: () => _calculateFingerprint(target),
+      fingerprint: () => _calculateFingerprint(target, sourceInputs),
       primaryOutput: outFile,
       notice: notice,
       build: () async {
@@ -140,7 +142,10 @@ class GoBuilder {
     if (outFile != null) ...['-o', outFile],
   ];
 
-  Future<Fingerprint> _calculateFingerprint(Target target) async {
+  Future<Fingerprint> _calculateFingerprint(
+    Target target,
+    List<String> sourceInputs,
+  ) async {
     final env = _buildEnvironment(target);
     final builder = FingerprintBuilder(rootDir: rootDir)
       ..addValue('cache_schema', BuildCache.schemaVersion)
@@ -189,6 +194,7 @@ class GoBuilder {
       if (File(goWorkSum).existsSync()) inputs.add(goWorkSum);
     }
     inputs.addAll(harnessInputs);
+    inputs.addAll(sourceInputs);
 
     if (target.isLib) {
       final compilerVersion = runCommand(env['CC']!, ['--version']);

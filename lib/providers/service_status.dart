@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/service_probe.dart';
+import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -17,6 +18,10 @@ class ServiceStatus extends _$ServiceStatus
   RoutedProbeState<ServiceTarget, ServiceCheck> build() => buildProbe();
 
   @override
+  void cancelProbe(ServiceTarget target) =>
+      request.cancelKey('service:${target.id}');
+
+  @override
   bool isFailure(ServiceCheck value) =>
       value.status == ServiceProbeStatus.timeout ||
       value.status == ServiceProbeStatus.failed;
@@ -26,10 +31,21 @@ class ServiceStatus extends _$ServiceStatus
     ServiceTarget target,
     RouteState route,
   ) async {
-    final checks = await checkServices(
-      ref.read(coreHandlerProvider),
-      proxyName: route.proxied ? '' : directOutbound,
-      targets: [target],
+    final proxy = route.proxied ? '' : directOutbound;
+    final checks = await request.withSession(
+      key: 'service:${target.id}',
+      url: 'https://diagnostic.invalid',
+      explicitTarget: proxy,
+      action: (session) async {
+        if (!ref.mounted) throw const RequestUnavailable('request_cancelled');
+        final result = await checkServices(
+          ref.read(coreHandlerProvider),
+          proxyName: proxy,
+          targets: [target],
+        );
+        await session.check();
+        return result;
+      },
     );
     final check = checks[target];
     return {

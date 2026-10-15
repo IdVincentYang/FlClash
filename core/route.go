@@ -8,6 +8,7 @@ import (
 
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
+	"github.com/metacubex/mihomo/component/requestscope"
 	"github.com/metacubex/mihomo/tunnel"
 )
 
@@ -98,9 +99,18 @@ func readRuleSets() map[string]any {
 
 // A provider that swapped its list is a structural change: the names may
 // survive while the servers behind them do not. The caller holds selectMu.
-func refreshRouteLocked(structural bool) {
+func refreshRouteLocked(structural bool) { refreshRouteQualifiedLocked(structural, nil) }
+
+func refreshRouteQualifiedLocked(structural bool, completion *requestscope.Completion) {
 	picks, versions := readPicks()
 	ruleSets := readRuleSets()
+	if completion != nil {
+		appRequests.mu.Lock()
+		if !appRequests.completionCurrentLocked(*completion) {
+			appRequests.mu.Unlock()
+			return
+		}
+	}
 
 	currentRoute.mu.Lock()
 	if currentRoute.providerVersions != nil && !maps.Equal(versions, currentRoute.providerVersions) {
@@ -123,7 +133,13 @@ func refreshRouteLocked(structural bool) {
 	state := routeStateLocked()
 	watched := currentRoute.watched
 	currentRoute.mu.Unlock()
+	if completion != nil {
+		appRequests.mu.Unlock()
+	}
 
+	if changed {
+		invalidateAppRequestRoutesLocked()
+	}
 	if changed && watched {
 		publishRoute(state)
 	}

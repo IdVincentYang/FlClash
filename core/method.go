@@ -287,8 +287,12 @@ var methodHandlers = map[CoreMethod]methodHandler{
 			response.success("")
 		})
 	}),
-	updateGeoDataMethod: withArguments(func(geoType *string, response MethodResponse) {
-		response.success(handleUpdateGeoData(*geoType))
+	updateGeoDataMethod: withArguments(func(params *geoUpdateRequest, response MethodResponse) {
+		if params.ScopeID != "" {
+			response.success(handleScopedGeoUpdate(*params))
+			return
+		}
+		response.success(handleUpdateGeoData(params.Type))
 	}),
 	startLogMethod: withoutArguments(func(response MethodResponse) {
 		handleStartLog()

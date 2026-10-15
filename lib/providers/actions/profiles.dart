@@ -4,24 +4,33 @@ part of '../action.dart';
 class ProfilesAction extends _$ProfilesAction {
   CoreController get _core => ref.read(coreHandlerProvider);
 
+  @protected
+  Request get requestClient => request;
+
   @override
   void build() {}
 
   void updateCurrentSelectedMap(String groupName, String proxyName) {
-    final currentProfile = ref.read(currentProfileProvider);
-    if (currentProfile != null &&
-        currentProfile.selectedMap[groupName] != proxyName) {
-      final selectedMap = Map<String, String>.from(currentProfile.selectedMap)
-        ..[groupName] = proxyName;
+    final profile = ref.read(currentProfileProvider);
+    if (profile == null || profile.selectedMap[groupName] == proxyName) return;
+    unawaited(
       ref
           .read(profilesProvider.notifier)
-          .put(currentProfile.copyWith(selectedMap: selectedMap));
-    }
+          .updateProfile(
+            profile.id,
+            (current) => current.copyWith(
+              selectedMap: {...current.selectedMap, groupName: proxyName},
+            ),
+          ),
+    );
   }
 
   Future<void> deleteProfile(int id) async {
-    await ref.read(profilesProvider.notifier).del(id);
-    await clearEffect(id);
+    await requestClient.mutate(() async {
+      await requestClient.invalidateDataset();
+      await ref.read(profilesProvider.notifier).deletePersisted(id);
+      await clearEffect(id);
+    });
     final currentProfileId = ref.read(currentProfileIdProvider);
     if (currentProfileId == id) {
       final profiles = ref.read(profilesProvider);
@@ -33,6 +42,7 @@ class ProfilesAction extends _$ProfilesAction {
         unawaited(ref.read(setupActionProvider.notifier).setRunning(false));
       }
     }
+    ref.read(setupActionProvider.notifier).applyProfileDebounce(force: true);
   }
 
   Future<String> validateConfigWithData(String data) async {
@@ -49,17 +59,44 @@ class ProfilesAction extends _$ProfilesAction {
         continue;
       }
       try {
-        await updateProfile(profile);
+        await updateProfile(profile, automatic: true);
       } catch (e) {
         commonPrint.log(compactError(e), logLevel: LogLevel.warning);
       }
     }
   }
 
-  void putProfile(Profile profile, {Iterable<int> renameIn = const []}) {
-    ref.read(profilesProvider.notifier).put(profile, renameIn: renameIn);
-    if (ref.read(currentProfileIdProvider) != null) return;
-    ref.read(currentProfileIdProvider.notifier).value = profile.id;
+  Profile _editedProfile(Profile? current, Profile proposed) =>
+      (current ?? proposed).copyWith(
+        label: proposed.label,
+        url: proposed.url,
+        requestMode: proposed.requestMode,
+        requestProxy: proposed.requestProxy,
+        autoUpdate: proposed.autoUpdate,
+        autoUpdateDuration: proposed.autoUpdateDuration,
+      );
+
+  Future<void> putProfile(
+    Profile profile, {
+    Iterable<int> renameIn = const [],
+    void Function(RequestSource)? onSourceSaved,
+  }) async {
+    await requestClient.mutate(() async {
+      final current = (await database.profilesDao.query().get()).getProfile(
+        profile.id,
+      );
+      await ref
+          .read(profilesProvider.notifier)
+          .persist(_editedProfile(current, profile), renameIn: renameIn);
+      if (onSourceSaved != null) {
+        onSourceSaved(
+          await requestClient.captureSource('profile:${profile.id}'),
+        );
+      }
+    });
+    if (ref.read(currentProfileIdProvider) == null) {
+      ref.read(currentProfileIdProvider.notifier).value = profile.id;
+    }
   }
 
   Future<List<Profile>> providerUsers(Profile profile) async {
@@ -101,28 +138,176 @@ class ProfilesAction extends _$ProfilesAction {
   Future<void> updateProfile(
     Profile profile, {
     bool showLoading = false,
+    bool automatic = false,
+    bool allowBootstrap = false,
+    bool sourceEdit = false,
+    bool sourceMustMatch = false,
+    RequestSource? expectedSource,
     Iterable<int> renameIn = const [],
   }) async {
     final operation = showLoading
         ? ref.read(updatingKeysProvider.notifier).start(profile.updatingKey)
         : null;
+    RequestSession? session;
+    RequestFile? staged;
     try {
-      ref.read(profilesProvider.notifier).put(profile, renameIn: renameIn);
-      final newProfile = await profile.update(
-        validate: (path) => _core.validateConfig(path),
+      if (sourceEdit) await putProfile(profile, renameIn: renameIn);
+      if (expectedSource != null &&
+          !await requestClient.sourceCurrent(expectedSource)) {
+        return;
+      }
+      final previous = (await database.profilesDao.query().get()).getProfile(
+        profile.id,
       );
-      ref.read(profilesProvider.notifier).put(newProfile);
-      if (profile.id == ref.read(currentProfileIdProvider)) {
+      if (sourceMustMatch &&
+          (previous == null ||
+              (
+                    previous.url,
+                    previous.requestMode,
+                    previous.requestProxy,
+                    previous.autoUpdate,
+                    previous.autoUpdateDuration,
+                  ) !=
+                  (
+                    profile.url,
+                    profile.requestMode,
+                    profile.requestProxy,
+                    profile.autoUpdate,
+                    profile.autoUpdateDuration,
+                  ))) {
+        return;
+      }
+      profile = previous ?? profile;
+      session = await requestClient.begin(
+        key: 'profile:${profile.id}',
+        url: profile.url,
+        mode: profile.requestMode,
+        proxy: profile.requestProxy,
+        automatic: automatic,
+        allowBootstrap: allowBootstrap,
+        bootstrapIfUnconfigured:
+            previous == null && profile.requestMode == RequestMode.proxy,
+        label: profile.realLabel,
+        expectedSource: expectedSource,
+        sourceIsCurrent: () async {
+          final current = (await database.profilesDao.query().get()).getProfile(
+            profile.id,
+          );
+          return current == null
+              ? previous == null
+              : (
+                      current.url,
+                      current.requestMode,
+                      current.requestProxy,
+                      current.autoUpdate,
+                    ) ==
+                    (
+                      profile.url,
+                      profile.requestMode,
+                      profile.requestProxy,
+                      profile.autoUpdate,
+                    );
+        },
+      );
+      final response = await session.run(
+        () => requestClient.getFileResponseForUrl(profile.url),
+      );
+      staged = await RequestFile.stage(response.data ?? []);
+      final message = await _core.validateConfig(staged.staged.path);
+      if (message.isNotEmpty) throw MessageException(message);
+      final incoming = staged;
+      final path = await appPath.getProfilePath(profile.id.toString());
+      await session.commit(() async {
+        final current =
+            (await database.profilesDao.query().get()).getProfile(profile.id) ??
+            profile;
+        final next = current.copyWith(
+          label: current.label.takeFirstValid([
+            getFileNameForDisposition(
+              response.headers.value('content-disposition'),
+            ),
+            profile.id.toString(),
+          ]),
+          subscriptionInfo: SubscriptionInfo.formHString(
+            response.headers.value('subscription-userinfo'),
+          ),
+          lastUpdateDate: DateTime.now(),
+        );
+        await incoming.replace(
+          path,
+          () => ref
+              .read(profilesProvider.notifier)
+              .persist(next, networkResult: true),
+        );
+        await requestClient.invalidate('profile:${profile.id}');
+      });
+      if (ref.read(currentProfileIdProvider) == null) {
+        ref.read(currentProfileIdProvider.notifier).value = profile.id;
+      }
+      final completed = session;
+      Future<bool> current() async =>
+          profile.id == ref.read(currentProfileIdProvider) &&
+          await completed.lifecycleCurrent(sourceInvalidated: true);
+      if (await current()) {
         ref
             .read(setupActionProvider.notifier)
-            .applyProfileDebounce(silence: true);
+            .applyProfileDebounce(silence: true, isCurrent: current);
       }
     } finally {
+      session?.close();
+      await staged?.close();
       if (operation != null) {
         ref
             .read(updatingKeysProvider.notifier)
             .stop(profile.updatingKey, operation);
       }
+    }
+  }
+
+  Future<Profile?> ensureFile(Profile profile) async {
+    if (profile.url.isEmpty ||
+        await File(
+          await appPath.getProfilePath(profile.id.toString()),
+        ).exists()) {
+      return null;
+    }
+    await updateProfile(profile, allowBootstrap: true);
+    return (await database.profilesDao.query().get()).getProfile(profile.id);
+  }
+
+  Future<void> importFile(
+    Profile profile,
+    List<int> bytes, {
+    Iterable<int> renameIn = const [],
+  }) async {
+    final staged = await RequestFile.stage(bytes);
+    try {
+      final message = await _core.validateConfig(staged.staged.path);
+      if (message.isNotEmpty) throw MessageException(message);
+      final path = await appPath.getProfilePath(profile.id.toString());
+      await requestClient.mutate(() async {
+        await requestClient.invalidate('profile:${profile.id}');
+        final current = (await database.profilesDao.query().get()).getProfile(
+          profile.id,
+        );
+        await staged.replace(
+          path,
+          () => ref
+              .read(profilesProvider.notifier)
+              .persist(
+                _editedProfile(
+                  current,
+                  profile,
+                ).copyWith(lastUpdateDate: DateTime.now()),
+                renameIn: renameIn,
+              ),
+        );
+      });
+      if (ref.read(currentProfileIdProvider) == null) {
+        ref.read(currentProfileIdProvider.notifier).value = profile.id;
+      }
+    } finally {
+      await staged.close();
     }
   }
 
@@ -132,42 +317,50 @@ class ProfilesAction extends _$ProfilesAction {
     final bytes = await platformFile.readBytes();
     globalState.navigatorKey.currentState?.popUntil((route) => route.isFirst);
     ref.read(currentPageLabelProvider.notifier).toProfiles();
-    final profile = await globalState.loadingRun(
+    await globalState.loadingRun(
+      () => importFile(Profile.normal(label: platformFile.name), bytes),
       tag: LoadingTag.profiles,
-      () async {
-        return Profile.normal(
-          label: platformFile.name,
-        ).saveFile(bytes, validate: (path) => _core.validateConfig(path));
-      },
       title: currentAppLocalizations.addProfile,
     );
-    if (profile != null) {
-      putProfile(profile);
-    }
   }
 
-  Future<void> addProfileFormURL(String url, {String? label}) async {
-    if (globalState.navigatorKey.currentState?.canPop() ?? false) {
-      globalState.navigatorKey.currentState?.popUntil((route) => route.isFirst);
+  Future<void> addProfileFormURL(
+    String url, {
+    String? label,
+    RequestMode mode = RequestMode.auto,
+    String? proxy,
+    bool confirmed = false,
+  }) async {
+    if (!confirmed) {
+      final result = await dialogs.showNamedUrlInput(
+        title: currentAppLocalizations.importFromURL,
+        url: url,
+        label: label ?? '',
+        requestMode: mode,
+        requestProxy: proxy,
+        onRequestRouteChanged: (value) {
+          mode = value.$1;
+          proxy = value.$2;
+        },
+      );
+      if (result == null) return;
+      url = result.url;
+      label = result.label;
     }
+    final profile = Profile.normal(
+      label: label,
+      url: url,
+    ).copyWith(requestMode: mode, requestProxy: proxy);
     ref.read(currentPageLabelProvider.notifier).value = PageLabel.profiles;
-    final profile = await globalState.loadingRun(
+    await globalState.loadingRun(
+      () => updateProfile(profile),
       tag: LoadingTag.profiles,
-      () async {
-        return Profile.normal(
-          label: label,
-          url: url,
-        ).update(validate: (path) => _core.validateConfig(path));
-      },
       title: currentAppLocalizations.addProfile,
     );
-    if (profile != null) {
-      putProfile(profile);
-    }
   }
 
-  void setProfileAndAutoApply(Profile profile) {
-    ref.read(profilesProvider.notifier).put(profile);
+  Future<void> setProfileAndAutoApply(Profile profile) async {
+    await putProfile(profile);
     if (profile.id == ref.read(currentProfileIdProvider)) {
       ref.read(setupActionProvider.notifier).applyProfileDebounce();
     }

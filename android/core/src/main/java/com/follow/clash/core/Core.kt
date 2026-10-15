@@ -5,12 +5,22 @@ import java.net.InetSocketAddress
 import java.net.URI
 
 object Core {
+
+    external fun requestControl(data: String): String
+
+    external fun setRequestSocketListener(callback: RequestSocketInterface?)
+
+    external fun setTunRequestIdentity(serviceId: String, generation: Long)
+
+    external fun stopTunRequest(serviceId: String, generation: Long): Boolean
     private external fun startTun(
         fd: Int,
         cb: TunInterface,
         stack: String,
         address: String,
         dns: String,
+        serviceId: String,
+        generation: Long,
     ): Boolean
 
     external fun forceGC()
@@ -34,6 +44,8 @@ object Core {
         stack: String,
         address: String,
         dns: String,
+        serviceId: String,
+        generation: Long,
     ): Boolean {
         return startTun(
             fd,
@@ -57,6 +69,8 @@ object Core {
             stack,
             address,
             dns,
+            serviceId,
+            generation,
         )
     }
 

@@ -43,6 +43,7 @@ export 'protocol.dart';
 export 'provider_reader.dart';
 export 'proxy.dart';
 export 'request.dart';
+export 'request_file.dart';
 export 'scroll.dart';
 export 'search.dart';
 export 'shape.dart';

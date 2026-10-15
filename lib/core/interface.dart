@@ -289,7 +289,14 @@ abstract class CoreHandlerInterface with CoreInterface {
 
   @override
   Future<String> updateGeoData(String type) async {
-    return _invokeMessage(method: CoreMethod.updateGeoData, arguments: type);
+    final session = RequestSession.current;
+    return _invokeMessage(
+      method: CoreMethod.updateGeoData,
+      arguments: session?.id == null
+          ? type
+          : {'type': type, 'scopeId': session!.id},
+      timeout: session == null ? null : const Duration(seconds: 100),
+    );
   }
 
   @override
@@ -406,6 +413,8 @@ abstract class CoreHandlerInterface with CoreInterface {
       'proxy-name': proxyName,
       'timeout': delayTestTimeoutDuration.inMilliseconds,
       'test-url': url,
+      if (RequestSession.current?.id != null)
+        'scopeId': RequestSession.current!.id,
     };
     final data = await _invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.asyncTestDelay,
@@ -419,7 +428,11 @@ abstract class CoreHandlerInterface with CoreInterface {
   Future<ProbeResult?> probe(ProbeParams params) async {
     final data = await _invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.probe,
-      arguments: params.toJson(),
+      arguments: {
+        ...params.toJson(),
+        if (RequestSession.current?.id != null)
+          'scopeId': RequestSession.current!.id,
+      },
       timeout: probeGuardDuration(params),
     );
     return data == null ? null : ProbeResult.fromJson(data);
@@ -429,7 +442,11 @@ abstract class CoreHandlerInterface with CoreInterface {
   Future<OutboundIpResult?> outboundIp(OutboundIpParams params) async {
     final data = await _invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.outboundIp,
-      arguments: params.toJson(),
+      arguments: {
+        ...params.toJson(),
+        if (RequestSession.current?.id != null)
+          'scopeId': RequestSession.current!.id,
+      },
       timeout: coreGuardFor(params.timeout),
     );
     return data == null ? null : OutboundIpResult.fromJson(data);
@@ -439,7 +456,11 @@ abstract class CoreHandlerInterface with CoreInterface {
   Future<List<ServiceCheckItem>> serviceCheck(ServiceCheckParams params) async {
     final data = await _invokeMethod<List<dynamic>>(
       method: CoreMethod.serviceCheck,
-      arguments: params.toJson(),
+      arguments: {
+        ...params.toJson(),
+        if (RequestSession.current?.id != null)
+          'scopeId': RequestSession.current!.id,
+      },
       timeout: coreGuardFor(
         params.timeout,
         budgetFactor: serviceSweepBudgetFactor,

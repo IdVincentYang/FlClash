@@ -42,6 +42,7 @@ const (
 
 // An empty Names runs every check.
 type ServiceCheckParams struct {
+	ScopeID   string   `json:"scopeId"`
 	ProxyName string   `json:"proxy-name"`
 	Names     []string `json:"names"`
 	Timeout   int64    `json:"timeout"`
@@ -119,7 +120,11 @@ func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
 	}
 
 	timeout := probeTimeout(params.Timeout)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*serviceSweepBudgetFactor)
+	parent, _, requestErr := requestOperationContext(params.ScopeID, params.ProxyName)
+	if requestErr != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout*serviceSweepBudgetFactor)
 	defer cancel()
 
 	// Claimed before queueing, so a check waiting for a slot is cancelled the

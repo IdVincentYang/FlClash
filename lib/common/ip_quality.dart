@@ -70,6 +70,10 @@ class _Lookup {
     if (_completer.isCompleted) {
       return;
     }
+    if (cancelToken.isCancelled) {
+      _completer.completeError(cancelToken.cancelError!);
+      return;
+    }
     if (_wave == _waves.length) {
       _settle();
       return;

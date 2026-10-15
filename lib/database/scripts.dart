@@ -13,6 +13,10 @@ class Scripts extends Table {
 
   TextColumn get url => text().nullable()();
 
+  TextColumn get requestMode => text().withDefault(const Constant('auto'))();
+
+  TextColumn get requestProxy => text().nullable()();
+
   IntColumn get order => integer().nullable()();
 
   @override
@@ -80,6 +84,8 @@ extension RawScriptExt on RawScript {
       label: label,
       lastUpdateTime: lastUpdateTime,
       url: url,
+      requestMode: RequestMode.values.byName(requestMode),
+      requestProxy: requestProxy,
       order: order,
     );
   }
@@ -92,6 +98,8 @@ extension ScriptsCompanionExt on Script {
       label: label,
       lastUpdateTime: lastUpdateTime,
       url: Value(url),
+      requestMode: Value(requestMode.name),
+      requestProxy: Value(requestProxy),
       order: Value(order ?? this.order),
     );
   }

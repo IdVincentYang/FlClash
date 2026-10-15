@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -43,13 +42,7 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
     if (res != true || !mounted) {
       return;
     }
-    ref.read(scriptsProvider.notifier).del(script.id);
-    unawaited(_clearEffect(script.id));
-  }
-
-  Future<void> _clearEffect(int id) async {
-    final path = await appPath.getScriptPath(id.toString());
-    await File(path).safeDelete();
+    await _scriptsAction.deleteScript(script.id);
   }
 
   Widget _buildContent(List<Script> scripts, {required bool isLoading}) {
@@ -117,19 +110,34 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
   }
 
   Future<void> _handleEditUrl(Script script) async {
-    final url = await dialogs.showUrlInput(
+    var mode = script.requestMode;
+    var proxy = script.requestProxy;
+    final result = await dialogs.showNamedUrlInput(
       title: context.appLocalizations.url,
-      value: script.url ?? '',
+      label: script.label,
+      url: script.url ?? '',
+      requestMode: mode,
+      requestProxy: proxy,
+      onRequestRouteChanged: (value) {
+        mode = value.$1;
+        proxy = value.$2;
+      },
     );
-    if (url == null || url == script.url) {
-      return;
-    }
-    await _handleUpdate(script.copyWith(url: url));
+    if (result == null) return;
+    await _handleUpdate(
+      script.copyWith(
+        label: result.label,
+        url: result.url,
+        requestMode: mode,
+        requestProxy: proxy,
+      ),
+      sourceEdit: true,
+    );
   }
 
-  Future<void> _handleUpdate(Script script) async {
+  Future<void> _handleUpdate(Script script, {bool sourceEdit = false}) async {
     await globalState.safeRun(
-      () => _scriptsAction.updateScript(script),
+      () => _scriptsAction.updateScript(script, sourceEdit: sourceEdit),
       title: script.label,
     );
   }
@@ -187,10 +195,10 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
       );
       return;
     }
-    final newScript =
-        await (script?.copyWith(label: label) ?? Script.create(label: label))
-            .save(content);
-    _scriptsAction.putScript(newScript);
+    await _scriptsAction.saveScript(
+      script?.copyWith(label: label) ?? Script.create(label: label),
+      content,
+    );
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -256,30 +264,42 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
       fileName.fileStem,
       fallback: context.appLocalizations.script,
     );
-    final script = await Script.create(label: label, url: url).save(content);
-    _scriptsAction.putScript(script);
+    await _scriptsAction.saveScript(
+      Script.create(label: label, url: url),
+      content,
+    );
   }
 
   Future<void> _handleImportFromUrl() async {
     final appLocalizations = context.appLocalizations;
-    final url = await dialogs.showUrlInput(title: appLocalizations.importUrl);
-    if (url == null) {
-      return;
-    }
-    final res = await globalState.loadingRun(
-      () => request.getTextResponseForUrl(url),
+    var mode = RequestMode.auto;
+    String? proxy;
+    final result = await dialogs.showNamedUrlInput(
+      title: appLocalizations.importUrl,
+      onRequestRouteChanged: (value) {
+        mode = value.$1;
+        proxy = value.$2;
+      },
+    );
+    if (result == null || !mounted) return;
+    final url = result.url;
+    final fileName =
+        Uri.parse(
+          url,
+        ).pathSegments.lastWhereOrNull((item) => item.isNotEmpty) ??
+        '';
+    final script = Script.create(
+      label: _scripts.uniqueLabel(
+        result.label.isEmpty ? fileName.fileStem : result.label,
+        fallback: appLocalizations.script,
+      ),
+      url: url,
+    ).copyWith(requestMode: mode, requestProxy: proxy);
+    await globalState.loadingRun(
+      () => _scriptsAction.updateScript(script),
       title: appLocalizations.importUrl,
       tag: LoadingTag.scripts,
     );
-    if (res == null || !mounted) {
-      return;
-    }
-    final fileName =
-        Uri.tryParse(
-          url,
-        )?.pathSegments.lastWhereOrNull((it) => it.isNotEmpty) ??
-        '';
-    await _handleImport(res.data ?? '', url: url, fileName: fileName);
   }
 
   Future<void> _handleImportFromFile() async {

@@ -362,7 +362,7 @@ final class ProfilesProvider
   }
 }
 
-String _$profilesHash() => r'30c2b73ecd127bd5c483e72ba9d6e3bb88c3647f';
+String _$profilesHash() => r'aee7607e7e95fe68320f48968ae23fc579417b6c';
 
 abstract class _$Profiles extends $Notifier<List<Profile>> {
   List<Profile> build();
@@ -406,7 +406,7 @@ final class ScriptsProvider
   Scripts create() => Scripts();
 }
 
-String _$scriptsHash() => r'd972619681830814ed31751a17346bbfd0ca64a2';
+String _$scriptsHash() => r'a6b05cbb54668b01e7aa5c1100efce43f299f793';
 
 abstract class _$Scripts extends $StreamNotifier<List<Script>> {
   Stream<List<Script>> build();

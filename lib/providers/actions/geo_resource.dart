@@ -41,17 +41,37 @@ class GeoResourceAction extends _$GeoResourceAction {
   /// Completion arrives as a geo-update event through [handleCoreUpdate];
   /// callers that need it watch [isUpdatingProvider] for the key to clear.
   Future<void> updateGeoResource(GeoResource geoResource) async {
-    _manualUpdates.add(geoResource);
-    final operation = _startUpdating(geoResource);
-    try {
-      final message = await _core.updateGeoData(geoResource.name);
-      if (message.isNotEmpty) {
-        throw MessageException(message);
+    if (!system.isAndroid) {
+      _manualUpdates.add(geoResource);
+      final operation = _startUpdating(geoResource);
+      try {
+        final message = await _core.updateGeoData(geoResource.name);
+        if (message.isNotEmpty) throw MessageException(message);
+      } catch (_) {
+        _manualUpdates.remove(geoResource);
+        _stopUpdating(geoResource, operation);
+        rethrow;
       }
-    } catch (_) {
-      _manualUpdates.remove(geoResource);
+      return;
+    }
+    final operation = _startUpdating(geoResource);
+    RequestSession? session;
+    try {
+      final url =
+          ref.read(patchClashConfigProvider).geoXUrl[geoResource] ??
+          defaultGeoXUrl[geoResource]!;
+      session = await request.begin(key: 'geo:${geoResource.name}', url: url);
+      final message = await session.run(
+        () => _core.updateGeoData(geoResource.name),
+      );
+      if (message.isNotEmpty) throw MessageException(message);
+      await session.check();
+      dialogs.showNotifier(
+        currentAppLocalizations.geoUpdated(geoResource.name),
+      );
+    } finally {
+      session?.close();
       _stopUpdating(geoResource, operation);
-      rethrow;
     }
   }
 
@@ -81,12 +101,18 @@ class GeoResourceAction extends _$GeoResourceAction {
     }
   }
 
-  void updateGeoResourceUrl(GeoResource geoResource, String newUrl) {
+  Future<void> updateGeoResourceUrl(
+    GeoResource geoResource,
+    String newUrl,
+  ) async {
     if (!newUrl.isUrl) {
       throw ArgumentError.value(newUrl, 'newUrl', 'Not a valid URL');
     }
-    ref.read(patchClashConfigProvider.notifier).update((state) {
-      return state.copyWith(geoXUrl: {...state.geoXUrl, geoResource: newUrl});
+    await request.mutate(() async {
+      await request.invalidate('geo:${geoResource.name}');
+      ref.read(patchClashConfigProvider.notifier).update((state) {
+        return state.copyWith(geoXUrl: {...state.geoXUrl, geoResource: newUrl});
+      });
     });
   }
 }

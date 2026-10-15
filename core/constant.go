@@ -70,12 +70,14 @@ type RouteState struct {
 }
 
 type TestDelayParams struct {
+	ScopeID   string `json:"scopeId"`
 	ProxyName string `json:"proxy-name"`
 	TestUrl   string `json:"test-url"`
 	Timeout   int64  `json:"timeout"`
 }
 
 type ProbeParams struct {
+	ScopeID   string            `json:"scopeId"`
 	Url       string            `json:"url"`
 	ProxyName string            `json:"proxy-name"`
 	Headers   map[string]string `json:"headers"`

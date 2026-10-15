@@ -40,6 +40,8 @@ class SystemAction extends _$SystemAction {
 
   @protected
   Future<void> cleanupExitResources(bool needSave) async {
+    await service?.prepareRunIntent(running: false, source: 'exit');
+    await request.detach();
     final saveOperation = needSave ? _savePreferencesSafely() : null;
     final tray = trayPort;
     if (tray != null) {
@@ -86,7 +88,11 @@ class SystemAction extends _$SystemAction {
         );
       }
     }
-    await preferences.saveConfig(ref.read(configProvider));
+    await request.mutate(() async {
+      if (!await preferences.saveConfig(ref.read(configProvider))) {
+        throw const RequestUnavailable('preferences_save_failed');
+      }
+    });
   }
 
   @protected

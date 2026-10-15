@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'effect.dart';
 import 'list.dart';
 import 'theme.dart';
+import 'request_route.dart';
 part 'edit_view.dart';
 
 class OptionsDialog<T> extends StatelessWidget {
@@ -107,6 +108,9 @@ class NamedUrlDialog extends StatefulWidget {
   final String url;
   final FormFieldValidator<String>? labelValidator;
   final FormFieldValidator<String>? urlValidator;
+  final RequestMode requestMode;
+  final String? requestProxy;
+  final ValueChanged<(RequestMode, String?)>? onRequestRouteChanged;
 
   const NamedUrlDialog({
     super.key,
@@ -115,6 +119,9 @@ class NamedUrlDialog extends StatefulWidget {
     this.url = '',
     this.labelValidator,
     this.urlValidator,
+    this.requestMode = RequestMode.auto,
+    this.requestProxy,
+    this.onRequestRouteChanged,
   });
 
   @override
@@ -127,9 +134,14 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
   late final TextEditingController _labelController;
   late final TextEditingController _urlController;
 
+  late RequestMode _requestMode;
+  String? _requestProxy;
+
   @override
   void initState() {
     super.initState();
+    _requestMode = widget.requestMode;
+    _requestProxy = widget.requestProxy;
     _labelController = TextEditingController(text: widget.label);
     _urlController = TextEditingController(text: widget.url);
   }
@@ -162,6 +174,7 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
     if (_formKey.currentState?.validate() == false) {
       return;
     }
+    widget.onRequestRouteChanged?.call((_requestMode, _requestProxy));
     Navigator.of(context).pop<({String label, String url})>((
       label: _labelController.text.trim(),
       url: _urlController.text.trim(),
@@ -219,6 +232,15 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
               },
               decoration: InputDecoration(labelText: appLocalizations.url),
             ),
+            if (widget.onRequestRouteChanged != null)
+              RequestRouteFields(
+                mode: _requestMode,
+                proxy: _requestProxy,
+                onChanged: (value) => setState(() {
+                  _requestMode = value.$1;
+                  _requestProxy = value.$2;
+                }),
+              ),
           ],
         ),
       ),

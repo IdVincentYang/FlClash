@@ -136,23 +136,28 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m45(count) =>
       "${Intl.plural(count, one: '1 proxy', other: '${count} proxies')}";
 
-  static String m46(count) =>
-      "${Intl.plural(count, one: '1 rule', other: '${count} rules')}";
+  static String m46(host) =>
+      "The current configuration cannot fetch this item. Allow this operation to connect directly to ${host}? This permission ends when the operation finishes or its source changes.";
 
-  static String m47(appName) => "${appName} (Safe mode)";
+  static String m47(target) => "GLOBAL (current selection: ${target})";
 
   static String m48(count) =>
+      "${Intl.plural(count, one: '1 rule', other: '${count} rules')}";
+
+  static String m49(appName) => "${appName} (Safe mode)";
+
+  static String m50(count) =>
       "${Intl.plural(count, one: '1 second', other: '${count} seconds')}";
 
-  static String m49(count) => "${count} selected";
+  static String m51(count) => "${count} selected";
 
-  static String m50(time) => "Checked at ${time}";
+  static String m52(time) => "Checked at ${time}";
 
-  static String m51(label) => "${label} must be a single item";
+  static String m53(label) => "${label} must be a single item";
 
-  static String m52(label) => "${label} must be a URL";
+  static String m54(label) => "${label} must be a URL";
 
-  static String m53(count) =>
+  static String m55(count) =>
       "${Intl.plural(count, one: '1 year ago', other: '${count} years ago')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -695,10 +700,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Enter the rule content",
     ),
-    "installedAppsPermissionDeniedMessage":
-        MessageLookupByLibrary.simpleMessage(
-          "The app list permission was denied, so installed apps cannot be listed. Please grant it manually in system settings.",
-        ),
+    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
+      "The app list permission was denied, so installed apps cannot be listed. Please grant it manually in system settings.",
+    ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "This system hides the installed app list until the permission is granted. Authorize it to configure the per-app proxy.",
     ),
@@ -1089,6 +1093,25 @@ class MessageLookup extends MessageLookupByLibrary {
     "replace": MessageLookupByLibrary.simpleMessage("Replace"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("Replace all"),
     "request": MessageLookupByLibrary.simpleMessage("Request"),
+    "requestDirectRecoveryMessage": m46,
+    "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Restore this item using Direct?",
+    ),
+    "requestMode": MessageLookupByLibrary.simpleMessage("Request route"),
+    "requestModeAuto": MessageLookupByLibrary.simpleMessage("Auto"),
+    "requestModeDirect": MessageLookupByLibrary.simpleMessage("Direct"),
+    "requestModeHelp": MessageLookupByLibrary.simpleMessage(
+      "Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.",
+    ),
+    "requestModeProxy": MessageLookupByLibrary.simpleMessage("Proxy"),
+    "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
+      "Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked.",
+    ),
+    "requestProxyDefault": m47,
+    "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Proxy target"),
+    "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
+      "The selected request route is unavailable.",
+    ),
     "requests": MessageLookupByLibrary.simpleMessage("Requests"),
     "requestsAndUpdates": MessageLookupByLibrary.simpleMessage(
       "Requests and updates",
@@ -1259,10 +1282,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("Rule set"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("Rule target"),
     "rules": MessageLookupByLibrary.simpleMessage("Rules"),
-    "rulesCount": m46,
+    "rulesCount": m48,
     "runTime": MessageLookupByLibrary.simpleMessage("Run time"),
     "safeMode": MessageLookupByLibrary.simpleMessage("Safe mode"),
-    "safeModeAppTitle": m47,
+    "safeModeAppTitle": m49,
     "save": MessageLookupByLibrary.simpleMessage("Save"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("Save the changes?"),
     "script": MessageLookupByLibrary.simpleMessage("Script"),
@@ -1274,7 +1297,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Search"),
     "seconds": MessageLookupByLibrary.simpleMessage("seconds"),
-    "secondsCount": m48,
+    "secondsCount": m50,
     "selectAll": MessageLookupByLibrary.simpleMessage("Select all"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Select proxies"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1290,13 +1313,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Please select a sub-rule",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Selected"),
-    "selectedCountTitle": m49,
+    "selectedCountTitle": m51,
     "server": MessageLookupByLibrary.simpleMessage("Server"),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("Available"),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("Blocked"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Check"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Check all"),
-    "serviceCheckedAt": m50,
+    "serviceCheckedAt": m52,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Coming soon"),
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Disallowed ISP",
@@ -1333,7 +1356,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Start without showing the window",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("Single add"),
-    "singleValueTip": m51,
+    "singleValueTip": m53,
     "size": MessageLookupByLibrary.simpleMessage("Size"),
     "slide": MessageLookupByLibrary.simpleMessage("Slide"),
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKS port"),
@@ -1435,7 +1458,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "urlDesc": MessageLookupByLibrary.simpleMessage(
       "Obtain a profile from a URL",
     ),
-    "urlTip": m52,
+    "urlTip": m54,
     "useHosts": MessageLookupByLibrary.simpleMessage("Use hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("Use system hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Used traffic"),
@@ -1460,7 +1483,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Also set the system clock; Android ignores it",
     ),
-    "yearsAgo": m53,
+    "yearsAgo": m55,
     "yes": MessageLookupByLibrary.simpleMessage("Yes"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Simplified Chinese"),
   };

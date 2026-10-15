@@ -32,6 +32,10 @@ class Profiles extends Table {
 
   TextColumn get unfoldSet => text().map(const StringSetConverter())();
 
+  TextColumn get requestMode => text().withDefault(const Constant('auto'))();
+
+  TextColumn get requestProxy => text().nullable()();
+
   IntColumn get order => integer().nullable()();
 
   @override
@@ -113,6 +117,8 @@ extension RawProfilExt on RawProfile {
       label: label,
       currentGroupName: currentGroupName,
       url: url,
+      requestMode: RequestMode.values.byName(requestMode),
+      requestProxy: requestProxy,
       lastUpdateDate: lastUpdateDate,
       autoUpdateDuration: Duration(milliseconds: autoUpdateDurationMillis),
       subscriptionInfo: subscriptionInfo,
@@ -134,6 +140,8 @@ extension ProfilesCompanionExt on Profile {
       label: label,
       currentGroupName: Value(currentGroupName),
       url: url,
+      requestMode: Value(requestMode.name),
+      requestProxy: Value(requestProxy),
       lastUpdateDate: Value(lastUpdateDate),
       autoUpdateDurationMillis: autoUpdateDuration.inMilliseconds,
       subscriptionInfo: Value(subscriptionInfo),

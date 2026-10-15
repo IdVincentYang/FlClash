@@ -1,4 +1,5 @@
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -9,6 +10,7 @@ import 'package:fl_clash/views/backup_and_restore.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/glyph_finders.dart';
 import '../helpers/test_app.dart';
@@ -26,11 +28,17 @@ void main() {
 
   late ProviderContainer container;
 
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
   setUp(() {
     container = ProviderContainer(
       overrides: [profilesProvider.overrideWith(TestProfiles.new)],
     );
     globalState.container = container;
+    container.listen(configProvider, (_, _) {});
     container.read(viewSizeProvider.notifier).value = const Size(1200, 1400);
     container.listen(davSettingProvider, (_, _) {}, fireImmediately: true);
   });
@@ -113,7 +121,10 @@ void main() {
     testWidgets('rejects an empty form and stores nothing', (tester) async {
       await pumpDialog(tester, const WebDAVFormDialog());
 
-      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(TextButton, 'Save'));
+        await dataMutations.run(() async {});
+      });
       await tester.pumpAndSettle();
 
       expect(container.read(davSettingProvider), isNull);
@@ -152,7 +163,10 @@ void main() {
         find.widgetWithGlyph(TextFormField, AppGlyphs.password),
         'secret',
       );
-      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(TextButton, 'Save'));
+        await dataMutations.run(() async {});
+      });
       await tester.pumpAndSettle();
 
       expect(container.read(davSettingProvider), isNull);
@@ -175,7 +189,10 @@ void main() {
         find.widgetWithGlyph(TextFormField, AppGlyphs.password),
         'secret',
       );
-      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(TextButton, 'Save'));
+        await dataMutations.run(() async {});
+      });
       await tester.pumpAndSettle();
 
       final dav = container.read(davSettingProvider);
@@ -195,7 +212,10 @@ void main() {
         find.widgetWithGlyph(TextFormField, AppGlyphs.account),
         'bob',
       );
-      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(TextButton, 'Save'));
+        await dataMutations.run(() async {});
+      });
       await tester.pumpAndSettle();
 
       final dav = container.read(davSettingProvider);
@@ -217,7 +237,10 @@ void main() {
       container.read(davSettingProvider.notifier).update((_) => _existing);
       await pumpDialog(tester, const WebDAVFormDialog(dav: _existing));
 
-      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+        await dataMutations.run(() async {});
+      });
       await tester.pumpAndSettle();
 
       expect(container.read(davSettingProvider), isNull);

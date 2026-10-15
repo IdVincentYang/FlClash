@@ -137,23 +137,28 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m45(count) => "${count} прокси";
 
-  static String m46(count) =>
-      "${Intl.plural(count, one: '${count} правило', few: '${count} правила', many: '${count} правил', other: '${count} правила')}";
+  static String m46(host) =>
+      "Текущая конфигурация не позволяет загрузить этот объект. Разрешить этой операции прямое соединение с ${host}? Разрешение истечёт после завершения операции или изменения источника.";
 
-  static String m47(appName) => "${appName} (Безопасный режим)";
+  static String m47(target) => "GLOBAL (текущий выбор: ${target})";
 
   static String m48(count) =>
+      "${Intl.plural(count, one: '${count} правило', few: '${count} правила', many: '${count} правил', other: '${count} правила')}";
+
+  static String m49(appName) => "${appName} (Безопасный режим)";
+
+  static String m50(count) =>
       "${Intl.plural(count, one: '${count} секунда', few: '${count} секунды', many: '${count} секунд', other: '${count} секунды')}";
 
-  static String m49(count) => "Выбрано: ${count}";
+  static String m51(count) => "Выбрано: ${count}";
 
-  static String m50(time) => "Проверено в ${time}";
+  static String m52(time) => "Проверено в ${time}";
 
-  static String m51(label) => "«${label}» — только одно значение";
+  static String m53(label) => "«${label}» — только одно значение";
 
-  static String m52(label) => "Значение «${label}» должно быть URL";
+  static String m54(label) => "Значение «${label}» должно быть URL";
 
-  static String m53(count) =>
+  static String m55(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -718,10 +723,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Введите содержимое правила",
     ),
-    "installedAppsPermissionDeniedMessage":
-        MessageLookupByLibrary.simpleMessage(
-          "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
-        ),
+    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
+      "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
+    ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Эта система не выдаёт список установленных приложений без разрешения. Предоставьте его, чтобы настроить прокси для отдельных приложений.",
     ),
@@ -1142,6 +1146,25 @@ class MessageLookup extends MessageLookupByLibrary {
     "replace": MessageLookupByLibrary.simpleMessage("Заменить"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("Заменить все"),
     "request": MessageLookupByLibrary.simpleMessage("Запрос"),
+    "requestDirectRecoveryMessage": m46,
+    "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Восстановить через прямое соединение?",
+    ),
+    "requestMode": MessageLookupByLibrary.simpleMessage("Маршрут запросов"),
+    "requestModeAuto": MessageLookupByLibrary.simpleMessage("Авто"),
+    "requestModeDirect": MessageLookupByLibrary.simpleMessage("Напрямую"),
+    "requestModeHelp": MessageLookupByLibrary.simpleMessage(
+      "Для собственных запросов этого объекта. Прокси требует действующий узел; прямое соединение — доступную сеть без VPN.",
+    ),
+    "requestModeProxy": MessageLookupByLibrary.simpleMessage("Прокси"),
+    "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
+      "Часть локальных изменений не удалось отменить. Файлы восстановления сохранены; автоматические обновления заблокированы.",
+    ),
+    "requestProxyDefault": m47,
+    "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Цель прокси"),
+    "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Выбранный маршрут запросов недоступен.",
+    ),
     "requests": MessageLookupByLibrary.simpleMessage("Запросы"),
     "requestsAndUpdates": MessageLookupByLibrary.simpleMessage(
       "Запросы и обновления",
@@ -1328,10 +1351,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("Набор правил"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("Цель правила"),
     "rules": MessageLookupByLibrary.simpleMessage("Правила"),
-    "rulesCount": m46,
+    "rulesCount": m48,
     "runTime": MessageLookupByLibrary.simpleMessage("Время работы"),
     "safeMode": MessageLookupByLibrary.simpleMessage("Безопасный режим"),
-    "safeModeAppTitle": m47,
+    "safeModeAppTitle": m49,
     "save": MessageLookupByLibrary.simpleMessage("Сохранить"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("Сохранить изменения?"),
     "script": MessageLookupByLibrary.simpleMessage("Скрипт"),
@@ -1343,7 +1366,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Поиск"),
     "seconds": MessageLookupByLibrary.simpleMessage("секунд"),
-    "secondsCount": m48,
+    "secondsCount": m50,
     "selectAll": MessageLookupByLibrary.simpleMessage("Выбрать всё"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Выбрать прокси"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1359,13 +1382,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Выберите подправило",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Выбрано"),
-    "selectedCountTitle": m49,
+    "selectedCountTitle": m51,
     "server": MessageLookupByLibrary.simpleMessage("Сервер"),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("Доступен"),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("Заблокировано"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Проверить"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Проверить все"),
-    "serviceCheckedAt": m50,
+    "serviceCheckedAt": m52,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Скоро появится"),
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Недопустимый провайдер",
@@ -1406,7 +1429,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Запускаться без показа окна",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("По одному"),
-    "singleValueTip": m51,
+    "singleValueTip": m53,
     "size": MessageLookupByLibrary.simpleMessage("Размер"),
     "slide": MessageLookupByLibrary.simpleMessage("Сдвиг"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Порт SOCKS"),
@@ -1514,7 +1537,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("Получить профиль по URL"),
-    "urlTip": m52,
+    "urlTip": m54,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системный hosts",
@@ -1547,7 +1570,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Также устанавливать системные часы; Android это игнорирует",
     ),
-    "yearsAgo": m53,
+    "yearsAgo": m55,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

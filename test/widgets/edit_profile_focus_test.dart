@@ -34,6 +34,22 @@ class _FakePathProvider extends PathProviderPlatform {
 class _NoopSetupAction extends SetupAction {
   @override
   void autoApplyProfile() {}
+
+  @override
+  void applyProfileDebounce({
+    bool silence = false,
+    bool force = false,
+    Future<bool> Function()? isCurrent,
+  }) {}
+
+  @override
+  Future<bool> setRunning(
+    bool running, {
+    bool initialize = false,
+    int? preparedRequestId,
+    String source = 'ui',
+    bool? paused,
+  }) async => true;
 }
 
 class _RenameConflictProfilesAction extends ProfilesAction {
@@ -47,8 +63,13 @@ class _RenameConflictProfilesAction extends ProfilesAction {
       (renameIn: const <Profile>[], conflicts: [Profile.normal(label: 'Work')]);
 
   @override
-  void putProfile(Profile profile, {Iterable<int> renameIn = const []}) =>
-      put.add(profile);
+  Future<void> putProfile(
+    Profile profile, {
+    Iterable<int> renameIn = const [],
+    void Function(RequestSource)? onSourceSaved,
+  }) async {
+    put.add(profile);
+  }
 }
 
 Profile _urlProfile() =>

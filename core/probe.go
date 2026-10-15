@@ -13,6 +13,7 @@ import (
 
 	N "github.com/metacubex/mihomo/common/net"
 	"github.com/metacubex/mihomo/component/ca"
+	"github.com/metacubex/mihomo/component/requestscope"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
@@ -47,6 +48,7 @@ type probeRoute struct {
 // of the most recent one, which after redirects is the one that produced the
 // final response.
 type probeDialer struct {
+	lease requestscope.Lease
 	proxy constant.Proxy
 
 	mu   sync.Mutex
@@ -63,13 +65,26 @@ func (d *probeDialer) dial(ctx context.Context, _ string, address string) (net.C
 	if err := metadata.SetRemoteAddress(address); err != nil {
 		return nil, err
 	}
+	if err := requestscope.Check(d.lease); err != nil {
+		return nil, err
+	}
+	if d.lease != nil {
+		requestscope.Route(d.lease, metadata)
+		if err := requestscope.BeforeDial(d.lease, metadata); err != nil {
+			return nil, err
+		}
+	}
 	if d.proxy != nil {
-		conn, err := d.proxy.DialContext(ctx, metadata)
+		proxy, selectErr := requestscope.SelectProxy(d.lease, d.proxy, metadata)
+		if selectErr != nil {
+			return nil, selectErr
+		}
+		conn, err := proxy.DialContext(ctx, metadata)
 		if err != nil {
 			return nil, err
 		}
 		d.remember(&routedConn{route: &probeRoute{chains: conn.Chains()}})
-		return conn, nil
+		return requestscope.Track(ctx, conn, d.lease)
 	}
 	if err := awaitTunnel(ctx); err != nil {
 		return nil, err
@@ -77,9 +92,17 @@ func (d *probeDialer) dial(ctx context.Context, _ string, address string) (net.C
 	local, remote := N.Pipe()
 	routed := &routedConn{Conn: local, metadata: metadata}
 	pendingProbeRoutes.Store(metadata, routed)
-	go tunnel.Tunnel.HandleTCPConn(remote, metadata)
+	if d.lease != nil {
+		if err := d.lease.TrackConn(remote); err != nil {
+			_ = routed.Close()
+			return nil, err
+		}
+		go requestscope.HandleTCP(ctx, tunnel.Tunnel, remote, metadata, d.lease)
+	} else {
+		go tunnel.Tunnel.HandleTCPConn(remote, metadata)
+	}
 	d.remember(routed)
-	return routed, nil
+	return requestscope.Track(ctx, routed, d.lease)
 }
 
 // Applying a config suspends the tunnel before the route epoch moves, so a
@@ -184,7 +207,11 @@ type probeRequest struct {
 }
 
 func handleProbe(params *ProbeParams) *ProbeResult {
-	return runProbe(context.Background(), probeRequest{
+	ctx, _, err := requestOperationContext(params.ScopeID, params.ProxyName)
+	if err != nil {
+		return nil
+	}
+	return runProbe(ctx, probeRequest{
 		method:    http.MethodGet,
 		url:       params.Url,
 		proxyName: params.ProxyName,
@@ -204,8 +231,17 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 		return result
 	}
 
-	dialer := &probeDialer{}
-	if req.proxyName != "" {
+	lease := requestscope.FromContext(parent)
+	if requestscope.BeginHook != nil && lease == nil {
+		return fail(requestscope.ErrBlocked)
+	}
+	if err := requestscope.Check(lease); err != nil {
+		return fail(err)
+	}
+	dialer := &probeDialer{lease: lease}
+	if proxy, fixed := requestscope.FixedProxy(lease); fixed {
+		dialer.proxy = proxy
+	} else if req.proxyName != "" {
 		dialer.proxy = lookupProxy(req.proxyName)
 		if dialer.proxy == nil {
 			return fail(fmt.Errorf("proxy %q is not part of the applied config", req.proxyName))
@@ -280,6 +316,9 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	}
 	if req.maxBody > 0 {
 		result.Body = readProbeBody(response.Body, req.maxBody, req.until)
+	}
+	if err := requestscope.Check(lease); err != nil {
+		return fail(err)
 	}
 	return result
 }

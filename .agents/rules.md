@@ -2,6 +2,17 @@
 
 These are repository coding and testing conventions. Codex command permission rules belong in `.codex/rules/*.rules`; see `.agents/agent-config.md` before adding those.
 
+## Task Continuity
+
+- After compaction or recovery, use the current task entry, latest valid handoff, actual branch and local changes to
+  establish the objective, stage, remaining work, next deliverable and authorization. Resolve contradictory task records
+  in their existing locations before continuing; preserve valid results and other participants' changes.
+- Answered historical questions and status requests do not replace unfinished authorized work. Answer interruptions and
+  continue that work unless the user explicitly cancels, pauses or changes the objective.
+- Before ending a turn, check whether the current scope has reached its complete review handoff or completion, a reported
+  real blocker, or an explicit stopping point. Continue when useful authorized work remains; compaction alone is not a
+  stopping point. This check adds no polling loop, per-step reporting requirement or approval gate.
+
 ## Dart and Flutter Style
 
 The lint set lives in `lint_options.yaml` at the repo root. The root `analysis_options.yaml` and every local plugin under

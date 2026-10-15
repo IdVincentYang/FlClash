@@ -763,5 +763,16 @@
   "large": "Large",
   "extraLarge": "Extra large",
   "switchProfile": "Switch profile",
-  "lastUpdated": "Last updated"
+  "lastUpdated": "Last updated",
+  "requestDirectRecoveryTitle": "Restore this item using Direct?",
+  "requestDirectRecoveryMessage": "The current configuration cannot fetch this item. Allow this operation to connect directly to {host}? This permission ends when the operation finishes or its source changes.",
+  "requestMode": "Request route",
+  "requestModeAuto": "Auto",
+  "requestModeProxy": "Proxy",
+  "requestModeDirect": "Direct",
+  "requestProxyTarget": "Proxy target",
+  "requestProxyDefault": "GLOBAL (current selection: {target})",
+  "requestModeHelp": "Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.",
+  "requestRouteUnavailable": "The selected request route is unavailable.",
+  "requestPartialCommit": "Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked."
 }

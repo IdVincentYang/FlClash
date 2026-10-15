@@ -6307,6 +6307,106 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Restore this item using Direct?`
+  String get requestDirectRecoveryTitle {
+    return Intl.message(
+      'Restore this item using Direct?',
+      name: 'requestDirectRecoveryTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The current configuration cannot fetch this item. Allow this operation to connect directly to {host}? This permission ends when the operation finishes or its source changes.`
+  String requestDirectRecoveryMessage(Object host) {
+    return Intl.message(
+      'The current configuration cannot fetch this item. Allow this operation to connect directly to $host? This permission ends when the operation finishes or its source changes.',
+      name: 'requestDirectRecoveryMessage',
+      desc: '',
+      args: [host],
+    );
+  }
+
+  /// `Request route`
+  String get requestMode {
+    return Intl.message(
+      'Request route',
+      name: 'requestMode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Auto`
+  String get requestModeAuto {
+    return Intl.message('Auto', name: 'requestModeAuto', desc: '', args: []);
+  }
+
+  /// `Proxy`
+  String get requestModeProxy {
+    return Intl.message('Proxy', name: 'requestModeProxy', desc: '', args: []);
+  }
+
+  /// `Direct`
+  String get requestModeDirect {
+    return Intl.message(
+      'Direct',
+      name: 'requestModeDirect',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy target`
+  String get requestProxyTarget {
+    return Intl.message(
+      'Proxy target',
+      name: 'requestProxyTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `GLOBAL (current selection: {target})`
+  String requestProxyDefault(Object target) {
+    return Intl.message(
+      'GLOBAL (current selection: $target)',
+      name: 'requestProxyDefault',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.`
+  String get requestModeHelp {
+    return Intl.message(
+      'Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.',
+      name: 'requestModeHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The selected request route is unavailable.`
+  String get requestRouteUnavailable {
+    return Intl.message(
+      'The selected request route is unavailable.',
+      name: 'requestRouteUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked.`
+  String get requestPartialCommit {
+    return Intl.message(
+      'Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked.',
+      name: 'requestPartialCommit',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

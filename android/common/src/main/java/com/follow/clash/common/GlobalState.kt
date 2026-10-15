@@ -26,8 +26,30 @@ object GlobalState : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatch
     @Volatile
     private var appInstance: Application? = null
 
+    @Volatile private var requestNetworkSource: RequestNetworkSource? = null
+
+    val networkSource: RequestNetworkSource?
+        get() = requestNetworkSource
+
     fun init(application: Application) {
+        if (appInstance === application) return
+        requestNetworkSource?.close()
+        requestNetworkSource = null
         appInstance = application
+    }
+
+    @Synchronized
+    fun startRequestNetworkObservation() {
+        if (requestNetworkSource?.observing == true) return
+        val source = RequestNetworkSource(application) { facts -> RequestObservations.handler?.onNetworkChanged(facts) }
+        requestNetworkSource = source
+        source.start()
+    }
+
+    @Synchronized
+    fun stopRequestNetworkObservation() {
+        requestNetworkSource?.close()
+        requestNetworkSource = null
     }
 
     fun log(text: String) {

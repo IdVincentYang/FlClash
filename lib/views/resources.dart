@@ -170,7 +170,7 @@ class _GeoResourceListItemState extends ConsumerState<_GeoResourceListItem> {
     );
     if (newUrl != null && newUrl != url && mounted) {
       try {
-        ref
+        await ref
             .read(geoResourceActionProvider.notifier)
             .updateGeoResourceUrl(widget.type, newUrl);
       } catch (e) {

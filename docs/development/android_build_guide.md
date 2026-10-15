@@ -27,9 +27,13 @@ Native Assets 曾选用本机 NDK 29.0.14206865，与 Gradle 声明不同。每�
 在仓库根目录操作。
 
 1. 按 [fork 同步约定](../../CONTRIBUTING.md)选择工作分支，确认当前改动和需要构建的源码。
-2. 执行 `git submodule update --init --recursive`，获取锁定的 Clash.Meta 源码。
+2. 安装 Python 3.12 或兼容的 Python 3，执行 `python3 tool/restore_l1_t03_core.py`，再执行
+   `git submodule update --init --recursive`。Windows 使用 `python`。
+   [源码载体](../../core/patches/l1_t03/manifest.json)从项目配置来源取得公开基线，重建并核对核心 tree/commit；
+   新 gitlink 未推送，普通 recursive 初始化不能代替恢复。已有不匹配的本地修改会被保留并报错。
+   `--check` 仅在临时对象目录核对现有源码，不下载或覆盖工作区。
 3. 确认 Flutter、Go、Rustup 和 JDK 已可调用，并安装 Rust 工具链文件中的 Android target。
-4. 保持 [pubspec.yaml](../../pubspec.yaml) 中 setup 与 rust_api 的 `build_assets: true`。Go/Rust 由 Native Assets hooks 构建；关闭 hooks 会使产物来源不完整或复用旧库。
+4. 保持 [pubspec.yaml](../../pubspec.yaml) 中 setup 与 rust_api 的 `build_assets: true`。Go hook 在编译或返回内层缓存前执行源码检查，载体和实际来源配置同时进入内外层缓存依赖。Go/Rust 由 Native Assets hooks 构建；关闭 hooks 会使产物来源不完整或复用旧库。
 5. 保持 pubspec.lock 与 Cargo.lock 的锁定版本。以下流程使用 `--enforce-lockfile`；解析失败时处理版本或缓存原因，不为绕过错误重新生成锁文件。
 
 `setup.dart` 会生成忽略的 env.json，并激活其中指定的 flutter_distributor Git 版本。依赖和工具来自项目配置的数据源；来源核验及进一步固定版本见 Loop 5。

@@ -25,7 +25,11 @@ class _RecordingSetupAction extends SetupAction {
   int applies = 0;
 
   @override
-  void applyProfileDebounce({bool silence = false, bool force = false}) {
+  void applyProfileDebounce({
+    bool silence = false,
+    bool force = false,
+    Future<bool> Function()? isCurrent,
+  }) {
     applies++;
   }
 }

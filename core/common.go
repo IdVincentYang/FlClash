@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -20,6 +21,7 @@ import (
 	"github.com/metacubex/mihomo/adapter/provider"
 	"github.com/metacubex/mihomo/component/auth"
 	"github.com/metacubex/mihomo/component/dialer"
+	"github.com/metacubex/mihomo/component/requestscope"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
@@ -271,6 +273,17 @@ func updateConfig(params *UpdateParams) error {
 	}
 
 	general := currentConfig.General
+	routeChanged := params.Mode != nil && general.Mode != *params.Mode || params.IPv6 != nil && general.IPv6 != *params.IPv6
+	sourceChanged := params.Authentication != nil && !slices.Equal(general.Authentication, *params.Authentication)
+	for geoType, link := range params.GeoXUrl {
+		if resource, exists := geoResources[strings.ToUpper(geoType)]; exists && link != "" && link != resource.url() {
+			sourceChanged = true
+		}
+	}
+	if routeChanged || sourceChanged {
+		end := beginAppRouteMutation()
+		defer end()
+	}
 	if params.MixedPort != nil {
 		general.MixedPort = *params.MixedPort
 	}
@@ -290,9 +303,7 @@ func updateConfig(params *UpdateParams) error {
 		adapter.UnifiedDelay.Store(general.UnifiedDelay)
 	}
 	// IPv6 belongs with mode: turning it on moves a direct dial to another exit address.
-	routeChanged := false
 	if params.Mode != nil {
-		routeChanged = routeChanged || general.Mode != *params.Mode
 		general.Mode = *params.Mode
 		tunnel.SetMode(general.Mode)
 	}
@@ -301,7 +312,6 @@ func updateConfig(params *UpdateParams) error {
 		log.SetLevel(general.LogLevel)
 	}
 	if params.IPv6 != nil {
-		routeChanged = routeChanged || general.IPv6 != *params.IPv6
 		general.IPv6 = *params.IPv6
 		resolver.DisableIPv6 = !general.IPv6
 	}
@@ -396,11 +406,31 @@ func loadConfig(path string) (*config.Config, error) {
 
 func applyConfig(params *SetupParams) error {
 	runtime.GC()
-	configMu.Lock()
+	var readID string
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var err error
+		readID, err = beginRequestDataRead()
+		if err != nil {
+			return err
+		}
+		if configMu.TryLock() {
+			break
+		}
+		appRequests.endDataRead(readID)
+		if time.Now().After(deadline) {
+			return errRequestCommitBusy
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 	defer configMu.Unlock()
+	defer appRequests.endDataRead(readID)
+
+	owner := appRequests.newOwner()
 
 	setTestURL(params.TestURL)
 	cfg, err := loadConfig(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
+	appRequests.endDataRead(readID)
 	if err != nil {
 		// The fallback is what keeps the listeners serving while the host
 		// reports the error, but it applies a config with no proxies in it.
@@ -411,6 +441,7 @@ func applyConfig(params *SetupParams) error {
 			"config apply failed, falling back to the built-in default - no proxies will be available: %v",
 			err,
 		)
+		requestscope.Phase(owner, "failed")
 		fallback, fallbackErr := config.ParseRawConfig(config.DefaultRawConfig())
 		if fallbackErr != nil {
 			return err
@@ -418,12 +449,27 @@ func applyConfig(params *SetupParams) error {
 		cfg = fallback
 	}
 
+	if currentConfig != nil {
+		for _, p := range currentConfig.Providers {
+			if closer, ok := p.(interface{ Close() error }); ok {
+				_ = closer.Close()
+			}
+		}
+		for _, p := range currentConfig.RuleProviders {
+			if closer, ok := p.(interface{ Close() error }); ok {
+				_ = closer.Close()
+			}
+		}
+	}
 	currentConfig = cfg
 	hub.ApplyConfig(cfg)
 	patchSelectGroup(params.SelectedMap)
 	bumpRouteEpoch()
 	updateListeners(cfg)
 	reconcileGeoUpdater()
+	if err == nil {
+		requestscope.Phase(owner, "ready")
+	}
 	return err
 }
 

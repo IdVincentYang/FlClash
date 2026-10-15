@@ -11,6 +11,12 @@ import android.util.Log
 import androidx.core.content.getSystemService
 import com.follow.clash.common.AccessControlMode
 import com.follow.clash.common.GlobalState
+import com.follow.clash.common.RequestServiceIdentity
+import com.follow.clash.common.RequestProtection
+import com.follow.clash.common.RequestObservations
+import java.util.UUID
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import com.follow.clash.common.R as CommonR
 import com.follow.clash.core.Core
 import com.follow.clash.service.models.CIDR
@@ -23,13 +29,46 @@ import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 import android.net.VpnService as SystemVpnService
 
-class VpnService : SystemVpnService(), ManagedService {
+class VpnService : SystemVpnService(), ManagedService, RequestProtection {
     private val modules = ServiceModules(this)
     private val binder = LocalBinder()
     private val tunLock = Any()
+    private val tunTransitionLock = ReentrantLock()
     private var tunRunning = false
+    private var tunIdentity: RequestServiceIdentity? = null
+    @Volatile private var destroyed = false
+    @Volatile override var requestIdentity = RequestServiceIdentity(UUID.randomUUID().toString(), 0)
+        private set
+
+    override fun attachRequest(requestId: Long) = tunTransitionLock.withLock {
+        check(!destroyed) { "Service instance was destroyed" }
+        val requested = requestIdentity.copy(requestId = requestId, generation = 0)
+        requestIdentity = requested
+        val existing = synchronized(tunLock) { tunRunning }
+        if (existing) {
+            val generation = RequestObservations.handler?.onProtectionChanged(this, requested, "starting") ?: 0
+            check(generation > 0) { "Service request was superseded" }
+            val identity = requested.copy(generation = generation)
+            synchronized(tunLock) {
+                check(!destroyed && requestIdentity.requestId == requestId && tunRunning) { "Service instance changed" }
+                tunIdentity = identity
+                requestIdentity = identity
+            }
+            Core.setTunRequestIdentity(identity.serviceId, identity.generation)
+            check(RequestObservations.handler?.onProtectionChanged(this, identity, "ready") == generation) { "Service request was superseded" }
+        }
+    }
+
+    override fun protectRequestSocket(fd: Int, expected: RequestServiceIdentity): Boolean = synchronized(tunLock) {
+        !destroyed && tunRunning && tunIdentity == expected && protect(fd)
+    }
+
+    override fun isRequestLockdownEnabled(): Boolean? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) isLockdownEnabled else null
 
     override fun onDestroy() {
+        destroyed = true
+        val identity = requestIdentity
+        RequestObservations.handler?.onServiceLost(identity.serviceId, identity.requestId)
         try {
             cleanup()
         } finally {
@@ -107,16 +146,31 @@ class VpnService : SystemVpnService(), ManagedService {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Android starts always-on VPN through this callback instead of FlClash's bound-service
         // path. Notify the app layer so it can restore Core and fully initialize the VPN service.
-        notifyVpnStartRequested()
+        val requestId = RequestObservations.handler?.onVpnStartRequested(requestIdentity.serviceId) ?: 0
+        if (requestId > 0) requestIdentity = requestIdentity.copy(requestId = requestId)
         return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onRevoke() {
+        val identity = synchronized(tunLock) { tunIdentity ?: requestIdentity.takeIf { it.generation > 0 } }
+        if (identity != null) {
+            if (RequestObservations.handler == null) {
+                Core.requestControl("{\"action\":\"block\"}")
+                Core.requestControl("{\"action\":\"flush\"}")
+            }
+            else RequestObservations.handler?.onProtectionChanged(this, identity, "retiring", "vpnRevoked")
+        }
         stop()
         notifyVpnRevoked()
     }
 
-    private fun handleStart(options: VpnOptions) {
+    private fun handleStart(options: VpnOptions) = tunTransitionLock.withLock {
+        check(!destroyed) { "Service instance was destroyed" }
+        val requested = requestIdentity
+        val generation = RequestObservations.handler?.onProtectionChanged(this, requested, "starting") ?: 0
+        check(generation > 0) { "Service request was superseded" }
+        val identity = requested.copy(generation = generation)
+        requestIdentity = identity
         val fd = with(Builder()) {
             addAddressAndRoutes(options)
             addDnsServers(options)
@@ -143,30 +197,22 @@ class VpnService : SystemVpnService(), ManagedService {
             establish()?.detachFd()
                 ?: error("VPN establishment was rejected by the system")
         }
-        synchronized(tunLock) {
-            tunRunning = true
-            try {
-                // A Core that fails to take the descriptor leaves the system
-                // routes pointing at an interface nothing reads, and it no
-                // longer keeps its own sockets out of them: every connection
-                // then hangs until it times out. Tear the VPN down instead of
-                // reporting a start that only looks successful.
-                check(
-                    Core.startTun(
-                        fd = fd,
-                        protect = this::protect,
-                        resolveUid = this::resolveUid,
-                        resolvePackage = this::resolvePackage,
-                        stack = options.stack,
-                        address = options.tunAddress,
-                        dns = options.tunDns,
-                    ),
-                ) { "Core rejected the tun file descriptor" }
-            } catch (error: Exception) {
-                stopTunLocked()
-                throw error
-            }
+        try {
+            check(!destroyed) { "Service instance was destroyed" }
+            check(Core.startTun(
+                fd = fd, protect = this::protect,
+                resolveUid = this::resolveUid, resolvePackage = this::resolvePackage,
+                stack = options.stack, address = options.tunAddress, dns = options.tunDns,
+                serviceId = identity.serviceId, generation = identity.generation,
+            )) { "Core rejected the tun file descriptor" }
+            synchronized(tunLock) { tunIdentity = identity; tunRunning = true }
+        } catch (error: Exception) {
+            Core.stopTunRequest(identity.serviceId, identity.generation)
+            RequestObservations.handler?.onProtectionChanged(this, identity, "retiring")
+            RequestObservations.handler?.onProtectionChanged(this, identity, "none")
+            throw error
         }
+        check(RequestObservations.handler?.onProtectionChanged(this, identity, "ready") == generation) { "Service request was superseded" }
     }
 
     private fun Builder.addAddressAndRoutes(options: VpnOptions) {
@@ -273,15 +319,16 @@ class VpnService : SystemVpnService(), ManagedService {
         }
     }
 
-    private fun stopTun() = synchronized(tunLock) {
-        stopTunLocked()
-    }
-
-    private fun stopTunLocked() {
-        if (tunRunning) {
-            Core.stopTun()
+    private fun stopTun() = tunTransitionLock.withLock {
+        val identity = synchronized(tunLock) {
+            val current = tunIdentity
             tunRunning = false
-        }
+            tunIdentity = null
+            current
+        } ?: return@withLock
+        RequestObservations.handler?.onProtectionChanged(this, identity, "retiring")
+        Core.stopTunRequest(identity.serviceId, identity.generation)
+        RequestObservations.handler?.onProtectionChanged(this, identity, "none")
     }
 
     companion object {

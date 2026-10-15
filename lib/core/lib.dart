@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/run_request.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -113,13 +114,19 @@ class CoreLib extends CoreHandlerInterface {
   @override
   Future<bool> startListener() async {
     final listenerStarted = await super.startListener();
-    final serviceStarted = await _service?.start() ?? false;
+    final requestId = RunRequestScope.current;
+    final serviceStarted = requestId == null
+        ? await _service?.start() ?? false
+        : await _service?.startPrepared(requestId) ?? false;
     return listenerStarted && serviceStarted;
   }
 
   @override
   Future<bool> stopListener() async {
-    final serviceStopped = await _service?.stop() ?? false;
+    final requestId = RunRequestScope.current;
+    final serviceStopped = requestId == null
+        ? await _service?.stop() ?? false
+        : await _service?.stopPrepared(requestId) ?? false;
     final listenerStopped = await super.stopListener();
     return serviceStopped && listenerStopped;
   }

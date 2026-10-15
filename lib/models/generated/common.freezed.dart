@@ -2668,7 +2668,7 @@ as bool,
 /// @nodoc
 mixin _$DAVProps {
 
- String get uri; String get user;@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) String get password; String get fileName;
+ String get uri; String get user;@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) String get password; String get fileName; RequestMode get requestMode; String? get requestProxy;
 /// Create a copy of DAVProps
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2682,14 +2682,14 @@ $DAVPropsCopyWith<DAVProps> get copyWith => _$DAVPropsCopyWithImpl<DAVProps>(thi
 @override
 bool operator ==(Object other) {
   final _this = this as DAVProps;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DAVProps&&(identical(other.uri, _this.uri) || other.uri == _this.uri)&&(identical(other.user, _this.user) || other.user == _this.user)&&(identical(other.password, _this.password) || other.password == _this.password)&&(identical(other.fileName, _this.fileName) || other.fileName == _this.fileName));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DAVProps&&(identical(other.uri, _this.uri) || other.uri == _this.uri)&&(identical(other.user, _this.user) || other.user == _this.user)&&(identical(other.password, _this.password) || other.password == _this.password)&&(identical(other.fileName, _this.fileName) || other.fileName == _this.fileName)&&(identical(other.requestMode, _this.requestMode) || other.requestMode == _this.requestMode)&&(identical(other.requestProxy, _this.requestProxy) || other.requestProxy == _this.requestProxy));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as DAVProps;
-  return Object.hash(runtimeType,_this.uri,_this.user,_this.password,_this.fileName);
+  return Object.hash(runtimeType,_this.uri,_this.user,_this.password,_this.fileName,_this.requestMode,_this.requestProxy);
 }
 
 
@@ -2701,7 +2701,7 @@ abstract mixin class $DAVPropsCopyWith<$Res>  {
   factory $DAVPropsCopyWith(DAVProps value, $Res Function(DAVProps) _then) = _$DAVPropsCopyWithImpl;
 @useResult
 $Res call({
- String uri, String user,@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) String password, String fileName
+ String uri, String user,@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) String password, String fileName, RequestMode requestMode, String? requestProxy
 });
 
 
@@ -2718,13 +2718,15 @@ class _$DAVPropsCopyWithImpl<$Res>
 
 /// Create a copy of DAVProps
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? uri = null,Object? user = null,Object? password = null,Object? fileName = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? uri = null,Object? user = null,Object? password = null,Object? fileName = null,Object? requestMode = null,Object? requestProxy = freezed,}) {
   return _then(DAVProps(
 uri: null == uri ? _self.uri : uri // ignore: cast_nullable_to_non_nullable
 as String,user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
 as String,password: null == password ? _self.password : password // ignore: cast_nullable_to_non_nullable
 as String,fileName: null == fileName ? _self.fileName : fileName // ignore: cast_nullable_to_non_nullable
-as String,
+as String,requestMode: null == requestMode ? _self.requestMode : requestMode // ignore: cast_nullable_to_non_nullable
+as RequestMode,requestProxy: freezed == requestProxy ? _self.requestProxy : requestProxy // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -2809,10 +2811,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String uri,  String user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword)  String password,  String fileName)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String uri,  String user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword)  String password,  String fileName,  RequestMode requestMode,  String? requestProxy)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DAVProps() when $default != null:
-return $default(_that.uri,_that.user,_that.password,_that.fileName);case _:
+return $default(_that.uri,_that.user,_that.password,_that.fileName,_that.requestMode,_that.requestProxy);case _:
   return orElse();
 
 }
@@ -2830,10 +2832,10 @@ return $default(_that.uri,_that.user,_that.password,_that.fileName);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String uri,  String user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword)  String password,  String fileName)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String uri,  String user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword)  String password,  String fileName,  RequestMode requestMode,  String? requestProxy)  $default,) {final _that = this;
 switch (_that) {
 case _DAVProps():
-return $default(_that.uri,_that.user,_that.password,_that.fileName);case _:
+return $default(_that.uri,_that.user,_that.password,_that.fileName,_that.requestMode,_that.requestProxy);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -2850,10 +2852,10 @@ return $default(_that.uri,_that.user,_that.password,_that.fileName);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String uri,  String user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword)  String password,  String fileName)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String uri,  String user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword)  String password,  String fileName,  RequestMode requestMode,  String? requestProxy)?  $default,) {final _that = this;
 switch (_that) {
 case _DAVProps() when $default != null:
-return $default(_that.uri,_that.user,_that.password,_that.fileName);case _:
+return $default(_that.uri,_that.user,_that.password,_that.fileName,_that.requestMode,_that.requestProxy);case _:
   return null;
 
 }
@@ -2865,13 +2867,15 @@ return $default(_that.uri,_that.user,_that.password,_that.fileName);case _:
 @JsonSerializable()
 
 class _DAVProps extends DAVProps {
-  const _DAVProps({required this.uri, required this.user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) this.password = '', this.fileName = defaultDavFileName}): super._();
+  const _DAVProps({required this.uri, required this.user, @JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) this.password = '', this.fileName = defaultDavFileName, this.requestMode = RequestMode.auto, this.requestProxy}): super._();
   factory _DAVProps.fromJson(Map<String, dynamic> json) => _$DAVPropsFromJson(json);
 
 @override final  String uri;
 @override final  String user;
 @override@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) final  String password;
 @override@JsonKey() final  String fileName;
+@override@JsonKey() final  RequestMode requestMode;
+@override final  String? requestProxy;
 
 /// Create a copy of DAVProps
 /// with the given fields replaced by the non-null parameter values.
@@ -2886,13 +2890,13 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DAVProps&&(identical(other.uri, uri) || other.uri == uri)&&(identical(other.user, user) || other.user == user)&&(identical(other.password, password) || other.password == password)&&(identical(other.fileName, fileName) || other.fileName == fileName));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DAVProps&&(identical(other.uri, uri) || other.uri == uri)&&(identical(other.user, user) || other.user == user)&&(identical(other.password, password) || other.password == password)&&(identical(other.fileName, fileName) || other.fileName == fileName)&&(identical(other.requestMode, requestMode) || other.requestMode == requestMode)&&(identical(other.requestProxy, requestProxy) || other.requestProxy == requestProxy));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,uri,user,password,fileName);
+    return Object.hash(runtimeType,uri,user,password,fileName,requestMode,requestProxy);
 }
 
 
@@ -2904,7 +2908,7 @@ abstract mixin class _$DAVPropsCopyWith<$Res> implements $DAVPropsCopyWith<$Res>
   factory _$DAVPropsCopyWith(_DAVProps value, $Res Function(_DAVProps) _then) = __$DAVPropsCopyWithImpl;
 @override @useResult
 $Res call({
- String uri, String user,@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) String password, String fileName
+ String uri, String user,@JsonKey(fromJson: _decodeDavPassword, toJson: _encodeDavPassword) String password, String fileName, RequestMode requestMode, String? requestProxy
 });
 
 
@@ -2921,13 +2925,15 @@ class __$DAVPropsCopyWithImpl<$Res>
 
 /// Create a copy of DAVProps
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? uri = null,Object? user = null,Object? password = null,Object? fileName = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? uri = null,Object? user = null,Object? password = null,Object? fileName = null,Object? requestMode = null,Object? requestProxy = freezed,}) {
   return _then(_DAVProps(
 uri: null == uri ? _self.uri : uri // ignore: cast_nullable_to_non_nullable
 as String,user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
 as String,password: null == password ? _self.password : password // ignore: cast_nullable_to_non_nullable
 as String,fileName: null == fileName ? _self.fileName : fileName // ignore: cast_nullable_to_non_nullable
-as String,
+as String,requestMode: null == requestMode ? _self.requestMode : requestMode // ignore: cast_nullable_to_non_nullable
+as RequestMode,requestProxy: freezed == requestProxy ? _self.requestProxy : requestProxy // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -5668,7 +5674,7 @@ as String,
 /// @nodoc
 mixin _$Script {
 
- int get id; String get label; DateTime get lastUpdateTime; String? get url; int? get order;
+ int get id; String get label; DateTime get lastUpdateTime; String? get url; RequestMode get requestMode; String? get requestProxy; int? get order;
 /// Create a copy of Script
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -5682,20 +5688,20 @@ $ScriptCopyWith<Script> get copyWith => _$ScriptCopyWithImpl<Script>(this as Scr
 @override
 bool operator ==(Object other) {
   final _this = this as Script;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Script&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.label, _this.label) || other.label == _this.label)&&(identical(other.lastUpdateTime, _this.lastUpdateTime) || other.lastUpdateTime == _this.lastUpdateTime)&&(identical(other.url, _this.url) || other.url == _this.url)&&(identical(other.order, _this.order) || other.order == _this.order));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Script&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.label, _this.label) || other.label == _this.label)&&(identical(other.lastUpdateTime, _this.lastUpdateTime) || other.lastUpdateTime == _this.lastUpdateTime)&&(identical(other.url, _this.url) || other.url == _this.url)&&(identical(other.requestMode, _this.requestMode) || other.requestMode == _this.requestMode)&&(identical(other.requestProxy, _this.requestProxy) || other.requestProxy == _this.requestProxy)&&(identical(other.order, _this.order) || other.order == _this.order));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Script;
-  return Object.hash(runtimeType,_this.id,_this.label,_this.lastUpdateTime,_this.url,_this.order);
+  return Object.hash(runtimeType,_this.id,_this.label,_this.lastUpdateTime,_this.url,_this.requestMode,_this.requestProxy,_this.order);
 }
 
 @override
 String toString() {
   final _this = this as Script;
-  return 'Script(id: ${_this.id}, label: ${_this.label}, lastUpdateTime: ${_this.lastUpdateTime}, url: ${_this.url}, order: ${_this.order})';
+  return 'Script(id: ${_this.id}, label: ${_this.label}, lastUpdateTime: ${_this.lastUpdateTime}, url: ${_this.url}, requestMode: ${_this.requestMode}, requestProxy: ${_this.requestProxy}, order: ${_this.order})';
 }
 
 
@@ -5706,7 +5712,7 @@ abstract mixin class $ScriptCopyWith<$Res>  {
   factory $ScriptCopyWith(Script value, $Res Function(Script) _then) = _$ScriptCopyWithImpl;
 @useResult
 $Res call({
- int id, String label, DateTime lastUpdateTime, String? url, int? order
+ int id, String label, DateTime lastUpdateTime, String? url, RequestMode requestMode, String? requestProxy, int? order
 });
 
 
@@ -5723,12 +5729,14 @@ class _$ScriptCopyWithImpl<$Res>
 
 /// Create a copy of Script
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? label = null,Object? lastUpdateTime = null,Object? url = freezed,Object? order = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? label = null,Object? lastUpdateTime = null,Object? url = freezed,Object? requestMode = null,Object? requestProxy = freezed,Object? order = freezed,}) {
   return _then(Script(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
 as String,lastUpdateTime: null == lastUpdateTime ? _self.lastUpdateTime : lastUpdateTime // ignore: cast_nullable_to_non_nullable
 as DateTime,url: freezed == url ? _self.url : url // ignore: cast_nullable_to_non_nullable
+as String?,requestMode: null == requestMode ? _self.requestMode : requestMode // ignore: cast_nullable_to_non_nullable
+as RequestMode,requestProxy: freezed == requestProxy ? _self.requestProxy : requestProxy // ignore: cast_nullable_to_non_nullable
 as String?,order: freezed == order ? _self.order : order // ignore: cast_nullable_to_non_nullable
 as int?,
   ));
@@ -5815,10 +5823,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String label,  DateTime lastUpdateTime,  String? url,  int? order)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String label,  DateTime lastUpdateTime,  String? url,  RequestMode requestMode,  String? requestProxy,  int? order)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Script() when $default != null:
-return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.order);case _:
+return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.requestMode,_that.requestProxy,_that.order);case _:
   return orElse();
 
 }
@@ -5836,10 +5844,10 @@ return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.order)
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String label,  DateTime lastUpdateTime,  String? url,  int? order)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String label,  DateTime lastUpdateTime,  String? url,  RequestMode requestMode,  String? requestProxy,  int? order)  $default,) {final _that = this;
 switch (_that) {
 case _Script():
-return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.order);case _:
+return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.requestMode,_that.requestProxy,_that.order);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -5856,10 +5864,10 @@ return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.order)
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String label,  DateTime lastUpdateTime,  String? url,  int? order)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String label,  DateTime lastUpdateTime,  String? url,  RequestMode requestMode,  String? requestProxy,  int? order)?  $default,) {final _that = this;
 switch (_that) {
 case _Script() when $default != null:
-return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.order);case _:
+return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.requestMode,_that.requestProxy,_that.order);case _:
   return null;
 
 }
@@ -5871,13 +5879,15 @@ return $default(_that.id,_that.label,_that.lastUpdateTime,_that.url,_that.order)
 @JsonSerializable()
 
 class _Script implements Script {
-  const _Script({required this.id, required this.label, required this.lastUpdateTime, this.url, this.order});
+  const _Script({required this.id, required this.label, required this.lastUpdateTime, this.url, this.requestMode = RequestMode.auto, this.requestProxy, this.order});
   factory _Script.fromJson(Map<String, dynamic> json) => _$ScriptFromJson(json);
 
 @override final  int id;
 @override final  String label;
 @override final  DateTime lastUpdateTime;
 @override final  String? url;
+@override@JsonKey() final  RequestMode requestMode;
+@override final  String? requestProxy;
 @override final  int? order;
 
 /// Create a copy of Script
@@ -5893,18 +5903,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Script&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&(identical(other.lastUpdateTime, lastUpdateTime) || other.lastUpdateTime == lastUpdateTime)&&(identical(other.url, url) || other.url == url)&&(identical(other.order, order) || other.order == order));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Script&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&(identical(other.lastUpdateTime, lastUpdateTime) || other.lastUpdateTime == lastUpdateTime)&&(identical(other.url, url) || other.url == url)&&(identical(other.requestMode, requestMode) || other.requestMode == requestMode)&&(identical(other.requestProxy, requestProxy) || other.requestProxy == requestProxy)&&(identical(other.order, order) || other.order == order));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,label,lastUpdateTime,url,order);
+    return Object.hash(runtimeType,id,label,lastUpdateTime,url,requestMode,requestProxy,order);
 }
 
 @override
 String toString() {
-    return 'Script(id: $id, label: $label, lastUpdateTime: $lastUpdateTime, url: $url, order: $order)';
+    return 'Script(id: $id, label: $label, lastUpdateTime: $lastUpdateTime, url: $url, requestMode: $requestMode, requestProxy: $requestProxy, order: $order)';
 }
 
 
@@ -5915,7 +5925,7 @@ abstract mixin class _$ScriptCopyWith<$Res> implements $ScriptCopyWith<$Res> {
   factory _$ScriptCopyWith(_Script value, $Res Function(_Script) _then) = __$ScriptCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String label, DateTime lastUpdateTime, String? url, int? order
+ int id, String label, DateTime lastUpdateTime, String? url, RequestMode requestMode, String? requestProxy, int? order
 });
 
 
@@ -5932,12 +5942,14 @@ class __$ScriptCopyWithImpl<$Res>
 
 /// Create a copy of Script
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? label = null,Object? lastUpdateTime = null,Object? url = freezed,Object? order = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? label = null,Object? lastUpdateTime = null,Object? url = freezed,Object? requestMode = null,Object? requestProxy = freezed,Object? order = freezed,}) {
   return _then(_Script(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
 as String,lastUpdateTime: null == lastUpdateTime ? _self.lastUpdateTime : lastUpdateTime // ignore: cast_nullable_to_non_nullable
 as DateTime,url: freezed == url ? _self.url : url // ignore: cast_nullable_to_non_nullable
+as String?,requestMode: null == requestMode ? _self.requestMode : requestMode // ignore: cast_nullable_to_non_nullable
+as RequestMode,requestProxy: freezed == requestProxy ? _self.requestProxy : requestProxy // ignore: cast_nullable_to_non_nullable
 as String?,order: freezed == order ? _self.order : order // ignore: cast_nullable_to_non_nullable
 as int?,
   ));

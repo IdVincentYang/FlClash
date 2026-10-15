@@ -8,6 +8,13 @@ void (*free_string_func)(char *data);
 
 int (*protect_func)(void *tun_interface, int fd);
 
+int (*request_socket_func)(void *callback, const char *state, int fd);
+
+int request_socket(void *callback, const char *state, int fd) {
+    if (callback == NULL || request_socket_func == NULL) return 0;
+    return request_socket_func(callback, state, fd);
+}
+
 int (*resolve_uid_func)(void *tun_interface, int protocol, const char *source, const char *target);
 
 char* (*resolve_package_func)(void *tun_interface, int uid);

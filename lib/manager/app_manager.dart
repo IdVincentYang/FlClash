@@ -52,6 +52,10 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
       }
     });
     ref.listenManual(suspendProvider, (prev, next) {
+      if (system.isAndroid && prev != next && !ref.read(safeModeProvider)) {
+        unawaited(ref.read(setupActionProvider.notifier).setPaused(next));
+        return;
+      }
       final isStart = ref.read(isStartProvider);
       if (prev != next && isStart && !ref.read(safeModeProvider)) {
         debouncer.call(FunctionTag.suspend, () async {

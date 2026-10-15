@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/cache.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/state.dart';
@@ -120,10 +121,10 @@ class _IconEditViewState extends ConsumerState<IconEditView>
     _streamSubscription?.cancel();
     _state.setValue(null);
     if (text.isEmpty || !text.isUrl) return;
-    _streamSubscription = DefaultCacheManager().getFileStream(text).listen((
+    _streamSubscription = DefaultCacheManager().getFileStreamV2(text).listen((
       data,
     ) {
-      if (mounted && data is FileInfo) {
+      if (mounted) {
         _state.setValue(data.file);
       }
     });

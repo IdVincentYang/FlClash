@@ -48,6 +48,8 @@ abstract class Profile with _$Profile {
     @Default('') String label,
     String? currentGroupName,
     @Default('') String url,
+    @Default(RequestMode.auto) RequestMode requestMode,
+    String? requestProxy,
     DateTime? lastUpdateDate,
     required Duration autoUpdateDuration,
     SubscriptionInfo? subscriptionInfo,

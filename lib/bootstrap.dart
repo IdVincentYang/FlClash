@@ -14,6 +14,7 @@ import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/disclaimer.dart';
@@ -123,7 +124,7 @@ class Bootstrap {
           accentColor: dynamicColor.accentColor,
         );
     final profiles = await database.profilesDao.query().get();
-    container.read(profilesProvider.notifier).setAndReorder(profiles);
+    container.read(profilesProvider.notifier).initialize(profiles);
     await AppLocalizations.load(
       getLocaleForString(config.appSettingProps.locale) ??
           WidgetsBinding.instance.platformDispatcher.locale,
@@ -148,9 +149,6 @@ class Bootstrap {
   Future<void> _initApp() async {
     unawaited(_container.read(systemActionProvider.notifier).updateTray());
     unawaited(
-      _container.read(profilesActionProvider.notifier).autoUpdateProfiles(),
-    );
-    unawaited(
       autoLaunch?.updateStatus(_container.read(appSettingProvider).autoLaunch),
     );
     if (!_container.read(appSettingProvider).silentLaunch) {
@@ -160,12 +158,22 @@ class Bootstrap {
     }
     await _handleFailedPreference();
     await _handlerDisclaimer();
+    await request.ready();
     await _showCrashRecoveryTip();
     await _container.read(coreActionProvider.notifier).startCore();
     if (!_bootDecision.isDegraded) {
       await _container.read(setupActionProvider.notifier).initStatus();
+    } else if (service != null) {
+      final state = await service!.getRequestState();
+      await service!.initializeRequestState(
+        state['revision'] as int,
+        recovery: true,
+      );
     }
     _container.read(initProvider.notifier).value = true;
+    unawaited(
+      _container.read(profilesActionProvider.notifier).autoUpdateProfiles(),
+    );
     await bootGuard.markRunning();
     permissions.check(_container.read);
   }

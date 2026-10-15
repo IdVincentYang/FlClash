@@ -8,5 +8,7 @@ class FlClashApplication : Application() {
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
         GlobalState.init(this)
+        ServiceState.bindRequestObservers()
+        GlobalState.startRequestNetworkObservation()
     }
 }

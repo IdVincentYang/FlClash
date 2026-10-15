@@ -9,17 +9,42 @@
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_follow_clash_core_Core_startTun(JNIEnv *env, jobject thiz, jint fd, jobject cb,
-                                         jstring stack, jstring address, jstring dns) {
+                                         jstring stack, jstring address, jstring dns, jstring service_id, jlong generation) {
     const auto interface = new_global(cb);
-    return startTUN(interface, fd, get_string(stack), get_string(address), get_string(dns))
+    return startTUN(interface, fd, get_string(stack), get_string(address), get_string(dns), get_string(service_id), generation)
            ? JNI_TRUE
            : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_follow_clash_core_Core_stopTunRequest(JNIEnv *env, jobject thiz, jstring service_id, jlong generation) {
+    return stopTunRequest(get_string(service_id), generation) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_stopTun(JNIEnv *env, jobject thiz) {
     stopTun();
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_follow_clash_core_Core_requestControl(JNIEnv *env, jobject thiz, jstring data) {
+    scoped_string response = requestControl(get_string(data));
+    return new_string(response);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_follow_clash_core_Core_setRequestSocketListener(JNIEnv *env, jobject thiz, jobject cb) {
+    setRequestSocketListener(cb == nullptr ? nullptr : new_global(cb));
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_follow_clash_core_Core_setTunRequestIdentity(JNIEnv *env, jobject thiz, jstring service_id, jlong generation) {
+    setTunRequestIdentity(get_string(service_id), generation);
 }
 
 extern "C"
@@ -81,6 +106,17 @@ static jmethodID m_tun_interface_protect;
 static jmethodID m_tun_interface_resolve_uid;
 static jmethodID m_tun_interface_resolve_package;
 static jmethodID m_invoke_interface_result;
+static jmethodID m_request_socket_prepare;
+
+static int call_request_socket_impl(void *callback, const char *state, int fd) {
+    if (callback == nullptr) return 0;
+    ATTACH_JNI();
+    const auto payload = new_string(state);
+    const auto accepted = env->CallBooleanMethod(static_cast<jobject>(callback), m_request_socket_prepare, payload, fd);
+    const auto failed = jni_clear_exception(env);
+    if (payload != nullptr) env->DeleteLocalRef(payload);
+    return !failed && accepted == JNI_TRUE ? 1 : 0;
+}
 
 
 static void release_jni_object_impl(void *obj) {
@@ -177,6 +213,7 @@ JNI_OnLoad(JavaVM *vm, void *) {
     const auto c_tun_interface = find_class("com/follow/clash/core/TunInterface");
 
     const auto c_invoke_interface = find_class("com/follow/clash/core/InvokeInterface");
+    const auto c_request_socket = find_class("com/follow/clash/core/RequestSocketInterface");
 
     m_tun_interface_protect = find_method(c_tun_interface, "protect", "(I)Z");
     m_tun_interface_resolve_uid = find_method(c_tun_interface, "resolveUid",
@@ -185,9 +222,11 @@ JNI_OnLoad(JavaVM *vm, void *) {
                                                   "(I)Ljava/lang/String;");
     m_invoke_interface_result = find_method(c_invoke_interface, "onResult",
                                             "([B)V");
+    m_request_socket_prepare = find_method(c_request_socket, "prepareSocket", "(Ljava/lang/String;I)Z");
 
 
     protect_func = &call_tun_interface_protect_impl;
+    request_socket_func = &call_request_socket_impl;
     resolve_uid_func = &call_tun_interface_resolve_uid_impl;
     resolve_package_func = &call_tun_interface_resolve_package_impl;
     result_func = &call_invoke_interface_result_impl;

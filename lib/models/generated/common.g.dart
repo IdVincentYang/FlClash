@@ -172,6 +172,10 @@ _DAVProps _$DAVPropsFromJson(Map<String, dynamic> json) => _DAVProps(
       ? ''
       : _decodeDavPassword(json['password'] as String?),
   fileName: json['fileName'] as String? ?? defaultDavFileName,
+  requestMode:
+      $enumDecodeNullable(_$RequestModeEnumMap, json['requestMode']) ??
+      RequestMode.auto,
+  requestProxy: json['requestProxy'] as String?,
 );
 
 Map<String, dynamic> _$DAVPropsToJson(_DAVProps instance) => <String, dynamic>{
@@ -179,6 +183,14 @@ Map<String, dynamic> _$DAVPropsToJson(_DAVProps instance) => <String, dynamic>{
   'user': instance.user,
   'password': _encodeDavPassword(instance.password),
   'fileName': instance.fileName,
+  'requestMode': _$RequestModeEnumMap[instance.requestMode]!,
+  'requestProxy': instance.requestProxy,
+};
+
+const _$RequestModeEnumMap = {
+  RequestMode.auto: 'auto',
+  RequestMode.proxy: 'proxy',
+  RequestMode.direct: 'direct',
 };
 
 _VersionInfo _$VersionInfoFromJson(Map<String, dynamic> json) => _VersionInfo(
@@ -281,6 +293,10 @@ _Script _$ScriptFromJson(Map<String, dynamic> json) => _Script(
   label: json['label'] as String,
   lastUpdateTime: DateTime.parse(json['lastUpdateTime'] as String),
   url: json['url'] as String?,
+  requestMode:
+      $enumDecodeNullable(_$RequestModeEnumMap, json['requestMode']) ??
+      RequestMode.auto,
+  requestProxy: json['requestProxy'] as String?,
   order: (json['order'] as num?)?.toInt(),
 );
 
@@ -289,5 +305,7 @@ Map<String, dynamic> _$ScriptToJson(_Script instance) => <String, dynamic>{
   'label': instance.label,
   'lastUpdateTime': instance.lastUpdateTime.toIso8601String(),
   'url': instance.url,
+  'requestMode': _$RequestModeEnumMap[instance.requestMode]!,
+  'requestProxy': instance.requestProxy,
   'order': instance.order,
 };

@@ -8,10 +8,10 @@ import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/action.dart';
-import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/request_route.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,6 +34,8 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
   late final TextEditingController _urlController;
   late final TextEditingController _autoUpdateDurationController;
   late bool _autoUpdate;
+  late RequestMode _requestMode;
+  String? _requestProxy;
   String? _rawText;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _fileInfoNotifier = ValueNotifier<FileInfo?>(null);
@@ -46,6 +48,8 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     _labelController = TextEditingController(text: widget.profile.label);
     _urlController = TextEditingController(text: widget.profile.url);
     _autoUpdate = widget.profile.autoUpdate;
+    _requestMode = widget.profile.requestMode;
+    _requestProxy = widget.profile.requestProxy;
     _autoUpdateDurationController = TextEditingController(
       text: widget.profile.autoUpdateDuration.inMinutes.toString(),
     );
@@ -68,6 +72,8 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
       url: _urlController.text,
       label: _labelController.text,
       autoUpdate: _autoUpdate,
+      requestMode: _requestMode,
+      requestProxy: _requestProxy,
       autoUpdateDuration: Duration(
         minutes: int.parse(_autoUpdateDurationController.text),
       ),
@@ -100,25 +106,33 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
           profile = profile.copyWith(autoUpdate: false);
         }
       }
-      final savedProfile = await globalState.safeRun(
-        () => profile.saveFile(
+      final saved = await globalState.safeRun(() async {
+        await profilesAction.importFile(
+          profile,
           _fileData!,
-          validate: (path) =>
-              ref.read(coreHandlerProvider).validateConfig(path),
-        ),
-      );
-      if (savedProfile == null) {
-        return;
-      }
-      profilesAction.putProfile(savedProfile, renameIn: renameIn);
+          renameIn: renameIn,
+        );
+        return true;
+      });
+      if (saved != true) return;
     } else if (!hasUpdate) {
-      profilesAction.putProfile(profile, renameIn: renameIn);
+      await profilesAction.putProfile(profile, renameIn: renameIn);
     } else {
+      late RequestSource source;
+      await profilesAction.putProfile(
+        profile,
+        renameIn: renameIn,
+        onSourceSaved: (value) => source = value,
+      );
       unawaited(
         globalState.safeRun(() async {
           await Future.delayed(commonDuration);
           if (hasUpdate) {
-            await profilesAction.updateProfile(profile, renameIn: renameIn);
+            await profilesAction.updateProfile(
+              profile,
+              sourceMustMatch: true,
+              expectedSource: source,
+            );
           }
         }),
       );
@@ -246,6 +260,14 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
       ),
       if (widget.profile.type == ProfileType.url) ...[
         _ProfileUrlField(controller: _urlController),
+        RequestRouteFields(
+          mode: _requestMode,
+          proxy: _requestProxy,
+          onChanged: (value) => setState(() {
+            _requestMode = value.$1;
+            _requestProxy = value.$2;
+          }),
+        ),
         ListItem.toggle(
           title: Text(appLocalizations.autoUpdate),
           value: _autoUpdate,

@@ -32,7 +32,7 @@ void main(List<String> args) {
         final version = await system.init();
         final container = await bootstrap.init(version);
         HttpOverrides.global = FlClashHttpOverrides(container);
-        request.attach(container.read);
+        request.attach(container);
         runApp(
           UncontrolledProviderScope(
             container: container,

@@ -763,5 +763,16 @@
   "large": "大",
   "extraLarge": "特大",
   "switchProfile": "プロファイルを切り替え",
-  "lastUpdated": "最終更新"
+  "lastUpdated": "最終更新",
+  "requestDirectRecoveryTitle": "今回のみ直接接続で復元しますか？",
+  "requestDirectRecoveryMessage": "現在の設定ではこの項目を取得できません。今回の操作で {host} への直接接続を許可しますか？操作の完了または接続先の変更で許可は失効します。",
+  "requestMode": "リクエストの経路",
+  "requestModeAuto": "自動",
+  "requestModeProxy": "プロキシ",
+  "requestModeDirect": "直接接続",
+  "requestProxyTarget": "プロキシの接続先",
+  "requestProxyDefault": "GLOBAL（現在の選択：{target}）",
+  "requestModeHelp": "この項目自体の通信に適用します。プロキシには有効なノードが、直接接続には利用可能な非 VPN ネットワークが必要です。",
+  "requestRouteUnavailable": "選択した通信経路は現在利用できません。",
+  "requestPartialCommit": "一部のローカル変更を復元できませんでした。復旧用ファイルを保持し、自動更新を停止しました。"
 }

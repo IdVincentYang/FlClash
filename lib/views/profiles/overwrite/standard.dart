@@ -260,7 +260,7 @@ class _MatchTargetItem extends ConsumerWidget {
     if (res == null) {
       return;
     }
-    ref.read(profilesProvider.notifier).updateProfile(profileId, (state) {
+    await ref.read(profilesProvider.notifier).updateProfile(profileId, (state) {
       return state.copyWith(matchTarget: res.isEmpty ? null : res);
     });
   }

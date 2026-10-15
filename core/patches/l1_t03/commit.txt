@@ -1,0 +1,6 @@
+tree 28734038b58367ad5e0215a7388b84daea33337e
+parent 8597778c7df410ebe88c57e59eaab32d203156df
+author Vincent <idvincentyang@gmail.com> 1792057113 +0800
+committer Vincent <idvincentyang@gmail.com> 1792057113 +0800
+
+security: scope application requests and local commits

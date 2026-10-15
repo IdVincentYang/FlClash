@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/service_probe.dart';
+import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -17,6 +18,9 @@ class OutboundIpProbe extends _$OutboundIpProbe
   RoutedProbeState<String, IpInfo> build() => buildProbe();
 
   @override
+  void cancelProbe(String target) => request.cancelKey('outboundIp:$target');
+
+  @override
   Future<Map<String, ProbeAnswer<IpInfo>>> probe(
     String target,
     RouteState route,
@@ -24,9 +28,19 @@ class OutboundIpProbe extends _$OutboundIpProbe
     final proxyName = target == routedOutbound && !route.proxied
         ? directOutbound
         : target;
-    final result = await lookupOutboundIp(
-      ref.read(coreHandlerProvider),
-      proxyName,
+    final result = await request.withSession(
+      key: 'outboundIp:$target',
+      url: 'https://diagnostic.invalid',
+      explicitTarget: proxyName,
+      action: (session) async {
+        if (!ref.mounted) throw const RequestUnavailable('request_cancelled');
+        final result = await lookupOutboundIp(
+          ref.read(coreHandlerProvider),
+          proxyName,
+        );
+        await session.check();
+        return result;
+      },
     );
     final value = parseOutboundIp(result);
     final chains = result?.chains ?? const <String>[];

@@ -33,6 +33,8 @@ review and carry forward.
 
 ## Highest Priority Rules
 
+- After compaction or recovery, reconcile the active task with its latest valid handoff and the actual checkout before
+  continuing. Keep unfinished authorized work active across answered interruptions; see [task continuity](.agents/rules.md#task-continuity).
 - When the user explicitly requests a scoped, low-risk change, inspect the relevant context and implement it directly.
   Do not require brainstorming, design documents, implementation plans, multiple-option proposals, or repeated confirmation.
   Ask only when material ambiguity, destructive impact, additional authority, or scope expansion could change the result.

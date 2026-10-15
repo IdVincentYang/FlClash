@@ -20,6 +20,9 @@ class FlClashHttpOverrides extends HttpOverrides {
     if ([localhost].contains(url.host)) {
       return 'DIRECT';
     }
+    if (system.isAndroid) {
+      throw const RequestUnavailable('request_scope_required');
+    }
     final isStart = read(isStartProvider);
     final suspend = read(suspendProvider);
     commonPrint.log('find $url proxy: $isStart');

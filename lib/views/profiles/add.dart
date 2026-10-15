@@ -51,8 +51,14 @@ class AddProfileView extends ConsumerWidget {
     final reservedLabels = ref.read(
       appProviderLabelsProvider(ProviderKind.proxy),
     );
+    var mode = RequestMode.auto;
+    String? proxy;
     final res = await dialogs.showNamedUrlInput(
       title: appLocalizations.importFromURL,
+      onRequestRouteChanged: (value) {
+        mode = value.$1;
+        proxy = value.$2;
+      },
       labelValidator: (value) {
         if (reservedLabels.contains(value?.trim())) {
           return appLocalizations.existsTip(appLocalizations.name);
@@ -70,7 +76,15 @@ class AddProfileView extends ConsumerWidget {
       },
     );
     if (res != null) {
-      unawaited(profilesAction.addProfileFormURL(res.url, label: res.label));
+      unawaited(
+        profilesAction.addProfileFormURL(
+          res.url,
+          label: res.label,
+          mode: mode,
+          proxy: proxy,
+          confirmed: true,
+        ),
+      );
     }
   }
 

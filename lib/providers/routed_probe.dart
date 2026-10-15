@@ -89,13 +89,29 @@ mixin RoutedProbe<K, V>
   Future<Map<K, ProbeAnswer<V>>> probe(K target, RouteState route);
 
   @protected
+  void cancelProbe(K target) {}
+
+  @protected
   bool isFailure(V value) => false;
 
   @protected
   RoutedProbeState<K, V> buildProbe() {
+    ref.onDispose(() {
+      for (final target in _inFlight.keys.toList()) {
+        cancelProbe(target);
+      }
+    });
     _route = ref.read(routeTrackerProvider);
     ref.listen(routeTrackerProvider, _onRoute);
     ref.listen(appVisibleProvider, (_, visible) {
+      if (!visible) {
+        final entries = Map<K, ProbeEntry<V>>.of(state.entries);
+        for (final target in _inFlight.keys.toList()) {
+          _inFlight.remove(target);
+          _invalidate(target, entries);
+        }
+        state = RoutedProbeState(entries);
+      }
       if (visible && _due.isNotEmpty) {
         _schedule();
       }
@@ -127,6 +143,7 @@ mixin RoutedProbe<K, V>
       return;
     }
     _watchers.remove(target);
+    cancelProbe(target);
     final due = _due[target];
     if (due != null && !due.forced) {
       _due.remove(target);
@@ -231,7 +248,10 @@ mixin RoutedProbe<K, V>
         logLevel: coreFailureLogLevel(error),
       );
     }
-    if (!ref.mounted || _inFlight[target] != run) {
+    if (!ref.mounted ||
+        _inFlight[target] != run ||
+        !ref.read(appVisibleProvider) ||
+        !_route.live) {
       return;
     }
     _inFlight.remove(target);
@@ -306,7 +326,8 @@ mixin RoutedProbe<K, V>
         previous != null &&
         (next.coreEpoch != previous.coreEpoch ||
             next.hostEpoch != previous.hostEpoch ||
-            next.proxied != previous.proxied);
+            next.proxied != previous.proxied ||
+            !next.live);
     for (final MapEntry(key: target, value: entry) in state.entries.entries) {
       if (_inFlight.containsKey(target)) {
         if (moved) {
@@ -337,6 +358,8 @@ mixin RoutedProbe<K, V>
   /// A stale entry is asked again while someone watches it and forgotten
   /// otherwise; either way its old value is never shown.
   void _invalidate(K target, Map<K, ProbeEntry<V>> entries) {
+    cancelProbe(target);
+    _inFlight.remove(target);
     if (_watchers.containsKey(target)) {
       entries[target] = ProbeEntry(phase: ProbePhase.probing);
       _due[target] = (keepValue: false, forced: false, supersede: true);

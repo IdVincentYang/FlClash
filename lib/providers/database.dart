@@ -113,83 +113,151 @@ class Profiles extends _$Profiles {
         provider.label,
   };
 
-  void _optimistic(List<Profile> next, FutureOr<void> Function() action) {
-    unawaited(
-      _optimisticAsync(next, action).catchError(_reportOptimisticFailure),
-    );
+  Profile labeled(Profile profile) =>
+      state.optimizeLabel(profile, reserved: _reservedLabels);
+
+  Future<Profile> persist(
+    Profile profile, {
+    Iterable<int> renameIn = const [],
+    bool networkResult = false,
+  }) async {
+    final current = await database.profilesDao.query().get();
+    final previous = current.getProfile(profile.id);
+    var next = current.optimizeLabel(profile, reserved: _reservedLabels);
+    final changedSource =
+        previous == null ||
+        (
+              previous.url,
+              previous.requestMode,
+              previous.requestProxy,
+              previous.autoUpdate,
+              previous.autoUpdateDuration,
+            ) !=
+            (
+              next.url,
+              next.requestMode,
+              next.requestProxy,
+              next.autoUpdate,
+              next.autoUpdateDuration,
+            );
+    if (!networkResult &&
+        !changedSource &&
+        (next.lastUpdateDate == null ||
+            previous.lastUpdateDate != null &&
+                next.lastUpdateDate!.isBefore(previous.lastUpdateDate!))) {
+      next = next.copyWith(
+        lastUpdateDate: previous.lastUpdateDate,
+        subscriptionInfo: previous.subscriptionInfo,
+      );
+    }
+    if (changedSource && !networkResult) {
+      await request.invalidate('profile:${profile.id}');
+    }
+    await database.transaction(() async {
+      if (previous != null &&
+          renameIn.isNotEmpty &&
+          previous.realLabel != next.realLabel) {
+        await database.proxyGroupsDao.renameUse(
+          renameIn,
+          oldName: previous.realLabel,
+          newName: next.realLabel,
+        );
+      }
+      await database.profiles.put(next.toCompanion());
+    });
+    if (ref.mounted) {
+      state = current.copyAndPut(next, (item) => item.id == next.id);
+    }
+    return next;
   }
 
-  Future<void> _optimisticAsync(
-    List<Profile> next,
-    FutureOr<void> Function() action,
-  ) {
+  Future<void> put(Profile profile, {Iterable<int> renameIn = const []}) {
+    final next = state.copyAndPut(
+      labeled(profile),
+      (item) => item.id == profile.id,
+    );
     return _persistOptimistically(
       state,
       next,
       () => state,
-      (v) => state = v,
-      action,
+      (value) => state = value,
+      () => request.mutate(() async {
+        await persist(profile, renameIn: renameIn);
+      }),
     );
   }
 
-  Profile labeled(Profile profile) =>
-      state.optimizeLabel(profile, reserved: _reservedLabels);
+  Future<void> deletePersisted(int id) async {
+    await request.invalidate('profile:$id');
+    await database.deleteProfile(id);
+    state = state.where((item) => item.id != id).toList();
+  }
 
-  void put(Profile profile, {Iterable<int> renameIn = const []}) {
-    final newProfile = labeled(profile);
-    final previousLabel = state.getProfile(profile.id)?.realLabel;
-    final renamedFrom =
-        renameIn.isNotEmpty && previousLabel != newProfile.realLabel
-        ? previousLabel
-        : null;
-    _optimistic(
-      state.copyAndPut(newProfile, (item) => item.id == newProfile.id),
-      renamedFrom == null
-          ? () => database.profiles.put(newProfile.toCompanion())
-          : () => database.transaction(() async {
-              await database.proxyGroupsDao.renameUse(
-                renameIn,
-                oldName: renamedFrom,
-                newName: newProfile.realLabel,
-              );
-              await database.profiles.put(newProfile.toCompanion());
-            }),
+  Future<void> del(int id) => _persistOptimistically(
+    state,
+    state.where((item) => item.id != id).toList(),
+    () => state,
+    (value) => state = value,
+    () => request.mutate(() => deletePersisted(id)),
+  );
+
+  Future<void> updateProfile(
+    int profileId,
+    Profile Function(Profile profile) builder,
+  ) {
+    final previous = state.getProfile(profileId);
+    if (previous == null) return Future.value();
+    final next = state.copyAndPut(
+      builder(previous),
+      (item) => item.id == profileId,
+    );
+    return _persistOptimistically(
+      state,
+      next,
+      () => state,
+      (value) => state = value,
+      () => request.mutate(() async {
+        final current = (await database.profilesDao.query().get()).getProfile(
+          profileId,
+        );
+        if (current != null) await persist(builder(current));
+      }),
     );
   }
 
-  Future<void> del(int id) {
-    return _optimisticAsync(
-      state.where((e) => e.id != id).toList(),
-      () => database.deleteProfile(id),
-    );
+  void initialize(List<Profile> profiles) {
+    state = List.of(profiles);
   }
 
-  void updateProfile(int profileId, Profile Function(Profile profile) builder) {
-    final index = state.indexWhere((element) => element.id == profileId);
-    if (index == -1) return;
-    final newProfile = builder(state[index]);
-    final next = List<Profile>.from(state);
-    next[index] = newProfile;
-    _optimistic(next, () => database.profiles.put(newProfile.toCompanion()));
-  }
+  Future<void> setAndReorder(List<Profile> profiles) => _persistOptimistically(
+    state,
+    List.of(profiles),
+    () => state,
+    (value) => state = value,
+    () => request.mutate(() async {
+      await request.invalidateDataset();
+      await database.profilesDao.setAll(profiles);
+      state = List.of(profiles);
+    }),
+  );
 
-  void setAndReorder(List<Profile> profiles) {
-    _optimistic(
-      List<Profile>.from(profiles),
-      () => database.profilesDao.setAll(profiles),
-    );
-  }
-
-  void reorder(List<Profile> profiles) {
-    final next = List<Profile>.from(profiles);
-    final needUpdate = <ProfilesCompanion>[];
-    next.forEachIndexed((index, item) {
-      if (item.order != index) {
-        needUpdate.add(item.toCompanion(index));
+  Future<void> reorder(List<Profile> profiles) => _persistOptimistically(
+    state,
+    List.of(profiles),
+    () => state,
+    (value) => state = value,
+    () => request.mutate(() async {
+      final current = await database.profilesDao.query().get();
+      final changes = <ProfilesCompanion>[];
+      for (var index = 0; index < profiles.length; index++) {
+        final profile = current.getProfile(profiles[index].id);
+        if (profile != null && profile.order != index) {
+          changes.add(profile.copyWith(order: index).toCompanion(index));
+        }
       }
-    });
-    _optimistic(next, () => database.profilesDao.putAll(needUpdate));
-  }
+      await database.profilesDao.putAll(changes);
+    }),
+  );
 
   @override
   bool updateShouldNotify(List<Profile> previous, List<Profile> next) {
@@ -207,36 +275,62 @@ class Scripts extends _$Scripts with AsyncNotifierMixin, OptimisticMixin {
   @override
   List<Script> get value => state.value ?? [];
 
-  void put(Script script) {
-    final next = List<Script>.from(value);
-    final index = next.indexWhere((item) => item.id == script.id);
-    if (index != -1) {
-      next[index] = script;
-    } else {
-      next.add(script);
+  Future<Script> persist(Script script, {bool networkResult = false}) async {
+    final current = await database.scriptsDao.query().get();
+    final previous = current.get(script.id);
+    if (!networkResult &&
+        (previous == null ||
+            (previous.url, previous.requestMode, previous.requestProxy) !=
+                (script.url, script.requestMode, script.requestProxy))) {
+      await request.invalidate('script:${script.id}');
     }
-    optimistic(next, () => database.scripts.put(script.toCompanion()));
+    final next =
+        !networkResult &&
+            previous != null &&
+            script.lastUpdateTime.isBefore(previous.lastUpdateTime)
+        ? script.copyWith(lastUpdateTime: previous.lastUpdateTime)
+        : script;
+    await database.scripts.put(next.toCompanion());
+    if (ref.mounted) {
+      state = AsyncData(current.copyAndPut(next, (item) => item.id == next.id));
+    }
+    return next;
   }
 
-  void del(int id) {
-    final next = List<Script>.from(value);
-    final index = next.indexWhere((item) => item.id == id);
-    if (index == -1) return;
-    next.removeAt(index);
-    optimistic(next, () => database.scripts.remove((t) => t.id.equals(id)));
+  Future<void> put(Script script) => optimisticAsync(
+    value.copyAndPut(script, (item) => item.id == script.id),
+    () => request.mutate(() async {
+      await persist(script);
+    }),
+  );
+
+  Future<void> deletePersisted(int id) async {
+    await request.invalidate('script:$id');
+    await database.scripts.remove((table) => table.id.equals(id));
   }
 
-  void order(int oldIndex, int newIndex) {
-    final next = value.copyAndReorder(oldIndex, newIndex);
-    final changed = <ScriptsCompanion>[];
-    next.forEachIndexed((index, item) {
-      if (item.order != index) {
-        next[index] = item.copyWith(order: index);
-        changed.add(item.toCompanion(index));
-      }
-    });
-    optimistic(next, () => database.scriptsDao.putAll(changed));
+  Future<void> del(int id) {
+    if (!value.any((script) => script.id == id)) {
+      request.cancelKey('script:$id');
+      return Future.value();
+    }
+    return optimisticAsync(
+      value.where((script) => script.id != id).toList(),
+      () => request.mutate(() => deletePersisted(id)),
+    );
   }
+
+  Future<void> order(int oldIndex, int newIndex) => optimisticAsync(
+    value.copyAndReorder(oldIndex, newIndex),
+    () => request.mutate(() async {
+      final current = await database.scriptsDao.query().get();
+      final next = current.copyAndReorder(oldIndex, newIndex);
+      await database.scriptsDao.putAll([
+        for (var index = 0; index < next.length; index++)
+          next[index].copyWith(order: index).toCompanion(index),
+      ]);
+    }),
+  );
 
   @override
   bool updateShouldNotify(

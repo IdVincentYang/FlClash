@@ -6,12 +6,26 @@ import android.os.Binder
 import android.os.IBinder
 import com.follow.clash.core.Core
 import com.follow.clash.service.modules.ServiceModules
+import com.follow.clash.common.RequestServiceIdentity
+import com.follow.clash.common.RequestObservations
+import java.util.UUID
 
 class ProxyService : Service(), ManagedService {
     private val modules = ServiceModules(this)
     private val binder = LocalBinder()
+    @Volatile private var destroyed = false
+    @Volatile override var requestIdentity = RequestServiceIdentity(UUID.randomUUID().toString(), 0)
+        private set
+
+    override fun attachRequest(requestId: Long) {
+        check(!destroyed) { "Service instance was destroyed" }
+        requestIdentity = requestIdentity.copy(requestId = requestId)
+    }
 
     override fun onDestroy() {
+        destroyed = true
+        val identity = requestIdentity
+        RequestObservations.handler?.onServiceLost(identity.serviceId, identity.requestId)
         try {
             cleanup()
         } finally {
@@ -32,6 +46,7 @@ class ProxyService : Service(), ManagedService {
     override fun onBind(intent: Intent): IBinder = binder
 
     override fun start() {
+        check(!destroyed) { "Service instance was destroyed" }
         try {
             modules.start()
         } catch (error: Exception) {

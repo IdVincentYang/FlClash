@@ -70,3 +70,34 @@ This workflow keeps the security delta visible during every sync and gives revie
 - 官方更新后先 fetch `upstream`，再 fast-forward 本地 `main`，将 `upstream/main` merge 到 `security/android`，保留已有安全修复。各整改分支再跟进集成分支：尚未发布且未共享的分支可以 rebase；已经共享的分支用 merge，避免改写他人历史。
 - 冲突要结合当前官方行为和安全要求重新合并，不要直接选择 ours 或 theirs。安全相关冲突需在该轮结果或评审记录中写明涉及的风险编号、保留的行为和取舍原因。
 - 同步后检查分支相对 `upstream/main` 的完整差异，确认安全行为没有丢失、没有带入无关改动；对受影响路径做定向验证，并重新核对依赖锁和数据摘要。不要强推共享分支。
+
+## L1-T03 core source carrier
+
+The local core gitlink is reconstructed from the public base identified in
+[the carrier manifest](core/patches/l1_t03/manifest.json). Run
+`python3 tool/restore_l1_t03_core.py` before initializing remaining submodules;
+Windows uses `python`. `--check` verifies existing content without downloading or
+replacing local changes. A plain recursive checkout cannot fetch the unpublished
+gitlink. The build hook checks the carrier before compiling or accepting its cache.
+
+For L1-T03, the core gitlink is deliberately unpublished and the parent repository
+contains the complete approved source carrier. The default
+`--recurse-submodules=check` policy above will reject this parent push. After M
+verifies the complete carrier and exact reconstruction from the public base, M
+uses this task-specific exception for the authorized ordinary parent push:
+
+```bash
+git push --no-follow-tags --recurse-submodules=no origin refs/heads/security/android:refs/heads/security/android
+```
+
+This exception does not publish the core repository or authorize a new core remote.
+D completes local integration; M verifies and pushes the parent branch. A clean
+checkout still needs the restoration command above before normal build steps.
+
+When updating the configured upstream base, reapply and review the scoped changes,
+regenerate the binary patch, exact commit bytes, tree/blob hashes and parent gitlink,
+and verify reconstruction in a separate object directory. Keep the public base as
+the sole parent, or supply the complete required object closure. Remote delivery
+follows the standing parent authorization and task exception above; publishing the
+core repository still requires separate authorization. See the
+[task design](docs/features/security/loop1/l1_t03_plan.md#核心源码恢复与官方同步契约).

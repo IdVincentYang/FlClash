@@ -4,6 +4,7 @@ package main
 
 /*
 #include <stdlib.h>
+#include "bride.h"
 */
 import "C"
 
@@ -22,8 +23,11 @@ import (
 
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/process"
+	"github.com/metacubex/mihomo/component/requestscope"
+	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/dns"
+	"github.com/metacubex/mihomo/listener"
 	"github.com/metacubex/mihomo/listener/sing_tun"
 	"github.com/metacubex/mihomo/log"
 )
@@ -37,12 +41,21 @@ type TunHandler struct {
 	listener *sing_tun.Listener
 	callback unsafe.Pointer
 
-	mu sync.RWMutex
+	mu                sync.RWMutex
+	serviceID         string
+	protectGeneration uint64
 }
 
 func (th *TunHandler) start(fd int, stack, address, dns string) bool {
 	configMu.Lock()
 	defer configMu.Unlock()
+	if !canStartRequestTun(th.serviceID, th.protectGeneration) {
+		_ = syscall.Close(fd)
+		th.mu.Lock()
+		th.clear()
+		th.mu.Unlock()
+		return false
+	}
 
 	th.mu.Lock()
 	th.initHook()
@@ -216,9 +229,18 @@ func stopTunLocked() {
 	tunHandler = nil
 }
 
-func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string) bool {
+func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns, serviceID string, generation uint64) bool {
 	tunLock.Lock()
 	defer tunLock.Unlock()
+	if !canStartRequestTun(serviceID, generation) {
+		if callback != nil {
+			releaseObject(callback)
+		}
+		if fd != 0 {
+			_ = syscall.Close(fd)
+		}
+		return false
+	}
 	stopTunLocked()
 	if fd == 0 {
 		if callback != nil {
@@ -228,7 +250,9 @@ func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string)
 		return false
 	}
 	tunHandler = &TunHandler{
-		callback: callback,
+		callback:          callback,
+		serviceID:         serviceID,
+		protectGeneration: generation,
 	}
 	if tunHandler.start(fd, stack, address, dns) {
 		return true
@@ -295,15 +319,41 @@ func invokeMethod(callback unsafe.Pointer, paramsChar *C.char) {
 }
 
 //export startTUN
-func startTUN(callback unsafe.Pointer, fd C.int, stackChar, addressChar, dnsChar *C.char) bool {
-	started := handleStartTun(callback, int(fd), takeCString(stackChar), takeCString(addressChar), takeCString(dnsChar))
+func startTUN(callback unsafe.Pointer, fd C.int, stackChar, addressChar, dnsChar, serviceID *C.char, generation C.longlong) bool {
+	identity := takeCString(serviceID)
+	version := uint64(generation)
+	started := handleStartTun(callback, int(fd), takeCString(stackChar), takeCString(addressChar), takeCString(dnsChar), identity, version)
 	if !started {
 		return false
 	}
-	if !isRunning.Load() {
-		handleStartListener()
+	if !startRequestListener(identity, version) {
+		handleStopTunIdentity(identity, version)
+		return false
+	}
+	return true
+}
+
+func startRequestListener(identity string, generation uint64) bool {
+	configMu.Lock()
+	defer configMu.Unlock()
+	if !canStartRequestTun(identity, generation) {
+		return false
+	}
+	opened := !isRunning.Load()
+	if opened {
+		isRunning.Store(true)
+		updateListeners(currentConfig)
+		resolver.ResetConnection()
+		refreshRoute()
 	} else {
 		handleResetConnections()
+	}
+	if !canStartRequestTun(identity, generation) {
+		if opened {
+			isRunning.Store(false)
+			listener.StopListener()
+		}
+		return false
 	}
 	return true
 }
@@ -401,4 +451,93 @@ func forceGC() {
 //export updateDns
 func updateDns(s *C.char) {
 	handleUpdateDns(takeCString(s))
+}
+
+var requestSocketMu sync.RWMutex
+var requestSocketCallback unsafe.Pointer
+
+//export requestControl
+func requestControl(data *C.char) *C.char {
+	return C.CString(handleRequestControl(takeCString(data)))
+}
+
+//export setRequestSocketListener
+func setRequestSocketListener(callback unsafe.Pointer) {
+	requestSocketMu.Lock()
+	previous := requestSocketCallback
+	requestSocketCallback = callback
+	requestSocketMu.Unlock()
+	if previous != nil {
+		releaseObject(previous)
+	}
+}
+
+//export setTunRequestIdentity
+func setTunRequestIdentity(serviceID *C.char, generation C.longlong) {
+	identity := takeCString(serviceID)
+	tunLock.Lock()
+	defer tunLock.Unlock()
+	if tunHandler == nil {
+		return
+	}
+	tunHandler.mu.Lock()
+	tunHandler.serviceID = identity
+	tunHandler.protectGeneration = uint64(generation)
+	tunHandler.mu.Unlock()
+}
+
+func prepareAppRequestSocket(id string, state AppRequestState, fd int) error {
+	if state.ProtectPhase == "ready" {
+		handler := activeTunHandler.Load()
+		if handler == nil {
+			return requestscope.ErrBlocked
+		}
+		handler.mu.RLock()
+		valid := handler.listener != nil && handler.callback != nil && handler.serviceID == state.ServiceID && handler.protectGeneration == state.ProtectGeneration
+		handler.mu.RUnlock()
+		if !valid {
+			return requestscope.ErrBlocked
+		}
+	}
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return requestscope.ErrBlocked
+	}
+	data := C.CString(string(payload))
+	defer C.free(unsafe.Pointer(data))
+	requestSocketMu.RLock()
+	defer requestSocketMu.RUnlock()
+	if requestSocketCallback == nil || C.request_socket(requestSocketCallback, data, C.int(fd)) == 0 {
+		return requestscope.ErrBlocked
+	}
+	return nil
+}
+
+func init() { appRequests.socketGate = prepareAppRequestSocket }
+
+func canStartRequestTun(serviceID string, generation uint64) bool {
+	appRequests.mu.Lock()
+	defer appRequests.mu.Unlock()
+	state := appRequests.state
+	return state.IntentRunning && !state.Paused && state.Phase == "starting" && state.ProtectPhase == "starting" && state.ServiceID == serviceID && generation != 0 && state.ProtectGeneration == generation && appRequests.phase == "ready"
+}
+
+//export stopTunRequest
+func stopTunRequest(serviceID *C.char, generation C.longlong) bool {
+	return handleStopTunIdentity(takeCString(serviceID), uint64(generation))
+}
+
+func handleStopTunIdentity(identity string, generation uint64) bool {
+	tunLock.Lock()
+	defer tunLock.Unlock()
+	if tunHandler == nil {
+		return false
+	}
+	tunHandler.mu.RLock()
+	matches := tunHandler.serviceID == identity && tunHandler.protectGeneration == generation
+	tunHandler.mu.RUnlock()
+	if !matches {
+		return false
+	}
+	return stopOwnedRequestService(requestTunIdentity{identity, generation}, requestTunIdentity{tunHandler.serviceID, tunHandler.protectGeneration}, stopTunLocked)
 }

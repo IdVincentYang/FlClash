@@ -24,11 +24,16 @@ class StoreAction extends _$StoreAction {
 
   void savePreferencesDebounce() {
     debouncer.call(FunctionTag.savePreferences, () async {
-      await preferences.saveConfig(ref.read(configProvider));
+      await request.mutate(() async {
+        if (!await preferences.saveConfig(ref.read(configProvider))) {
+          throw const RequestUnavailable('preferences_save_failed');
+        }
+      });
     });
   }
 
-  Future handleClear() async {
+  Future<void> handleClear() => request.mutate(() async {
+    await request.invalidateDataset();
     debouncer.cancel(FunctionTag.savePreferences);
     final profileIds = ref
         .read(profilesProvider)
@@ -62,5 +67,5 @@ class StoreAction extends _$StoreAction {
     await File(await appPath.databasePath).safeDelete(recursive: true);
     await Directory(await appPath.profilesPath).safeDelete(recursive: true);
     unawaited(ref.read(systemActionProvider.notifier).handleExit(false));
-  }
+  });
 }

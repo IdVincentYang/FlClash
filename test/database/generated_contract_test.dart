@@ -8,6 +8,7 @@ void main() {
   test('profile and script generated data classes preserve all fields', () {
     final date = DateTime.utc(2026, 7, 26);
     final profile = RawProfile(
+      requestMode: 'auto',
       id: 1,
       label: 'Profile',
       currentGroupName: 'Select',
@@ -29,8 +30,8 @@ void main() {
       order: 3,
     );
 
-    expect(profile.toColumns(true), hasLength(14));
-    expect(profile.toCompanion(true).toColumns(true), hasLength(14));
+    expect(profile.toColumns(true), hasLength(15));
+    expect(profile.toCompanion(true).toColumns(true), hasLength(15));
     expect(RawProfile.fromJson(profile.toJson()).toJson(), profile.toJson());
     expect(profile.copyWith(label: 'Next').label, 'Next');
     expect(
@@ -50,6 +51,7 @@ void main() {
     expect(profile.toString(), contains('Profile'));
 
     const emptyProfile = RawProfile(
+      requestMode: 'auto',
       id: 2,
       label: 'Empty',
       url: '',
@@ -59,9 +61,9 @@ void main() {
       selectedMap: {},
       unfoldSet: {},
     );
-    expect(emptyProfile.toColumns(true), hasLength(8));
-    expect(emptyProfile.toColumns(false), hasLength(14));
-    expect(emptyProfile.toCompanion(true).toColumns(true), hasLength(8));
+    expect(emptyProfile.toColumns(true), hasLength(9));
+    expect(emptyProfile.toColumns(false), hasLength(16));
+    expect(emptyProfile.toCompanion(true).toColumns(true), hasLength(9));
 
     final insertedProfile = ProfilesCompanion.insert(
       label: 'Inserted',
@@ -94,9 +96,14 @@ void main() {
       hasLength(14),
     );
 
-    final script = RawScript(id: 2, label: 'Script', lastUpdateTime: date);
-    expect(script.toColumns(true), hasLength(3));
-    expect(script.toCompanion(true).toColumns(true), hasLength(3));
+    final script = RawScript(
+      id: 2,
+      label: 'Script',
+      lastUpdateTime: date,
+      requestMode: 'auto',
+    );
+    expect(script.toColumns(true), hasLength(4));
+    expect(script.toCompanion(true).toColumns(true), hasLength(4));
     final restoredScript = RawScript.fromJson(script.toJson());
     expect(restoredScript.id, script.id);
     expect(restoredScript.label, script.label);

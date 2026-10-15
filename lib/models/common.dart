@@ -413,6 +413,8 @@ abstract class DAVProps with _$DAVProps {
     @Default('')
     String password,
     @Default(defaultDavFileName) String fileName,
+    @Default(RequestMode.auto) RequestMode requestMode,
+    String? requestProxy,
   }) = _DAVProps;
 
   factory DAVProps.fromJson(Map<String, Object?> json) =>
@@ -716,6 +718,8 @@ abstract class Script with _$Script {
     required String label,
     required DateTime lastUpdateTime,
     String? url,
+    @Default(RequestMode.auto) RequestMode requestMode,
+    String? requestProxy,
     int? order,
   }) = _Script;
 
@@ -784,7 +788,7 @@ extension ScriptExt on Script {
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
-    await File(copyPath).copy(copyPath);
+    await File(copyPath).copy(file.path);
     return copyWith(lastUpdateTime: DateTime.now());
   }
 }

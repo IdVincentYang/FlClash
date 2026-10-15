@@ -8,6 +8,9 @@ extern void (*free_string_func)(char *data);
 
 extern int (*protect_func)(void *tun_interface, int fd);
 
+extern int (*request_socket_func)(void *callback, const char *state, int fd);
+extern int request_socket(void *callback, const char *state, int fd);
+
 extern int (*resolve_uid_func)(void *tun_interface, int protocol, const char *source, const char *target);
 
 extern char* (*resolve_package_func)(void *tun_interface, int uid);
