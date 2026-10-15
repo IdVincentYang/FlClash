@@ -1,6 +1,6 @@
 # L1-T03：应用请求的出口与生命周期
 
-本设计及第四轮实现已获 M 评审通过，源码 `5fd4adab4d52926c7c034915d46b797268e5472d` 已本地合入 `security/android`，当前由 M 核对父仓库远端交付。实际状态、最终绑定与限制见[验证记录](l1_t03_result.md#收尾与本地集成)。获审设计 SHA-256 为 `f0849056e085ed62c078d9b6c4c060fe94bcce49233ccbe62fb16b2395062344`，原文保留在本地忽略证据目录。方案在现有请求入口增加一次用途的生命周期：固定出口，撤销时取消连接/后续请求，保存前取得资格。Dart、Go 探测和核心下载分别接入真实通道；Android 服务仍由 ServiceState 仲裁。
+本设计及第四轮实现已获 M 评审通过，源码 `5fd4adab4d52926c7c034915d46b797268e5472d` 已合入 `security/android`，M 已核对并推送至 `origin/security/android`，任务结束。实际状态、最终绑定与限制见[验证记录](l1_t03_result.md#收尾与本地集成)。获审设计 SHA-256 为 `f0849056e085ed62c078d9b6c4c060fe94bcce49233ccbe62fb16b2395062344`，原文保留在本地忽略证据目录。方案在现有请求入口增加一次用途的生命周期：固定出口，撤销时取消连接/后续请求，保存前取得资格。Dart、Go 探测和核心下载分别接入真实通道；Android 服务仍由 ServiceState 仲裁。
 
 依据为[共同安全目标](../security_requirements.md)、[Loop 1 范围](loop1_plan.md#核实应用自身联网的完整范围)和 [L1-T03](loop1_tasks.md#l1-t03-修改请求出口与生命周期处理)。源码起点 `be9bc7d`，派工基线 `75ef51024ae543864382f8ced679d38edd53f343`，核心子模块 `8597778c7df410ebe88c57e59eaab32d203156df`。D 为 D-02，M 为 Codex；原实施分支为 `security/l1-t03-requests`，已在本地合入后清理；共享 checkout 与证据保留。
 
