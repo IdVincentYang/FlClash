@@ -1,6 +1,6 @@
 # L2-T01 验证与交付记录
 
-2026-10-16，Codex（M）已通过完整实现评审，I1–I8 均闭合。D-02 已完成源码提交 `4d442992150a492a6036a1ca9cafad749165fa7b`，快进合入 `security/android` 并清理任务临时分支；远端仍待 M 核对后普通推送。沿用已通过的[任务设计](l2_t01_plan.md)及控制器补充，其它 L2 任务未启动，L1-T04 继续暂缓。
+2026-10-16，Codex（M）已通过完整实现评审，I1–I8 均闭合。D-02 已完成源码提交 `4d442992150a492a6036a1ca9cafad749165fa7b`，快进合入 `security/android` 并清理任务临时分支；M 已核对并普通推送个人 fork 的 `origin/security/android`，从远端读回确认。沿用已通过的[任务设计](l2_t01_plan.md)及控制器补充，其它 L2 任务未启动，L1-T04 继续暂缓。
 
 ## 本轮修订与实际观察
 
@@ -63,7 +63,9 @@ Flutter 3.47.4 / Dart 3.13.3、Go 1.26.4、Rust 1.98.1、Gradle 9.8.0；JVM 测�
 
 ## 收尾与本地集成
 
-M 通过的父候选 tree 为 `47a2474bbe83e0df414e9e67699b9fd544d17a87`。提交前结构检查覆盖输入、Go 安装/恢复、原生服务所有权、Dart 调度及只读显示边界，未发现达到仓库 skill 门槛的结构性问题，保持获审代码不变。源码提交为 `4d442992150a492a6036a1ca9cafad749165fa7b`，已从原基线快进合入 `security/android`；原 feature 分支已删除，共享目录、独立聊天及本地证据保留。提交与获审候选的差异仅为 5 份文档的状态/导航对账，生产、生成代码和第四轮构建输入未变，沿用第四轮 APK 及对应符号，不冒称重新构建。后续只补本文档状态；实际最终 HEAD、目标推进、清理和产物等价性由[本地交付记录](../../../../build/verification/l2-t01/final/local_delivery.json)维护。M 尚未执行本轮远端交付。
+M 通过的父候选 tree 为 `47a2474bbe83e0df414e9e67699b9fd544d17a87`。提交前结构检查覆盖输入、Go 安装/恢复、原生服务所有权、Dart 调度及只读显示边界，未发现达到仓库 skill 门槛的结构性问题，保持获审代码不变。源码提交为 `4d442992150a492a6036a1ca9cafad749165fa7b`，已从原基线快进合入 `security/android`；原 feature 分支已删除，共享目录、独立聊天及本地证据保留。提交与获审候选的差异仅为 5 份文档的状态/导航对账，生产、生成代码和第四轮构建输入未变，沿用第四轮 APK 及对应符号，不冒称重新构建。D 的本地交付 HEAD 为 `06c4121cd154ce898b2c875b835cb4f9ec32c1f9`，当时的集成、清理和产物等价性见[本地交付记录](../../../../build/verification/l2-t01/final/local_delivery.json)。
+
+M 于 2026-10-16 独立核对获审 tree 与本地交付仅有上述文档差异、1883 项运行输入与第四轮构建逐项一致、APK 摘要未变；Core/gitlink/完整载体未变，沿用已审独立恢复。随后按[贡献指南](../../../../CONTRIBUTING.md#l1-t03-core-source-carrier)的 carrier 例外普通推送父分支，`git ls-remote --heads origin refs/heads/security/android` 返回 `06c4121cd154ce898b2c875b835cb4f9ec32c1f9`。本轮后续提交仅对账远端交付文档；没有推送 Core、标签或上传 APK、符号及原始证据。
 
 ## 复现与未覆盖范围
 
