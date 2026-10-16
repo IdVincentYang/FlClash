@@ -20,8 +20,13 @@ The README build commands continue to identify the canonical upstream source.
 ## Task completion and remote delivery
 
 The user has authorized Codex (M) to push `security/android` to the personal fork
-`origin`, now and after each completed task. This standing authorization continues
-until the user changes it.
+`origin` after each completed task. This standing authorization continues until
+the user changes it.
+
+For implementation tasks, completion means the implementation and required
+verification have passed review and the task has been integrated. Design approval,
+a local commit, or a design-only milestone does not trigger a remote push. A
+separate design-only remote delivery requires explicit user authorization.
 
 After D passes the required reviews, commits the task and integrates it into
 `security/android`, M verifies the integrated commit and pushes that branch once:
@@ -65,7 +70,7 @@ This workflow keeps the security delta visible during every sync and gives revie
 - `origin` 是个人仓库 `IdVincentYang/FlClash`；`upstream` 是官方仓库 `chen08209/FlClash`。
 - 两个 remote 都使用本机 SSH 配置中的 `github-vincent` 别名；当前地址分别为 `git@github-vincent:IdVincentYang/FlClash.git` 和 `git@github-vincent:chen08209/FlClash.git`。
 - `main` 只通过 fast-forward 跟进 `upstream/main`；`security/android` 是保留已完成 Android 改动的共享集成分支。每轮从当前集成分支建立短期分支，完成后合回集成分支。
-- **逐任务远端交付：用户已持续授权 Codex（M）在每个任务通过评审、完成提交并合入 `security/android` 后，向个人 fork 的 `origin/security/android` 普通推送一次。** M 核对最终提交并报告远端结果；授权持续有效，直到用户调整。具体范围和命令见上方「Task completion and remote delivery」。
+- **逐任务远端交付：实现任务须完成实现、必要验证和评审，提交并合入 `security/android` 后，Codex（M）才向个人 fork 的 `origin/security/android` 普通推送一次。设计评审通过、本地提交或仅设计阶段交付不触发推送；单独推送设计文档须有用户明确授权。** M 核对最终提交并报告远端结果；授权持续有效，直到用户调整。具体范围和命令见上方「Task completion and remote delivery」。
 - 按风险或行为拆分小提交；避免无关格式化、整文件替换和不必要的生成文件改动。必须改共享核心、锁文件或生成资产时，记录基于的官方版本、保留本地差异的原因及再生成/复核方法。
 - 官方更新后先 fetch `upstream`，再 fast-forward 本地 `main`，将 `upstream/main` merge 到 `security/android`，保留已有安全修复。各整改分支再跟进集成分支：尚未发布且未共享的分支可以 rebase；已经共享的分支用 merge，避免改写他人历史。
 - 冲突要结合当前官方行为和安全要求重新合并，不要直接选择 ours 或 theirs。安全相关冲突需在该轮结果或评审记录中写明涉及的风险编号、保留的行为和取舍原因。

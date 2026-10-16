@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "domainRules": [
+    {"id": "wide", "type": "DOMAIN-SUFFIX", "value": "example.test", "target": {"kind": "proxy", "group": "a"}, "dnsService": "dnsA"},
+    {"id": "exact", "type": "DOMAIN", "value": "exact.example.test", "target": {"kind": "proxy", "group": "b"}, "dnsService": "dnsB"},
+    {"id": "local", "type": "DOMAIN-SUFFIX", "value": "lan.test", "target": {"kind": "direct"}, "dnsService": "localDns"},
+    {"id": "blocked", "type": "DOMAIN-SUFFIX", "value": "denied.test", "target": {"kind": "reject"}}
+  ],
+  "domainDefault": {"target": {"kind": "proxy", "group": "b"}, "dnsService": "dnsB"},
+  "ipRules": [
+    {"id": "loopback", "cidr": "127.0.0.0/8", "target": {"kind": "direct"}},
+    {"id": "loopback6", "cidr": "::1/128", "target": {"kind": "direct"}}
+  ],
+  "ipDefault": {"kind": "reject"},
+  "dnsServices": {
+    "dnsA": {"protocol": "tcp", "address": "127.0.0.1", "port": 5301},
+    "dnsB": {"protocol": "tcp", "address": "127.0.0.1", "port": 5302},
+    "localDns": {"protocol": "tcp", "address": "127.0.0.1", "port": 5303}
+  },
+  "bootstrapDns": {"protocol": "tcp", "address": "127.0.0.1", "port": 5304},
+  "proxies": {
+    "nodeA": {"type": "socks5", "address": "127.0.0.1", "port": 1081, "udp": false},
+    "nodeB": {"type": "socks5", "address": "127.0.0.1", "port": 1082, "udp": false}
+  },
+  "groups": {"a": ["nodeA"], "b": ["nodeB"]},
+  "listeners": {"mixedPort": 17890, "dnsPort": 17853}
+}
