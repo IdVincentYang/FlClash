@@ -1,6 +1,6 @@
 # L2-T02-01 验证记录：静态策略编译与本地消费
 
-2026-10-16，D-02 在 macOS arm64 完成首项实现、自验及 I1／I2 窄修订，**implementation_v2 已获 M1 实现评审通过，当前本地收尾中，尚未提交合入**。仅交付本地编译出口，普通 Profile／UI／DB／setup 尚未消费本策略；整个 L2-T02 未完成，不推送。
+2026-10-16，D-02 在 macOS arm64 完成首项实现、自验及 I1／I2 窄修订，**implementation_v2 已获 M1 实现评审通过，源码已本地合入 security/android，首项结束**。仅交付本地编译出口，普通 Profile／UI／DB／setup 尚未消费本策略；整个 L2-T02 未完成，未推送。
 
 范围与契约见[首项设计](l2_t02_01_plan.md)，阶段状态见[子任务清单](l2_t02_tasks.md)。本次证明的是封闭静态输入在当前 Core 下的生成与消费行为，不证明所有应用上网已受管，也不消除[总体残留风险](l2_t02_plan.md#10-残留风险与不再承诺的能力)。
 
@@ -92,10 +92,17 @@ env FLCLASH_MANAGED_PROFILE_COMPILER="$PWD/build/verification/l2-t02/subtask_01/
 
 缺少编译器环境变量时集成测试会明确 skip；本次带真实路径运行，未复用 skip 作为通过。CLI 输入／输出夹具与记录可本地检查，不需要启动应用或改变宿主网络。
 
+## 本地交付
+
+- 实现提交为 `d7b66dcd00f0c7242c0ac1b7d59768d7bb74395f`，已快进合入 `security/android`；最终本地 HEAD、状态记录提交及文件校验见[收尾绑定](../../../../build/verification/l2-t02/subtask_01/final/binding.json)。
+- 合入后产品代码、测试及最小夹具与已审 implementation_v2 完全相同；后续只记录评审／交付状态，原构建及消费证据保持有效，没有因提交历史重复产品验证。
+- 按 pre-commit-quality-review 检查严格模型、同源编译器与 CLI I/O 的职责和依赖，未发现需处理的结构问题。Dart／Go 格式、comment-density、文档 H1／链接及 diff 检查通过；6 份 Markdown 按现有长段落风格关闭 MD013，其余 lint 为 0。
+- 临时分支 `security/l2-t02-01-static-policy` 已删除；没有创建临时 worktree。共享 checkout、独立聊天及 v1／v2／收尾本地证据保留。
+
 ## 未接入与剩余边界
 
 - 尚无 Profile 策略页、DB／备份迁移、普通 setup 最终编译接入、来源资格撤销、受管控制接口和刷新。现有 Profile 的行为仍由旧路径决定。
 - 尚不支持 DoH、域名节点／服务、regex／Geo／动态 provider、其它节点协议、fake-ip／hosts 或 WG 特殊解析；未知／不支持输入拒绝，不能用丢条件提高兼容率。
 - 主动 DNS 探针为 A，真实 DIRECT 解析还触发 A／AAAA；CNAME、非地址记录和 UDP 截断后重试未做专项验证。本轮不把这些核心路径记作已验证。
 - 旧 DNS Background、共享缓存／查询、迟到结果、远端解析以及物理网络来源未修复。本地配置级证明不能替代全设备接管、停止后零外发或核心取消保证。
-- M1 已通过 implementation_v2，I1／I2 闭合；本地提交合入与临时分支清理正在收尾。整个 L2-T02 未完成前不推送。
+- M1 已通过 implementation_v2，I1／I2 闭合，首项完成本地交付；后续子任务未启动，整个 L2-T02 未完成前不推送。
