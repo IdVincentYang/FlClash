@@ -93,14 +93,6 @@ Java_com_follow_clash_core_Core_getTotalTraffic(JNIEnv *env, jobject thiz,
     return new_string(traffic);
 }
 
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_follow_clash_core_Core_quickSetup(JNIEnv *env, jobject thiz, jstring init_params_string,
-                                           jstring setup_params_string, jobject cb) {
-    const auto interface = new_global(cb);
-    quickSetup(interface, get_string(init_params_string), get_string(setup_params_string));
-}
-
 
 static jmethodID m_tun_interface_protect;
 static jmethodID m_tun_interface_resolve_uid;

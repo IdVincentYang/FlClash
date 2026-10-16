@@ -238,6 +238,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "appendSystemDns": MessageLookupByLibrary.simpleMessage(
       "Append system DNS",
     ),
+    "appliedProfile": MessageLookupByLibrary.simpleMessage(
+      "Active configuration",
+    ),
     "authentication": MessageLookupByLibrary.simpleMessage("Authentication"),
     "authenticationDesc": MessageLookupByLibrary.simpleMessage(
       "Require credentials on the local proxy port to keep other local apps from using it",
@@ -361,8 +364,20 @@ class MessageLookup extends MessageLookupByLibrary {
     "colorSchemes": MessageLookupByLibrary.simpleMessage("Color schemes"),
     "columns": MessageLookupByLibrary.simpleMessage("Columns"),
     "compatible": MessageLookupByLibrary.simpleMessage("Compatibility mode"),
+    "configApplying": MessageLookupByLibrary.simpleMessage(
+      "Applying configuration",
+    ),
     "configDataDetected": MessageLookupByLibrary.simpleMessage(
       "Data detected in the configuration",
+    ),
+    "configInactive": MessageLookupByLibrary.simpleMessage(
+      "No active configuration",
+    ),
+    "configLoaded": MessageLookupByLibrary.simpleMessage(
+      "Loaded; traffic is not handled",
+    ),
+    "configRetained": MessageLookupByLibrary.simpleMessage(
+      "New configuration not applied; using the previous configuration",
     ),
     "confirm": MessageLookupByLibrary.simpleMessage("Confirm"),
     "confirmClearAllData": MessageLookupByLibrary.simpleMessage(

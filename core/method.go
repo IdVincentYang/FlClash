@@ -22,6 +22,10 @@ var methodCallSeq atomic.Uint64
 // transport has to deliver calls in the order the host sent them.
 func dispatchMethodCall(call *MethodCall, response MethodResponse) {
 	call.seq = methodCallSeq.Add(1)
+	if call.Method == registerConfigInputMethod {
+		registerConfigInput(call, response)
+		return
+	}
 	go handleMethodCall(call, response)
 }
 
@@ -167,6 +171,7 @@ func withoutArguments(handle func(response MethodResponse)) methodHandler {
 }
 
 var methodHandlers = map[CoreMethod]methodHandler{
+	registerConfigInputMethod: registerConfigInput,
 	initClashMethod: withArguments(func(params *InitParams, response MethodResponse) {
 		response.success(handleInitClash(params))
 	}),
@@ -305,9 +310,9 @@ var methodHandlers = map[CoreMethod]methodHandler{
 	startListenerMethod: withoutArguments(func(response MethodResponse) {
 		response.success(handleStartListener())
 	}),
-	stopListenerMethod: withoutArguments(func(response MethodResponse) {
-		response.success(handleStopListener())
-	}),
+	stopListenerMethod: func(call *MethodCall, response MethodResponse) {
+		response.success(stopListenerReceived(call.seq))
+	},
 	getMemoryStatsMethod: withoutArguments(func(response MethodResponse) {
 		safeGo(response, func() {
 			response.success(handleGetMemoryStats())

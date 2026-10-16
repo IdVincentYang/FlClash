@@ -5,6 +5,7 @@ import 'package:fl_clash/common/run_request.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import 'desktop/model.dart';
@@ -113,12 +114,19 @@ class CoreLib extends CoreHandlerInterface {
 
   @override
   Future<bool> startListener() async {
-    final listenerStarted = await super.startListener();
     final requestId = RunRequestScope.current;
     final serviceStarted = requestId == null
         ? await _service?.start() ?? false
         : await _service?.startPrepared(requestId) ?? false;
-    return listenerStarted && serviceStarted;
+    return serviceStarted;
+  }
+
+  @override
+  Future<ConfigApplyResult> applyConfigInput(Map<String, Object?> input) async {
+    await _connectedCompleter.future;
+    final native = _service;
+    if (native == null) throw StateError('Android service unavailable');
+    return ConfigApplyResult.fromJson(await native.applyConfig(input));
   }
 
   @override
@@ -127,8 +135,7 @@ class CoreLib extends CoreHandlerInterface {
     final serviceStopped = requestId == null
         ? await _service?.stop() ?? false
         : await _service?.stopPrepared(requestId) ?? false;
-    final listenerStopped = await super.stopListener();
-    return serviceStopped && listenerStopped;
+    return serviceStopped;
   }
 
   @override

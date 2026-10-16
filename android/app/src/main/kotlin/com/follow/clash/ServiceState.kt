@@ -21,6 +21,8 @@ object ServiceState {
 
     fun getRequestState(): ApplicationRequestState = machine.getRequestState()
 
+    fun configOperationToken(): Long = machine.configOperationToken()
+
     fun getNetworkInput(): RequestNetworkFacts = machine.getNetworkInput()
 
     fun getProtection(): Pair<RequestProtection, RequestServiceIdentity>? = machine.getProtection()
@@ -33,7 +35,11 @@ object ServiceState {
 
     fun initializeRequestState(expectedRevision: Long, recovery: Boolean): Boolean = machine.initializeRequestState(expectedRevision, recovery)
 
-    fun failRunIntent(requestId: Long): Boolean = machine.failRunIntent(requestId)
+    suspend fun failRunIntent(requestId: Long, token: Long) = machine.failRunIntent(requestId, token)
+
+    fun applyConfig(input: com.google.gson.JsonObject) = machine.applyConfig(input)
+
+    fun observeConfigFact(fact: com.follow.clash.models.ConfigFact) = machine.observeConfigFact(fact)
 
     fun bindService(serviceId: String, requestId: Long): Boolean = machine.bindService(serviceId, requestId)
 

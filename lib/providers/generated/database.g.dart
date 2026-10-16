@@ -362,7 +362,7 @@ final class ProfilesProvider
   }
 }
 
-String _$profilesHash() => r'aee7607e7e95fe68320f48968ae23fc579417b6c';
+String _$profilesHash() => r'fe31183205397494254878ae6fd1513def542305';
 
 abstract class _$Profiles extends $Notifier<List<Profile>> {
   List<Profile> build();
@@ -467,7 +467,7 @@ final class ClashProvidersProvider
   }
 }
 
-String _$clashProvidersHash() => r'e2cd40bb0c849d300fdbc0243cc552349cf2b571';
+String _$clashProvidersHash() => r'43109cef3b5204ec4ae88a65a82ce145f586d9bf';
 
 final class ClashProvidersFamily extends $Family
     with
@@ -609,7 +609,7 @@ final class GlobalRulesProvider
   GlobalRules create() => GlobalRules();
 }
 
-String _$globalRulesHash() => r'e6e597e3e66f748a036110e5b3d6d99acfa46ce9';
+String _$globalRulesHash() => r'9c22d95fe742a2ac89ef3a03ac0ca618171cd015';
 
 abstract class _$GlobalRules extends $StreamNotifier<List<Rule>> {
   Stream<List<Rule>> build();
@@ -670,7 +670,7 @@ final class ProfileAddedRulesProvider
   }
 }
 
-String _$profileAddedRulesHash() => r'89bfe4ed6ce0991672a40607ac18ddb71b793c51';
+String _$profileAddedRulesHash() => r'e0d87993573129953dd2732b08d3cf0f1e47f835';
 
 final class ProfileAddedRulesFamily extends $Family
     with
@@ -760,7 +760,7 @@ final class ProfileCustomRulesProvider
 }
 
 String _$profileCustomRulesHash() =>
-    r'06db5c36e773ce8cba9c6a7ef26717316dd2a68e';
+    r'2ab4bbd249e1b0a524543a6e4fd1b6f1ab98ecd7';
 
 final class ProfileCustomRulesFamily extends $Family
     with
@@ -849,7 +849,7 @@ final class ProxyGroupsProvider
   }
 }
 
-String _$proxyGroupsHash() => r'caaf53c947ae2da656c284410860448353a209b0';
+String _$proxyGroupsHash() => r'08abe2a3d6fb67ad3e30a2a3ae016dcd8dbd72f6';
 
 final class ProxyGroupsFamily extends $Family
     with
@@ -939,7 +939,7 @@ final class CustomProxiesProvider
   }
 }
 
-String _$customProxiesHash() => r'bc9fbfcc728ae91a19c5e9f596926f32aa74a36a';
+String _$customProxiesHash() => r'c2449821f944fa833e79fede527412f35af1c79e';
 
 final class CustomProxiesFamily extends $Family
     with
@@ -1031,7 +1031,7 @@ final class ProfileDisabledRuleIdsProvider
 }
 
 String _$profileDisabledRuleIdsHash() =>
-    r'7a06f7f179f9c42671f9ccb97124aed670ab51bd';
+    r'ca97cf332c761f54240042e91ddffc6a48bd491a';
 
 final class ProfileDisabledRuleIdsFamily extends $Family
     with

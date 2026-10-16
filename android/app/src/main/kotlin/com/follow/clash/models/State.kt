@@ -9,6 +9,9 @@ data class SharedState(
     val localNetworkTip: String =
         "Local network permission denied: using the gvisor stack, LAN is unreachable.",
     val currentProfileName: String = "FlClash",
+    val systemProxyRequested: Boolean = false,
+    val configInactiveTip: String = "No active configuration",
+    val configApplyingTip: String = "Applying configuration",
     val stopText: String = "Stop",
     val onlyStatisticsProxy: Boolean = false,
     val showStopAction: Boolean = true,

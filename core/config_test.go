@@ -109,16 +109,14 @@ func TestHandleUpdateConfigReportsAnUnappliedConfig(t *testing.T) {
 	}
 }
 
-func TestUpdateConfigAppliesAllowLan(t *testing.T) {
+func TestUpdateConfigRequiresFullApplyForAllowLan(t *testing.T) {
 	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
 	allowLan := true
-
-	if err := updateConfig(&UpdateParams{AllowLan: &allowLan}); err != nil {
-		t.Fatalf("updateConfig error: %v", err)
+	if err := updateConfig(&UpdateParams{AllowLan: &allowLan}); err == nil || err.Error() != "configuration_reapply_required" {
+		t.Fatal("listener change did not require preparation", err)
 	}
-
-	if !currentConfig.General.AllowLan {
-		t.Error("AllowLan stayed false; the patched value never reached the general config")
+	if currentConfig.General.AllowLan {
+		t.Fatal("listener option changed before full preparation")
 	}
 }
 
@@ -171,7 +169,7 @@ func TestSetGeoResourceUrlWritesOnlyAChangedLink(t *testing.T) {
 	}
 }
 
-func TestUpdateConfigAppliesAuthenticationAndClearsLoopbackExemptions(t *testing.T) {
+func TestInstalledAuthenticationUsesSharedDecoderAndClearsLoopbackExemptions(t *testing.T) {
 	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
 	currentConfig.General.SkipAuthPrefixes = []netip.Prefix{
 		netip.MustParsePrefix("127.0.0.1/32"),
@@ -183,9 +181,10 @@ func TestUpdateConfigAppliesAuthenticationAndClearsLoopbackExemptions(t *testing
 	})
 
 	users := []string{"user:pass"}
-	if err := updateConfig(&UpdateParams{Authentication: &users}); err != nil {
-		t.Fatalf("updateConfig error: %v", err)
+	if err := updateConfig(&UpdateParams{Authentication: &users}); err == nil || err.Error() != "configuration_reapply_required" {
+		t.Fatal("authentication did not require new service preparation", err)
 	}
+	applyAuthentication(currentConfig, users)
 	authenticator := authStore.Default.Authenticator()
 	if authenticator == nil || !authenticator.Verify("user", "pass") {
 		t.Error("authenticator missing or rejecting the configured credentials")
@@ -195,22 +194,21 @@ func TestUpdateConfigAppliesAuthenticationAndClearsLoopbackExemptions(t *testing
 	}
 
 	empty := []string{}
-	if err := updateConfig(&UpdateParams{Authentication: &empty}); err != nil {
-		t.Fatalf("updateConfig error: %v", err)
-	}
+	applyAuthentication(currentConfig, empty)
 	if authStore.Default.Authenticator() != nil {
 		t.Error("authenticator survived an empty authentication list")
 	}
 }
 
-func TestUpdateConfigPatchesOnlyTheTunFieldsItWasGiven(t *testing.T) {
+func TestTunProjectionChangesOnlySuppliedFields(t *testing.T) {
 	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
 	currentConfig.General.Tun.Device = "keep-me"
 	device := "flclash-tun"
 
-	if err := updateConfig(&UpdateParams{Tun: &tunSchema{Enable: true}}); err != nil {
-		t.Fatalf("updateConfig error: %v", err)
+	if err := updateConfig(&UpdateParams{Tun: &tunSchema{Enable: true}}); err == nil || err.Error() != "configuration_reapply_required" {
+		t.Fatal("TUN change did not require a full preparation", err)
 	}
+	patchTun(&currentConfig.General.Tun, &tunSchema{Enable: true})
 	if !currentConfig.General.Tun.Enable {
 		t.Error("Tun.Enable stayed false")
 	}
@@ -218,9 +216,7 @@ func TestUpdateConfigPatchesOnlyTheTunFieldsItWasGiven(t *testing.T) {
 		t.Errorf("Tun.Device = %q, want an omitted field left untouched", currentConfig.General.Tun.Device)
 	}
 
-	if err := updateConfig(&UpdateParams{Tun: &tunSchema{Enable: true, Device: &device}}); err != nil {
-		t.Fatalf("updateConfig error: %v", err)
-	}
+	patchTun(&currentConfig.General.Tun, &tunSchema{Enable: true, Device: &device})
 	if currentConfig.General.Tun.Device != device {
 		t.Errorf("Tun.Device = %q, want %q", currentConfig.General.Tun.Device, device)
 	}
@@ -610,21 +606,13 @@ func TestGeoUpdateHookDoesNotReleaseAManualClaim(t *testing.T) {
 	settleMessageBatcher()
 }
 
-// An empty config.yaml is how the app expresses "no profile selected". mihomo's
-// own reader rejects it.
-func TestLoadConfigTreatsAnEmptyProfileAsTheDefaults(t *testing.T) {
+func TestLoadConfigRejectsAnEmptyProfile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
 	}
-
-	cfg, err := loadConfig(path)
-
-	if err != nil {
-		t.Fatalf("loadConfig = %v, want no error for an empty profile", err)
-	}
-	if cfg == nil {
-		t.Fatal("loadConfig returned no config for an empty profile")
+	if cfg, err := loadConfig(path); err == nil || cfg != nil {
+		t.Fatal("empty input became defaults", cfg, err)
 	}
 }
 
@@ -691,10 +679,7 @@ func withSetupConfig(t *testing.T, apply func(*SetupParams) error) {
 	})
 }
 
-// applyConfig rolls back to the default config when the profile fails to parse.
-// That rollback is the whole recovery: the error reaches the host and the
-// listeners keep serving while the user picks another profile.
-func TestHandleSetupConfigKeepsTheListenerWhenTheProfileFails(t *testing.T) {
+func TestLegacySetupConfigRejectionDoesNotRetireAnExistingListener(t *testing.T) {
 	withSetupConfig(t, func(*SetupParams) error { return errors.New("bad profile") })
 
 	got := handleSetupConfig(defaultSetupParams())

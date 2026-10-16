@@ -1,5 +1,4 @@
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/features/overwrite/overwrite.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart' hide FileInfo;
@@ -25,33 +24,10 @@ class CustomContent extends ConsumerWidget {
       return;
     }
     await globalState.safeRun(() async {
-      final clashConfig = await ref.read(clashConfigProvider(profileId).future);
-      final proxies = feature.customProxies
-          ? await _readConfigProxies(ref, profileId)
-          : null;
-      await database.setProfileCustomData(
-        profileId,
-        proxies,
-        clashConfig.proxyGroups,
-        clashConfig.rules,
-      );
+      await ref
+          .read(profilesActionProvider.notifier)
+          .useDefaultCustomConfig(profileId);
     });
-  }
-
-  Future<List<CustomProxy>> _readConfigProxies(
-    WidgetRef ref,
-    int profileId,
-  ) async {
-    final rawProxies = (await ref
-        .read(coreHandlerProvider)
-        .getConfig(profileId))['proxies'];
-    if (rawProxies != null && rawProxies is! List) {
-      throw const FormatException('proxies');
-    }
-    return [
-      for (final item in rawProxies ?? const [])
-        if (item is Map) CustomProxy.fromDefinition(item),
-    ];
   }
 
   void _handleToProxiesView(BuildContext context, int profileId) {

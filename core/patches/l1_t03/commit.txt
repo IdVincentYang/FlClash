@@ -1,6 +1,6 @@
-tree 28734038b58367ad5e0215a7388b84daea33337e
+tree f08a2ac1a2cd78649b4a144e4c3fb16318f96887
 parent 8597778c7df410ebe88c57e59eaab32d203156df
-author Vincent <idvincentyang@gmail.com> 1792057113 +0800
-committer Vincent <idvincentyang@gmail.com> 1792057113 +0800
+author Vincent <idvincentyang@gmail.com> 1792122394 +0800
+committer Vincent <idvincentyang@gmail.com> 1792122394 +0800
 
-security: scope application requests and local commits
+security: bind configuration activation and application requests

@@ -13,7 +13,6 @@ import (
 	t "core/tun"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -24,10 +23,8 @@ import (
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/process"
 	"github.com/metacubex/mihomo/component/requestscope"
-	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/dns"
-	"github.com/metacubex/mihomo/listener"
 	"github.com/metacubex/mihomo/listener/sing_tun"
 	"github.com/metacubex/mihomo/log"
 )
@@ -70,6 +67,11 @@ func (th *TunHandler) start(fd int, stack, address, dns string) bool {
 
 	th.mu.Lock()
 	defer th.mu.Unlock()
+	if tunListener != nil && !canStartRequestTun(th.serviceID, th.protectGeneration) {
+		_ = tunListener.Close()
+		th.clear()
+		return false
+	}
 	if tunListener != nil {
 		log.Infoln("TUN address: %v", tunListener.Address())
 		th.listener = tunListener
@@ -326,63 +328,7 @@ func startTUN(callback unsafe.Pointer, fd C.int, stackChar, addressChar, dnsChar
 	if !started {
 		return false
 	}
-	if !startRequestListener(identity, version) {
-		handleStopTunIdentity(identity, version)
-		return false
-	}
 	return true
-}
-
-func startRequestListener(identity string, generation uint64) bool {
-	configMu.Lock()
-	defer configMu.Unlock()
-	if !canStartRequestTun(identity, generation) {
-		return false
-	}
-	opened := !isRunning.Load()
-	if opened {
-		isRunning.Store(true)
-		updateListeners(currentConfig)
-		resolver.ResetConnection()
-		refreshRoute()
-	} else {
-		handleResetConnections()
-	}
-	if !canStartRequestTun(identity, generation) {
-		if opened {
-			isRunning.Store(false)
-			listener.StopListener()
-		}
-		return false
-	}
-	return true
-}
-
-//export quickSetup
-func quickSetup(callback unsafe.Pointer, initParamsChar *C.char, setupParamsChar *C.char) {
-	go func() {
-		defer releaseObject(callback)
-		defer func() {
-			if r := recover(); r != nil {
-				logError("panic in quickSetup: %v\n%s", r, stackTrace())
-				invokeResult(callback, fmt.Sprintf("internal panic: %v", r))
-			}
-		}()
-		initParamsString := takeCString(initParamsChar)
-		setupParamsString := takeCString(setupParamsChar)
-		initParams := InitParams{}
-		if err := json.Unmarshal([]byte(initParamsString), &initParams); err != nil || !handleInitClash(&initParams) {
-			invokeResult(callback, "init failed")
-			return
-		}
-		setupParams := defaultSetupParams()
-		if err := UnmarshalJson([]byte(setupParamsString), setupParams); err != nil {
-			invokeResult(callback, err.Error())
-			return
-		}
-		isRunning.Store(true)
-		invokeResult(callback, handleSetupConfig(setupParams))
-	}()
 }
 
 // The listener goes away with the Flutter engine, which never gets to release
@@ -516,10 +462,14 @@ func prepareAppRequestSocket(id string, state AppRequestState, fd int) error {
 func init() { appRequests.socketGate = prepareAppRequestSocket }
 
 func canStartRequestTun(serviceID string, generation uint64) bool {
+	prepared := preparedConfigGate.Load()
+	if prepared == nil || !prepared.current() || !prepared.op.request.Active || prepared.mixed.Validate() != nil {
+		return false
+	}
 	appRequests.mu.Lock()
 	defer appRequests.mu.Unlock()
 	state := appRequests.state
-	return state.IntentRunning && !state.Paused && state.Phase == "starting" && state.ProtectPhase == "starting" && state.ServiceID == serviceID && generation != 0 && state.ProtectGeneration == generation && appRequests.phase == "ready"
+	return preparedConfigGate.Load() == prepared && operationRunValidLocked(prepared.op) && appRequests.owner.ID == prepared.receipt.Owner && appRequests.phase == "parsing" && state.IntentRunning && !state.Paused && state.Phase == "starting" && state.ProtectPhase == "starting" && state.ServiceID == serviceID && generation != 0 && state.ProtectGeneration == generation
 }
 
 //export stopTunRequest

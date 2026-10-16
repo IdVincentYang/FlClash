@@ -199,6 +199,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "appAccessControl": MessageLookupByLibrary.simpleMessage("アプリアクセス制御"),
     "appIconDesign": MessageLookupByLibrary.simpleMessage("アプリアイコンのデザイン"),
     "appendSystemDns": MessageLookupByLibrary.simpleMessage("システムDNSを追加"),
+    "appliedProfile": MessageLookupByLibrary.simpleMessage("適用中の設定"),
     "authentication": MessageLookupByLibrary.simpleMessage("認証"),
     "authenticationDesc": MessageLookupByLibrary.simpleMessage(
       "ローカルプロキシポートに認証を要求し、他のアプリによる無断利用を防ぎます",
@@ -296,8 +297,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "colorSchemes": MessageLookupByLibrary.simpleMessage("カラースキーム"),
     "columns": MessageLookupByLibrary.simpleMessage("列数"),
     "compatible": MessageLookupByLibrary.simpleMessage("互換モード"),
+    "configApplying": MessageLookupByLibrary.simpleMessage("設定を適用中"),
     "configDataDetected": MessageLookupByLibrary.simpleMessage(
       "設定内にデータが見つかりました",
+    ),
+    "configInactive": MessageLookupByLibrary.simpleMessage("トラフィックを処理していません"),
+    "configLoaded": MessageLookupByLibrary.simpleMessage("読み込み済み・トラフィック未処理"),
+    "configRetained": MessageLookupByLibrary.simpleMessage(
+      "新しい設定は未適用です。以前の設定を使用しています",
     ),
     "confirm": MessageLookupByLibrary.simpleMessage("OK"),
     "confirmClearAllData": MessageLookupByLibrary.simpleMessage(

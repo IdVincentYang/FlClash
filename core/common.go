@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -21,15 +21,12 @@ import (
 	"github.com/metacubex/mihomo/adapter/provider"
 	"github.com/metacubex/mihomo/component/auth"
 	"github.com/metacubex/mihomo/component/dialer"
-	"github.com/metacubex/mihomo/component/requestscope"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
 	cp "github.com/metacubex/mihomo/constant/provider"
-	"github.com/metacubex/mihomo/hub"
-	"github.com/metacubex/mihomo/hub/executor"
 	"github.com/metacubex/mihomo/hub/route"
 	"github.com/metacubex/mihomo/listener"
 	authStore "github.com/metacubex/mihomo/listener/auth"
@@ -136,30 +133,59 @@ func sideUpdateExternalProvider(p cp.Provider, data []byte) error {
 	}
 }
 
-func updateListeners(cfg *config.Config) {
-	if cfg == nil || !isRunning.Load() {
-		return
-	}
+func updateListenersChecked(cfg *config.Config, target constant.Tunnel, mixed *listener.MixedBinding) error {
 	general := cfg.General
-	listener.PatchInboundListeners(cfg.Listeners, tunnel.Tunnel, true)
-
+	if err := mixed.Validate(); err != nil {
+		return err
+	}
 	listener.SetAllowLan(general.AllowLan)
+	listener.SetBindAddress(general.BindAddress)
 	inbound.SetSkipAuthPrefixes(general.SkipAuthPrefixes)
 	inbound.SetAllowedIPs(general.LanAllowedIPs)
 	inbound.SetDisAllowedIPs(general.LanDisAllowedIPs)
-
-	listener.SetBindAddress(general.BindAddress)
-	listener.ReCreateHTTP(general.Port, tunnel.Tunnel)
-	listener.ReCreateSocks(general.SocksPort, tunnel.Tunnel)
-	listener.ReCreateRedir(general.RedirPort, tunnel.Tunnel)
-	listener.ReCreateTProxy(general.TProxyPort, tunnel.Tunnel)
-	listener.ReCreateMixed(general.MixedPort, tunnel.Tunnel)
-	listener.ReCreateShadowSocks(general.ShadowSocksConfig, tunnel.Tunnel)
-	listener.ReCreateVmess(general.VmessConfig, tunnel.Tunnel)
-	listener.ReCreateTuic(general.TuicServer, tunnel.Tunnel)
-	if !features.Android {
-		listener.ReCreateTun(general.Tun, tunnel.Tunnel)
+	if err := listener.PatchInboundListenersChecked(cfg.Listeners, target, true); err != nil {
+		return err
 	}
+	for _, item := range []struct {
+		port   int
+		create func(int, constant.Tunnel) error
+	}{
+		{general.Port, listener.ReCreateHTTPChecked},
+		{general.SocksPort, listener.ReCreateSocksChecked},
+		{general.RedirPort, listener.ReCreateRedirChecked},
+		{general.TProxyPort, listener.ReCreateTProxyChecked},
+	} {
+		if err := item.create(item.port, target); err != nil {
+			return err
+		}
+	}
+	if general.MixedPort != 0 && mixed == nil {
+		return errors.New("mixed listener was not prepared")
+	}
+	if err := listener.ReCreateShadowSocksChecked(general.ShadowSocksConfig, target); err != nil {
+		return err
+	}
+	if err := listener.ReCreateVmessChecked(general.VmessConfig, target); err != nil {
+		return err
+	}
+	if err := listener.ReCreateTuicChecked(general.TuicServer, target); err != nil {
+		return err
+	}
+	if !features.Android {
+		if err := listener.ReCreateTunChecked(general.Tun, target); err != nil {
+			return err
+		}
+	}
+	if err := listener.PatchTunnelChecked(cfg.Tunnels, target); err != nil {
+		return err
+	}
+	return mixed.Validate()
+}
+
+func stopBusinessListeners() {
+	listener.StopListener()
+	listener.PatchInboundListeners(nil, tunnel.Tunnel, true)
+	_ = listener.PatchTunnelChecked(nil, tunnel.Tunnel)
 }
 
 func patchSelectGroup(mapping map[string]string) {
@@ -266,13 +292,38 @@ func patchTun(target *LC.Tun, params *tunSchema) {
 }
 
 func updateConfig(params *UpdateParams) error {
+	return updateConfigOwned(params, nil)
+}
+
+func updateConfigOwned(params *UpdateParams, expected *controllerConfigMutation) error {
 	configMu.Lock()
 	defer configMu.Unlock()
-	if currentConfig == nil {
+	if expected != nil && !expected.valid() {
+		return errConfigSuperseded
+	}
+	if currentConfig == nil || pendingConfig != nil && configFact.Phase != "ready" {
 		return errConfigNotApplied
 	}
 
 	general := currentConfig.General
+	tunChanged := false
+	if params.Tun != nil {
+		projected := general.Tun
+		patchTun(&projected, params.Tun)
+		tunChanged = !reflect.DeepEqual(projected, general.Tun)
+	}
+	if params.MixedPort != nil && *params.MixedPort != general.MixedPort || params.AllowLan != nil && *params.AllowLan != general.AllowLan || params.Authentication != nil && !slices.Equal(*params.Authentication, general.Authentication) || tunChanged || params.ExternalController != nil && *params.ExternalController != currentConfig.Controller.ExternalController {
+		return errors.New("configuration_reapply_required")
+	}
+	selectMu.Lock()
+	checkpointMu.Lock()
+	locked := true
+	defer func() {
+		if locked {
+			checkpointMu.Unlock()
+			selectMu.Unlock()
+		}
+	}()
 	routeChanged := params.Mode != nil && general.Mode != *params.Mode || params.IPv6 != nil && general.IPv6 != *params.IPv6
 	sourceChanged := params.Authentication != nil && !slices.Equal(general.Authentication, *params.Authentication)
 	for geoType, link := range params.GeoXUrl {
@@ -284,35 +335,25 @@ func updateConfig(params *UpdateParams) error {
 		end := beginAppRouteMutation()
 		defer end()
 	}
-	if params.MixedPort != nil {
-		general.MixedPort = *params.MixedPort
-	}
-	if params.AllowLan != nil {
-		general.AllowLan = *params.AllowLan
+	if err := patchGeneralOverrides(general, params); err != nil {
+		return err
 	}
 	if params.FindProcessMode != nil {
-		general.FindProcessMode = *params.FindProcessMode
 		tunnel.SetFindProcessMode(general.FindProcessMode)
 	}
 	if params.TCPConcurrent != nil {
-		general.TCPConcurrent = *params.TCPConcurrent
 		dialer.SetTcpConcurrent(general.TCPConcurrent)
 	}
 	if params.UnifiedDelay != nil {
-		general.UnifiedDelay = *params.UnifiedDelay
 		adapter.UnifiedDelay.Store(general.UnifiedDelay)
 	}
-	// IPv6 belongs with mode: turning it on moves a direct dial to another exit address.
 	if params.Mode != nil {
-		general.Mode = *params.Mode
 		tunnel.SetMode(general.Mode)
 	}
 	if params.LogLevel != nil {
-		general.LogLevel = *params.LogLevel
 		log.SetLevel(general.LogLevel)
 	}
 	if params.IPv6 != nil {
-		general.IPv6 = *params.IPv6
 		resolver.DisableIPv6 = !general.IPv6
 	}
 	if params.Tun != nil {
@@ -327,24 +368,26 @@ func updateConfig(params *UpdateParams) error {
 		applyAuthentication(currentConfig, *params.Authentication)
 	}
 
-	updateListeners(currentConfig)
 	for geoType, link := range params.GeoXUrl {
 		setGeoResourceUrl(geoType, link)
 	}
 	syncGeoUpdater(params.GeoAutoUpdate, params.GeoUpdateInterval)
 	if routeChanged {
-		bumpRouteEpoch()
+		refreshRouteLocked(true)
+	}
+	configFact.Version = configFactSequence.Add(1)
+	checkpointMu.Unlock()
+	selectMu.Unlock()
+	locked = false
+	err := saveAcceptedConfigChanges(params, nil)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 func applyAuthentication(cfg *config.Config, authentication []string) {
-	users := make([]auth.AuthUser, 0, len(authentication))
-	for _, line := range authentication {
-		if user, pass, found := strings.Cut(line, ":"); found {
-			users = append(users, auth.AuthUser{User: user, Pass: pass})
-		}
-	}
+	users := config.ParseAuthentication(authentication)
 	cfg.General.Authentication = authentication
 	cfg.Users = users
 	authStore.Default.SetAuthenticator(auth.NewAuthenticator(users))
@@ -393,7 +436,11 @@ func loadConfig(path string) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := executor.ParseWithBytes(buf)
+	raw, _, err := decodeConfigDocument(buf)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -405,72 +452,7 @@ func loadConfig(path string) (*config.Config, error) {
 }
 
 func applyConfig(params *SetupParams) error {
-	runtime.GC()
-	var readID string
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		var err error
-		readID, err = beginRequestDataRead()
-		if err != nil {
-			return err
-		}
-		if configMu.TryLock() {
-			break
-		}
-		appRequests.endDataRead(readID)
-		if time.Now().After(deadline) {
-			return errRequestCommitBusy
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
-	defer configMu.Unlock()
-	defer appRequests.endDataRead(readID)
-
-	owner := appRequests.newOwner()
-
-	setTestURL(params.TestURL)
-	cfg, err := loadConfig(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
-	appRequests.endDataRead(readID)
-	if err != nil {
-		// The fallback is what keeps the listeners serving while the host
-		// reports the error, but it applies a config with no proxies in it.
-		// From the UI that is indistinguishable from a subscription that went
-		// dead: the profile still lists every node, every delay test answers
-		// Timeout, and nothing routes. Name the real cause in the log.
-		logError(
-			"config apply failed, falling back to the built-in default - no proxies will be available: %v",
-			err,
-		)
-		requestscope.Phase(owner, "failed")
-		fallback, fallbackErr := config.ParseRawConfig(config.DefaultRawConfig())
-		if fallbackErr != nil {
-			return err
-		}
-		cfg = fallback
-	}
-
-	if currentConfig != nil {
-		for _, p := range currentConfig.Providers {
-			if closer, ok := p.(interface{ Close() error }); ok {
-				_ = closer.Close()
-			}
-		}
-		for _, p := range currentConfig.RuleProviders {
-			if closer, ok := p.(interface{ Close() error }); ok {
-				_ = closer.Close()
-			}
-		}
-	}
-	currentConfig = cfg
-	hub.ApplyConfig(cfg)
-	patchSelectGroup(params.SelectedMap)
-	bumpRouteEpoch()
-	updateListeners(cfg)
-	reconcileGeoUpdater()
-	if err == nil {
-		requestscope.Phase(owner, "ready")
-	}
-	return err
+	return errors.New("immutable configuration input required")
 }
 
 func UnmarshalJson(data []byte, v any) error {

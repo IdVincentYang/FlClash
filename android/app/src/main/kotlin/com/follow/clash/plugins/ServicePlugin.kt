@@ -49,9 +49,26 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "syncState" -> syncState(call, result)
             "start" -> start(call, result)
             "stop" -> stop(call, result)
-            "getRequestState" -> result.success(gson.toJson(ServiceState.getRequestState()))
+            "getRequestState" -> {
+                val state = gson.toJsonTree(ServiceState.getRequestState()).asJsonObject
+                state.addProperty("configToken", ServiceState.configOperationToken())
+                result.success(gson.toJson(state))
+            }
             "prepareRunIntent" -> prepareRunIntent(call, result)
-            "failRunIntent" -> result.success((call.arguments as? Number)?.toLong()?.let(ServiceState::failRunIntent) ?: false)
+            "failRunIntent" -> scope.launch {
+                val args = call.arguments as? Map<*, *>
+                val id = (args?.get("requestId") as? Number)?.toLong()
+                val token = (args?.get("token") as? Number)?.toLong()
+                if (id == null || token == null) result.error("INVALID_ARGUMENT", "Missing request or configuration token", null)
+                else result.success(gson.toJson(ServiceState.failRunIntent(id, token)))
+            }
+            "applyConfig" -> {
+                val input = runCatching { JsonParser.parseString(call.arguments as? String).asJsonObject }.getOrNull()
+                if (input == null) result.error("INVALID_ARGUMENT", "Missing configuration input", null)
+                else runCatching { ServiceState.applyConfig(input) }
+                    .onSuccess { pending -> scope.launch { result.success(gson.toJson(pending.await())) } }
+                    .onFailure { result.error("CONFIGURATION_FAILED", it.message, null) }
+            }
             "initializeRequestState" -> initializeRequestState(call, result)
             "requestControl" -> requestControl(call, result)
             else -> result.notImplemented()
@@ -81,6 +98,11 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         val data = call.arguments as? String
         if (data == null) {
             result.error("INVALID_ARGUMENT", "Method call payload must be a string", null)
+            return
+        }
+        val method = runCatching { JsonParser.parseString(data).asJsonObject.get("method").asString }.getOrNull()
+        if (method in setOf("registerConfigInput", "prepareConfig", "installConfig", "activateConfig", "abortConfig", "getReplayInput", "setupConfig", "startListener")) {
+            result.error("INVALID_ARGUMENT", "Configuration must use the service apply pipeline", null)
             return
         }
         // Inline rather than a coroutine per call, which could swap two: watchRoute

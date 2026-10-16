@@ -157,6 +157,109 @@ index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c5585
  		history:      queue.New[C.DelayHistory](defaultHistoriesNum),
  		alive:        atomic.NewBool(true),
  	}
+diff --git a/adapter/inbound/auth.go b/adapter/inbound/auth.go
+index 8317274687f0c334c5b90494ef5bee2114a1f530..282b89b08bebccf6993b8efc89ad6857b2ba28e7 100644
+--- a/adapter/inbound/auth.go
++++ b/adapter/inbound/auth.go
+@@ -3,18 +3,26 @@ package inbound
+ import (
+ 	"net"
+ 	"net/netip"
++	"slices"
++	"sync"
+ 
+ 	C "github.com/metacubex/mihomo/constant"
+ )
+ 
++var authPolicyMu sync.RWMutex
++
+ var skipAuthPrefixes []netip.Prefix
+ 
+ func SetSkipAuthPrefixes(prefixes []netip.Prefix) {
+-	skipAuthPrefixes = prefixes
++	authPolicyMu.Lock()
++	defer authPolicyMu.Unlock()
++	skipAuthPrefixes = slices.Clone(prefixes)
+ }
+ 
+ func SkipAuthPrefixes() []netip.Prefix {
+-	return skipAuthPrefixes
++	authPolicyMu.RLock()
++	defer authPolicyMu.RUnlock()
++	return slices.Clone(skipAuthPrefixes)
+ }
+ 
+ func SkipAuthRemoteAddr(addr net.Addr) bool {
+@@ -34,5 +42,7 @@ func SkipAuthRemoteAddress(addr string) bool {
+ }
+ 
+ func skipAuth(addr netip.Addr) bool {
++	authPolicyMu.RLock()
++	defer authPolicyMu.RUnlock()
+ 	return prefixesContains(skipAuthPrefixes, addr)
+ }
+diff --git a/adapter/inbound/ipfilter.go b/adapter/inbound/ipfilter.go
+index 872d0c85a1cb31b11730f2a673b6636d4ca6cf48..65dbbbfe7bb00576fc21a89611f99c87037c8d12 100644
+--- a/adapter/inbound/ipfilter.go
++++ b/adapter/inbound/ipfilter.go
+@@ -3,27 +3,39 @@ package inbound
+ import (
+ 	"net"
+ 	"net/netip"
++	"slices"
++	"sync"
+ 
+ 	C "github.com/metacubex/mihomo/constant"
+ )
+ 
++var lanPolicyMu sync.RWMutex
++
+ var lanAllowedIPs []netip.Prefix
+ var lanDisAllowedIPs []netip.Prefix
+ 
+ func SetAllowedIPs(prefixes []netip.Prefix) {
+-	lanAllowedIPs = prefixes
++	lanPolicyMu.Lock()
++	defer lanPolicyMu.Unlock()
++	lanAllowedIPs = slices.Clone(prefixes)
+ }
+ 
+ func SetDisAllowedIPs(prefixes []netip.Prefix) {
+-	lanDisAllowedIPs = prefixes
++	lanPolicyMu.Lock()
++	defer lanPolicyMu.Unlock()
++	lanDisAllowedIPs = slices.Clone(prefixes)
+ }
+ 
+ func AllowedIPs() []netip.Prefix {
+-	return lanAllowedIPs
++	lanPolicyMu.RLock()
++	defer lanPolicyMu.RUnlock()
++	return slices.Clone(lanAllowedIPs)
+ }
+ 
+ func DisAllowedIPs() []netip.Prefix {
+-	return lanDisAllowedIPs
++	lanPolicyMu.RLock()
++	defer lanPolicyMu.RUnlock()
++	return slices.Clone(lanDisAllowedIPs)
+ }
+ 
+ func IsRemoteAddrDisAllowed(addr net.Addr) bool {
+@@ -39,9 +51,13 @@ func IsRemoteAddrDisAllowed(addr net.Addr) bool {
+ }
+ 
+ func isAllowed(addr netip.Addr) bool {
++	lanPolicyMu.RLock()
++	defer lanPolicyMu.RUnlock()
+ 	return prefixesContains(lanAllowedIPs, addr)
+ }
+ 
+ func isDisAllowed(addr netip.Addr) bool {
++	lanPolicyMu.RLock()
++	defer lanPolicyMu.RUnlock()
+ 	return prefixesContains(lanDisAllowedIPs, addr)
+ }
 diff --git a/adapter/outboundgroup/fallback.go b/adapter/outboundgroup/fallback.go
 index 98aaf20a9d98522da3086e39064128ff5c89440e..bde3877d215d9c1877dcbbbb4c8223ccce85a9eb 100644
 --- a/adapter/outboundgroup/fallback.go
@@ -907,6 +1010,155 @@ index 81644b007620a1c9917105d3545a9135051b33a3..4930ca4c7a20465ad5b3dfeccfc637a8
 +		_ = asnReader.Reader.Close()
 +	}
 +}
+diff --git a/component/requestscope/business.go b/component/requestscope/business.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3f3fe29e54482bac176093c8dc820861f524950
+--- /dev/null
++++ b/component/requestscope/business.go
+@@ -0,0 +1,127 @@
++package requestscope
++
++import (
++	"context"
++	"net"
++	"strconv"
++	"sync"
++	"sync/atomic"
++
++	C "github.com/metacubex/mihomo/constant"
++	"github.com/metacubex/sing/common"
++)
++
++var BusinessHook func() *BusinessScope
++
++// BusinessScope belongs to one activation. Its check uses the host's existing
++// Owner and service authority; it grants no application data commit rights.
++type BusinessScope struct {
++	ID      uint64
++	ctx     context.Context
++	cancel  context.CancelFunc
++	active  atomic.Bool
++	retired atomic.Bool
++	check   func() bool
++}
++
++func NewBusinessScope(id uint64, check func() bool) *BusinessScope {
++	ctx, cancel := context.WithCancel(context.Background())
++	return &BusinessScope{ID: id, ctx: ctx, cancel: cancel, check: check}
++}
++
++func (s *BusinessScope) Context() context.Context { return s.ctx }
++func (s *BusinessScope) IsActive() bool           { return s.active.Load() && !s.retired.Load() }
++func (s *BusinessScope) Dialer() C.Dialer         { return nil }
++func (s *BusinessScope) Activate() bool {
++	if s.retired.Load() {
++		return false
++	}
++	s.active.Store(true)
++	return !s.retired.Load()
++}
++func (s *BusinessScope) Invalidate() func() {
++	s.retired.Store(true)
++	return s.cancel
++}
++func (s *BusinessScope) Close() { s.Invalidate()() }
++func (s *BusinessScope) Check() error {
++	if s.retired.Load() || !s.active.Load() || s.ctx.Err() != nil || s.check != nil && !s.check() {
++		return ErrBlocked
++	}
++	return nil
++}
++func (s *BusinessScope) TrackConn(conn net.Conn) error {
++	if err := s.Check(); err != nil {
++		_ = conn.Close()
++		return err
++	}
++	context.AfterFunc(s.ctx, func() { _ = conn.Close() })
++	if err := s.Check(); err != nil {
++		_ = conn.Close()
++		return err
++	}
++	return nil
++}
++func (s *BusinessScope) LockCommit(context.Context) (func(), error) { return nil, ErrBlocked }
++func (s *BusinessScope) GrantCommit() (Receipt, error)              { return nil, ErrBlocked }
++func (s *BusinessScope) Key(key string) string                      { return strconv.FormatUint(s.ID, 10) + ":" + key }
++
++// GuardConn keeps copy/unwrap fast paths behind the per-action check.
++func (s *BusinessScope) GuardConn(conn net.Conn) net.Conn {
++	c := &businessConn{Conn: conn, scope: s}
++	c.stop = context.AfterFunc(s.ctx, func() { _ = conn.Close() })
++	return c
++}
++
++type businessConn struct {
++	net.Conn
++	scope *BusinessScope
++	stop  func() bool
++	once  sync.Once
++}
++
++func (c *businessConn) Close() (err error) {
++	c.once.Do(func() {
++		if c.stop != nil {
++			c.stop()
++		}
++		err = c.Conn.Close()
++	})
++	return
++}
++
++func (c *businessConn) Read(p []byte) (int, error) {
++	if err := c.scope.Check(); err != nil {
++		return 0, err
++	}
++	n, err := c.Conn.Read(p)
++	if check := c.scope.Check(); check != nil {
++		return 0, check
++	}
++	return n, err
++}
++func (c *businessConn) Write(p []byte) (int, error) {
++	if err := c.scope.Check(); err != nil {
++		return 0, err
++	}
++	return c.Conn.Write(p)
++}
++
++func (c *businessConn) CloseWrite() error {
++	if err := c.scope.Check(); err != nil {
++		return err
++	}
++	if writer, ok := common.Cast[interface{ CloseWrite() error }](c.Conn); ok {
++		return writer.CloseWrite()
++	}
++	return c.Conn.Close()
++}
++
++func AcceptBusinessConn(tunnel C.Tunnel, conn net.Conn) (net.Conn, error) {
++	if scoped, ok := tunnel.(interface {
++		TrackInbound(net.Conn) (net.Conn, error)
++	}); ok {
++		return scoped.TrackInbound(conn)
++	}
++	return conn, nil
++}
+diff --git a/component/requestscope/controller.go b/component/requestscope/controller.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..d964b0a0343517fc6038e177b878a087b2923995
+--- /dev/null
++++ b/component/requestscope/controller.go
+@@ -0,0 +1,10 @@
++package requestscope
++
++type ControllerMutation interface {
++	Patch([]byte) error
++	Select(group, name string, clear bool) error
++}
++
++// The embedding application captures its configuration authority at receipt.
++// A standalone core keeps its original controller behavior when the hook is nil.
++var ControllerMutationHook func() ControllerMutation
 diff --git a/component/requestscope/scope.go b/component/requestscope/scope.go
 new file mode 100644
 index 0000000000000000000000000000000000000000..5df9f351f05591a5d337b185d0dab73cce462bb3
@@ -2290,7 +2542,7 @@ index 229833859f0806c427fb877dc0ea9542b7a92dfb..47a26b7624a70d12387669b686842a33
 +	return done
  }
 diff --git a/config/config.go b/config/config.go
-index 99648bcde2a679f651ee6a20744d71ab657eea96..dce2bee08213a5105c902cf2adff5fe107a67169 100644
+index 99648bcde2a679f651ee6a20744d71ab657eea96..c8eed04f476fafb2f87344000b6dda636f5955ce 100644
 --- a/config/config.go
 +++ b/config/config.go
 @@ -24,6 +24,7 @@ import (
@@ -2309,17 +2561,111 @@ index 99648bcde2a679f651ee6a20744d71ab657eea96..dce2bee08213a5105c902cf2adff5fe1
  	General       *General
  	Controller    *Controller
  	Experimental  *Experimental
-@@ -622,7 +624,7 @@ func UnmarshalRawConfig(buf []byte) (*RawConfig, error) {
+@@ -622,7 +624,13 @@ func UnmarshalRawConfig(buf []byte) (*RawConfig, error) {
  }
  
  func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
 -	config := &Config{}
 +	config := &Config{RequestOwner: requestscope.CurrentOwner()}
++	complete := false
++	defer func() {
++		if !complete {
++			config.CloseProviders()
++		}
++	}()
  	log.Infoln("Start initial configuration in progress") //Segment finished in xxm
  	startTime := time.Now()
  
+@@ -732,6 +740,7 @@ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
+ 	}
+ 
+ 	config.Users = parseAuthentication(rawCfg.Authentication)
++	config.General.Authentication = slices.Clone(rawCfg.Authentication)
+ 
+ 	config.Tunnels = rawCfg.Tunnels
+ 	// verify tunnels
+@@ -751,6 +760,7 @@ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
+ 	elapsedTime := time.Since(startTime) / time.Millisecond                     // duration in ms
+ 	log.Infoln("Initial configuration complete, total time: %dms", elapsedTime) //Segment finished in xxm
+ 
++	complete = true
+ 	return config, nil
+ }
+ 
+@@ -879,6 +889,19 @@ func parseTLS(cfg *RawConfig) (*TLS, error) {
+ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[string]P.ProxyProvider, err error) {
+ 	proxies = make(map[string]C.Proxy)
+ 	providersMap = make(map[string]P.ProxyProvider)
++	ownedProxies, ownedProviders := proxies, providersMap
++	defer func() {
++		if err != nil {
++			for _, provider := range ownedProviders {
++				if closer, ok := provider.(interface{ Close() error }); ok {
++					_ = closer.Close()
++				}
++			}
++			for _, proxy := range ownedProxies {
++				_ = proxy.Close()
++			}
++		}
++	}()
+ 	proxiesConfig := cfg.Proxy
+ 	groupsConfig := cfg.ProxyGroup
+ 	providersConfig := cfg.ProxyProvider
+@@ -905,6 +928,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
+ 		}
+ 
+ 		if _, exist := proxies[proxy.Name()]; exist {
++			_ = proxy.Close()
+ 			return nil, nil, fmt.Errorf("proxy %s is the duplicate name", proxy.Name())
+ 		}
+ 		proxies[proxy.Name()] = proxy
+@@ -957,6 +981,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
+ 
+ 		groupName := group.Name()
+ 		if _, exist := proxies[groupName]; exist {
++			_ = group.Close()
+ 			return nil, nil, fmt.Errorf("proxy group %s: the duplicate name", groupName)
+ 		}
+ 
+@@ -1020,6 +1045,16 @@ func parseListeners(cfg *RawConfig) (listeners map[string]C.InboundListener, err
+ func parseRuleProviders(cfg *RawConfig) (ruleProviders map[string]P.RuleProvider, err error) {
+ 	RP.SetTunnel(T.Tunnel)
+ 	ruleProviders = map[string]P.RuleProvider{}
++	owned := ruleProviders
++	defer func() {
++		if err != nil {
++			for _, provider := range owned {
++				if closer, ok := provider.(interface{ Close() error }); ok {
++					_ = closer.Close()
++				}
++			}
++		}
++	}()
+ 	// parse rule provider
+ 	for name, mapping := range cfg.RuleProvider {
+ 		rp, err := RP.ParseRuleProvider(name, mapping, R.ParseRule, RB.MakeBundleFile)
+@@ -1979,3 +2014,18 @@ func parseDomainRuleSet(domainSetName string, adapterName string, ruleProviders
+ 	}
+ 	return RP.NewRuleSet(domainSetName, adapterName, false, true)
+ }
++
++func (cfg *Config) CloseProviders() {
++	for _, p := range cfg.Providers {
++		if c, ok := p.(interface{ Close() error }); ok {
++			_ = c.Close()
++		}
++	}
++	for _, p := range cfg.RuleProviders {
++		if c, ok := p.(interface{ Close() error }); ok {
++			_ = c.Close()
++		}
++	}
++}
++
++func ParseAuthentication(lines []string) []auth.AuthUser { return parseAuthentication(lines) }
 diff --git a/hub/executor/executor.go b/hub/executor/executor.go
-index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae09fb73dcb 100644
+index dc7c66b9376f67135e1d33becc4b54d6bf619422..11cbe760c08228e9f2f3910a05aff778145d6933 100644
 --- a/hub/executor/executor.go
 +++ b/hub/executor/executor.go
 @@ -1,6 +1,8 @@
@@ -2339,7 +2685,31 @@ index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae0
  	"github.com/metacubex/mihomo/component/resolver"
  	"github.com/metacubex/mihomo/component/resource"
  	"github.com/metacubex/mihomo/component/sniffer"
-@@ -112,6 +115,7 @@ func ApplyConfig(cfg *config.Config, force bool) {
+@@ -82,6 +85,15 @@ func ParseWithBytes(buf []byte) (*config.Config, error) {
+ 
+ // ApplyConfig dispatch configure to all parts without ExternalController
+ func ApplyConfig(cfg *config.Config, force bool) {
++	applyConfig(cfg, force, false)
++}
++
++// ApplyConfigStaged leaves ordinary traffic closed until the host activates it.
++func ApplyConfigStaged(cfg *config.Config, force bool) {
++	applyConfig(cfg, force, true)
++}
++
++func applyConfig(cfg *config.Config, force bool, staged bool) {
+ 	mux.Lock()
+ 	defer mux.Unlock()
+ 	log.SetLevel(cfg.General.LogLevel)
+@@ -107,16 +119,21 @@ func ApplyConfig(cfg *config.Config, force bool) {
+ 	//updateListeners(cfg.General, cfg.Listeners, force)
+ 	//updateTun(cfg.General) // tun should not care "force"
+ 	updateIPTables(cfg)
+-	updateTunnels(cfg.Tunnels)
++	if !staged {
++		updateTunnels(cfg.Tunnels)
++	}
+ 
  	tunnel.OnInnerLoading()
  
  	initInnerTcp()
@@ -2347,7 +2717,15 @@ index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae0
  	loadProvider(cfg.Providers)
  	updateProfile(cfg)
  	loadProvider(cfg.RuleProviders)
-@@ -325,6 +329,30 @@ func loadProvider[T P.Provider](providers map[string]T) {
+ 	runtime.GC()
+-	tunnel.OnRunning()
++	if !staged {
++		tunnel.OnRunning()
++	}
+ 	updateUpdater(cfg)
+ 
+ 	resolver.ResetConnection()
+@@ -325,6 +342,30 @@ func loadProvider[T P.Provider](providers map[string]T) {
  		}
  
  		if err := pv.Initial(); err != nil {
@@ -2378,7 +2756,7 @@ index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae0
  			switch pv.Type() {
  			case P.Proxy:
  				{
-@@ -336,7 +364,7 @@ func loadProvider[T P.Provider](providers map[string]T) {
+@@ -336,7 +377,7 @@ func loadProvider[T P.Provider](providers map[string]T) {
  				}
  			}
  		} else {
@@ -2387,7 +2765,7 @@ index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae0
  				DefaultProviderLoadedHook(name)
  			}
  		}
-@@ -539,3 +567,8 @@ func Shutdown() {
+@@ -539,3 +580,8 @@ func Shutdown() {
  
  	log.Warnln("Mihomo shutting down")
  }
@@ -2395,6 +2773,302 @@ index dc7c66b9376f67135e1d33becc4b54d6bf619422..92c6a7798f0e980975e511f51d7b6ae0
 +func cfgOwnerCurrent(p P.Provider) bool {
 +	owned, ok := p.(interface{ RequestOwner() requestscope.Owner })
 +	return ok && requestscope.OwnerActive(owned.RequestOwner())
++}
+diff --git a/hub/hub.go b/hub/hub.go
+index 29ddd2e61cf56fed59518b60b3d12641ec3016b7..9439b1663b1b6dfc2b8e4ed18759a07d157b37b3 100644
+--- a/hub/hub.go
++++ b/hub/hub.go
+@@ -57,6 +57,11 @@ func ApplyConfig(cfg *config.Config) {
+ 	executor.ApplyConfig(cfg, true)
+ }
+ 
++func ApplyConfigStaged(cfg *config.Config) {
++	applyRoute(cfg)
++	executor.ApplyConfigStaged(cfg, true)
++}
++
+ func applyRoute(cfg *config.Config) {
+ 	if cfg.Controller.ExternalUI != "" {
+ 		route.SetUIPath(cfg.Controller.ExternalUI)
+diff --git a/hub/route/config_mutation.go b/hub/route/config_mutation.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..95f395301e9946a8382fab7bcb1132524db4dc9f
+--- /dev/null
++++ b/hub/route/config_mutation.go
+@@ -0,0 +1,23 @@
++package route
++
++import (
++	"github.com/metacubex/chi/render"
++	"github.com/metacubex/http"
++	"github.com/metacubex/mihomo/component/requestscope"
++)
++
++func controllerMutation() requestscope.ControllerMutation {
++	if requestscope.ControllerMutationHook != nil {
++		return requestscope.ControllerMutationHook()
++	}
++	return nil
++}
++
++func rejectConfigMutation(w http.ResponseWriter, r *http.Request, err error) {
++	render.Status(r, http.StatusConflict)
++	message := "Apply the complete configuration through FlClash"
++	if err != nil {
++		message = err.Error()
++	}
++	render.JSON(w, r, newError(message))
++}
+diff --git a/hub/route/configs.go b/hub/route/configs.go
+index 35584b5642e63b2240bab4c2b7f3165542dbb306..a7f7451110f58568ae14f21192b6ed3953e1c503 100644
+--- a/hub/route/configs.go
++++ b/hub/route/configs.go
+@@ -1,6 +1,7 @@
+ package route
+ 
+ import (
++	"io"
+ 	"net/netip"
+ 	"path/filepath"
+ 
+@@ -328,6 +329,22 @@ func pointerOrDefaultTuicServer(p *tuicServerSchema, def LC.TuicServer) LC.TuicS
+ }
+ 
+ func patchConfigs(w http.ResponseWriter, r *http.Request) {
++	if mutation := controllerMutation(); mutation != nil {
++		data, err := io.ReadAll(io.LimitReader(r.Body, (1<<20)+1))
++		if len(data) > 1<<20 {
++			rejectConfigMutation(w, r, nil)
++			return
++		}
++		if err == nil {
++			err = mutation.Patch(data)
++		}
++		if err != nil {
++			rejectConfigMutation(w, r, err)
++			return
++		}
++		render.NoContent(w, r)
++		return
++	}
+ 	general := &configSchema{}
+ 	if err := render.DecodeJSON(r.Body, &general); err != nil {
+ 		render.Status(r, http.StatusBadRequest)
+@@ -399,6 +416,10 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ func updateConfigs(w http.ResponseWriter, r *http.Request) {
++	if controllerMutation() != nil {
++		rejectConfigMutation(w, r, nil)
++		return
++	}
+ 	req := struct {
+ 		Path    string `json:"path"`
+ 		Payload string `json:"payload"`
+diff --git a/hub/route/groups.go b/hub/route/groups.go
+index 5d5e5b817fa559ffb20fb537d0c33ced81d42940..01725164721e8ef177040eca287ad712a38afb03 100644
+--- a/hub/route/groups.go
++++ b/hub/route/groups.go
+@@ -51,6 +51,7 @@ func getGroup(w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ func getGroupDelay(w http.ResponseWriter, r *http.Request) {
++	mutation := controllerMutation()
+ 	proxy := r.Context().Value(CtxKeyProxy).(C.Proxy)
+ 	group, ok := proxy.Adapter().(outboundgroup.ProxyGroup)
+ 	if !ok {
+@@ -59,11 +60,6 @@ func getGroupDelay(w http.ResponseWriter, r *http.Request) {
+ 		return
+ 	}
+ 
+-	if selectAble, ok := proxy.Adapter().(outboundgroup.SelectAble); ok && proxy.Type() != C.Selector {
+-		selectAble.ForceSet("")
+-		cachefile.Cache().SetSelected(proxy.Name(), "")
+-	}
+-
+ 	query := r.URL.Query()
+ 	url := query.Get("url")
+ 	timeout, err := strconv.ParseInt(query.Get("timeout"), 10, 32)
+@@ -79,6 +75,17 @@ func getGroupDelay(w http.ResponseWriter, r *http.Request) {
+ 		render.JSON(w, r, ErrBadRequest)
+ 		return
+ 	}
++	if selectAble, ok := proxy.Adapter().(outboundgroup.SelectAble); ok && proxy.Type() != C.Selector {
++		if mutation != nil {
++			if err := mutation.Select(proxy.Name(), "", true); err != nil {
++				rejectConfigMutation(w, r, err)
++				return
++			}
++		} else {
++			selectAble.ForceSet("")
++			cachefile.Cache().SetSelected(proxy.Name(), "")
++		}
++	}
+ 
+ 	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*time.Duration(timeout))
+ 	defer cancel()
+diff --git a/hub/route/proxies.go b/hub/route/proxies.go
+index e8623b52bbc024305ad891d6e90b5933ffbfca38..a3087365aa03fee03dde5fd7b2b5451f0a34db7f 100644
+--- a/hub/route/proxies.go
++++ b/hub/route/proxies.go
+@@ -72,6 +72,7 @@ func getProxy(w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ func updateProxy(w http.ResponseWriter, r *http.Request) {
++	mutation := controllerMutation()
+ 	req := struct {
+ 		Name string `json:"name"`
+ 	}{}
+@@ -80,8 +81,21 @@ func updateProxy(w http.ResponseWriter, r *http.Request) {
+ 		render.JSON(w, r, ErrBadRequest)
+ 		return
+ 	}
++	if req.Name == "" {
++		render.Status(r, http.StatusBadRequest)
++		render.JSON(w, r, ErrBadRequest)
++		return
++	}
+ 
+ 	proxy := r.Context().Value(CtxKeyProxy).(C.Proxy)
++	if mutation != nil {
++		if err := mutation.Select(proxy.Name(), req.Name, false); err != nil {
++			rejectConfigMutation(w, r, err)
++			return
++		}
++		render.NoContent(w, r)
++		return
++	}
+ 	selector, ok := proxy.Adapter().(outboundgroup.SelectAble)
+ 	if !ok {
+ 		render.Status(r, http.StatusBadRequest)
+@@ -148,7 +162,16 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ func unfixedProxy(w http.ResponseWriter, r *http.Request) {
++	mutation := controllerMutation()
+ 	proxy := r.Context().Value(CtxKeyProxy).(C.Proxy)
++	if mutation != nil {
++		if err := mutation.Select(proxy.Name(), "", true); err != nil {
++			rejectConfigMutation(w, r, err)
++			return
++		}
++		render.NoContent(w, r)
++		return
++	}
+ 	if selectAble, ok := proxy.Adapter().(outboundgroup.SelectAble); ok && proxy.Type() != C.Selector {
+ 		selectAble.ForceSet("")
+ 		cachefile.Cache().SetSelected(proxy.Name(), "")
+diff --git a/hub/route/rules.go b/hub/route/rules.go
+index 04ba15c296539c079f1f3f2e8a0abded3a72b446..171f8ee8e6d8790f387f71a1f182be4cdcd29930 100644
+--- a/hub/route/rules.go
++++ b/hub/route/rules.go
+@@ -74,6 +74,10 @@ func getRules(w http.ResponseWriter, r *http.Request) {
+ 
+ // disableRules disable or enable rules by their indexes.
+ func disableRules(w http.ResponseWriter, r *http.Request) {
++	if controllerMutation() != nil {
++		rejectConfigMutation(w, r, nil)
++		return
++	}
+ 	// key: rule index, value: disabled
+ 	var payload map[int]bool
+ 	if err := render.DecodeJSON(r.Body, &payload); err != nil {
+diff --git a/hub/route/server.go b/hub/route/server.go
+index b1659cd085d278193a94ed860e3bfd9a8721d95e..9cefea67af66bbdf1ad65e0d6b2029be1bd2b2df 100644
+--- a/hub/route/server.go
++++ b/hub/route/server.go
+@@ -102,7 +102,7 @@ func SetUIPath(path string) {
+ 	uiPath = C.Path.Resolve(path)
+ }
+ 
+-func router(isDebug bool, secret string, dohServer string, cors Cors) *chi.Mux {
++func NewHandler(isDebug bool, secret string, dohServer string, cors Cors) *chi.Mux {
+ 	r := chi.NewRouter()
+ 	cors.Apply(r)
+ 	if isDebug {
+@@ -178,7 +178,7 @@ func start(cfg *Config) {
+ 		log.Infoln("RESTful API listening at: %s", l.Addr().String())
+ 
+ 		server := &http.Server{
+-			Handler: router(cfg.IsDebug, cfg.Secret, cfg.DohServer, cfg.Cors),
++			Handler: NewHandler(cfg.IsDebug, cfg.Secret, cfg.DohServer, cfg.Cors),
+ 		}
+ 		httpServer = server
+ 		_ = server.Serve(l)
+@@ -237,7 +237,7 @@ func startTLS(cfg *Config) {
+ 			}
+ 		}
+ 		server := &http.Server{
+-			Handler: router(cfg.IsDebug, cfg.Secret, cfg.DohServer, cfg.Cors),
++			Handler: NewHandler(cfg.IsDebug, cfg.Secret, cfg.DohServer, cfg.Cors),
+ 		}
+ 		tlsServer = server
+ 		if err = server.Serve(tls.NewListener(l, tlsConfig)); err != nil {
+@@ -285,7 +285,7 @@ func startUnix(cfg *Config) {
+ 		log.Infoln("RESTful API unix listening at: %s", l.Addr().String())
+ 
+ 		server := &http.Server{
+-			Handler: router(cfg.IsDebug, "", cfg.DohServer, cfg.Cors),
++			Handler: NewHandler(cfg.IsDebug, "", cfg.DohServer, cfg.Cors),
+ 		}
+ 		unixServer = server
+ 		if err = server.Serve(l); err != nil {
+@@ -316,7 +316,7 @@ func startPipe(cfg *Config) {
+ 		log.Infoln("RESTful API pipe listening at: %s", l.Addr().String())
+ 
+ 		server := &http.Server{
+-			Handler: router(cfg.IsDebug, "", cfg.DohServer, cfg.Cors),
++			Handler: NewHandler(cfg.IsDebug, "", cfg.DohServer, cfg.Cors),
+ 		}
+ 		pipeServer = server
+ 		if err = server.Serve(l); err != nil {
+diff --git a/listener/binding.go b/listener/binding.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..5eefbdaf40ca8c210f2016389426be1b2891e56f
+--- /dev/null
++++ b/listener/binding.go
+@@ -0,0 +1,42 @@
++package listener
++
++import (
++	"errors"
++	"sync/atomic"
++
++	C "github.com/metacubex/mihomo/constant"
++	"github.com/metacubex/mihomo/listener/mixed"
++	"github.com/metacubex/mihomo/listener/socks"
++)
++
++var bindingSequence atomic.Uint64
++
++type MixedBinding struct {
++	ID  uint64
++	tcp *mixed.Listener
++	udp *socks.UDPListener
++}
++
++func PrepareMixed(port int, tunnel C.Tunnel) (*MixedBinding, error) {
++	if port == 0 {
++		return nil, nil
++	}
++	if err := ReCreateMixedChecked(port, tunnel); err != nil {
++		return nil, err
++	}
++	mixedMux.Lock()
++	defer mixedMux.Unlock()
++	return &MixedBinding{ID: bindingSequence.Add(1), tcp: mixedListener, udp: mixedUDPLister}, nil
++}
++
++func (b *MixedBinding) Validate() error {
++	if b == nil {
++		return nil
++	}
++	mixedMux.Lock()
++	defer mixedMux.Unlock()
++	if b.tcp == nil || b.udp == nil || b.tcp != mixedListener || b.udp != mixedUDPLister || !b.tcp.Alive() || !b.udp.Alive() {
++		return errors.New("prepared mixed binding is no longer owned")
++	}
++	return nil
 +}
 diff --git a/listener/http/client.go b/listener/http/client.go
 index 9f5c37f8bda729d178605bcb1a297b1b26fcc3fc..494d9df67d42275984faadfc70147a7e57b17e24 100644
@@ -2565,6 +3239,56 @@ index 4cc03f49c6a2f5e168e62cb5457a343ba40fad84..7d60569ffbab29d4156c4b482b66aa87
  
  				startBackgroundRead := func() {
  					go func() {
+diff --git a/listener/http/server.go b/listener/http/server.go
+index 5a7a469488860cec6ed440edb92dd40da5b78a50..eb8a0e3e5c30daafa300f9a1144ce574fcc5cb99 100644
+--- a/listener/http/server.go
++++ b/listener/http/server.go
+@@ -3,7 +3,9 @@ package http
+ import (
+ 	"context"
+ 	"errors"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	"github.com/metacubex/mihomo/component/ca"
+@@ -20,7 +22,7 @@ import (
+ type Listener struct {
+ 	listener net.Listener
+ 	addr     string
+-	closed   bool
++	closed   atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -35,7 +37,7 @@ func (l *Listener) Address() string {
+ 
+ // Close implements C.Listener
+ func (l *Listener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.listener.Close()
+ }
+ 
+@@ -128,12 +130,16 @@ func NewWithConfig(config LC.AuthServer, lc C.InboundListenConfig, tunnel C.Tunn
+ 		for {
+ 			conn, err := hl.listener.Accept()
+ 			if err != nil {
+-				if hl.closed {
++				if hl.closed.Load() {
+ 					break
+ 				}
+ 				continue
+ 			}
+ 
++			conn, err = requestscope.AcceptBusinessConn(tunnel, conn)
++			if err != nil {
++				continue
++			}
+ 			store := config.AuthStore
+ 			if isDefault || store == authStore.Default { // only apply on default listener
+ 				if !inbound.IsRemoteAddrDisAllowed(conn.RemoteAddr()) {
 diff --git a/listener/http/upgrade.go b/listener/http/upgrade.go
 index b65891792568ab44d350a99c0319993482b99787..f5c6969228afdfcdd84f9009f5bf200232c68d79 100644
 --- a/listener/http/upgrade.go
@@ -2646,6 +3370,385 @@ index 95753fe9c42543413643f8d164a18e385a790dfb..7007505106ca933aa62a62d9dffaba64
 +	go requestscope.HandleTCP(ctx, tunnel, conn2, metadata, lease)
  	return conn1, nil
  }
+diff --git a/listener/listener.go b/listener/listener.go
+index ececbc41fd6bf11788a88b30399e0c0fbc75ec03..40e2958c3b5490025340128e45fd475205c0d884 100644
+--- a/listener/listener.go
++++ b/listener/listener.go
+@@ -1,6 +1,7 @@
+ package listener
+ 
+ import (
++	"errors"
+ 	"fmt"
+ 	"net"
+ 	"strconv"
+@@ -105,10 +106,13 @@ func SetBindAddress(host string) {
+ }
+ 
+ func ReCreateHTTP(port int, tunnel C.Tunnel) {
++	_ = ReCreateHTTPChecked(port, tunnel)
++}
++
++func ReCreateHTTPChecked(port int, tunnel C.Tunnel) (err error) {
+ 	httpMux.Lock()
+ 	defer httpMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start HTTP server error: %s", err.Error())
+@@ -136,13 +140,17 @@ func ReCreateHTTP(port int, tunnel C.Tunnel) {
+ 	}
+ 
+ 	log.Infoln("HTTP proxy listening at: %s", httpListener.Address())
++	return
+ }
+ 
+ func ReCreateSocks(port int, tunnel C.Tunnel) {
++	_ = ReCreateSocksChecked(port, tunnel)
++}
++
++func ReCreateSocksChecked(port int, tunnel C.Tunnel) (err error) {
+ 	socksMux.Lock()
+ 	defer socksMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start SOCKS server error: %s", err.Error())
+@@ -195,13 +203,17 @@ func ReCreateSocks(port int, tunnel C.Tunnel) {
+ 	socksUDPListener = udpListener
+ 
+ 	log.Infoln("SOCKS proxy listening at: %s", socksListener.Address())
++	return
+ }
+ 
+ func ReCreateRedir(port int, tunnel C.Tunnel) {
++	_ = ReCreateRedirChecked(port, tunnel)
++}
++
++func ReCreateRedirChecked(port int, tunnel C.Tunnel) (err error) {
+ 	redirMux.Lock()
+ 	defer redirMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start Redir server error: %s", err.Error())
+@@ -237,17 +249,23 @@ func ReCreateRedir(port int, tunnel C.Tunnel) {
+ 
+ 	redirUDPListener, err = tproxy.NewUDP(addr, tunnel)
+ 	if err != nil {
+-		log.Warnln("Failed to start Redir UDP Listener: %s", err)
++		redirListener.Close()
++		redirListener = nil
++		return
+ 	}
+ 
+ 	log.Infoln("Redirect proxy listening at: %s", redirListener.Address())
++	return
+ }
+ 
+ func ReCreateShadowSocks(shadowSocksConfig string, tunnel C.Tunnel) {
++	_ = ReCreateShadowSocksChecked(shadowSocksConfig, tunnel)
++}
++
++func ReCreateShadowSocksChecked(shadowSocksConfig string, tunnel C.Tunnel) (err error) {
+ 	ssMux.Lock()
+ 	defer ssMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start ShadowSocks server error: %s", err.Error())
+@@ -298,10 +316,13 @@ func ReCreateShadowSocks(shadowSocksConfig string, tunnel C.Tunnel) {
+ }
+ 
+ func ReCreateVmess(vmessConfig string, tunnel C.Tunnel) {
++	_ = ReCreateVmessChecked(vmessConfig, tunnel)
++}
++
++func ReCreateVmessChecked(vmessConfig string, tunnel C.Tunnel) (err error) {
+ 	vmessMux.Lock()
+ 	defer vmessMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start Vmess server error: %s", err.Error())
+@@ -350,6 +371,10 @@ func ReCreateVmess(vmessConfig string, tunnel C.Tunnel) {
+ }
+ 
+ func ReCreateTuic(config LC.TuicServer, tunnel C.Tunnel) {
++	_ = ReCreateTuicChecked(config, tunnel)
++}
++
++func ReCreateTuicChecked(config LC.TuicServer, tunnel C.Tunnel) (err error) {
+ 	tuicMux.Lock()
+ 	defer func() {
+ 		LastTuicConf = config
+@@ -357,7 +382,6 @@ func ReCreateTuic(config LC.TuicServer, tunnel C.Tunnel) {
+ 	}()
+ 	shouldIgnore := false
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start Tuic server error: %s", err.Error())
+@@ -395,10 +419,13 @@ func ReCreateTuic(config LC.TuicServer, tunnel C.Tunnel) {
+ }
+ 
+ func ReCreateTProxy(port int, tunnel C.Tunnel) {
++	_ = ReCreateTProxyChecked(port, tunnel)
++}
++
++func ReCreateTProxyChecked(port int, tunnel C.Tunnel) (err error) {
+ 	tproxyMux.Lock()
+ 	defer tproxyMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start TProxy server error: %s", err.Error())
+@@ -434,17 +461,23 @@ func ReCreateTProxy(port int, tunnel C.Tunnel) {
+ 
+ 	tproxyUDPListener, err = tproxy.NewUDP(addr, tunnel)
+ 	if err != nil {
+-		log.Warnln("Failed to start TProxy UDP Listener: %s", err)
++		tproxyListener.Close()
++		tproxyListener = nil
++		return
+ 	}
+ 
+ 	log.Infoln("TProxy server listening at: %s", tproxyListener.Address())
++	return
+ }
+ 
+ func ReCreateMixed(port int, tunnel C.Tunnel) {
++	_ = ReCreateMixedChecked(port, tunnel)
++}
++
++func ReCreateMixedChecked(port int, tunnel C.Tunnel) (err error) {
+ 	mixedMux.Lock()
+ 	defer mixedMux.Unlock()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start Mixed(http+socks) server error: %s", err.Error())
+@@ -489,13 +522,19 @@ func ReCreateMixed(port int, tunnel C.Tunnel) {
+ 	mixedUDPLister, err = socks.NewUDP(addr, tunnel)
+ 	if err != nil {
+ 		mixedListener.Close()
++		mixedListener = nil
+ 		return
+ 	}
+ 
+ 	log.Infoln("Mixed(http+socks) proxy listening at: %s", mixedListener.Address())
++	return
+ }
+ 
+ func ReCreateTun(tunConf LC.Tun, tunnel C.Tunnel) {
++	_ = ReCreateTunChecked(tunConf, tunnel)
++}
++
++func ReCreateTunChecked(tunConf LC.Tun, tunnel C.Tunnel) (err error) {
+ 	tunConf.Sort()
+ 
+ 	tunMux.Lock()
+@@ -504,7 +543,6 @@ func ReCreateTun(tunConf LC.Tun, tunnel C.Tunnel) {
+ 		tunMux.Unlock()
+ 	}()
+ 
+-	var err error
+ 	defer func() {
+ 		if err != nil {
+ 			log.Errorln("Start TUN listening error: %s", err.Error())
+@@ -530,9 +568,14 @@ func ReCreateTun(tunConf LC.Tun, tunnel C.Tunnel) {
+ 	tunLister = lister
+ 
+ 	log.Infoln("[TUN] Tun adapter listening at: %s", tunLister.Address())
++	return
+ }
+ 
+ func PatchTunnel(tunnels []LC.Tunnel, tunnel C.Tunnel) {
++	_ = PatchTunnelChecked(tunnels, tunnel)
++}
++
++func PatchTunnelChecked(tunnels []LC.Tunnel, tunnel C.Tunnel) (result error) {
+ 	tunnelMux.Lock()
+ 	defer tunnelMux.Unlock()
+ 
+@@ -546,7 +589,7 @@ func PatchTunnel(tunnels []LC.Tunnel, tunnel C.Tunnel) {
+ 	tcpOld := lo.Map(
+ 		lo.Keys(tunnelTCPListeners),
+ 		func(key string, _ int) addrProxy {
+-			parts := strings.Split(key, "/")
++			parts := strings.SplitN(key, "/", 3)
+ 			return addrProxy{
+ 				network: "tcp",
+ 				addr:    parts[0],
+@@ -558,7 +601,7 @@ func PatchTunnel(tunnels []LC.Tunnel, tunnel C.Tunnel) {
+ 	udpOld := lo.Map(
+ 		lo.Keys(tunnelUDPListeners),
+ 		func(key string, _ int) addrProxy {
+-			parts := strings.Split(key, "/")
++			parts := strings.SplitN(key, "/", 3)
+ 			return addrProxy{
+ 				network: "udp",
+ 				addr:    parts[0],
+@@ -606,6 +649,7 @@ func PatchTunnel(tunnels []LC.Tunnel, tunnel C.Tunnel) {
+ 			l, err := LT.New(elm.addr, elm.target, elm.proxy, lc, tunnel)
+ 			if err != nil {
+ 				log.Errorln("Start tunnel %s error: %s", elm.target, err.Error())
++				result = errors.Join(result, err)
+ 				continue
+ 			}
+ 			tunnelTCPListeners[key] = l
+@@ -614,15 +658,21 @@ func PatchTunnel(tunnels []LC.Tunnel, tunnel C.Tunnel) {
+ 			l, err := LT.NewUDP(elm.addr, elm.target, elm.proxy, lc, tunnel)
+ 			if err != nil {
+ 				log.Errorln("Start tunnel %s error: %s", elm.target, err.Error())
++				result = errors.Join(result, err)
+ 				continue
+ 			}
+ 			tunnelUDPListeners[key] = l
+ 			log.Infoln("Tunnel(udp/%s) proxy %s listening at: %s", elm.target, elm.proxy, tunnelUDPListeners[key].Address())
+ 		}
+ 	}
++	return
+ }
+ 
+ func PatchInboundListeners(newListenerMap map[string]C.InboundListener, tunnel C.Tunnel, dropOld bool) {
++	_ = PatchInboundListenersChecked(newListenerMap, tunnel, dropOld)
++}
++
++func PatchInboundListenersChecked(newListenerMap map[string]C.InboundListener, tunnel C.Tunnel, dropOld bool) (result error) {
+ 	inboundMux.Lock()
+ 	defer inboundMux.Unlock()
+ 
+@@ -636,6 +686,7 @@ func PatchInboundListeners(newListenerMap map[string]C.InboundListener, tunnel C
+ 		}
+ 		if err := newListener.Listen(tunnel); err != nil {
+ 			log.Errorln("Listener %s listen err: %s", name, err.Error())
++			result = errors.Join(result, fmt.Errorf("listener %s: %w", name, err))
+ 			continue
+ 		}
+ 		inboundListeners[name] = newListener
+@@ -649,6 +700,7 @@ func PatchInboundListeners(newListenerMap map[string]C.InboundListener, tunnel C
+ 			}
+ 		}
+ 	}
++	return
+ }
+ 
+ // GetPorts return the ports of proxy servers
+diff --git a/listener/mixed/mixed.go b/listener/mixed/mixed.go
+index 18a260e4d2e7594daddd530328f56d33792d758c..6970dd18d11d4fc56ec2b5573f21e91e5cf24136 100644
+--- a/listener/mixed/mixed.go
++++ b/listener/mixed/mixed.go
+@@ -3,7 +3,9 @@ package mixed
+ import (
+ 	"context"
+ 	"errors"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	N "github.com/metacubex/mihomo/common/net"
+@@ -26,7 +28,7 @@ import (
+ type Listener struct {
+ 	listener net.Listener
+ 	addr     string
+-	closed   bool
++	closed   atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -35,13 +37,15 @@ func (l *Listener) RawAddress() string {
+ }
+ 
+ // Address implements C.Listener
++func (l *Listener) Alive() bool { return !l.closed.Load() }
++
+ func (l *Listener) Address() string {
+ 	return l.listener.Addr().String()
+ }
+ 
+ // Close implements C.Listener
+ func (l *Listener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.listener.Close()
+ }
+ 
+@@ -123,11 +127,15 @@ func NewWithConfig(config LC.AuthServer, lc C.InboundListenConfig, tunnel C.Tunn
+ 		for {
+ 			c, err := ml.listener.Accept()
+ 			if err != nil {
+-				if ml.closed {
++				if ml.closed.Load() {
+ 					break
+ 				}
+ 				continue
+ 			}
++			c, err = requestscope.AcceptBusinessConn(tunnel, c)
++			if err != nil {
++				continue
++			}
+ 			store := config.AuthStore
+ 			if isDefault || store == authStore.Default { // only apply on default listener
+ 				if !inbound.IsRemoteAddrDisAllowed(c.RemoteAddr()) {
+diff --git a/listener/redir/tcp.go b/listener/redir/tcp.go
+index 47363182d01911bfcb7c1fdd30553860c9e95e33..1dae5f28426aa8f34dcd95a59e0e7a9c7099a032 100644
+--- a/listener/redir/tcp.go
++++ b/listener/redir/tcp.go
+@@ -1,7 +1,9 @@
+ package redir
+ 
+ import (
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	"github.com/metacubex/mihomo/component/keepalive"
+@@ -11,7 +13,7 @@ import (
+ type Listener struct {
+ 	listener net.Listener
+ 	addr     string
+-	closed   bool
++	closed   atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -26,7 +28,7 @@ func (l *Listener) Address() string {
+ 
+ // Close implements C.Listener
+ func (l *Listener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.listener.Close()
+ }
+ 
+@@ -52,11 +54,15 @@ func New(addr string, tunnel C.Tunnel, additions ...inbound.Addition) (*Listener
+ 		for {
+ 			c, err := l.Accept()
+ 			if err != nil {
+-				if rl.closed {
++				if rl.closed.Load() {
+ 					break
+ 				}
+ 				continue
+ 			}
++			c, err = requestscope.AcceptBusinessConn(tunnel, c)
++			if err != nil {
++				continue
++			}
+ 			go handleRedir(c, tunnel, additions...)
+ 		}
+ 	}()
 diff --git a/listener/sing_tun/server.go b/listener/sing_tun/server.go
 index ca4d0b8ad1e3c5c7f77fb24801ef78ea7fc45526..c1a4e0c9f6e80846fce5831af6c43f6b70b5da28 100644
 --- a/listener/sing_tun/server.go
@@ -2671,6 +3774,257 @@ index ca4d0b8ad1e3c5c7f77fb24801ef78ea7fc45526..c1a4e0c9f6e80846fce5831af6c43f6b
  	name := ruleProvider.Name()
  	if slices.Contains(l.options.RouteAddressSet, name) {
  		l.updateRule(ruleProvider, false, true)
+diff --git a/listener/socks/tcp.go b/listener/socks/tcp.go
+index 93239197560597fa33fb0edaae1e0cf2d63148f1..132d4854bca37de7f4a5c3b6af8659f3a2731263 100644
+--- a/listener/socks/tcp.go
++++ b/listener/socks/tcp.go
+@@ -3,8 +3,10 @@ package socks
+ import (
+ 	"context"
+ 	"errors"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"io"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	N "github.com/metacubex/mihomo/common/net"
+@@ -25,7 +27,7 @@ import (
+ type Listener struct {
+ 	listener net.Listener
+ 	addr     string
+-	closed   bool
++	closed   atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -40,7 +42,7 @@ func (l *Listener) Address() string {
+ 
+ // Close implements C.Listener
+ func (l *Listener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.listener.Close()
+ }
+ 
+@@ -126,11 +128,15 @@ func NewWithConfig(config LC.AuthServer, lc C.InboundListenConfig, tunnel C.Tunn
+ 		for {
+ 			c, err := l.Accept()
+ 			if err != nil {
+-				if sl.closed {
++				if sl.closed.Load() {
+ 					break
+ 				}
+ 				continue
+ 			}
++			c, err = requestscope.AcceptBusinessConn(tunnel, c)
++			if err != nil {
++				continue
++			}
+ 			store := config.AuthStore
+ 			if isDefault || store == authStore.Default { // only apply on default listener
+ 				if !inbound.IsRemoteAddrDisAllowed(c.RemoteAddr()) {
+diff --git a/listener/socks/udp.go b/listener/socks/udp.go
+index 1963163641a58f2b7bc11b52876cf922193f18f3..c7a1af645f6798b81994c3a8e405f9a4879c046b 100644
+--- a/listener/socks/udp.go
++++ b/listener/socks/udp.go
+@@ -3,6 +3,7 @@ package socks
+ import (
+ 	"context"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	N "github.com/metacubex/mihomo/common/net"
+@@ -16,7 +17,7 @@ import (
+ type UDPListener struct {
+ 	packetConn net.PacketConn
+ 	addr       string
+-	closed     bool
++	closed     atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -25,13 +26,15 @@ func (l *UDPListener) RawAddress() string {
+ }
+ 
+ // Address implements C.Listener
++func (l *UDPListener) Alive() bool { return !l.closed.Load() }
++
+ func (l *UDPListener) Address() string {
+ 	return l.packetConn.LocalAddr().String()
+ }
+ 
+ // Close implements C.Listener
+ func (l *UDPListener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.packetConn.Close()
+ }
+ 
+@@ -67,7 +70,7 @@ func NewUDPWithConfig(config LC.AuthServer, lc C.InboundListenConfig, tunnel C.T
+ 				if put != nil {
+ 					put()
+ 				}
+-				if sl.closed {
++				if sl.closed.Load() {
+ 					break
+ 				}
+ 				continue
+diff --git a/listener/tproxy/tproxy.go b/listener/tproxy/tproxy.go
+index 25c8adf7b9d5d808e245a3f7f2f21b23d70e80b2..358b8e6f4e117c0c67a8d6b672682062c6ed9310 100644
+--- a/listener/tproxy/tproxy.go
++++ b/listener/tproxy/tproxy.go
+@@ -2,7 +2,9 @@ package tproxy
+ 
+ import (
+ 	"context"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	"github.com/metacubex/mihomo/component/keepalive"
+@@ -14,7 +16,7 @@ import (
+ type Listener struct {
+ 	listener net.Listener
+ 	addr     string
+-	closed   bool
++	closed   atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -29,7 +31,7 @@ func (l *Listener) Address() string {
+ 
+ // Close implements C.Listener
+ func (l *Listener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.listener.Close()
+ }
+ 
+@@ -77,11 +79,15 @@ func New(addr string, tunnel C.Tunnel, additions ...inbound.Addition) (*Listener
+ 		for {
+ 			c, err := l.Accept()
+ 			if err != nil {
+-				if rl.closed {
++				if rl.closed.Load() {
+ 					break
+ 				}
+ 				continue
+ 			}
++			c, err = requestscope.AcceptBusinessConn(tunnel, c)
++			if err != nil {
++				continue
++			}
+ 			go rl.handleTProxy(c, tunnel, additions...)
+ 		}
+ 	}()
+diff --git a/listener/tunnel/tcp.go b/listener/tunnel/tcp.go
+index 1f1c65b547168cddb33bd5c7193ada35be97249b..0715bbe73a000d27c708865e7fa03f69b37c9a19 100644
+--- a/listener/tunnel/tcp.go
++++ b/listener/tunnel/tcp.go
+@@ -4,8 +4,10 @@ import (
+ 	"context"
+ 	"fmt"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/transport/socks5"
+ )
+@@ -15,7 +17,7 @@ type Listener struct {
+ 	addr     string
+ 	target   socks5.Addr
+ 	proxy    string
+-	closed   bool
++	closed   atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -30,7 +32,7 @@ func (l *Listener) Address() string {
+ 
+ // Close implements C.Listener
+ func (l *Listener) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.listener.Close()
+ }
+ 
+@@ -46,6 +48,7 @@ func New(addr, target, proxy string, lc C.InboundListenConfig, tunnel C.Tunnel,
+ 
+ 	targetAddr := socks5.ParseAddr(target)
+ 	if targetAddr == nil {
++		_ = l.Close()
+ 		return nil, fmt.Errorf("invalid target address %s", target)
+ 	}
+ 
+@@ -64,11 +67,15 @@ func New(addr, target, proxy string, lc C.InboundListenConfig, tunnel C.Tunnel,
+ 		for {
+ 			c, err := l.Accept()
+ 			if err != nil {
+-				if rl.closed {
++				if rl.closed.Load() {
+ 					break
+ 				}
+ 				continue
+ 			}
++			c, err = requestscope.AcceptBusinessConn(tunnel, c)
++			if err != nil {
++				continue
++			}
+ 			go rl.handleTCP(c, tunnel, additions...)
+ 		}
+ 	}()
+diff --git a/listener/tunnel/udp.go b/listener/tunnel/udp.go
+index 1f14a1e9268bef01cd937f037cd98a75a933a6d9..554c22cdf5eb748230df83a2e54d6e19fed5212c 100644
+--- a/listener/tunnel/udp.go
++++ b/listener/tunnel/udp.go
+@@ -4,6 +4,7 @@ import (
+ 	"context"
+ 	"fmt"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/metacubex/mihomo/adapter/inbound"
+ 	"github.com/metacubex/mihomo/common/pool"
+@@ -16,7 +17,7 @@ type PacketConn struct {
+ 	addr   string
+ 	target socks5.Addr
+ 	proxy  string
+-	closed bool
++	closed atomic.Bool
+ }
+ 
+ // RawAddress implements C.Listener
+@@ -31,7 +32,7 @@ func (l *PacketConn) Address() string {
+ 
+ // Close implements C.Listener
+ func (l *PacketConn) Close() error {
+-	l.closed = true
++	l.closed.Store(true)
+ 	return l.conn.Close()
+ }
+ 
+@@ -43,6 +44,7 @@ func NewUDP(addr, target, proxy string, lc C.InboundListenConfig, tunnel C.Tunne
+ 
+ 	targetAddr := socks5.ParseAddr(target)
+ 	if targetAddr == nil {
++		_ = l.Close()
+ 		return nil, fmt.Errorf("invalid target address %s", target)
+ 	}
+ 
+@@ -63,7 +65,7 @@ func NewUDP(addr, target, proxy string, lc C.InboundListenConfig, tunnel C.Tunne
+ 			n, remoteAddr, err := l.ReadFrom(buf)
+ 			if err != nil {
+ 				pool.Put(buf)
+-				if sl.closed {
++				if sl.closed.Load() {
+ 					break
+ 				}
+ 				continue
 diff --git a/ntp/ntp/service.go b/ntp/ntp/service.go
 index a629c626a34eb845f53180f742bc83023367a3a6..652bc292b966953f4822b920376fc8c3b42fd600 100644
 --- a/ntp/ntp/service.go
@@ -2824,8 +4178,340 @@ index 2e7829ae71af03449f6ec134157402deff914aac..689d3efd956f8bef82f549052633eecb
  
  	wrapper := &RuleSetProvider{
  		rp,
+diff --git a/tunnel/business.go b/tunnel/business.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..a308087d352a2823b624bc0e4c9e1059d6561c7f
+--- /dev/null
++++ b/tunnel/business.go
+@@ -0,0 +1,64 @@
++package tunnel
++
++import (
++	"context"
++	"net"
++
++	"github.com/metacubex/mihomo/component/requestscope"
++	C "github.com/metacubex/mihomo/constant"
++	icontext "github.com/metacubex/mihomo/context"
++)
++
++type businessTunnel struct{ scope *requestscope.BusinessScope }
++
++func BindBusiness(scope *requestscope.BusinessScope) C.Tunnel { return businessTunnel{scope} }
++func (t businessTunnel) NatTable() C.NatTable                 { return natTable }
++func (t businessTunnel) TrackInbound(conn net.Conn) (net.Conn, error) {
++	if err := t.scope.Check(); err != nil {
++		_ = conn.Close()
++		return nil, err
++	}
++	guarded := t.scope.GuardConn(conn)
++	if err := t.scope.Check(); err != nil {
++		_ = guarded.Close()
++		return nil, err
++	}
++	return guarded, nil
++}
++func (t businessTunnel) HandleTCPConn(conn net.Conn, metadata *C.Metadata) {
++	handleTCPConnScoped(icontext.NewConnContext(conn, metadata), t.scope.Context(), t.scope)
++}
++func (t businessTunnel) HandleUDPPacket(packet C.UDPPacket, metadata *C.Metadata) {
++	enqueueUDPPacket(packet, metadata, t.scope)
++}
++
++type businessPacket struct {
++	C.PacketAdapter
++	scope *requestscope.BusinessScope
++}
++
++func (p *businessPacket) Key() string { return p.scope.Key(p.PacketAdapter.Key()) }
++func (p *businessPacket) WriteBack(data []byte, addr net.Addr) (int, error) {
++	if err := p.scope.Check(); err != nil {
++		return 0, err
++	}
++	return p.PacketAdapter.WriteBack(data, addr)
++}
++func packetBusiness(packet C.PacketAdapter) *requestscope.BusinessScope {
++	if scoped, ok := packet.(*businessPacket); ok {
++		return scoped.scope
++	}
++	return nil
++}
++func businessContext(scope *requestscope.BusinessScope) context.Context {
++	if scope != nil {
++		return scope.Context()
++	}
++	return context.Background()
++}
++func businessCheck(scope *requestscope.BusinessScope) error {
++	if scope != nil {
++		return scope.Check()
++	}
++	return nil
++}
+diff --git a/tunnel/business_test.go b/tunnel/business_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..aae096046a5182cb606d1f1b8f8e20048cb89231
+--- /dev/null
++++ b/tunnel/business_test.go
+@@ -0,0 +1,181 @@
++package tunnel
++
++import (
++	"context"
++	"errors"
++	"net"
++	"net/netip"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/metacubex/mihomo/component/requestscope"
++	C "github.com/metacubex/mihomo/constant"
++	RC "github.com/metacubex/mihomo/rules/common"
++)
++
++type businessRuleBarrier struct {
++	C.Rule
++	entered, release chan struct{}
++	once             sync.Once
++}
++
++func (r *businessRuleBarrier) Match(metadata *C.Metadata, helper C.RuleMatchHelper) (bool, string) {
++	r.once.Do(func() { close(r.entered) })
++	<-r.release
++	return r.Rule.Match(metadata, helper)
++}
++
++type businessDialCounter struct {
++	C.Proxy
++	dials atomic.Int32
++}
++
++func (p *businessDialCounter) SupportUDP() bool { return true }
++
++func (p *businessDialCounter) Name() string                     { return "DIRECT" }
++func (p *businessDialCounter) Type() C.AdapterType              { return C.Direct }
++func (p *businessDialCounter) Unwrap(*C.Metadata, bool) C.Proxy { return nil }
++
++func (p *businessDialCounter) DialContext(context.Context, *C.Metadata) (C.Conn, error) {
++	p.dials.Add(1)
++	return nil, errors.New("unexpected business dial")
++}
++func (p *businessDialCounter) ListenPacketContext(context.Context, *C.Metadata) (C.PacketConn, error) {
++	p.dials.Add(1)
++	return nil, errors.New("unexpected business packet dial")
++}
++
++type businessTestPacket struct {
++	dropped chan struct{}
++	once    sync.Once
++}
++
++func (p *businessTestPacket) Data() []byte { return []byte("old packet") }
++func (p *businessTestPacket) LocalAddr() net.Addr {
++	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 49317}
++}
++func (p *businessTestPacket) WriteBack([]byte, net.Addr) (int, error) {
++	return 0, errors.New("unexpected old response")
++}
++func (p *businessTestPacket) Drop() { p.once.Do(func() { close(p.dropped) }) }
++
++func TestBusinessRevokedDuringRuleResolution(t *testing.T) {
++	for _, network := range []C.NetWork{C.TCP, C.UDP} {
++		t.Run(network.String(), func(t *testing.T) {
++			barrier := &businessRuleBarrier{Rule: RC.NewMatch("DIRECT"), entered: make(chan struct{}), release: make(chan struct{})}
++			proxy := &businessDialCounter{}
++			configMux.Lock()
++			oldRules, oldProxies, oldMode := rules, proxies, mode
++			rules, proxies, mode = []C.Rule{barrier}, map[string]C.Proxy{"DIRECT": proxy}, Rule
++			configMux.Unlock()
++			defer func() { configMux.Lock(); rules, proxies, mode = oldRules, oldProxies, oldMode; configMux.Unlock() }()
++			scope := requestscope.NewBusinessScope(17, func() bool { return true })
++			scope.Activate()
++			defer scope.Close()
++			metadata := &C.Metadata{NetWork: network, Type: C.SOCKS5, SrcIP: netip.MustParseAddr("127.0.0.1"), SrcPort: 49317, DstIP: netip.MustParseAddr("127.0.0.1"), DstPort: 49318}
++			done := make(chan struct{})
++			if network == C.TCP {
++				client, server := net.Pipe()
++				defer client.Close()
++				go func() { businessTunnel{scope}.HandleTCPConn(server, metadata); close(done) }()
++			} else {
++				packet := &businessTestPacket{dropped: done}
++				businessTunnel{scope}.HandleUDPPacket(packet, metadata)
++			}
++			select {
++			case <-barrier.entered:
++			case <-time.After(3 * time.Second):
++				t.Fatal("real rule resolution did not reach barrier")
++			}
++			scope.Close()
++			close(barrier.release)
++			select {
++			case <-done:
++			case <-time.After(3 * time.Second):
++				t.Fatal("revoked business work did not finish")
++			}
++			if proxy.dials.Load() != 0 {
++				t.Fatal("revoked resolution started a network action")
++			}
++		})
++	}
++}
++
++func TestBusinessPacketKeepsOriginalActivation(t *testing.T) {
++	old := requestscope.NewBusinessScope(1, func() bool { return true })
++	old.Activate()
++	current := requestscope.NewBusinessScope(2, func() bool { return true })
++	current.Activate()
++	defer current.Close()
++	packet := &businessTestPacket{dropped: make(chan struct{})}
++	metadata := &C.Metadata{}
++	oldPacket := &businessPacket{PacketAdapter: C.NewPacketAdapter(packet, metadata), scope: old}
++	newPacket := &businessPacket{PacketAdapter: C.NewPacketAdapter(packet, metadata), scope: current}
++	if oldPacket.Key() == newPacket.Key() {
++		t.Fatal("UDP activations share a NAT namespace")
++	}
++	old.Close()
++	if _, err := oldPacket.WriteBack([]byte("late"), nil); err == nil {
++		t.Fatal("old response borrowed a new activation")
++	}
++	if businessCheck(current) != nil {
++		t.Fatal("retiring old UDP also retired the new scope")
++	}
++}
++
++type businessSenderBarrier struct {
++	C.PacketConn
++	entered, release chan struct{}
++	writes           atomic.Int32
++}
++
++func (pc *businessSenderBarrier) ResolveUDP(_ context.Context, metadata *C.Metadata) error {
++	close(pc.entered)
++	<-pc.release
++	metadata.DstIP = netip.MustParseAddr("127.0.0.1")
++	return nil
++}
++func (pc *businessSenderBarrier) WriteTo(data []byte, _ net.Addr) (int, error) {
++	pc.writes.Add(1)
++	return len(data), nil
++}
++
++func TestBusinessSenderRevocationDropsResolvingAndQueuedPackets(t *testing.T) {
++	scope := requestscope.NewBusinessScope(31, func() bool { return true })
++	scope.Activate()
++	defer scope.Close()
++	sender := newPacketSenderScoped(scope)
++	defer sender.Close()
++	pc := &businessSenderBarrier{entered: make(chan struct{}), release: make(chan struct{})}
++	first := &businessTestPacket{dropped: make(chan struct{})}
++	queued := &businessTestPacket{dropped: make(chan struct{})}
++	metadata := &C.Metadata{NetWork: C.UDP, Type: C.SOCKS5, Host: "local.test", DstPort: 53}
++	sender.Send(&businessPacket{PacketAdapter: C.NewPacketAdapter(first, metadata), scope: scope})
++	done := make(chan struct{})
++	go func() { sender.Process(pc, nil); close(done) }()
++	select {
++	case <-pc.entered:
++	case <-time.After(time.Second):
++		t.Fatal("sender did not resolve")
++	}
++	sender.Send(&businessPacket{PacketAdapter: C.NewPacketAdapter(queued, metadata.Clone()), scope: scope})
++	scope.Close()
++	close(pc.release)
++	select {
++	case <-done:
++	case <-time.After(time.Second):
++		t.Fatal("sender did not finish after revoke")
++	}
++	for _, packet := range []*businessTestPacket{first, queued} {
++		select {
++		case <-packet.dropped:
++		default:
++			t.Fatal("old sender retained packet")
++		}
++	}
++	if pc.writes.Load() != 0 {
++		t.Fatal("old sender wrote after resolving revoke")
++	}
++}
+diff --git a/tunnel/connection.go b/tunnel/connection.go
+index 3a66a76e545826ecaba8a938ba7d199a58e676d0..38e41947fc56331446b3f7c03f56628d5f19f4e4 100644
+--- a/tunnel/connection.go
++++ b/tunnel/connection.go
+@@ -9,6 +9,7 @@ import (
+ 	"time"
+ 
+ 	N "github.com/metacubex/mihomo/common/net"
++	"github.com/metacubex/mihomo/component/requestscope"
+ 	C "github.com/metacubex/mihomo/constant"
+ 	"github.com/metacubex/mihomo/log"
+ )
+@@ -17,6 +18,7 @@ type packetSender struct {
+ 	ctx    context.Context
+ 	cancel context.CancelFunc
+ 	ch     chan C.PacketAdapter
++	scope  *requestscope.BusinessScope
+ 
+ 	// destination NAT mapping
+ 	originToTarget map[string]netip.Addr
+@@ -27,12 +29,17 @@ type packetSender struct {
+ // newPacketSender return a chan based C.PacketSender
+ // It ensures that packets can be sent sequentially and without blocking
+ func newPacketSender() C.PacketSender {
+-	ctx, cancel := context.WithCancel(context.Background())
++	return newPacketSenderScoped(nil)
++}
++
++func newPacketSenderScoped(scope *requestscope.BusinessScope) C.PacketSender {
++	ctx, cancel := context.WithCancel(businessContext(scope))
+ 	ch := make(chan C.PacketAdapter, senderCapacity)
+ 	return &packetSender{
+ 		ctx:    ctx,
+ 		cancel: cancel,
+ 		ch:     ch,
++		scope:  scope,
+ 
+ 		originToTarget: make(map[string]netip.Addr),
+ 		targetToOrigin: make(map[netip.Addr]netip.Addr),
+@@ -64,6 +71,9 @@ func (s *packetSender) RestoreReadFrom(addr netip.Addr) netip.Addr {
+ 
+ func (s *packetSender) processPacket(pc C.PacketConn, packet C.PacketAdapter) {
+ 	defer packet.Drop()
++	if businessCheck(s.scope) != nil {
++		return
++	}
+ 	metadata := packet.Metadata()
+ 
+ 	var addr *net.UDPAddr
+@@ -98,10 +108,13 @@ func (s *packetSender) processPacket(pc C.PacketConn, packet C.PacketAdapter) {
+ 		s.AddMapping(originMetadata, metadata)
+ 		addr = metadata.UDPAddr()
+ 	}
+-	_ = handleUDPToRemote(packet, pc, addr)
++	if businessCheck(s.scope) == nil {
++		_ = handleUDPToRemote(packet, pc, addr)
++	}
+ }
+ 
+ func (s *packetSender) Process(pc C.PacketConn, proxy C.WriteBackProxy) {
++	defer s.dropAll()
+ 	for {
+ 		select {
+ 		case <-s.ctx.Done():
+@@ -127,6 +140,10 @@ func (s *packetSender) dropAll() {
+ }
+ 
+ func (s *packetSender) Send(packet C.PacketAdapter) {
++	if businessCheck(s.scope) != nil {
++		packet.Drop()
++		return
++	}
+ 	select {
+ 	case <-s.ctx.Done():
+ 		packet.Drop() // sender closed before Send()
 diff --git a/tunnel/tunnel.go b/tunnel/tunnel.go
-index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4b2976494 100644
+index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6f9b9328e 100644
 --- a/tunnel/tunnel.go
 +++ b/tunnel/tunnel.go
 @@ -19,6 +19,7 @@ import (
@@ -2836,7 +4522,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  	"github.com/metacubex/mihomo/component/resolver"
  	"github.com/metacubex/mihomo/component/slowdown"
  	"github.com/metacubex/mihomo/component/sniffer"
-@@ -77,6 +78,11 @@ var _ C.Tunnel = Tunnel
+@@ -77,7 +78,21 @@ var _ C.Tunnel = Tunnel
  var _ P.Tunnel = Tunnel
  var _ proxydialer.Tunnel = Tunnel
  
@@ -2846,9 +4532,48 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
 +}
 +
  func (t tunnel) HandleTCPConn(conn net.Conn, metadata *C.Metadata) {
++	if metadata.Type != C.INNER && requestscope.BusinessHook != nil {
++		scope := requestscope.BusinessHook()
++		if scope == nil {
++			_ = conn.Close()
++			return
++		}
++		businessTunnel{scope}.HandleTCPConn(conn, metadata)
++		return
++	}
  	connCtx := icontext.NewConnContext(conn, metadata)
  	handleTCPConn(connCtx)
-@@ -315,10 +321,19 @@ func preHandleMetadata(metadata *C.Metadata) error {
+ }
+@@ -97,9 +112,28 @@ func initUDP() {
+ }
+ 
+ func (t tunnel) HandleUDPPacket(packet C.UDPPacket, metadata *C.Metadata) {
++	var scope *requestscope.BusinessScope
++	if metadata.Type != C.INNER && requestscope.BusinessHook != nil {
++		scope = requestscope.BusinessHook()
++		if scope == nil {
++			packet.Drop()
++			return
++		}
++	}
++	enqueueUDPPacket(packet, metadata, scope)
++}
++
++func enqueueUDPPacket(packet C.UDPPacket, metadata *C.Metadata, scope *requestscope.BusinessScope) {
++	if businessCheck(scope) != nil {
++		packet.Drop()
++		return
++	}
+ 	udpInit.Do(initUDP)
+ 
+ 	packetAdapter := C.NewPacketAdapter(packet, metadata)
++	if scope != nil {
++		packetAdapter = &businessPacket{packetAdapter, scope}
++	}
+ 	key := packetAdapter.Key()
+ 
+ 	hash := utils.MapHash(key)
+@@ -315,10 +349,19 @@ func preHandleMetadata(metadata *C.Metadata) error {
  	return nil
  }
  
@@ -2869,7 +4594,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  		if !exist {
  			err = fmt.Errorf("proxy %s not found", metadata.SpecialProxy)
  		}
-@@ -337,7 +352,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+@@ -337,7 +380,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
  	helper := C.RuleMatchHelper{
  		ResolveIP: func() {
  			if !resolved && metadata.Host != "" && !metadata.Resolved() {
@@ -2878,7 +4603,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  				defer cancel()
  				ip, err := resolver.ResolveIP(ctx, metadata.Host)
  				if err != nil {
-@@ -401,12 +416,16 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+@@ -401,12 +444,16 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
  
  	switch mode {
  	case Direct:
@@ -2896,7 +4621,84 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  	}
  	return
  }
-@@ -501,7 +520,22 @@ func handleUDPConn(packet C.PacketAdapter) {
+@@ -419,7 +466,8 @@ func processUDP(queue chan C.PacketAdapter) {
+ }
+ 
+ func handleUDPConn(packet C.PacketAdapter) {
+-	if !isHandle(packet.Metadata().Type) {
++	scope := packetBusiness(packet)
++	if businessCheck(scope) != nil || scope == nil && !isHandle(packet.Metadata().Type) {
+ 		packet.Drop()
+ 		return
+ 	}
+@@ -440,7 +488,7 @@ func handleUDPConn(packet C.PacketAdapter) {
+ 
+ 	key := packet.Key()
+ 	sender, loaded := natTable.GetOrCreate(key, func() C.PacketSender {
+-		sender := newPacketSender()
++		sender := newPacketSenderScoped(scope)
+ 		if sniffingEnable && snifferDispatcher.Enable() {
+ 			return snifferDispatcher.UDPSniff(packet, sender)
+ 		}
+@@ -458,16 +506,26 @@ func handleUDPConn(packet C.PacketAdapter) {
+ 
+ 			_ = preHandleMetadata(metadata) // error was pre-checked
+ 
+-			proxy, rule, err := resolveMetadata(metadata)
++			if err := businessCheck(scope); err != nil {
++				return nil, nil, err
++			}
++			var lease requestscope.Lease
++			if scope != nil {
++				lease = scope
++			}
++			proxy, rule, err := resolveMetadataScoped(businessContext(scope), metadata, lease)
+ 			if err != nil {
+ 				log.Warnln("[UDP] Parse metadata failed: %s", err.Error())
+ 				return nil, nil, err
+ 			}
+ 
+ 			dialMetadata := metadata.Pure()
+-			ctx, cancel := context.WithTimeout(context.Background(), C.DefaultUDPTimeout)
++			ctx, cancel := context.WithTimeout(businessContext(scope), C.DefaultUDPTimeout)
+ 			defer cancel()
+ 			rawPc, err := retry(ctx, func(ctx context.Context) (C.PacketConn, error) {
++				if err := businessCheck(scope); err != nil {
++					return nil, err
++				}
+ 				return proxy.ListenPacketContext(ctx, dialMetadata)
+ 			}, func(err error) {
+ 				logMetadataErr(metadata, rule, proxy, err)
+@@ -475,6 +533,14 @@ func handleUDPConn(packet C.PacketAdapter) {
+ 			if err != nil {
+ 				return nil, nil, err
+ 			}
++			var stopPC func() bool
++			if scope != nil {
++				stopPC = context.AfterFunc(scope.Context(), func() { _ = rawPc.Close() })
++				if err := scope.Check(); err != nil {
++					_ = rawPc.Close()
++					return nil, nil, err
++				}
++			}
+ 			logMetadata(metadata, rule, rawPc)
+ 
+ 			pc := statistic.NewUDPTracker(rawPc, statistic.DefaultManager, metadata, rule, 0, 0, true)
+@@ -483,7 +549,12 @@ func handleUDPConn(packet C.PacketAdapter) {
+ 			oAddrPort := dialMetadata.AddrPort()
+ 			writeBackProxy := nat.NewWriteBackProxy(packet)
+ 
+-			go handleUDPToLocal(writeBackProxy, pc, sender, key, oAddrPort)
++			go func() {
++				if stopPC != nil {
++					defer stopPC()
++				}
++				handleUDPToLocal(writeBackProxy, pc, sender, key, oAddrPort)
++			}()
+ 			return pc, writeBackProxy, nil
+ 		}
+ 
+@@ -501,7 +572,23 @@ func handleUDPConn(packet C.PacketAdapter) {
  }
  
  func handleTCPConn(connCtx C.ConnContext) {
@@ -2909,7 +4711,8 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
 +		_ = connCtx.Conn().Close()
 +		return
 +	}
-+	if lease != nil {
++	_, business := lease.(*requestscope.BusinessScope)
++	if lease != nil && !business {
 +		if lease.TrackConn(connCtx.Conn()) != nil {
 +			return
 +		}
@@ -2920,7 +4723,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  		_ = connCtx.Conn().Close()
  		return
  	}
-@@ -552,7 +586,21 @@ func handleTCPConn(connCtx C.ConnContext) {
+@@ -552,7 +639,21 @@ func handleTCPConn(connCtx C.ConnContext) {
  		}()
  	}
  
@@ -2943,11 +4746,17 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  	if err != nil {
  		log.Warnln("[Metadata] parse failed: %s", err.Error())
  		return
-@@ -572,14 +620,29 @@ func handleTCPConn(connCtx C.ConnContext) {
+@@ -572,14 +673,38 @@ func handleTCPConn(connCtx C.ConnContext) {
  	var peekBytes []byte
  	var peekLen int
  
 -	ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTCPTimeout)
++	var stopRemote func() bool
++	defer func() {
++		if stopRemote != nil {
++			stopRemote()
++		}
++	}()
 +	ctx, cancel := context.WithTimeout(parent, C.DefaultTCPTimeout)
  	defer cancel()
  	remoteConn, err := retry(ctx, func(ctx context.Context) (remoteConn C.Conn, err error) {
@@ -2963,18 +4772,47 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
 +			_ = remoteConn.Close()
 +			return
 +		}
-+		if lease != nil {
++		if lease != nil && !business {
 +			if err = lease.TrackConn(remoteConn); err != nil {
 +				_ = remoteConn.Close()
 +				return
 +			}
 +		}
 +		physicalConn := remoteConn
-+		context.AfterFunc(parent, func() { _ = physicalConn.Close() })
++		if stopRemote != nil {
++			stopRemote()
++		}
++		stopRemote = context.AfterFunc(parent, func() { _ = physicalConn.Close() })
  		if N.NeedHandshake(remoteConn) {
  			defer func() {
  				if err != nil {
-@@ -653,8 +716,15 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
+@@ -596,6 +721,9 @@ func handleTCPConn(connCtx C.ConnContext) {
+ 			peekMutex.Lock()
+ 			defer peekMutex.Unlock()
+ 			peekBytes, _ = conn.Peek(conn.Buffered())
++			if err = requestscope.Check(lease); err != nil {
++				return
++			}
+ 			_, err = remoteConn.Write(peekBytes)
+ 			if err != nil {
+ 				return
+@@ -622,7 +750,14 @@ func handleTCPConn(connCtx C.ConnContext) {
+ 	peekMutex.Lock()
+ 	defer peekMutex.Unlock()
+ 	_ = conn.SetReadDeadline(time.Time{}) // reset
+-	handleSocket(conn, remoteConn)
++	if scope, ok := lease.(*requestscope.BusinessScope); ok {
++		left, right := scope.GuardConn(conn), scope.GuardConn(remoteConn)
++		defer left.Close()
++		defer right.Close()
++		handleSocket(left, right)
++	} else {
++		handleSocket(conn, remoteConn)
++	}
+ }
+ 
+ func logMetadataErr(metadata *C.Metadata, rule C.Rule, proxy C.ProxyAdapter, err error) {
+@@ -653,8 +788,15 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
  }
  
  func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, error) {
@@ -2990,7 +4828,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  
  	var rematchChain []string
  	for {
-@@ -662,6 +732,9 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
+@@ -662,6 +804,9 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
  		var rematchRule C.Rule
  	GetRules:
  		for _, rule := range getRules(metadata) {
@@ -3000,7 +4838,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..7e69497c00be640057201bcd601083b4
  			if matched, ada := rule.Match(metadata, helper); matched {
  				adapter, ok := proxies[ada]
  				if !ok {
-@@ -696,7 +769,7 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
+@@ -696,7 +841,7 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
  				return rematchProxy, rematchRule, nil
  			}
  			rematchChain = append(rematchChain, rematchProxy.Name())

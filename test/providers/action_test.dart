@@ -583,36 +583,38 @@ void main() {
 
   group('SetupAction', () {
     group('rapid status changes', () {
-      test('updates runtime and traffic while core start is pending', () async {
-        final startCompleter = Completer<bool>();
-        final container = ProviderContainer(
-          overrides: [
-            initProvider.overrideWithBuild((_, _) => true),
-            commonActionProvider.overrideWith(_RaceCommonAction.new),
-            setupActionProvider.overrideWith(_RaceSetupAction.new),
-          ],
-        );
-        container.listen(configProvider, (_, _) {});
-        addTearDown(container.dispose);
-        final action =
-            container.read(setupActionProvider.notifier) as _RaceSetupAction;
-        final commonAction =
-            container.read(commonActionProvider.notifier) as _RaceCommonAction;
-        action.startCompleter = startCompleter;
+      test(
+        'waits for activation before reporting runtime and traffic',
+        () async {
+          final startCompleter = Completer<bool>();
+          final container = ProviderContainer(
+            overrides: [
+              initProvider.overrideWithBuild((_, _) => true),
+              commonActionProvider.overrideWith(_RaceCommonAction.new),
+              setupActionProvider.overrideWith(_RaceSetupAction.new),
+            ],
+          );
+          container.listen(configProvider, (_, _) {});
+          addTearDown(container.dispose);
+          final action =
+              container.read(setupActionProvider.notifier) as _RaceSetupAction;
+          final commonAction =
+              container.read(commonActionProvider.notifier)
+                  as _RaceCommonAction;
+          action.startCompleter = startCompleter;
 
-        final startFuture = action.setRunning(true);
-        final initialRunTime = container.read(runTimeProvider)!;
-        await Future<void>.delayed(const Duration(milliseconds: 1100));
+          final startFuture = action.setRunning(true);
+          await Future<void>.delayed(Duration.zero);
+          expect(container.read(runTimeProvider), isNull);
+          expect(commonAction.updateTrafficCount, 0);
 
-        expect(container.read(runTimeProvider), greaterThan(initialRunTime));
-        expect(commonAction.updateTrafficCount, greaterThanOrEqualTo(2));
+          startCompleter.complete(true);
+          await startFuture;
 
-        startCompleter.complete(true);
-        await startFuture;
-
-        expect(action.transitions, [true]);
-        await action.setRunning(false);
-      });
+          expect(action.transitions, [true]);
+          await action.setRunning(false);
+        },
+      );
 
       test('serializes listener changes while latest start owns UI', () async {
         final stopCompleter = Completer<bool>();
@@ -638,7 +640,7 @@ void main() {
 
         final startFuture = action.setRunning(true);
 
-        expect(container.read(runTimeProvider), isNotNull);
+        expect(container.read(runTimeProvider), isNull);
 
         stopCompleter.complete(true);
         await Future.wait([stopFuture, startFuture]);
@@ -680,7 +682,7 @@ void main() {
         expect(action.transitions, [true, false]);
         expect(container.read(runTimeProvider), isNull);
         expect(container.read(isStartProvider), isFalse);
-        expect(action.applyProfileDebounceCount, 0);
+        expect(action.applyProfileDebounceCount, 1);
         expect(action.resetCoreTrafficCount, 1);
       });
 
@@ -709,7 +711,7 @@ void main() {
 
         expect(action.transitions, [true, true]);
         expect(container.read(isStartProvider), isTrue);
-        expect(action.applyProfileDebounceCount, 1);
+        expect(action.applyProfileDebounceCount, 2);
         expect(action.resetCoreTrafficCount, 0);
 
         await action.setRunning(false);
@@ -762,7 +764,7 @@ void main() {
           await action.setRunning(true);
 
           expect(action.transitions, isEmpty);
-          expect(container.read(isStartProvider), isTrue);
+          expect(container.read(isStartProvider), isFalse);
           expect(action.applyProfileDebounceCount, 1);
 
           await action.setRunning(false);
@@ -1045,7 +1047,45 @@ class _AuthorizationSetupAction extends SetupAction {
 }
 
 class _RaceSetupAction extends SetupAction {
+  bool requestedRunning = false;
+  int requestSequence = 0;
   int applyProfileDebounceCount = 0;
+
+  @override
+  Future<bool> setRunning(
+    bool running, {
+    bool initialize = false,
+    int? preparedRequestId,
+    String source = 'ui',
+    bool? paused,
+  }) {
+    requestedRunning = running;
+    requestSequence++;
+    return super.setRunning(
+      running,
+      initialize: initialize,
+      preparedRequestId: preparedRequestId,
+      source: source,
+      paused: paused,
+    );
+  }
+
+  Future<void> prepareInput() async {}
+
+  @override
+  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
+    final sequence = requestSequence;
+    applyProfileDebounceCount++;
+    await prepareInput();
+    if (sequence != requestSequence) return false;
+    if (requestedRunning &&
+        !ref.read(safeModeProvider) &&
+        !ref.read(suspendProvider)) {
+      return setCoreRunning(true);
+    }
+    return true;
+  }
+
   int resetCoreTrafficCount = 0;
   final transitions = <bool>[];
   Completer<bool>? startCompleter;
@@ -1082,15 +1122,7 @@ class _InitializingSetupAction extends _RaceSetupAction {
   }
 
   @override
-  Future<bool> applyProfile({
-    bool silence = false,
-    bool force = false,
-    Future<void> Function()? preloadInvoke,
-  }) async {
-    await _initializationCompleter.future;
-    await preloadInvoke?.call();
-    return true;
-  }
+  Future<void> prepareInput() => _initializationCompleter.future;
 }
 
 class _RaceCommonAction extends CommonAction {

@@ -80,7 +80,7 @@ Windows uses `python`. `--check` verifies existing content without downloading o
 replacing local changes. A plain recursive checkout cannot fetch the unpublished
 gitlink. The build hook checks the carrier before compiling or accepting its cache.
 
-For L1-T03, the core gitlink is deliberately unpublished and the parent repository
+For L1-T03 and its cumulative L2-T01 update, the core gitlink is deliberately unpublished and the parent repository
 contains the complete approved source carrier. The default
 `--recurse-submodules=check` policy above will reject this parent push. After M
 verifies the complete carrier and exact reconstruction from the public base, M
@@ -100,4 +100,5 @@ and verify reconstruction in a separate object directory. Keep the public base a
 the sole parent, or supply the complete required object closure. Remote delivery
 follows the standing parent authorization and task exception above; publishing the
 core repository still requires separate authorization. See the
-[task design](docs/features/security/loop1/l1_t03_plan.md#核心源码恢复与官方同步契约).
+[original carrier contract](docs/features/security/loop1/l1_t03_plan.md#核心源码恢复与官方同步契约)
+and [L2-T01 scope](docs/features/security/loop2/l2_t01_plan.md#范围与交付终点).

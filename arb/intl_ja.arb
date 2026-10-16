@@ -774,5 +774,10 @@
   "requestProxyDefault": "GLOBAL（現在の選択：{target}）",
   "requestModeHelp": "この項目自体の通信に適用します。プロキシには有効なノードが、直接接続には利用可能な非 VPN ネットワークが必要です。",
   "requestRouteUnavailable": "選択した通信経路は現在利用できません。",
-  "requestPartialCommit": "一部のローカル変更を復元できませんでした。復旧用ファイルを保持し、自動更新を停止しました。"
+  "requestPartialCommit": "一部のローカル変更を復元できませんでした。復旧用ファイルを保持し、自動更新を停止しました。",
+  "appliedProfile": "適用中の設定",
+  "configApplying": "設定を適用中",
+  "configInactive": "トラフィックを処理していません",
+  "configLoaded": "読み込み済み・トラフィック未処理",
+  "configRetained": "新しい設定は未適用です。以前の設定を使用しています"
 }

@@ -246,6 +246,7 @@ enum CoreEventType {
   crash,
   geoUpdate,
   routeChanged,
+  configState,
 }
 
 enum InvokeMessageType { protect, process }

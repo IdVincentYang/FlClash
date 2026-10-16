@@ -312,6 +312,9 @@ abstract class SharedState with _$SharedState {
     required String stopText,
     required bool onlyStatisticsProxy,
     @Default(true) bool showStopAction,
+    @Default(false) bool systemProxyRequested,
+    @Default('No active configuration') String configInactiveTip,
+    @Default('Applying configuration') String configApplyingTip,
   }) = _SharedState;
 
   factory SharedState.fromJson(Map<String, Object?> json) =>

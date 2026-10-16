@@ -28,7 +28,6 @@ import (
 	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
 	P "github.com/metacubex/mihomo/constant/provider"
-	"github.com/metacubex/mihomo/listener"
 	ntpTime "github.com/metacubex/mihomo/ntp"
 	ntpService "github.com/metacubex/mihomo/ntp/ntp"
 	S5 "github.com/metacubex/mihomo/transport/socks5"
@@ -158,45 +157,35 @@ func TestAppRequestFallbackSetOwnsURLTestAndRejectsOldProxy(t *testing.T) {
 	}
 }
 
-func TestAppRequestOwningServiceStopClosesRealBusinessListener(t *testing.T) {
-	r, _ := appRequestFixture(t)
+func TestAppRequestTunStopPreservesNewPreparedBusinessBinding(t *testing.T) {
+	configTestHome(t)
+	r := appRequests
 	private, err := r.privateEndpoint()
 	if err != nil {
 		t.Fatal(err)
 	}
-	reservation, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	input := writeTestInput(t, configTestYAML(configTestPort(t)))
+	prepared := prepareConfig(registerConfigOperation(methodCallSeq.Add(1), ConfigInputRequest{InputID: input, Active: true}))
+	if prepared.Status != "prepared" {
+		t.Fatal(prepared)
 	}
-	addr := reservation.Addr().String()
-	port := reservation.Addr().(*net.TCPAddr).Port
-	_ = reservation.Close()
-	listener.SetAllowLan(false)
-	listener.SetBindAddress("127.0.0.1")
-	listener.ReCreateMixed(port, tunnel.Tunnel)
-	isRunning.Store(true)
-	defer handleStopListener()
-	connect := func(address string) bool {
-		conn, err := net.DialTimeout("tcp", address, time.Second)
-		if err == nil {
-			_ = conn.Close()
-		}
-		return err == nil
-	}
-	if !connect(addr) {
-		t.Fatal("business listener did not open")
-	}
-	current := requestTunIdentity{"new service", 2}
+	old, current := requestTunIdentity{"old", 1}, requestTunIdentity{"new", 2}
 	closed := false
-	if stopOwnedRequestService(requestTunIdentity{"old service", 1}, current, func() { closed = true }) || closed || !connect(addr) {
-		t.Fatal("old service stopped current listener")
+	if stopOwnedRequestService(old, current, func() { closed = true }) || closed {
+		t.Fatal("stale TUN stopped the new identity")
 	}
-	if !stopOwnedRequestService(current, current, func() { closed = true }) || !closed || isRunning.Load() || connect(addr) {
-		t.Fatal("owning service did not clean listener")
+	if !stopOwnedRequestService(current, current, func() { closed = true }) || !closed {
+		t.Fatal("owned TUN was not stopped")
 	}
-	if !connect(private) {
-		t.Fatal("business stop closed private maintenance channel")
+	if err := pendingConfig.mixed.Validate(); err != nil {
+		t.Fatal("TUN cleanup destroyed the prepared binding", err)
 	}
+	if conn, err := net.DialTimeout("tcp", private, time.Second); err != nil {
+		t.Fatal("TUN cleanup destroyed the maintenance channel", err)
+	} else {
+		conn.Close()
+	}
+	r.closePrivate()
 }
 
 type requestTouchProvider struct {

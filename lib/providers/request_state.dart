@@ -10,9 +10,12 @@ final nativeRequestStateProvider =
 
 class NativeRequestState extends Notifier<Map<String, Object?>>
     with ServiceListener {
+  NativeRequestState() : _native = null;
+  NativeRequestState.scoped(Service native) : _native = native;
+  final Service? _native;
   @override
   Map<String, Object?> build() {
-    final native = service;
+    final native = _native ?? service;
     native?.addListener(this);
     ref.onDispose(() => native?.removeListener(this));
     if (native != null) {

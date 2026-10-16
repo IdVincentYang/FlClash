@@ -7,6 +7,14 @@ import com.follow.clash.common.RequestProtection
 import com.follow.clash.common.RequestServiceIdentity
 import java.util.UUID
 import com.follow.clash.models.SharedState
+import com.follow.clash.models.ConfigReceipt
+import com.follow.clash.models.ConfigApplyResult
+import com.follow.clash.models.ConfigFact
+import com.follow.clash.models.ConfigCleanupResult
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 import com.follow.clash.service.models.NotificationParams
 import com.follow.clash.service.models.VpnOptions
 import com.google.gson.Gson
@@ -50,10 +58,17 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     private var protection: RequestProtection? = null
     private var protectionIdentity: RequestServiceIdentity? = null
     private var serviceRequestId = 0L
+    private var retiringService: RequestServiceIdentity? = null
+    private val configToken = AtomicLong()
+    @Volatile private var configFact = ConfigFact()
+    private var preparedOptionsFingerprint: String? = null
+    @Volatile private var pendingConfigReceipt = ConfigReceipt()
 
     val requestState = mutableRequestState.asStateFlow()
 
     fun getRequestState(): ApplicationRequestState = mutableRequestState.value
+
+    fun configOperationToken(): Long = configToken.get()
 
     fun getNetworkInput(): RequestNetworkFacts = synchronized(publicationLock) { networkInput }
 
@@ -65,6 +80,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     private fun publish(change: (ApplicationRequestState) -> ApplicationRequestState?): Boolean {
         var applied = false
+        var phaseChanged = false
         synchronized(publicationLock) {
             val previous = mutableRequestState.value
             val candidate = change(previous)
@@ -76,6 +92,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                     if (!host.publishRequestState(next)) host.blockRequestState()
                 }
                 mutableRequestState.value = next
+                phaseChanged = previous.phase != next.phase
                 mutableRunState.value = when (next.phase) {
                     "preparing", "starting" -> RunState.STARTING
                     "started" -> RunState.STARTED
@@ -85,7 +102,10 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                 applied = true
             }
         }
-        if (applied) host.finishRequestPublication()
+        if (applied) {
+            host.finishRequestPublication()
+            if (phaseChanged) applySharedState()
+        }
         return applied
     }
 
@@ -112,10 +132,144 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         else previous.copy(reason = if (recovery) "recovery" else "initializedIdle", phase = if (recovery) "failed" else "stopped")
     }
 
-    fun failRunIntent(requestId: Long): Boolean {
-        val request = preparedRequest(requestId) ?: return false
-        fail(request)
-        return true
+    suspend fun failRunIntent(requestId: Long, token: Long, abort: Boolean = true): ConfigCleanupResult {
+        val request = preparedRequest(requestId) ?: return ConfigCleanupResult("superseded")
+        val receipt = pendingConfigReceipt
+        if (abort && receipt.owner != 0L && receipt.token == token && isCurrent(request) && configToken.get() == token) {
+            val result = host.configPhase("abortConfig", receipt)
+            if (result.status == "superseded") return ConfigCleanupResult("superseded")
+            observeConfigFact(result.fact, authoritative = true)
+        }
+        return transitionLock.withLock {
+            if (!isCurrent(request) || configToken.get() != token) return@withLock ConfigCleanupResult("superseded")
+            val state = getRequestState()
+            val identity = RequestServiceIdentity(state.serviceId, serviceRequestId, if (state.protectPhase in setOf("starting", "ready")) state.protectGeneration else 0)
+            fail(request)
+            synchronized(publicationLock) { retiringService = identity }
+            try {
+                val cleaned = identity.serviceId.isEmpty() || host.stopOwnedService(identity)
+                if (arbiter.current().id != request.id || configToken.get() != token) return@withLock ConfigCleanupResult("superseded")
+                if (!cleaned) return@withLock ConfigCleanupResult("cleanupFailed", "Owned service cleanup did not complete")
+                preparedOptionsFingerprint = null
+                applySharedState()
+                ConfigCleanupResult("cleaned")
+            } catch (error: Exception) {
+                ConfigCleanupResult("cleanupFailed", error.message.orEmpty())
+            }
+        }
+    }
+
+    fun observeConfigFact(fact: ConfigFact, authoritative: Boolean = false) {
+        val previous = configFact
+        if (fact.runtimeEpoch.isEmpty() || !authoritative && previous.runtimeEpoch.isNotEmpty() && fact.runtimeEpoch != previous.runtimeEpoch || fact.runtimeEpoch == previous.runtimeEpoch && fact.version < previous.version) return
+        configFact = fact
+        applySharedState()
+    }
+
+    fun applyConfig(input: JsonObject): Deferred<ConfigApplyResult> {
+        val state = getRequestState()
+        val expectedRequest = input.get("requestId")?.takeUnless { it.isJsonNull }?.asLong
+        if (expectedRequest != null && expectedRequest != state.intentRevision) return CompletableDeferred(ConfigApplyResult("superseded"))
+        val request = arbiter.current()
+        val desired = sharedState
+        val payload = input.deepCopy().apply {
+            add("expectedRun", Gson().toJsonTree(state))
+            addProperty("active", state.intentRunning && !state.paused)
+            add("init", JsonParser.parseString(initParams(host.homeDirPath, host.sdkInt)))
+        }
+        val receipt = host.registerConfigInput(payload)
+        configToken.accumulateAndGet(receipt.token, ::maxOf)
+        if (configToken.get() == receipt.token) {
+            pendingConfigReceipt = receipt
+            abandonVpnPreparation()
+        }
+        val result = CompletableDeferred<ConfigApplyResult>()
+        host.scope.launch {
+            val applied = startPreparationLock.withLock {
+                runCatching { runConfigApply(request, state.intentRunning && !state.paused, desired, receipt) }
+                    .getOrElse { error ->
+                        host.log("Unable to apply configuration: $error")
+                        val owned = pendingConfigReceipt.takeIf { it.token == receipt.token } ?: receipt
+                        finishConfigFailure(request, owned, error.message.orEmpty())
+                    }
+            }
+            result.complete(applied)
+        }
+        return result
+    }
+
+    private fun currentConfigRequest(request: RunRequest, receipt: ConfigReceipt): Boolean =
+        isCurrent(request) && configToken.get() == receipt.token
+
+    private suspend fun finishConfigFailure(request: RunRequest, receipt: ConfigReceipt, message: String): ConfigApplyResult {
+        if (!currentConfigRequest(request, receipt)) return ConfigApplyResult("superseded", receipt = receipt)
+        val aborted = runCatching { host.configPhase("abortConfig", receipt) }.getOrNull()
+        if (aborted?.status == "superseded") return aborted
+        if (aborted != null) observeConfigFact(aborted.fact, authoritative = true)
+        val cleanup = failRunIntent(request.id, receipt.token, abort = false)
+        return ConfigApplyResult(if (cleanup.status == "cleaned") "blocked" else cleanup.status, message.ifEmpty { cleanup.message }, receipt, fact = aborted?.fact ?: configFact)
+    }
+
+    private suspend fun runConfigApply(request: RunRequest, active: Boolean, desired: SharedState, registered: ConfigReceipt): ConfigApplyResult {
+        if (!currentConfigRequest(request, registered)) return ConfigApplyResult("superseded", receipt = registered)
+        val prepared = host.configPhase("prepareConfig", registered)
+        if (currentConfigRequest(request, registered)) pendingConfigReceipt = prepared.receipt
+        if (prepared.status != "prepared") {
+            observeConfigFact(prepared.fact, authoritative = true)
+            if (active && getRequestState().phase == "preparing" && currentConfigRequest(request, registered)) failRunIntent(request.id, registered.token)
+            return prepared
+        }
+        val receipt = prepared.receipt
+        observeConfigFact(prepared.fact, authoritative = true)
+        var serviceReceipt = receipt
+        if (active) {
+            if (!prepareStartPermissions()) return finishConfigFailure(request, receipt, "Notification permission denied")
+            val core = requireNotNull(prepared.coreParams)
+            val desiredOptions = requireNotNull(desired.vpnOptions) { MISSING_CONFIG_MESSAGE }
+            val options = withLocalNetworkFallback(desiredOptions.copy(
+                port = core.mixedPort,
+                systemProxy = desired.systemProxyRequested && host.sdkInt >= 29 && core.bindingId != 0L && core.mixedPort != 0 && core.localReachable && !core.authenticationRequired,
+            ))
+            if (!prepareVpn(options)) return finishConfigFailure(request, receipt, VPN_PERMISSION_MESSAGE)
+            val fingerprint = MessageDigest.getInstance("SHA-256").digest(Gson().toJson(options).toByteArray()).joinToString("") { "%02x".format(it) }
+            val preparedService = transitionLock.withLock {
+                if (!currentConfigRequest(request, receipt)) return@withLock null
+                val before = getRequestState()
+                val compatible = runTimeMillis != 0L && preparedOptionsFingerprint == fingerprint && host.isVpnServiceActive() == options.enable && serviceRequestId == request.id && before.serviceId.isNotEmpty()
+                setPhase(request, "starting")
+                if (!compatible) {
+                    if (before.serviceId.isNotEmpty()) {
+                        val old = RequestServiceIdentity(before.serviceId, serviceRequestId, if (before.protectPhase in setOf("starting", "ready")) before.protectGeneration else 0)
+                        synchronized(publicationLock) { retiringService = old }
+                        check(host.stopOwnedService(old)) { "Owned service cleanup did not complete" }
+                    }
+                    if (!currentConfigRequest(request, receipt)) return@withLock null
+                    check(host.startService(options, request.id) != 0L) { START_FAILED_MESSAGE }
+                    preparedOptionsFingerprint = fingerprint
+                }
+                if (!currentConfigRequest(request, receipt)) return@withLock null
+                val state = getRequestState()
+                check(state.serviceId.isNotEmpty() && (!options.enable || state.protectGeneration != 0L && state.protectPhase == "ready")) { START_FAILED_MESSAGE }
+                receipt.copy(serviceId = state.serviceId, protectGeneration = if (options.enable) state.protectGeneration else 0, optionsFingerprint = fingerprint)
+            } ?: return ConfigApplyResult("superseded", receipt = receipt)
+            serviceReceipt = preparedService
+        }
+        val installed = host.configPhase("installConfig", receipt)
+        observeConfigFact(installed.fact, authoritative = true)
+        if (installed.status != "installed") {
+            if (installed.status in setOf("superseded", "bootstrapRequired")) return installed
+            return finishConfigFailure(request, receipt, installed.message)
+        }
+        return transitionLock.withLock {
+            if (!currentConfigRequest(request, receipt)) return@withLock ConfigApplyResult("superseded", receipt = receipt)
+            val activated = host.configPhase("activateConfig", serviceReceipt)
+            observeConfigFact(activated.fact, authoritative = true)
+            if (activated.status == "activated") setPhase(request, "started")
+            activated
+        }.let { activated ->
+            if (activated.status in setOf("activated", "installedInactive", "superseded")) activated
+            else finishConfigFailure(request, receipt, activated.message)
+        }
     }
 
     fun observeNetwork(facts: RequestNetworkFacts) {
@@ -176,7 +330,11 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                 protection = null
                 protectionIdentity = null
                 val current = arbiter.current()
-                if (current.id == requestId) {
+                if (retiringService?.let { it.serviceId == serviceId && it.requestId == requestId } == true) {
+                    retiringService = null
+                    serviceRequestId = 0
+                    previous.copy(serviceId = "", protectPhase = "none")
+                } else if (current.id == requestId) {
                     arbiter.resetToStopped(current)
                     previous.copy(serviceId = "", protectPhase = "none", phase = "failed", reason = "serviceLost")
                 } else previous.copy(serviceId = "", protectPhase = "none")
@@ -193,6 +351,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     @Volatile
     private var sharedState = SharedState()
+    private var hasSharedState = false
 
     @Volatile
     private var pendingVpnPreparation: (() -> Unit)? = null
@@ -210,7 +369,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
     }
 
-    suspend fun refresh(): Long = runTimeMillis
+    suspend fun refresh(): Long = if (getRequestState().phase == "started" && configFact.businessActive) runTimeMillis else 0L
 
     fun captureRequestToken(): RunRequest = arbiter.current()
 
@@ -266,35 +425,14 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         val request = preparedRequest(id) ?: return CompletableDeferred(false)
         if (!request.running) return CompletableDeferred(false)
         val result = CompletableDeferred<Boolean>()
-        val launchRequest: (Boolean) -> Unit = { shouldStart ->
-            if (!shouldStart) {
-                fail(request, "permissionDenied")
-                result.complete(false)
-            } else {
-                host.scope.launch {
-                    result.complete(
-                        runCatching { start(request) }
-                            .onFailure { error ->
-                                host.log("Unable to process service start request: $error")
-                                fail(request)
-                                reconcileStopped()
-                            }
-                            .getOrDefault(false),
-                    )
-                }
+        val originalToken = configToken.get()
+        host.scope.launch {
+            val started = try { start(request) } catch (error: Exception) {
+                host.log("Unable to process service start request: $error")
+                failRunIntent(request.id, originalToken)
+                false
             }
-        }
-        val app = host.app()
-        if (app != null) {
-            app.requestNotificationPermission { shouldStart ->
-                if (shouldStart) {
-                    app.requestLocalNetworkPermission { launchRequest(true) }
-                } else {
-                    launchRequest(false)
-                }
-            }
-        } else {
-            launchRequest(true)
+            result.complete(started)
         }
         return result
     }
@@ -318,108 +456,63 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     fun syncSharedState(state: SharedState) {
         sharedState = state
+        hasSharedState = true
         applySharedState()
     }
 
-    private suspend fun loadPreferencesAndStart(request: RunRequest) {
-        val loadedState = host.loadSharedStateForStart() ?: run { fail(request); return }
-        if (!isCurrent(request)) return
-        sharedState = loadedState
-        if (sharedState.setupParams == null || sharedState.vpnOptions == null) {
-            host.showToast(MISSING_CONFIG_MESSAGE)
-            fail(request)
-            return
+    private suspend fun loadPreferencesAndStart(request: RunRequest): Boolean {
+        val originalToken = configToken.get()
+        val loaded = try { if (hasSharedState) sharedState else host.loadSharedStateForStart() } catch (error: Exception) {
+            host.log("Unable to read service preferences: $error")
+            null
         }
-        if (setupCore() && isCurrent(request)) {
-            if (!requestStart(request.id).await()) {
-                host.showToast(START_FAILED_MESSAGE)
+        if (loaded == null) {
+            if (isCurrent(request)) {
+                showConfigError(MISSING_CONFIG_MESSAGE)
+                failRunIntent(request.id, originalToken)
             }
-        } else { fail(request) }
+            return false
+        }
+        if (!isCurrent(request)) return false
+        sharedState = loaded
+        hasSharedState = true
+        applySharedState()
+        if (sharedState.vpnOptions == null) {
+            showConfigError(MISSING_CONFIG_MESSAGE)
+            failRunIntent(request.id, originalToken)
+            return false
+        }
+        host.showToast(sharedState.startTip)
+        return try {
+            val input = host.replayConfigInput().apply { addProperty("requestId", request.id) }
+            val result = applyConfig(input).await()
+            if (result.status != "activated") {
+                showConfigError(result.message)
+                if (result.status == "bootstrapRequired") failRunIntent(request.id, result.receipt.token)
+            }
+            result.status == "activated"
+        } catch (error: Exception) {
+            showConfigError(error.message)
+            failRunIntent(request.id, originalToken)
+            false
+        }
     }
 
     private fun applySharedState() {
-        host.updateNotificationParams(notificationParams(sharedState))
-    }
-
-    private suspend fun setupCore(): Boolean {
-        applySharedState()
-        host.showToast(sharedState.startTip)
-        return host.quickSetup(
-            initParams(host.homeDirPath, host.sdkInt),
-            Gson().toJson(sharedState.setupParams),
-        ).fold(
-            onSuccess = { message ->
-                if (message.isEmpty()) {
-                    true
-                } else {
-                    host.log("Unable to set up core: $message")
-                    showConfigError(message)
-                    false
-                }
-            },
-            onFailure = { error ->
-                host.log("Unable to set up core: $error")
-                showConfigError(error.message)
-                false
-            },
-        )
+        val state = getRequestState()
+        val title = when {
+            state.phase == "started" && configFact.businessActive && configFact.phase == "ready" -> configFact.profileName.ifEmpty { "FlClash" }
+            state.phase in setOf("preparing", "starting") -> sharedState.configApplyingTip
+            else -> sharedState.configInactiveTip
+        }
+        host.updateNotificationParams(notificationParams(sharedState).copy(title = title))
     }
 
     private fun showConfigError(message: String?) {
         host.showToast(message?.takeIf { it.isNotBlank() } ?: INVALID_CONFIG_MESSAGE)
     }
 
-    private suspend fun start(request: RunRequest): Boolean = startPreparationLock.withLock {
-        val started = runStart(request)
-        if (!started) {
-            reconcileStopped()
-        }
-        started
-    }
-
-    private suspend fun runStart(request: RunRequest): Boolean {
-        if (!isCurrent(request)) {
-            return false
-        }
-        val options = sharedState.vpnOptions
-        if (options == null) {
-            fail(request)
-            return false
-        }
-        if (!prepareVpn(options)) {
-            if (host.app() == null && isCurrent(request)) {
-                host.showToast(VPN_PERMISSION_MESSAGE)
-            }
-            fail(request, "permissionDenied")
-            return false
-        }
-        if (!isCurrent(request)) {
-            return false
-        }
-
-        return transitionLock.withLock transition@{
-            if (!isCurrent(request)) {
-                return@transition false
-            }
-            if (runTimeMillis != 0L && host.isVpnServiceActive() == options.enable) {
-                host.adoptServiceRequest(request.id)
-                if (!isCurrent(request)) return@transition false
-                setPhase(request, "started")
-                return@transition true
-            }
-            setPhase(request, "starting")
-            val startedAtMillis = host.startService(withLocalNetworkFallback(options), request.id)
-            if (startedAtMillis == 0L) {
-                fail(request)
-                return@transition false
-            }
-            if (!isCurrent(request)) {
-                return@transition false
-            }
-            setPhase(request, "started")
-            true
-        }
-    }
+    private suspend fun start(request: RunRequest): Boolean = loadPreferencesAndStart(request)
 
     // system/mixed hand TCP to the kernel via the tun subnet, which Android 17 gates as local network.
     private fun withLocalNetworkFallback(options: VpnOptions): VpnOptions {
@@ -458,6 +551,19 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         isCurrent(request)
     }
 
+    private suspend fun prepareStartPermissions(): Boolean {
+        val app = host.app() ?: return true
+        return suspendCancellableCoroutine { continuation ->
+            app.requestNotificationPermission { granted ->
+                if (!granted) {
+                    if (continuation.isActive) continuation.resume(false)
+                } else {
+                    app.requestLocalNetworkPermission { if (continuation.isActive) continuation.resume(true) }
+                }
+            }
+        }
+    }
+
     private suspend fun prepareVpn(options: VpnOptions): Boolean {
         val app = host.app()
             ?: return !options.enable || host.isVpnPermissionGranted()
@@ -492,7 +598,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     private fun fail(request: RunRequest, reason: String = "setupFailed") {
         publish { previous ->
-            if (!arbiter.resetToStopped(request)) null else previous.copy(phase = "failed", reason = reason)
+            if (!arbiter.resetToStopped(request)) null else previous.copy(intentRunning = false, phase = "failed", reason = reason)
         }
     }
 
@@ -512,7 +618,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         )
 
         fun notificationParams(state: SharedState): NotificationParams = NotificationParams(
-            title = state.currentProfileName,
+            title = "FlClash",
             stopText = state.stopText,
             onlyStatisticsProxy = state.onlyStatisticsProxy,
             showStopAction = state.showStopAction,

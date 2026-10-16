@@ -144,6 +144,22 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
     final providers = ref.watch(providersProvider);
     final isUpdating = ref.watch(isUpdatingProvider(profile.updatingKey));
     final appLocalizations = context.appLocalizations;
+    final observation = ref.watch(configStateProvider);
+    final applied = observation.fact;
+    final active =
+        applied.businessActive &&
+        (!system.isAndroid ||
+            ref.watch(nativeRequestStateProvider)['phase'] == 'started');
+    final status = switch (applied.phase) {
+      'parsing' || 'installed' => appLocalizations.configApplying,
+      'ready'
+          when active &&
+              (observation.buildFailed || applied.profileId != profile.id) =>
+        appLocalizations.configRetained,
+      'ready' when active => applied.profileName,
+      'ready' => appLocalizations.configLoaded,
+      _ => appLocalizations.configInactive,
+    };
     final subscriptionInfo = profile.subscriptionInfo;
     return CommonScaffold(
       title: profile.realLabel,
@@ -187,6 +203,18 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
           generateSectionV3(
             title: appLocalizations.profile,
             items: [
+              _InfoRow(
+                label: appLocalizations.selected,
+                value: Text(profile.realLabel),
+              ),
+              _InfoRow(
+                label: appLocalizations.appliedProfile,
+                value: Text(active ? applied.profileName : status),
+              ),
+              if (observation.buildFailed ||
+                  applied.profileId != profile.id ||
+                  !active)
+                ListItem(title: Text(status)),
               _InfoRow(
                 label: appLocalizations.lastUpdated,
                 value: LastUpdateTimeText(

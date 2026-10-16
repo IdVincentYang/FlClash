@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:flutter/foundation.dart';
 
 List<CoreEvent> coreEventsFromData(Object? data) {
@@ -42,6 +43,8 @@ abstract mixin class CoreEventListener {
   ) {}
 
   void onRouteChanged(RouteSnapshot snapshot) {}
+
+  void onConfigState(ConfigFact fact) {}
 }
 
 class CoreEventManager {
@@ -77,6 +80,13 @@ class CoreEventManager {
                 data['updating'] as bool,
                 data['skipped'] as bool? ?? false,
                 data['error'] as String?,
+              );
+              break;
+            case CoreEventType.configState:
+              listener.onConfigState(
+                ConfigFact.fromJson(
+                  Map<String, Object?>.from(event.data as Map),
+                ),
               );
               break;
             case CoreEventType.routeChanged:

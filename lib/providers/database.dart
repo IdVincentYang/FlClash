@@ -132,6 +132,9 @@ class Profiles extends _$Profiles {
               previous.requestProxy,
               previous.autoUpdate,
               previous.autoUpdateDuration,
+              previous.overwriteType,
+              previous.scriptId,
+              previous.matchTarget,
             ) !=
             (
               next.url,
@@ -139,6 +142,9 @@ class Profiles extends _$Profiles {
               next.requestProxy,
               next.autoUpdate,
               next.autoUpdateDuration,
+              next.overwriteType,
+              next.scriptId,
+              next.matchTarget,
             );
     if (!networkResult &&
         !changedSource &&
@@ -152,6 +158,13 @@ class Profiles extends _$Profiles {
     }
     if (changedSource && !networkResult) {
       await request.invalidate('profile:${profile.id}');
+    }
+    if (previous != null && previous.realLabel != next.realLabel) {
+      for (final affected in await database.proxyGroupsDao.profileIdsUsing(
+        previous.realLabel,
+      )) {
+        await request.invalidate('profile:$affected');
+      }
     }
     await database.transaction(() async {
       if (previous != null &&
@@ -365,24 +378,27 @@ class ClashProviders extends _$ClashProviders
     }
     optimistic(
       next,
-      () => database.transaction(() async {
-        if (renamedFrom != null) {
-          switch (provider.kind) {
-            case ProviderKind.proxy:
-              await database.proxyGroupsDao.renameUse(
-                renameIn,
-                oldName: renamedFrom,
-                newName: provider.label,
-              );
-            case ProviderKind.rule:
-              await database.rulesDao.renameCustomRuleProvider(
-                renameIn,
-                oldName: renamedFrom,
-                newName: provider.label,
-              );
+      () => request.mutate(() async {
+        await request.invalidate('clash-provider:${provider.id}');
+        await database.transaction(() async {
+          if (renamedFrom != null) {
+            switch (provider.kind) {
+              case ProviderKind.proxy:
+                await database.proxyGroupsDao.renameUse(
+                  renameIn,
+                  oldName: renamedFrom,
+                  newName: provider.label,
+                );
+              case ProviderKind.rule:
+                await database.rulesDao.renameCustomRuleProvider(
+                  renameIn,
+                  oldName: renamedFrom,
+                  newName: provider.label,
+                );
+            }
           }
-        }
-        await database.clashProviders.put(provider.toCompanion());
+          await database.clashProviders.put(provider.toCompanion());
+        });
       }),
     );
   }
@@ -394,7 +410,10 @@ class ClashProviders extends _$ClashProviders
     next.removeAt(index);
     optimistic(
       next,
-      () => database.clashProviders.remove((t) => t.id.equals(id)),
+      () => request.mutate(() async {
+        await request.invalidate('clash-provider:$id');
+        await database.clashProviders.remove((t) => t.id.equals(id));
+      }),
     );
   }
 
@@ -430,7 +449,18 @@ Future<Script?> script(Ref ref, int? scriptId) async {
   return script;
 }
 
+Future<T> _mutateConfigSource<T>(
+  String key,
+  Future<T> Function() action, {
+  bool invalidate = true,
+}) => request.mutate(() async {
+  if (invalidate) await request.invalidate(key);
+  return action();
+});
+
 mixin RuleListMixin on OptimisticMixin<List<Rule>> {
+  String get configurationSourceKey;
+
   Future<void> persistRule(Rule rule);
 
   Future<void> persistOrder({required int ruleId, required String order});
@@ -450,7 +480,10 @@ mixin RuleListMixin on OptimisticMixin<List<Rule>> {
     final newRule = rule.autoOrder(rule, null, value.firstOrNull?.order);
     optimistic(
       value.copyAndPut(newRule, (rule) => rule.id == newRule.id),
-      () => persistRule(newRule),
+      () => _mutateConfigSource(
+        configurationSourceKey,
+        () => persistRule(newRule),
+      ),
     );
   }
 
@@ -469,11 +502,14 @@ mixin RuleListMixin on OptimisticMixin<List<Rule>> {
     ];
     optimistic(
       [...newRules, ...value],
-      () => database.transaction(() async {
-        for (final rule in newRules) {
-          await persistRule(rule);
-        }
-      }),
+      () => _mutateConfigSource(
+        configurationSourceKey,
+        () => database.transaction(() async {
+          for (final rule in newRules) {
+            await persistRule(rule);
+          }
+        }),
+      ),
     );
   }
 
@@ -481,7 +517,10 @@ mixin RuleListMixin on OptimisticMixin<List<Rule>> {
     final ids = ruleIds.toSet();
     optimistic(
       value.where((item) => !ids.contains(item.id)).toList(),
-      () => database.rulesDao.delRules(ids),
+      () => _mutateConfigSource(
+        configurationSourceKey,
+        () => database.rulesDao.delRules(ids),
+      ),
     );
   }
 
@@ -492,13 +531,22 @@ mixin RuleListMixin on OptimisticMixin<List<Rule>> {
       nextItems.safeGet(newIndex - 1)?.order,
       nextItems.safeGet(newIndex + 1)?.order,
     )!;
-    optimistic(nextItems, () => persistOrder(ruleId: item.id, order: newOrder));
+    optimistic(
+      nextItems,
+      () => _mutateConfigSource(
+        configurationSourceKey,
+        () => persistOrder(ruleId: item.id, order: newOrder),
+      ),
+    );
   }
 }
 
 @riverpod
 class GlobalRules extends _$GlobalRules
     with AsyncNotifierMixin, OptimisticMixin, RuleListMixin {
+  @override
+  String get configurationSourceKey => 'global-rules';
+
   @override
   Stream<List<Rule>> build() {
     return database.rulesDao.queryGlobalAddedRules().watch();
@@ -515,6 +563,9 @@ class GlobalRules extends _$GlobalRules
 @riverpod
 class ProfileAddedRules extends _$ProfileAddedRules
     with AsyncNotifierMixin, OptimisticMixin, RuleListMixin {
+  @override
+  String get configurationSourceKey => 'profile:$profileId';
+
   @override
   Stream<List<Rule>> build(int profileId) {
     return database.rulesDao.queryProfileAddedRules(profileId).watch();
@@ -536,6 +587,9 @@ class ProfileAddedRules extends _$ProfileAddedRules
 @riverpod
 class ProfileCustomRules extends _$ProfileCustomRules
     with AsyncNotifierMixin, OptimisticMixin, RuleListMixin {
+  @override
+  String get configurationSourceKey => 'profile:$profileId';
+
   @override
   Stream<List<Rule>> build(int profileId) {
     return database.rulesDao.queryProfileCustomRules(profileId).watch();
@@ -574,7 +628,10 @@ class ProxyGroups extends _$ProxyGroups
     final ids = proxyGroupIds.toSet();
     optimistic(
       value.where((item) => !ids.contains(item.id)).toList(),
-      () => database.proxyGroupsDao.delAll(ids),
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.proxyGroupsDao.delAll(ids),
+      ),
     );
   }
 
@@ -589,6 +646,9 @@ class ProxyGroups extends _$ProxyGroups
     final renamedFrom = index != -1 && previous[index].name != proxyGroup.name
         ? previous[index].name
         : null;
+    final changesConfig =
+        index == -1 ||
+        previous[index].copyWith(icon: proxyGroup.icon) != proxyGroup;
     final icon = proxyGroup.icon?.value;
     final next = List<ProxyGroup>.from(previous);
     final ProxyGroup nextProxyGroup;
@@ -604,24 +664,28 @@ class ProxyGroups extends _$ProxyGroups
     }
     optimistic(
       next,
-      () => database.transaction(() async {
-        if (renamedFrom != null) {
-          await database.rulesDao.renameCustomRuleTarget(
-            profileId,
-            oldName: renamedFrom,
-            newName: nextProxyGroup.name,
-          );
-          await database.proxyGroupsDao.renameProxies(
-            profileId,
-            oldName: renamedFrom,
-            newName: nextProxyGroup.name,
-          );
-        }
-        if (icon != null) {
-          await database.iconRecordsDao.put(icon);
-        }
-        await database.proxyGroups.put(nextProxyGroup.toCompanion(profileId));
-      }),
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.transaction(() async {
+          if (renamedFrom != null) {
+            await database.rulesDao.renameCustomRuleTarget(
+              profileId,
+              oldName: renamedFrom,
+              newName: nextProxyGroup.name,
+            );
+            await database.proxyGroupsDao.renameProxies(
+              profileId,
+              oldName: renamedFrom,
+              newName: nextProxyGroup.name,
+            );
+          }
+          if (icon != null) {
+            await database.iconRecordsDao.put(icon);
+          }
+          await database.proxyGroups.put(nextProxyGroup.toCompanion(profileId));
+        }),
+        invalidate: changesConfig,
+      ),
     );
     return true;
   }
@@ -635,10 +699,13 @@ class ProxyGroups extends _$ProxyGroups
     )!;
     optimistic(
       nextItems,
-      () => database.proxyGroupsDao.order(
-        profileId,
-        proxyGroup: item,
-        order: newOrder,
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.proxyGroupsDao.order(
+          profileId,
+          proxyGroup: item,
+          order: newOrder,
+        ),
       ),
     );
   }
@@ -670,7 +737,10 @@ class CustomProxies extends _$CustomProxies
     final idSet = ids.toSet();
     optimistic(
       value.where((item) => !idSet.contains(item.id)).toList(),
-      () => database.customProxiesDao.delAll(idSet),
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.customProxiesDao.delAll(idSet),
+      ),
     );
   }
 
@@ -696,21 +766,24 @@ class CustomProxies extends _$CustomProxies
     }
     optimistic(
       next,
-      () => database.transaction(() async {
-        if (renamedFrom != null) {
-          await database.rulesDao.renameCustomRuleTarget(
-            profileId,
-            oldName: renamedFrom,
-            newName: nextProxy.name,
-          );
-          await database.proxyGroupsDao.renameProxies(
-            profileId,
-            oldName: renamedFrom,
-            newName: nextProxy.name,
-          );
-        }
-        await database.customProxies.put(nextProxy.toCompanion(profileId));
-      }),
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.transaction(() async {
+          if (renamedFrom != null) {
+            await database.rulesDao.renameCustomRuleTarget(
+              profileId,
+              oldName: renamedFrom,
+              newName: nextProxy.name,
+            );
+            await database.proxyGroupsDao.renameProxies(
+              profileId,
+              oldName: renamedFrom,
+              newName: nextProxy.name,
+            );
+          }
+          await database.customProxies.put(nextProxy.toCompanion(profileId));
+        }),
+      ),
     );
   }
 
@@ -723,10 +796,13 @@ class CustomProxies extends _$CustomProxies
     )!;
     optimistic(
       nextItems,
-      () => database.customProxiesDao.order(
-        profileId,
-        proxy: item,
-        order: newOrder,
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.customProxiesDao.order(
+          profileId,
+          proxy: item,
+          order: newOrder,
+        ),
       ),
     );
   }
@@ -757,7 +833,10 @@ class ProfileDisabledRuleIds extends _$ProfileDisabledRuleIds
   void del(int ruleId) {
     optimistic(
       value.where((item) => item != ruleId).toList(),
-      () => database.rulesDao.delDisabledLink(profileId, ruleId),
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.rulesDao.delDisabledLink(profileId, ruleId),
+      ),
     );
   }
 
@@ -768,7 +847,10 @@ class ProfileDisabledRuleIds extends _$ProfileDisabledRuleIds
     }
     optimistic(
       next,
-      () => database.rulesDao.putDisabledLink(profileId, ruleId),
+      () => _mutateConfigSource(
+        'profile:$profileId',
+        () => database.rulesDao.putDisabledLink(profileId, ruleId),
+      ),
     );
   }
 }

@@ -774,5 +774,10 @@
   "requestProxyDefault": "GLOBAL（当前选择：{target}）",
   "requestModeHelp": "用于此对象自身的联网请求。代理需要有效代理节点；直连需要可用的非 VPN 网络。",
   "requestRouteUnavailable": "所选请求出口当前不可用。",
-  "requestPartialCommit": "部分本地修改未能恢复。已保留恢复文件，并阻止自动更新。"
+  "requestPartialCommit": "部分本地修改未能恢复。已保留恢复文件，并阻止自动更新。",
+  "appliedProfile": "实际生效配置",
+  "configApplying": "正在应用配置",
+  "configInactive": "当前未接管流量",
+  "configLoaded": "已载入配置，尚未接管流量",
+  "configRetained": "新配置未应用，仍使用之前的配置"
 }

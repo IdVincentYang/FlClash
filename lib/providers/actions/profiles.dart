@@ -10,6 +10,34 @@ class ProfilesAction extends _$ProfilesAction {
   @override
   void build() {}
 
+  Future<void> useDefaultCustomConfig(int profileId) async {
+    final source = await requestClient.captureSource('profile:$profileId');
+    final raw = await _core.getConfig(profileId);
+    final config = await clashConfigTask(raw);
+    final rawProxies = raw['proxies'];
+    if (feature.customProxies && rawProxies != null && rawProxies is! List) {
+      throw const FormatException('proxies');
+    }
+    final proxies = feature.customProxies
+        ? [
+            for (final item in rawProxies ?? const [])
+              if (item is Map) CustomProxy.fromDefinition(item),
+          ]
+        : null;
+    await requestClient.mutate(() async {
+      if (!await requestClient.configSourceCurrent(source)) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      await requestClient.invalidate('profile:$profileId');
+      await database.setProfileCustomData(
+        profileId,
+        proxies,
+        config.proxyGroups,
+        config.rules,
+      );
+    });
+  }
+
   void updateCurrentSelectedMap(String groupName, String proxyName) {
     final profile = ref.read(currentProfileProvider);
     if (profile == null || profile.selectedMap[groupName] == proxyName) return;

@@ -34,6 +34,7 @@ void main() {
       autoUpdateDuration: Duration.zero,
       overwriteType: OverwriteType.custom,
     );
+    await testDatabase.profiles.put(profile.toCompanion());
     final container = ProviderContainer(
       overrides: [
         profilesProvider.overrideWith(() => TestProfiles([profile])),

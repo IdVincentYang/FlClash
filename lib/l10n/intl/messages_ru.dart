@@ -245,6 +245,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "appendSystemDns": MessageLookupByLibrary.simpleMessage(
       "Добавлять системный DNS",
     ),
+    "appliedProfile": MessageLookupByLibrary.simpleMessage(
+      "Активная конфигурация",
+    ),
     "authentication": MessageLookupByLibrary.simpleMessage("Аутентификация"),
     "authenticationDesc": MessageLookupByLibrary.simpleMessage(
       "Требовать учётные данные для локального порта прокси, чтобы другие приложения не могли использовать его",
@@ -376,8 +379,20 @@ class MessageLookup extends MessageLookupByLibrary {
     "colorSchemes": MessageLookupByLibrary.simpleMessage("Цветовые схемы"),
     "columns": MessageLookupByLibrary.simpleMessage("Столбцы"),
     "compatible": MessageLookupByLibrary.simpleMessage("Режим совместимости"),
+    "configApplying": MessageLookupByLibrary.simpleMessage(
+      "Применение конфигурации",
+    ),
     "configDataDetected": MessageLookupByLibrary.simpleMessage(
       "В конфигурации обнаружены данные",
+    ),
+    "configInactive": MessageLookupByLibrary.simpleMessage(
+      "Трафик не обрабатывается",
+    ),
+    "configLoaded": MessageLookupByLibrary.simpleMessage(
+      "Загружена; трафик не обрабатывается",
+    ),
+    "configRetained": MessageLookupByLibrary.simpleMessage(
+      "Новая конфигурация не применена; используется предыдущая",
     ),
     "confirm": MessageLookupByLibrary.simpleMessage("Подтвердить"),
     "confirmClearAllData": MessageLookupByLibrary.simpleMessage(

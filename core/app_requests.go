@@ -58,6 +58,7 @@ type appRequestRegistry struct {
 	state           AppRequestState
 	owner           requestscope.Owner
 	phase           string
+	configToken     uint64
 	next            uint64
 	leases          map[string]*appRequestLease
 	latest          map[string]*appRequestLease
@@ -200,7 +201,20 @@ func (r *appRequestRegistry) publishPrepared(state AppRequestState) bool {
 		r.mu.Unlock()
 		return false
 	}
+	previous := r.state
 	r.state = state
+	protectedBusiness := false
+	if prepared := preparedConfigGate.Load(); prepared != nil && prepared.scope == activeBusiness.Load() {
+		protectedBusiness = prepared.receipt.ProtectGeneration != 0
+	}
+	if scope := activeBusiness.Load(); scope != nil && scope.IsActive() &&
+		(previous.ProcessEpoch != state.ProcessEpoch || previous.IntentRevision != state.IntentRevision || previous.ServiceID != state.ServiceID || protectedBusiness && previous.ProtectGeneration != state.ProtectGeneration || !state.IntentRunning || state.Paused || state.Phase != "starting" && state.Phase != "started" || protectedBusiness && state.ProtectPhase != "ready") {
+		cancel := scope.Invalidate()
+		r.pendingCleanups = append(r.pendingCleanups, func() {
+			cancel()
+			safeGoDetached("retire business", func() { retireOwnedBusiness(scope) })
+		})
+	}
 	r.pendingCleanups = append(r.pendingCleanups, r.invalidateLocked()...)
 	r.mu.Unlock()
 	return true
@@ -218,8 +232,7 @@ func (r *appRequestRegistry) flushCleanup() {
 	}
 }
 
-func (r *appRequestRegistry) newOwner() requestscope.Owner {
-	selectMu.Lock()
+func (r *appRequestRegistry) nextConfigOwner() (requestscope.Owner, []func()) {
 	r.mu.Lock()
 	r.next++
 	r.owner = requestscope.Owner{ID: r.next}
@@ -228,6 +241,14 @@ func (r *appRequestRegistry) newOwner() requestscope.Owner {
 	owner := r.owner
 	cleanups := r.invalidateLocked()
 	r.mu.Unlock()
+	return owner, cleanups
+}
+
+func (r *appRequestRegistry) newOwner() requestscope.Owner {
+	selectMu.Lock()
+	checkpointMu.Lock()
+	owner, cleanups := r.nextConfigOwner()
+	checkpointMu.Unlock()
 	selectMu.Unlock()
 	finishRequestCleanup(cleanups)
 	return owner
@@ -251,6 +272,12 @@ func (r *appRequestRegistry) setPhase(owner requestscope.Owner, phase string) {
 }
 
 func (r *appRequestRegistry) allowedLocked(spec requestscope.Spec) bool {
+	if r.configToken != 0 && r.phase != "ready" && spec.Owner == r.owner {
+		if latest := latestConfig.Load(); latest == nil || latest.token != r.configToken {
+			return false
+		}
+	}
+
 	if spec.Client != "" && (!r.clientReady || spec.Client != r.client || spec.Dataset != r.dataset || spec.SourceRevision != r.sources[spec.Key] || spec.Operation != r.operations[spec.Key]) {
 		return false
 	}
@@ -722,6 +749,7 @@ func (r *appRequestRegistry) bindProxy(conn net.Conn, user, password string) (re
 }
 
 type appRequestControl struct {
+	ConfigInput                                                                      *ConfigInputRequest
 	Action, ID, Kind, Trigger, Key, Proxy, User, Password, Mode, URL, Client, Permit string
 	Owner, Dataset, SourceRevision, Operation                                        uint64
 	ExpectedState                                                                    *requestscope.StateVersion
@@ -739,6 +767,17 @@ func handleRequestControl(data string) string {
 }
 
 func (r *appRequestRegistry) control(params appRequestControl) any {
+	if params.Action == "registerConfigInput" {
+		if params.ConfigInput == nil || !validInputID(params.ConfigInput.InputID) {
+			return map[string]string{"error": "invalid_config_input"}
+		}
+		return registerConfigOperation(methodCallSeq.Add(1), *params.ConfigInput)
+	}
+	if params.Action == "attach" || params.Action == "invalidate" || params.Action == "invalidateDataset" {
+		checkpointMu.Lock()
+		defer checkpointMu.Unlock()
+	}
+
 	failure := func(code string) any { return map[string]string{"error": code} }
 	proxyConfigured := false
 	if params.Action == "inspect" {
@@ -820,6 +859,10 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		case "invalidateDataset":
 			r.dataset++
 			r.phase = "retired"
+			if scope := activeBusiness.Load(); scope != nil {
+				cancel := scope.Invalidate()
+				r.pendingCleanups = append(r.pendingCleanups, func() { cancel(); safeGoDetached("retire dataset business", func() { retireOwnedBusiness(scope) }) })
+			}
 		case "permit":
 			if !r.clientReady || params.ExpectedState == nil || params.ExpectedState.Epoch != r.state.ProcessEpoch || params.ExpectedState.Revision != r.state.Revision || params.Dataset != r.dataset || params.SourceRevision != r.sources[params.Key] || params.URL == "" || len(r.permits) >= 32 {
 				r.mu.Unlock()
@@ -842,6 +885,15 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 				}
 			}
 		}
+		if params.Action == "invalidate" || params.Action == "invalidateDataset" {
+			r.mu.Unlock()
+			err := invalidateConfigCheckpointLocked(params.Key, params.Action == "invalidateDataset")
+			r.mu.Lock()
+			if err != nil {
+				r.mu.Unlock()
+				return failure("request_commit_recovery_required")
+			}
+		}
 		commits := len(r.commits)
 		if r.commits[params.ID] != nil {
 			commits--
@@ -851,6 +903,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		for _, lease := range old {
 			lease.Close()
 		}
+		r.flushCleanup()
 		return result
 	case "begin":
 		if params.Mode != "direct" && params.Proxy != "DIRECT" {

@@ -6,6 +6,7 @@ import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
@@ -99,6 +100,14 @@ class CoreController {
 
   FutureOr<bool> get isInit => _interface.isInit;
 
+  Future<ConfigFact> getConfigState() => _interface.getConfigState();
+
+  Future<void> releaseConfigInput(String markerName) =>
+      _interface.releaseConfigInput(markerName);
+
+  Future<ConfigApplyResult> applyConfigInput(Map<String, Object?> input) =>
+      _interface.applyConfigInput(input);
+
   Future<String> validateConfig(String path) async {
     final res = await _interface.validateConfig(path);
     return res;
@@ -124,19 +133,8 @@ class CoreController {
     return _interface.updateConfig(updateParams);
   }
 
-  Future<String> setupConfig({
-    required SetupParams params,
-    Future<void> Function()? preloadInvoke,
-  }) async {
-    if (preloadInvoke == null) {
-      return _interface.setupConfig(params);
-    }
-    final (result, _) = await (
-      _interface.setupConfig(params),
-      preloadInvoke(),
-    ).wait;
-    return result;
-  }
+  Future<String> setupConfig({required SetupParams params}) =>
+      _interface.setupConfig(params);
 
   Future<List<Group>> getProxiesGroups({
     required ProxiesSortType sortType,
@@ -241,7 +239,11 @@ class CoreController {
   }
 
   Future<Map<String, dynamic>> getAppliedConfig() async {
-    return _readConfig(await appPath.configFilePath);
+    final result = await _interface.invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.getAppliedInput,
+    );
+    if (result == null) throw StateError('Applied configuration unavailable');
+    return result;
   }
 
   Future<Map<String, dynamic>> _readConfig(String path) async {

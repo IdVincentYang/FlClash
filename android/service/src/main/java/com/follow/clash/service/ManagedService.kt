@@ -12,6 +12,8 @@ interface ManagedService {
     fun attachRequest(requestId: Long)
     fun start()
 
+    fun stopOwned(expected: RequestServiceIdentity): Boolean
+
     fun stop()
 }
 

@@ -10,8 +10,5 @@ func stopOwnedRequestService(expected, current requestTunIdentity, stopTun func(
 		return false
 	}
 	stopTun()
-	if isRunning.Load() {
-		handleStopListener()
-	}
 	return true
 }

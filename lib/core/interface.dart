@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 
 import 'desktop/model.dart';
 import 'method.dart';
@@ -92,6 +93,46 @@ mixin CoreInterface {
 }
 
 abstract class CoreHandlerInterface with CoreInterface {
+  Future<void> releaseConfigInput(String markerName) async {
+    await invokeMethod<bool>(
+      method: CoreMethod.releaseConfigInput,
+      arguments: markerName,
+    );
+  }
+
+  Future<ConfigFact> getConfigState() async {
+    final result = await invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.getConfigState,
+    );
+    if (result == null) {
+      throw StateError('Core configuration state unavailable');
+    }
+    return ConfigFact.fromJson(result);
+  }
+
+  Future<ConfigApplyResult> applyConfigInput(Map<String, Object?> input) async {
+    var receipt = await invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.registerConfigInput,
+      arguments: input,
+    );
+    if (receipt == null) throw StateError('Configuration registration failed');
+    for (final phase in [
+      CoreMethod.prepareConfig,
+      CoreMethod.installConfig,
+      CoreMethod.activateConfig,
+    ]) {
+      final result = await invokeMethod<Map<String, dynamic>>(
+        method: phase,
+        arguments: receipt,
+      );
+      if (result == null) throw StateError('Configuration phase failed');
+      final applied = ConfigApplyResult.fromJson(result);
+      if (!['prepared', 'installed'].contains(applied.status)) return applied;
+      receipt = Map<String, dynamic>.from(applied.receipt);
+    }
+    throw StateError('Configuration did not reach activation');
+  }
+
   Future<T?> _invokeMethod<T>({
     required CoreMethod method,
     Object? arguments,

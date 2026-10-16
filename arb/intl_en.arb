@@ -774,5 +774,10 @@
   "requestProxyDefault": "GLOBAL (current selection: {target})",
   "requestModeHelp": "Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.",
   "requestRouteUnavailable": "The selected request route is unavailable.",
-  "requestPartialCommit": "Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked."
+  "requestPartialCommit": "Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked.",
+  "appliedProfile": "Active configuration",
+  "configApplying": "Applying configuration",
+  "configInactive": "No active configuration",
+  "configLoaded": "Loaded; traffic is not handled",
+  "configRetained": "New configuration not applied; using the previous configuration"
 }

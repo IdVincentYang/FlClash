@@ -39,17 +39,19 @@ Future<ClashConfig> clashConfig(Ref ref, int profileId) async {
 
 @riverpod
 Future<SetupState> setupState(Ref ref, int? profileId) async {
-  final profile = ref.watch(profileProvider(profileId));
-  final scriptId = profile?.scriptId;
-  final profileLastUpdateDate = profile?.lastUpdateDate?.millisecondsSinceEpoch;
-  final overwriteType = profile?.overwriteType ?? OverwriteType.standard;
+  ref.watch(profileProvider(profileId));
   final dns = ref.watch(patchClashConfigProvider.select((state) => state.dns));
   final dnsOverrideKeys = ref.watch(
     patchClashConfigProvider.select((state) => state.dnsOverrideKeys),
   );
   final overrideDns = ref.watch(overrideDnsProvider);
+  final profiles = await database.profilesDao.query().get();
+  final profile = profiles.getProfile(profileId);
+  final scriptId = profile?.scriptId;
+  final profileLastUpdateDate = profile?.lastUpdateDate?.millisecondsSinceEpoch;
+  final overwriteType = profile?.overwriteType ?? OverwriteType.standard;
   final allProfileProviders = feature.customProviders
-      ? ref.watch(profileProvidersProvider)
+      ? {for (final profile in profiles) profile.realLabel: profile.id}
       : const <String, int>{};
   List<CustomProxy> customProxies = [];
   List<ProxyGroup> proxyGroups = [];

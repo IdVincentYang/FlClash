@@ -11,6 +11,10 @@ import com.follow.clash.core.Core
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.follow.clash.models.SharedState
+import com.follow.clash.models.ConfigReceipt
+import com.follow.clash.models.ConfigApplyResult
+import com.google.gson.JsonObject
+import com.follow.clash.common.RequestServiceIdentity
 import com.follow.clash.plugins.AppPlugin
 import com.follow.clash.plugins.TilePlugin
 import com.follow.clash.service.ServiceConfig
@@ -49,7 +53,6 @@ internal interface ServiceStateHost {
 
     fun app(): AppGateway?
 
-    suspend fun quickSetup(initParams: String, setupParams: String): Result<String>
 
     suspend fun startService(options: VpnOptions): Long
 
@@ -68,6 +71,14 @@ internal interface ServiceStateHost {
     suspend fun startService(options: VpnOptions, requestId: Long): Long = startService(options)
 
     suspend fun adoptServiceRequest(requestId: Long) {}
+
+    fun registerConfigInput(input: JsonObject): ConfigReceipt = error("Configuration registration unavailable")
+
+    suspend fun configPhase(method: String, receipt: ConfigReceipt): ConfigApplyResult = error("Configuration phase unavailable")
+
+    suspend fun replayConfigInput(): JsonObject = error("Configuration checkpoint unavailable")
+
+    suspend fun stopOwnedService(identity: RequestServiceIdentity): Boolean = false
 }
 
 internal interface TileGateway {
@@ -172,15 +183,28 @@ internal object AndroidServiceStateHost : ServiceStateHost {
         }
     }
 
-    override suspend fun quickSetup(initParams: String, setupParams: String): Result<String> =
-        ServiceController.quickSetup(initParams, setupParams)
-
     override suspend fun startService(options: VpnOptions): Long =
         ServiceController.start(options, ServiceState.captureRequestToken().id)
 
     override suspend fun startService(options: VpnOptions, requestId: Long): Long = ServiceController.start(options, requestId)
 
     override suspend fun adoptServiceRequest(requestId: Long) = ServiceController.adoptRequest(requestId)
+
+    override fun registerConfigInput(input: JsonObject): ConfigReceipt {
+        val request = Gson().toJson(mapOf("action" to "registerConfigInput", "ConfigInput" to input))
+        val response = JsonParser.parseString(Core.requestControl(request)).asJsonObject
+        check(!response.has("error")) { "Configuration registration rejected" }
+        return Gson().fromJson(response, ConfigReceipt::class.java)
+    }
+
+    override suspend fun configPhase(method: String, receipt: ConfigReceipt): ConfigApplyResult =
+        Gson().fromJson(ServiceController.configCall(method, Gson().toJsonTree(receipt)), ConfigApplyResult::class.java)
+
+    override suspend fun replayConfigInput(): JsonObject = ServiceController.configCall(
+        "getReplayInput", JsonParser.parseString(ServiceStateMachine.initParams(homeDirPath, sdkInt)),
+    ).asJsonObject
+
+    override suspend fun stopOwnedService(identity: RequestServiceIdentity): Boolean = ServiceController.stopOwned(identity)
 
     override fun publishRequestState(state: ApplicationRequestState): Boolean = runCatching {
         val response = Core.requestControl(Gson().toJson(mapOf("action" to "publish", "state" to state)))

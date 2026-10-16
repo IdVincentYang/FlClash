@@ -229,14 +229,14 @@ void main() {
       expect(await lib.startListener(), isFalse);
     });
 
-    test('stopListener stops the service before the core listener', () async {
+    test('stopListener submits only the owned native stop', () async {
       await lib.start();
       service.onInvokeMethod = (_) =>
           const CoreMethodResponse(id: '1', result: true);
       service.calls.clear();
 
       expect(await lib.stopListener(), isTrue);
-      expect(service.calls, ['stop', 'invokeMethod:stopListener']);
+      expect(service.calls, ['stop']);
     });
   });
 

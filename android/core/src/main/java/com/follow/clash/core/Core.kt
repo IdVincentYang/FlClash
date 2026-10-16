@@ -111,28 +111,6 @@ object Core {
         }
     }
 
-    fun quickSetup(
-        initParamsString: String,
-        setupParamsString: String,
-        callback: (result: String?) -> Unit,
-    ) {
-        quickSetup(
-            initParamsString,
-            setupParamsString,
-            object : InvokeInterface {
-                override fun onResult(result: ByteArray?) {
-                    callback(result?.decodeToString())
-                }
-            },
-        )
-    }
-
-    private external fun quickSetup(
-        initParamsString: String,
-        setupParamsString: String,
-        cb: InvokeInterface,
-    )
-
     external fun stopTun()
 
     external fun getTraffic(onlyStatisticsProxy: Boolean): String

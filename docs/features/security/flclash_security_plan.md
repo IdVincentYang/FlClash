@@ -5,7 +5,7 @@
 | Loop | 子计划入口 | 状态 | 前置依赖 |
 | --- | --- | --- | --- |
 | 1 | [loop1_plan.md](loop1/loop1_plan.md) | 部分完成，含用户暂缓项 | 无 |
-| 2 | [loop2_plan.md](loop2/loop2_plan.md) | 已细化，首项进入设计 | L1-T03 已完成；本地配置/业务出口可先行，联网身份边界接 Loop 1 实际交付 |
+| 2 | [loop2_plan.md](loop2/loop2_plan.md) | 进行中 | L1-T03 已完成；本地配置/业务出口可先行，联网身份边界接 Loop 1 实际交付 |
 | 3 | [loop3_plan.md](loop3/loop3_plan.md) | 计划待评审，未实施 | 无；与 Loop 1 对齐本地报告边界 |
 | 4 | [loop4_plan.md](loop4/loop4_plan.md) | 计划待评审，未实施 | 可先审基线；完整范围接收 Loop 5 清单 |
 | 5 | [loop5_plan.md](loop5/loop5_plan.md) | 计划待评审，未实施 | 无；按各 loop 最终修改更新清单 |

@@ -191,6 +191,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "appAccessControl": MessageLookupByLibrary.simpleMessage("应用访问控制"),
     "appIconDesign": MessageLookupByLibrary.simpleMessage("应用图标设计"),
     "appendSystemDns": MessageLookupByLibrary.simpleMessage("追加系统DNS"),
+    "appliedProfile": MessageLookupByLibrary.simpleMessage("实际生效配置"),
     "authentication": MessageLookupByLibrary.simpleMessage("认证"),
     "authenticationDesc": MessageLookupByLibrary.simpleMessage(
       "为本地代理端口启用认证，防止本机其他应用擅自使用",
@@ -278,7 +279,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "colorSchemes": MessageLookupByLibrary.simpleMessage("配色方案"),
     "columns": MessageLookupByLibrary.simpleMessage("列数"),
     "compatible": MessageLookupByLibrary.simpleMessage("兼容模式"),
+    "configApplying": MessageLookupByLibrary.simpleMessage("正在应用配置"),
     "configDataDetected": MessageLookupByLibrary.simpleMessage("检测到配置中存在数据"),
+    "configInactive": MessageLookupByLibrary.simpleMessage("当前未接管流量"),
+    "configLoaded": MessageLookupByLibrary.simpleMessage("已载入配置，尚未接管流量"),
+    "configRetained": MessageLookupByLibrary.simpleMessage("新配置未应用，仍使用之前的配置"),
     "confirm": MessageLookupByLibrary.simpleMessage("确定"),
     "confirmClearAllData": MessageLookupByLibrary.simpleMessage("确定要清除所有数据？"),
     "confirmDeleteProxyGroup": MessageLookupByLibrary.simpleMessage(

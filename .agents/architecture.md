@@ -161,8 +161,9 @@ Android deliberately keeps Flutter requests optimistic and the native layer auth
   state. Identity checks discard obsolete work. `startPreparationLock` serializes permission/setup preparation and
   `transitionLock` serializes actual service transitions.
 - `ServiceController` owns exactly one `ManagedServiceBinding`, selects `VpnService` or `ProxyService` from `VpnOptions`,
-  binds with a five-second connection timeout, invokes `ManagedService.start()`/`stop()` off the main thread, and clears
-  binding/run-time state on failure or disconnection.
+  binds with a five-second connection timeout, invokes `ManagedService.start()`/`stopOwned()` off the main thread, and clears
+  binding/run-time state after owned cleanup or disconnection. Failed starts retain the binding until
+  `ServiceState` finishes identity-owned cleanup.
 - Generic service creation/destruction is lifecycle evidence, not user intent. New commands must flow through
   `ServiceState.requestStart()`/`requestStop()` or the explicit system-action handlers instead of inferring intent from a
   callback.
@@ -171,7 +172,10 @@ Quick Settings, notification, revoke, and Always-on VPN paths converge on the sa
 
 - With a Flutter engine attached, `ServiceState.handleStartAction()`/`handleStopAction()` forward through `TilePlugin` to
   `TileManager`, which updates normal Flutter setup state. Without Flutter, native code restores `SharedState` from
-  preferences, runs `quickSetup`, checks VPN permission, and submits the native request directly.
+  preferences for independent VPN options and replays the verified ConfigInput checkpoint through the same
+  prepare/service/install/activate flow. Legacy data without a valid checkpoint requires a foreground Flutter rebuild.
+  Full application, controlled hot updates and controller compatibility are described in
+  [L2-T01](../docs/features/security/loop2/l2_t01_plan.md).
 - Android may create an Always-on `VpnService` through `onStartCommand()` without FlClash's bound-service path. The service
   sends the explicit, permission-protected `VPN_START_REQUESTED` broadcast to `ServiceBroadcastReceiver`, which routes it to
   `ServiceState.handleStartAction()` so Core/configuration and the normal binding are restored before TUN is treated as

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -78,6 +80,26 @@ class TestCommonAction extends CommonAction {
 class TestSetupAction extends SetupAction {
   final List<bool> coreRunningCalls = [];
   final List<Completer<void>> pendingCoreCalls = [];
+  bool requestedRunning = false;
+
+  @override
+  Future<bool> setRunning(
+    bool running, {
+    bool initialize = false,
+    int? preparedRequestId,
+    String source = 'ui',
+    bool? paused,
+  }) {
+    requestedRunning = running;
+    return super.setRunning(
+      running,
+      initialize: initialize,
+      preparedRequestId: preparedRequestId,
+      source: source,
+      paused: paused,
+    );
+  }
+
   int trafficResets = 0;
   int applyProfileCalls = 0;
   bool blockCoreCalls = false;
@@ -110,20 +132,59 @@ class TestSetupAction extends SetupAction {
   void resetCoreTraffic() => trafficResets++;
 
   @override
-  Future<bool> applyProfile({
-    bool silence = false,
-    bool force = false,
-    Future<void> Function()? preloadInvoke,
-  }) async {
+  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
     applyProfileCalls++;
-    await preloadInvoke?.call();
+    if (requestedRunning &&
+        !ref.read(safeModeProvider) &&
+        !ref.read(suspendProvider)) {
+      return setCoreRunning(true);
+    }
     return true;
   }
 }
 
+_MockCoreHandlerInterface _newCore() {
+  final core = _MockCoreHandlerInterface();
+  when(
+    () => core.getConfigState(),
+  ).thenAnswer((_) async => const ConfigFact(runtimeEpoch: 'fixture'));
+  when(() => core.releaseConfigInput(any())).thenAnswer((_) async {});
+  return core;
+}
+
+ConfigApplyResult _appliedResult([String status = 'installedInactive']) =>
+    ConfigApplyResult.fromJson({
+      'status': status,
+      'message': status == 'blocked' ? 'configuration rejected' : '',
+      'fact': {
+        'runtimeEpoch': 'fixture',
+        'version': 1,
+        'owner': 1,
+        'token': 1,
+        'phase': status == 'blocked' ? 'failed' : 'ready',
+        'businessActive': false,
+      },
+    });
+
+Future<String> _submittedYaml(Object? arguments) async {
+  final input = Map<String, Object?>.from(arguments as Map);
+  final home = await appPath.homeDirPath;
+  final manifest =
+      jsonDecode(
+            await File(
+              '$home/config-inputs/${input['inputId']}.json',
+            ).readAsString(),
+          )
+          as Map;
+  return File(
+    '$home/config-inputs/${manifest['yamlSha256']}.yaml',
+  ).readAsString();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() {
+  setUpAll(() async {
+    await AppLocalizations.load(const Locale('en'));
     registerFallbackValue(const SetupParams(selectedMap: {}, testUrl: ''));
     registerFallbackValue(
       const UpdateParams(
@@ -213,7 +274,7 @@ void main() {
 
       expect(scopedAction.coreRunningCalls, isEmpty);
       expect(scopedAction.applyProfileCalls, 1);
-      expect(scoped.read(isStartProvider), isTrue);
+      expect(scoped.read(isStartProvider), isFalse);
 
       await scoped.read(setupActionProvider.notifier).setRunning(false);
 
@@ -242,9 +303,9 @@ void main() {
       markInitialized();
       action.coreRunningError = StateError('start failed');
 
-      await expectLater(
-        container.read(setupActionProvider.notifier).setRunning(true),
-        throwsStateError,
+      expect(
+        await container.read(setupActionProvider.notifier).setRunning(true),
+        isFalse,
       );
 
       expect(container.read(runTimeProvider), isNull);
@@ -564,7 +625,7 @@ void main() {
 
   group('updateConfig', () {
     test('safe mode pushes tun disabled even once authorized', () async {
-      final core = _MockCoreHandlerInterface();
+      final core = _newCore();
       when(() => core.updateConfig(any())).thenAnswer((_) async => '');
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
@@ -595,7 +656,7 @@ void main() {
     });
 
     test('safe mode closes the external controller', () async {
-      final core = _MockCoreHandlerInterface();
+      final core = _newCore();
       when(() => core.updateConfig(any())).thenAnswer((_) async => '');
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
@@ -792,49 +853,50 @@ void main() {
     );
 
     test(
-      'a refresh failure still runs core.setupConfig and preloadInvoke',
+      'a refresh failure can still apply the verified cached profile',
       () async {
         final profile = Profile.normal(label: 'p', url: 'http://127.0.0.1:9/');
-        final core = _MockCoreHandlerInterface();
-        when(() => core.setupConfig(any())).thenAnswer((_) async => '');
-        var preloadRan = false;
+        final core = _newCore();
+        when(
+          () => core.applyConfigInput(any()),
+        ).thenAnswer((_) async => _appliedResult());
+        when(() => core.getConfig(any())).thenAnswer(
+          (_) async => {
+            'mode': 'rule',
+            'rules': ['MATCH,DIRECT'],
+          },
+        );
         final scoped = ProviderContainer(
           overrides: [
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            setupStateProvider.overrideWith(
+              (_, id) => nullProfileSetupState.copyWith(profileId: id),
+            ),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             setupActionProvider.overrideWith(SetupAction.new),
           ],
         );
         addTearDown(scoped.dispose);
 
-        await scoped
+        final succeeded = await scoped
             .read(setupActionProvider.notifier)
-            .applyProfile(
-              force: true,
-              preloadInvoke: () async {
-                preloadRan = true;
-              },
-            );
-
-        expect(preloadRan, isTrue);
-        verify(() => core.setupConfig(any())).called(1);
+            .applyProfile(force: true);
+        expect(succeeded, isTrue);
+        verify(() => core.applyConfigInput(any())).called(1);
       },
     );
 
     test(
-      'a profile that fails to build still pushes the empty config to core',
+      'a build failure retains the existing input and never sends empty YAML',
       () async {
         final profile = Profile.normal(label: 'p');
-        final core = _MockCoreHandlerInterface();
+        final core = _newCore();
         when(() => core.getConfig(any())).thenThrow(Exception('broken yaml'));
         String? pushedConfig;
-        when(() => core.setupConfig(any())).thenAnswer((_) async {
-          pushedConfig = await File(
-            await appPath.configFilePath,
-          ).readAsString();
-          return '';
+        when(() => core.applyConfigInput(any())).thenAnswer((call) async {
+          pushedConfig = await _submittedYaml(call.positionalArguments.single);
+          return _appliedResult();
         });
         final scoped = ProviderContainer(
           overrides: [
@@ -855,7 +917,8 @@ void main() {
             .applyProfile(force: true);
 
         expect(succeeded, isFalse);
-        expect(pushedConfig, isEmpty);
+        expect(pushedConfig, isNull);
+        verifyNever(() => core.applyConfigInput(any()));
         expect(scoped.read(currentProfileIdProvider), profile.id);
       },
     );
@@ -863,20 +926,25 @@ void main() {
     test(
       'a config write failure reports setup as failed without calling core',
       () async {
-        final configPath = await appPath.configFilePath;
-        final configFile = File(configPath);
-        if (await configFile.exists()) {
-          await configFile.delete();
+        final home = await appPath.homeDirPath;
+        final blockedInputs = File('$home/config-inputs');
+        final existingInputs = Directory(blockedInputs.path);
+        if (await existingInputs.exists()) {
+          await existingInputs.delete(recursive: true);
         }
-        final configAsDirectory = Directory(configPath);
-        await configAsDirectory.create(recursive: true);
-
-        final core = _MockCoreHandlerInterface();
-        when(() => core.setupConfig(any())).thenAnswer((_) async => '');
+        await blockedInputs.writeAsString('blocked');
+        final profile = Profile.normal(label: 'write failure');
+        final core = _newCore();
+        when(() => core.getConfig(any())).thenAnswer((_) async => {});
+        when(
+          () => core.applyConfigInput(any()),
+        ).thenAnswer((_) async => _appliedResult());
         final scoped = ProviderContainer(
           overrides: [
-            currentProfileProvider.overrideWithValue(null),
-            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            currentProfileProvider.overrideWithValue(profile),
+            setupStateProvider.overrideWith(
+              (_, id) => nullProfileSetupState.copyWith(profileId: id),
+            ),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             setupActionProvider.overrideWith(SetupAction.new),
           ],
@@ -889,9 +957,9 @@ void main() {
               .applyProfile(force: true);
 
           expect(succeeded, isFalse);
-          verifyNever(() => core.setupConfig(any()));
+          verifyNever(() => core.applyConfigInput(any()));
         } finally {
-          await configAsDirectory.delete(recursive: true);
+          await blockedInputs.delete();
         }
       },
     );
@@ -900,14 +968,12 @@ void main() {
       'safe mode writes a closed external controller into the profile',
       () async {
         final profile = Profile.normal(label: 'p');
-        final core = _MockCoreHandlerInterface();
+        final core = _newCore();
         when(() => core.getConfig(any())).thenAnswer((_) async => {});
         String? pushedConfig;
-        when(() => core.setupConfig(any())).thenAnswer((_) async {
-          pushedConfig = await File(
-            await appPath.configFilePath,
-          ).readAsString();
-          return '';
+        when(() => core.applyConfigInput(any())).thenAnswer((call) async {
+          pushedConfig = await _submittedYaml(call.positionalArguments.single);
+          return _appliedResult();
         });
         final scoped = ProviderContainer(
           overrides: [
@@ -943,7 +1009,7 @@ void main() {
 
     test('a custom overwrite injects only the providers it names', () async {
       final profile = Profile.normal(label: 'p');
-      final core = _MockCoreHandlerInterface();
+      final core = _newCore();
       when(() => core.getConfig(any())).thenAnswer(
         (_) async => {
           'proxy-providers': {
@@ -1051,14 +1117,18 @@ void main() {
     });
 
     test(
-      'a rejected setupConfig without a handoff reports failure, not success',
+      'a missing selected profile is rejected before a Core apply',
       () async {
-        final core = _MockCoreHandlerInterface();
-        when(() => core.setupConfig(any())).thenThrow(StateError('rejected'));
+        final core = _newCore();
+        when(
+          () => core.applyConfigInput(any()),
+        ).thenThrow(StateError('rejected'));
         final scoped = ProviderContainer(
           overrides: [
             currentProfileProvider.overrideWithValue(null),
-            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            setupStateProvider.overrideWith(
+              (_, id) => nullProfileSetupState.copyWith(profileId: id),
+            ),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             setupActionProvider.overrideWith(SetupAction.new),
           ],
@@ -1070,19 +1140,30 @@ void main() {
             .applyProfile(force: true);
 
         expect(succeeded, isFalse);
-        verify(() => core.setupConfig(any())).called(1);
+        verifyNever(() => core.applyConfigInput(any()));
       },
     );
 
     test(
-      'a listener handoff failure during initialize rolls back running',
+      'a blocked activation during initialize never publishes running',
       () async {
-        final core = _MockCoreHandlerInterface();
-        when(() => core.setupConfig(any())).thenAnswer((_) async => '');
+        final profile = Profile.normal(label: 'p');
+        final core = _newCore();
+        when(() => core.getConfig(any())).thenAnswer(
+          (_) async => {
+            'rules': ['MATCH,DIRECT'],
+          },
+        );
+        when(
+          () => core.applyConfigInput(any()),
+        ).thenAnswer((_) async => _appliedResult('blocked'));
         final scoped = ProviderContainer(
           overrides: [
-            currentProfileProvider.overrideWithValue(null),
-            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            setupStateProvider.overrideWith(
+              (_, id) => nullProfileSetupState.copyWith(profileId: id),
+            ),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             setupActionProvider.overrideWith(
               _ListenerHandoffFailureSetupAction.new,
@@ -1096,23 +1177,32 @@ void main() {
 
         await handoffAction.setRunning(true, initialize: true);
 
-        expect(handoffAction.coreRunningCalls, [true, false]);
+        expect(handoffAction.coreRunningCalls, isEmpty);
         expect(scoped.read(runTimeProvider), isNull);
-        verify(() => core.setupConfig(any())).called(1);
+        verify(() => core.applyConfigInput(any())).called(1);
       },
     );
 
     test(
-      'a non-empty setupConfig message during initialize rolls back running',
+      'a rejected activation during initialize leaves runtime stopped',
       () async {
-        final core = _MockCoreHandlerInterface();
+        final profile = Profile.normal(label: 'p');
+        final core = _newCore();
+        when(() => core.getConfig(any())).thenAnswer(
+          (_) async => {
+            'rules': ['MATCH,DIRECT'],
+          },
+        );
         when(
-          () => core.setupConfig(any()),
-        ).thenAnswer((_) async => 'config rejected');
+          () => core.applyConfigInput(any()),
+        ).thenAnswer((_) async => _appliedResult('blocked'));
         final scoped = ProviderContainer(
           overrides: [
-            currentProfileProvider.overrideWithValue(null),
-            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            setupStateProvider.overrideWith(
+              (_, id) => nullProfileSetupState.copyWith(profileId: id),
+            ),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             setupActionProvider.overrideWith(_MessageFailureSetupAction.new),
           ],
@@ -1124,9 +1214,9 @@ void main() {
 
         await messageAction.setRunning(true, initialize: true);
 
-        expect(messageAction.coreRunningCalls, [true, false]);
+        expect(messageAction.coreRunningCalls, isEmpty);
         expect(scoped.read(runTimeProvider), isNull);
-        verify(() => core.setupConfig(any())).called(1);
+        verify(() => core.applyConfigInput(any())).called(1);
       },
     );
   });

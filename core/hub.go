@@ -37,7 +37,6 @@ import (
 	cp "github.com/metacubex/mihomo/constant/provider"
 	"github.com/metacubex/mihomo/dns"
 	"github.com/metacubex/mihomo/hub/executor"
-	"github.com/metacubex/mihomo/listener"
 	"github.com/metacubex/mihomo/log"
 	coreNtp "github.com/metacubex/mihomo/ntp/ntp"
 	rp "github.com/metacubex/mihomo/rules/provider"
@@ -54,28 +53,41 @@ var (
 func handleInitClash(params *InitParams) bool {
 	configMu.Lock()
 	defer configMu.Unlock()
-	sdkVersion.Store(int32(params.Version))
-	constant.SetHomeDir(params.HomeDir)
-	initOwnership(params.HomeDir)
-	isInit.Store(true)
+	if isInit.Load() {
+		return filepath.Clean(params.HomeDir) == filepath.Clean(constant.Path.HomeDir())
+	}
+	initializeCore(params)
 	return true
 }
 
 func handleStartListener() bool {
 	configMu.Lock()
 	defer configMu.Unlock()
-	isRunning.Store(true)
-	updateListeners(currentConfig)
-	resolver.ResetConnection()
-	refreshRoute()
-	return true
+	scope := activeBusiness.Load()
+	return scope != nil && scope.Check() == nil && currentConfig != nil && configFact.Phase == "ready"
 }
 
 func handleStopListener() bool {
+	return stopListenerReceived(0)
+}
+
+func stopListenerReceived(sequence uint64) bool {
 	configMu.Lock()
 	defer configMu.Unlock()
+	if op := latestConfig.Load(); sequence != 0 && op != nil && op.token > sequence {
+		return true
+	}
+	revokeBusiness()
+	preparedConfigGate.Store(nil)
 	isRunning.Store(false)
-	listener.StopListener()
+	tunnel.OnSuspend()
+	stopBusinessListeners()
+	checkpointMu.Lock()
+	configFact.BusinessActive = false
+	configFact.Phase = "retired"
+	configFact.Version = configFactSequence.Add(1)
+	checkpointMu.Unlock()
+	sendMessage(Message{Type: ConfigStateMessage, Data: configFact})
 	resolver.ResetConnection()
 	return true
 }
@@ -101,7 +113,7 @@ func handleShutdown() bool {
 
 	configMu.Lock()
 	isRunning.Store(false)
-	listener.StopListener()
+	stopBusinessListeners()
 	updater.StopGeoUpdater()
 	coreNtp.ReCreateNTPService("", 0, "", nil, false)
 	executor.Shutdown()
@@ -118,7 +130,7 @@ func handleValidateConfig(path string) string {
 	if err != nil {
 		return err.Error()
 	}
-	if _, err = config.UnmarshalRawConfig(buf); err != nil {
+	if _, _, err = decodeConfigDocument(buf); err != nil {
 		return err.Error()
 	}
 	return ""
@@ -256,17 +268,33 @@ func selectableGroup(groupName string) (pickableGroup, error) {
 }
 
 func handleChangeProxy(params *ChangeProxyParams) *ChangeProxyResult {
+	return changeProxyOwned(params, nil, false)
+}
+
+func changeProxyOwned(params *ChangeProxyParams, expected *controllerConfigMutation, clear bool) *ChangeProxyResult {
 	selectMu.Lock()
+	checkpointMu.Lock()
 	locked := true
 	defer func() {
 		if locked {
+			checkpointMu.Unlock()
 			selectMu.Unlock()
 		}
 	}()
+	if expected != nil && !expected.valid() {
+		return &ChangeProxyResult{Message: errConfigSuperseded.Error()}
+	}
+	if pendingConfig != nil && configFact.Phase != "ready" {
+		return &ChangeProxyResult{Message: errConfigNotApplied.Error()}
+	}
+	owner := configFact.Owner
 
 	selector, err := selectableGroup(params.GroupName)
 	if err != nil {
 		return &ChangeProxyResult{Message: err.Error()}
+	}
+	if clear && lookupProxy(params.GroupName).Type() == constant.Selector {
+		return &ChangeProxyResult{Message: "Only automatic groups can clear a forced selection"}
 	}
 	before := selector.Now()
 	if before != params.ProxyName {
@@ -279,16 +307,33 @@ func handleChangeProxy(params *ChangeProxyParams) *ChangeProxyResult {
 		if err != nil {
 			return &ChangeProxyResult{Message: err.Error()}
 		}
+		checkpointMu.Unlock()
 		selectMu.Unlock()
 		locked = false
 		probe()
 		selectMu.Lock()
+		checkpointMu.Lock()
 		locked = true
+		if owner != configFact.Owner || pendingConfig != nil && configFact.Phase != "ready" {
+			return &ChangeProxyResult{Message: errConfigSuperseded.Error()}
+		}
 	} else if err := selector.Set(params.ProxyName); err != nil {
 		return &ChangeProxyResult{Message: err.Error()}
 	}
 	changed := selector.Now() != before
 	refreshRouteLocked(false)
+	checkpointMu.Unlock()
+	selectMu.Unlock()
+	locked = false
+	configMu.Lock()
+	checkpointMu.Lock()
+	configFact.Version = configFactSequence.Add(1)
+	checkpointMu.Unlock()
+	err = saveAcceptedConfigChanges(nil, nil)
+	configMu.Unlock()
+	if err != nil {
+		return &ChangeProxyResult{Message: err.Error(), Changed: changed}
+	}
 	return &ChangeProxyResult{Changed: changed}
 }
 
@@ -330,10 +375,7 @@ func delayTestTimeout(milliseconds int64) time.Duration {
 
 var missingDelayTestProxyAt atomic.Int64
 
-// A delay test against a name the tunnel does not know is what an apply that
-// fell back to the default config looks like from the outside: the profile
-// still lists every node and every one of them reports Timeout. Say so, once a
-// second rather than once per node, so the log names the real failure.
+// Rate-limit missing-node diagnostics so stale UI batches cannot flood the log.
 func reportMissingDelayTestProxy(name string) {
 	now := time.Now().UnixNano()
 	last := missingDelayTestProxyAt.Load()
@@ -828,7 +870,8 @@ func handleGetConfig(path string) (*config.RawConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.UnmarshalRawConfig(buf)
+	raw, _, err := decodeConfigDocument(buf)
+	return raw, err
 }
 
 func handleDumpRuleSet(path string) (string, error) {

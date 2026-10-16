@@ -9,15 +9,18 @@ import com.follow.clash.service.modules.ServiceModules
 import com.follow.clash.common.RequestServiceIdentity
 import com.follow.clash.common.RequestObservations
 import java.util.UUID
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 class ProxyService : Service(), ManagedService {
     private val modules = ServiceModules(this)
     private val binder = LocalBinder()
+    private val requestLock = ReentrantLock()
     @Volatile private var destroyed = false
     @Volatile override var requestIdentity = RequestServiceIdentity(UUID.randomUUID().toString(), 0)
         private set
 
-    override fun attachRequest(requestId: Long) {
+    override fun attachRequest(requestId: Long) = requestLock.withLock {
         check(!destroyed) { "Service instance was destroyed" }
         requestIdentity = requestIdentity.copy(requestId = requestId)
     }
@@ -45,7 +48,7 @@ class ProxyService : Service(), ManagedService {
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    override fun start() {
+    override fun start() = requestLock.withLock {
         check(!destroyed) { "Service instance was destroyed" }
         try {
             modules.start()
@@ -53,6 +56,13 @@ class ProxyService : Service(), ManagedService {
             stop()
             throw error
         }
+    }
+
+    override fun stopOwned(expected: RequestServiceIdentity): Boolean = requestLock.withLock {
+        if (requestIdentity != expected) return@withLock false
+        if (destroyed) return@withLock true
+        stop()
+        true
     }
 
     override fun stop() {

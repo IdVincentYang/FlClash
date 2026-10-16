@@ -211,3 +211,18 @@ type GeoUpdateStatus struct {
 	Skipped  bool   `json:"skipped,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
+
+const (
+	registerConfigInputMethod CoreMethod  = "registerConfigInput"
+	prepareConfigMethod       CoreMethod  = "prepareConfig"
+	installConfigMethod       CoreMethod  = "installConfig"
+	activateConfigMethod      CoreMethod  = "activateConfig"
+	abortConfigMethod         CoreMethod  = "abortConfig"
+	getConfigStateMethod      CoreMethod  = "getConfigState"
+	getReplayInputMethod      CoreMethod  = "getReplayInput"
+	ConfigStateMessage        MessageType = "configState"
+)
+
+const getAppliedInputMethod CoreMethod = "getAppliedInput"
+
+const releaseConfigInputMethod CoreMethod = "releaseConfigInput"

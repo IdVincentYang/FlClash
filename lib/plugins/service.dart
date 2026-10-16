@@ -119,9 +119,25 @@ class Service {
     return result;
   }
 
-  Future<bool> failRunIntent(int requestId) async {
-    return await methodChannel.invokeMethod<bool>('failRunIntent', requestId) ??
-        false;
+  Future<Map<String, Object?>> failRunIntent(
+    int requestId, {
+    required int token,
+  }) async {
+    final result = await methodChannel.invokeMethod<String>('failRunIntent', {
+      'requestId': requestId,
+      'token': token,
+    });
+    if (result == null) throw StateError('Service cleanup unavailable');
+    return Map<String, Object?>.from(json.decode(result) as Map);
+  }
+
+  Future<Map<String, Object?>> applyConfig(Map<String, Object?> input) async {
+    final result = await methodChannel.invokeMethod<String>(
+      'applyConfig',
+      json.encode(input),
+    );
+    if (result == null) throw StateError('Configuration apply unavailable');
+    return Map<String, Object?>.from(json.decode(result) as Map);
   }
 
   Future<Map<String, Object?>> getRequestState() async {

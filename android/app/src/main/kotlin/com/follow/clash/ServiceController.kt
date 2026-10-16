@@ -16,6 +16,10 @@ import com.follow.clash.service.ProxyService
 import com.follow.clash.service.ServiceConfig
 import com.follow.clash.service.VpnService
 import com.follow.clash.service.models.VpnOptions
+import com.google.gson.Gson
+import com.google.gson.JsonElement
+import com.google.gson.JsonParser
+import com.follow.clash.models.ConfigFact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -33,6 +37,7 @@ object ServiceController {
     @Volatile private var binding: ManagedServiceBinding? = null
     @Volatile
     private var runTimeMillis = 0L
+    @Volatile private var flutterEventListener: ((String?) -> Unit)? = null
 
     suspend fun unbind() = lock.withLock {
         clearBinding()
@@ -49,19 +54,35 @@ object ServiceController {
         }
     }
 
-    suspend fun quickSetup(
-        initParams: String,
-        setupParams: String,
-    ): Result<String> = runCatching {
-        suspendCancellableCoroutine { continuation ->
-            Core.quickSetup(initParams, setupParams) { result ->
-                continuation.resume(result.orEmpty())
-            }
-        }
+    fun setEventListener(callback: ((String?) -> Unit)?): Result<Unit> = runCatching {
+        flutterEventListener = callback
+        Core.updateEventListener(::consumeCoreEvents)
     }
 
-    fun setEventListener(callback: ((String?) -> Unit)?): Result<Unit> = runCatching {
-        Core.updateEventListener(callback)
+    private fun consumeCoreEvents(value: String?) {
+        runCatching {
+            val events = JsonParser.parseString(value).asJsonObject.getAsJsonArray("arguments")
+            events?.forEach { event ->
+                val item = event.asJsonObject
+                if (item.get("type")?.asString == "configState") {
+                    val fact = Gson().fromJson(item.get("data"), ConfigFact::class.java)
+                    GlobalState.launch { ServiceState.observeConfigFact(fact) }
+                }
+            }
+        }
+        flutterEventListener?.invoke(value)
+    }
+
+    suspend fun configCall(method: String, arguments: JsonElement): JsonElement = suspendCancellableCoroutine { continuation ->
+        Core.updateEventListener(::consumeCoreEvents)
+        Core.invokeMethod(Gson().toJson(mapOf("method" to method, "arguments" to arguments))) { bytes ->
+            val response = runCatching {
+                val envelope = JsonParser.parseString(bytes?.decodeToString()).asJsonObject
+                check(!envelope.has("error")) { "Core configuration call failed" }
+                requireNotNull(envelope.get("result"))
+            }
+            if (continuation.isActive) continuation.resumeWith(response)
+        }
     }
 
     suspend fun start(options: VpnOptions, requestId: Long): Long = lock.withLock {
@@ -74,7 +95,11 @@ object ServiceController {
 
         if (binding?.component != nextIntent.component) {
             if (binding != null) {
-                tearDownServices()
+                val previous = binding!!
+                val identity = requireNotNull(previous.requestIdentity) { "Previous service identity unavailable" }
+                check(previous.useService { it.stopOwned(identity) }.getOrThrow()) { "Previous service identity changed" }
+                clearBinding()
+                runTimeMillis = 0L
             }
             lateinit var nextBinding: ManagedServiceBinding
             nextBinding = ManagedServiceBinding(nextIntent, requestId) { message, identity ->
@@ -95,17 +120,12 @@ object ServiceController {
             service.attachRequest(requestId)
             currentBinding.requestIdentity = service.requestIdentity
             service.start()
+            check(service.requestIdentity.requestId == requestId) { "Service request was superseded" }
             currentBinding.requestIdentity = service.requestIdentity
         }
         if (result.isFailure) {
             GlobalState.log("Unable to start background service: ${result.exceptionOrNull()}")
-            currentBinding.stopIfConnected()
-                .onFailure { error ->
-                    GlobalState.log("Unable to clean up failed background service start: $error")
-                }
-            clearBinding()
-            runTimeMillis = 0L
-            return@withLock runTimeMillis
+            return@withLock 0L
         }
 
         if (runTimeMillis == 0L) {
@@ -117,6 +137,16 @@ object ServiceController {
     suspend fun stop() = lock.withLock {
         tearDownServices()
         runTimeMillis = 0L
+    }
+
+    suspend fun stopOwned(identity: RequestServiceIdentity): Boolean = lock.withLock {
+        val owned = binding ?: return@withLock runTimeMillis == 0L
+        var stopped = false
+        owned.useService { service ->
+            stopped = service.stopOwned(identity)
+        }.getOrThrow()
+        if (stopped && binding === owned) { clearBinding(); runTimeMillis = 0L }
+        stopped
     }
 
     suspend fun adoptRequest(requestId: Long) = lock.withLock {
@@ -212,13 +242,6 @@ private class ManagedServiceBinding(
         }
         withContext(Dispatchers.Default) {
             block(service)
-        }
-    }
-
-    suspend fun stopIfConnected(): Result<Unit> = runCatching {
-        val service = serviceState.value?.getOrNull() ?: return@runCatching
-        withContext(Dispatchers.Default) {
-            service.stop()
         }
     }
 

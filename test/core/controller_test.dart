@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/core/interface.dart';
@@ -126,35 +124,13 @@ void main() {
       expect(result, 'ok');
     });
 
-    test('setupConfig waits for asynchronous preload', () async {
+    test('setupConfig delegates without a parallel preload', () async {
       const params = SetupParams(selectedMap: {}, testUrl: 'http://x.com');
-      final preloadCompleter = Completer<void>();
-      final events = <String>[];
-      when(() => mock.setupConfig(params)).thenAnswer((_) {
-        events.add('setup');
-        return Future.value('ok');
-      });
-
-      final setupFuture = controller.setupConfig(
-        params: params,
-        preloadInvoke: () async {
-          events.add('preload');
-          await preloadCompleter.future;
-        },
-      );
-      var completed = false;
-      unawaited(setupFuture.then((_) => completed = true));
-      await Future<void>.delayed(Duration.zero);
-
-      expect(events, ['setup', 'preload']);
-      expect(completed, isFalse);
-
-      preloadCompleter.complete();
-      expect(await setupFuture, 'ok');
+      when(() => mock.setupConfig(params)).thenAnswer((_) async => 'ok');
+      expect(await controller.setupConfig(params: params), 'ok');
+      verify(() => mock.setupConfig(params)).called(1);
     });
-  });
 
-  group('proxy methods', () {
     test('changeProxy delegates to interface', () async {
       const params = ChangeProxyParams(groupName: 'G1', proxyName: 'P1');
       const result = ChangeProxyResult(changed: true);

@@ -6407,6 +6407,56 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Active configuration`
+  String get appliedProfile {
+    return Intl.message(
+      'Active configuration',
+      name: 'appliedProfile',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Applying configuration`
+  String get configApplying {
+    return Intl.message(
+      'Applying configuration',
+      name: 'configApplying',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No active configuration`
+  String get configInactive {
+    return Intl.message(
+      'No active configuration',
+      name: 'configInactive',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Loaded; traffic is not handled`
+  String get configLoaded {
+    return Intl.message(
+      'Loaded; traffic is not handled',
+      name: 'configLoaded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `New configuration not applied; using the previous configuration`
+  String get configRetained {
+    return Intl.message(
+      'New configuration not applied; using the previous configuration',
+      name: 'configRetained',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -1,6 +1,6 @@
 part of '../action.dart';
 
-enum _SetupTaskResult { completed, handoffToCoreRestart, failed }
+enum _SetupTaskResult { completed, handoffToCoreRestart, failed, superseded }
 
 class _RunRequest {
   final bool running;
@@ -20,6 +20,24 @@ class _RunRequest {
 
 @Riverpod(keepAlive: true)
 class SetupAction extends _$SetupAction {
+  SetupAction() : _android = null, _native = null, _requestClient = null;
+
+  @visibleForTesting
+  SetupAction.scoped({
+    required bool isAndroid,
+    required Service native,
+    required Request requests,
+  }) : _android = isAndroid,
+       _native = native,
+       _requestClient = requests;
+
+  final bool? _android;
+  final Service? _native;
+  final Request? _requestClient;
+  bool get _isAndroid => _android ?? system.isAndroid;
+  Service? get _service => _native ?? service;
+  Request get _requests => _requestClient ?? request;
+
   CoreController get _core => ref.read(coreHandlerProvider);
 
   Timer? _runtimeTimer;
@@ -27,12 +45,27 @@ class SetupAction extends _$SetupAction {
   final _listenerScheduler = SerialTaskScheduler();
   _RunRequest? _latestRunRequest;
   DateTime? _startTime;
+  int _setupGeneration = 0;
 
   bool get _isRunning => _startTime != null && _startTime!.isBeforeNow;
 
   @override
   void build() {
     ref.onDispose(_stopRuntimeTicker);
+    if (_isAndroid) {
+      ref.listen(nativeRequestStateProvider, (_, next) {
+        if (next['phase'] != 'started') {
+          _stopRuntimeTicker();
+          if (next['phase'] == 'failed' || next['phase'] == 'stopped') {
+            _startTime = null;
+          }
+          ref.read(runTimeProvider.notifier).value = null;
+        } else {
+          unawaited(_syncNativeRuntime(next));
+        }
+      });
+    }
+
     ref.listen(appVisibleProvider, (_, _) => _syncRuntimeTicker());
     ref.listen(
       appSettingProvider.select((state) => state.showTrayTitle),
@@ -45,14 +78,6 @@ class SetupAction extends _$SetupAction {
       (system.isMacOS &&
           !ref.read(safeModeProvider) &&
           ref.read(appSettingProvider).showTrayTitle);
-
-  SetupParams get _setupParams {
-    final selectedMap = ref.read(selectedMapProvider);
-    final testUrl = ref.read(
-      appSettingProvider.select((state) => state.testUrl),
-    );
-    return SetupParams(selectedMap: selectedMap, testUrl: testUrl);
-  }
 
   Future<bool> fullSetup() async {
     if (!ref.read(initProvider)) return true;
@@ -121,8 +146,30 @@ class SetupAction extends _$SetupAction {
               startTime.millisecondsSinceEpoch;
   }
 
+  Future<void> _syncNativeRuntime(Map<String, Object?> snapshot) async {
+    try {
+      final startedAt = await _service?.getRunTime();
+      if (!ref.mounted) return;
+      final current = ref.read(nativeRequestStateProvider);
+      if (current['processEpoch'] != snapshot['processEpoch'] ||
+          current['revision'] != snapshot['revision'] ||
+          current['phase'] != 'started') {
+        return;
+      }
+      _startTime = startedAt;
+      if (startedAt == null) {
+        _stopRuntimeTicker();
+        ref.read(runTimeProvider.notifier).value = null;
+      } else {
+        _setLocalRunning(true);
+      }
+    } catch (_) {
+      if (ref.mounted) ref.read(runTimeProvider.notifier).value = null;
+    }
+  }
+
   Future<void> _updateStartTime() async {
-    _startTime = await service?.getRunTime();
+    _startTime = await _service?.getRunTime();
   }
 
   Future<void> initStatus() async {
@@ -132,10 +179,10 @@ class SetupAction extends _$SetupAction {
     }
     commonPrint.log('init status');
     Map<String, Object?>? native;
-    if (system.isAndroid) {
-      final snapshot = await service!.getRequestState();
-      await service!.initializeRequestState(snapshot['revision'] as int);
-      native = await service!.getRequestState();
+    if (_isAndroid) {
+      final snapshot = await _service!.getRequestState();
+      await _service!.initializeRequestState(snapshot['revision'] as int);
+      native = await _service!.getRequestState();
       await _updateStartTime();
     }
     final shouldRun =
@@ -171,11 +218,11 @@ class SetupAction extends _$SetupAction {
     final request = _RunRequest(
       running: running,
       initialize: running && initialize,
-      paused: system.isAndroid && (paused ?? ref.read(suspendProvider)),
+      paused: _isAndroid && (paused ?? ref.read(suspendProvider)),
       previousStartTime: _startTime,
       nativeRequest: preparedRequestId != null
           ? Future.value(preparedRequestId)
-          : service?.prepareRunIntent(
+          : _service?.prepareRunIntent(
                   running: running,
                   source: source,
                   paused: paused ?? ref.read(suspendProvider),
@@ -183,7 +230,7 @@ class SetupAction extends _$SetupAction {
                 Future.value(null),
     );
     _latestRunRequest = request;
-    _setLocalRunning(running);
+    if (!running) _setLocalRunning(false);
     if (request.initialize) {
       globalState.needInitStatus = false;
     }
@@ -201,7 +248,7 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<void> setPaused(bool paused) async {
-    final native = service;
+    final native = _service;
     if (native == null) return;
     final snapshot = await native.getRequestState();
     await setRunning(
@@ -212,37 +259,24 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<bool> _start(_RunRequest request) async {
-    if (request.initialize) {
-      var applied = false;
-      try {
-        applied = await applyProfile(
-          force: true,
-          preloadInvoke: () => _setCoreRunning(request),
-        );
-      } catch (_) {
-        applied = false;
-      }
-      if (!applied && _isCurrent(request)) {
-        if (system.isAndroid) {
-          await _failRunRequest(request);
-        } else {
-          await globalState.safeRun(() => setRunning(false));
-        }
-      }
-      return applied;
-    }
-
+    var applied = false;
     try {
-      await _setCoreRunning(request);
+      applied = await applyProfile(force: true);
     } catch (_) {
-      await _failRunRequest(request);
-      _rollbackRunning(request);
-      rethrow;
+      applied = false;
     }
-    if (_isCurrent(request)) {
-      applyProfileDebounce(force: true, silence: true);
+    if (!_isCurrent(request)) return false;
+    if (applied) {
+      if (_isAndroid) await _updateStartTime();
+      if (!_isCurrent(request)) return false;
+      _setLocalRunning(
+        !request.paused &&
+            !ref.read(suspendProvider) &&
+            !ref.read(safeModeProvider) &&
+            (!_isAndroid || _startTime != null),
+      );
     }
-    return true;
+    return applied;
   }
 
   Future<bool> _stop(_RunRequest request) async {
@@ -266,7 +300,7 @@ class SetupAction extends _$SetupAction {
       if (!_isCurrent(request)) {
         return;
       }
-      if (!system.isAndroid && request.running && ref.read(suspendProvider)) {
+      if (!_isAndroid && request.running && ref.read(suspendProvider)) {
         return;
       }
       if (ref.read(safeModeProvider)) {
@@ -275,18 +309,18 @@ class SetupAction extends _$SetupAction {
       final requestId = await request.nativeRequest;
       final running = request.running && !request.paused;
       if (requestId == null) {
-        await setCoreRunning(running);
+        if (!await setCoreRunning(running)) {
+          throw StateError('Core transition failed');
+        }
       } else {
-        await RunRequestScope.run(requestId, () => setCoreRunning(running));
+        if (!await RunRequestScope.run(
+          requestId,
+          () => setCoreRunning(running),
+        )) {
+          throw StateError('Core transition failed');
+        }
       }
     });
-  }
-
-  Future<void> _failRunRequest(_RunRequest request) async {
-    final requestId = await request.nativeRequest;
-    if (requestId == null) return;
-    await service!.failRunIntent(requestId);
-    if (_isCurrent(request)) _setLocalRunning(false);
   }
 
   void _rollbackRunning(_RunRequest request) {
@@ -294,7 +328,7 @@ class SetupAction extends _$SetupAction {
       return;
     }
     _startTime = request.previousStartTime;
-    _setLocalRunning(!request.running);
+    _setLocalRunning(_startTime != null);
   }
 
   bool _isCurrent(_RunRequest request) => identical(_latestRunRequest, request);
@@ -329,7 +363,14 @@ class SetupAction extends _$SetupAction {
           authentication: networkSetting.authentication.credentials,
         ),
       );
-      if (message.isNotEmpty) throw MessageException(message);
+      if (message == 'configuration_reapply_required' ||
+          message == 'config is not applied') {
+        if (!await applyProfile(force: true)) {
+          throw MessageException(currentAppLocalizations.configRetained);
+        }
+      } else if (message.isNotEmpty) {
+        throw MessageException(message);
+      }
     });
   }
 
@@ -362,52 +403,59 @@ class SetupAction extends _$SetupAction {
     runAfterFrame(applyProfile);
   }
 
-  // False means building the profile, the config write, or the Core setup
-  // step failed; a profile that fails to build is still pushed to the Core
-  // as the empty config so it never keeps serving the previous one.
-  // authorizeCore failures still throw.
-  Future<bool> applyProfile({
-    bool silence = false,
-    bool force = false,
-    Future<void> Function()? preloadInvoke,
-  }) async {
-    final result = await _runSetup(
-      force: force,
-      silence: silence,
-      preloadInvoke: preloadInvoke,
-    );
-    return result != _SetupTaskResult.failed;
+  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
+    final result = await _runSetup(force: force, silence: silence);
+    return result == _SetupTaskResult.completed;
   }
 
   Future<_SetupTaskResult> _runSetup({
     bool silence = false,
     bool force = false,
-    Future<void> Function()? preloadInvoke,
     Future<bool> Function()? isCurrent,
   }) async {
+    final generation = ++_setupGeneration;
+    Future<void>? deferredCleanup;
+    Future<bool> current() async =>
+        generation == _setupGeneration &&
+        (isCurrent == null || await isCurrent());
     final result = await _setupScheduler.run(() async {
       await dataMutations.run(() async {});
-      if (request.partialCommit) return _SetupTaskResult.failed;
-      if (isCurrent != null && !await isCurrent()) {
-        return _SetupTaskResult.failed;
+      if (!await current()) {
+        return _SetupTaskResult.superseded;
       }
       return _setupConfig(
         force: force,
         silence: silence,
-        preloadInvoke: preloadInvoke,
-        isCurrent: isCurrent,
+        isCurrent: current,
+        isLatestSetup: () => generation == _setupGeneration,
+        onCleanupDeferred: (cleanup) => deferredCleanup = cleanup,
         onUpdated: () async {
           await ref.read(proxiesActionProvider.notifier).updateGroups();
           await ref.read(providersProvider.notifier).syncProviders();
         },
       );
     });
+    await deferredCleanup;
     if (result != _SetupTaskResult.handoffToCoreRestart) {
       return result;
     }
     // Release the current serial task before restartCore reapplies the profile.
     final restarted = await _restartCoreAfterAuthorization();
     return restarted ? _SetupTaskResult.completed : _SetupTaskResult.failed;
+  }
+
+  Future<void> _finishPreparationAfterQueue(
+    Future<void> Function() cleanup,
+  ) async {
+    while (true) {
+      final generation = _setupGeneration;
+      final finished = await _setupScheduler.run(() async {
+        if (generation != _setupGeneration) return false;
+        await cleanup();
+        return true;
+      });
+      if (finished) return;
+    }
   }
 
   Future<bool> _restartCoreAfterAuthorization() async {
@@ -638,10 +686,36 @@ class SetupAction extends _$SetupAction {
   Future<_SetupTaskResult> _setupConfig({
     bool force = false,
     bool silence = false,
-    Future<void> Function()? preloadInvoke,
     FutureOr Function()? onUpdated,
     Future<bool> Function()? isCurrent,
+    required bool Function() isLatestSetup,
+    required void Function(Future<void>) onCleanupDeferred,
   }) async {
+    final nativeContext = _isAndroid ? await _service!.getRequestState() : null;
+    Future<void> finishOrDefer(Future<void> Function() cleanup) async {
+      if (isLatestSetup()) {
+        await cleanup();
+      } else {
+        onCleanupDeferred(_finishPreparationAfterQueue(cleanup));
+      }
+    }
+
+    Future<void> finishUnregisteredStart() async {
+      if (nativeContext == null ||
+          !['preparing', 'starting'].contains(nativeContext['phase'])) {
+        return;
+      }
+      await finishOrDefer(() async {
+        final cleanup = await _service!.failRunIntent(
+          (nativeContext['intentRevision'] as num).toInt(),
+          token: (nativeContext['configToken'] as num?)?.toInt() ?? 0,
+        );
+        if (cleanup['status'] == 'cleanupFailed') {
+          throw StateError('Owned service cleanup failed');
+        }
+      });
+    }
+
     var profile = ref.read(currentProfileProvider) ?? recoverMissingProfile();
     // A refresh failure is surfaced by safeRun; setup keeps the old profile.
     final nextProfile = await globalState.safeRun(
@@ -659,46 +733,122 @@ class SetupAction extends _$SetupAction {
       return _SetupTaskResult.handoffToCoreRestart;
     }
     final realPatchConfig = _effectivePatchConfig(patchConfig);
+    final selectedMap = Map<String, String>.of(ref.read(selectedMapProvider));
+    final testUrl = ref.read(appSettingProvider).testUrl;
+    final sources = <RequestSource>[];
     final realProfile = await globalState.safeRun(() async {
-      final setupState = await ref.read(setupStateProvider(profile?.id).future);
-      return getProfile(setupState: setupState, patchConfig: realPatchConfig);
+      if (_requests.partialCommit) return null;
+      final selectedProfile = profile;
+      if (selectedProfile == null) {
+        throw StateError('No configuration selected');
+      }
+      return _requests
+          .mutate(() async {
+            ref.invalidate(setupStateProvider(selectedProfile.id));
+            final setupState = await ref.read(
+              setupStateProvider(selectedProfile.id).future,
+            );
+            final keys = <String>{'profile:${selectedProfile.id}'};
+            if (setupState.overwriteType == OverwriteType.standard) {
+              keys.add('global-rules');
+            }
+            if (setupState.overwriteType == OverwriteType.script &&
+                setupState.script != null) {
+              keys.add('script:${setupState.script!.id}');
+            }
+            if (setupState.overwriteType == OverwriteType.custom) {
+              final proxyUses = {
+                for (final group in setupState.proxyGroups) ...?group.use,
+              };
+              final ruleUses = {
+                for (final rule in setupState.rules)
+                  if (rule.ruleAction == RuleAction.RULE_SET) rule.ruleProvider,
+              };
+              for (final entry in setupState.profileProviders.entries) {
+                if (proxyUses.contains(entry.key)) {
+                  keys.add('profile:${entry.value}');
+                }
+              }
+              for (final provider in setupState.clashProviders) {
+                if ((provider.kind == ProviderKind.proxy ? proxyUses : ruleUses)
+                    .contains(provider.label)) {
+                  keys.add('clash-provider:${provider.id}');
+                }
+              }
+            }
+            for (final key in keys) {
+              sources.add(await _requests.captureSource(key));
+            }
+            return setupState;
+          })
+          .then(
+            (setupState) => getProfile(
+              setupState: setupState,
+              patchConfig: realPatchConfig,
+            ),
+          );
     }, title: 'build profile');
-    final profileFailed = realProfile == null;
-    final yamlString = realProfile?.yaml ?? '';
-    final yamlMd5 = realProfile?.md5 ?? '';
-    Future<bool> current() async =>
-        profile?.id == ref.read(currentProfileIdProvider) &&
-        (isCurrent == null || await isCurrent());
-    if (!await current()) return _SetupTaskResult.failed;
-    if (!profileFailed && yamlMd5 == globalState.lastConfigMd5 && !force) {
-      return _SetupTaskResult.completed;
+    Future<bool> current() async {
+      if (profile?.id != ref.read(currentProfileIdProvider) ||
+          (isCurrent != null && !await isCurrent())) {
+        return false;
+      }
+      for (final source in sources) {
+        if (!await _requests.configSourceCurrent(source)) return false;
+      }
+      return true;
     }
-    // Recaptured so _start's catch can roll back after safeRun swallows it.
-    (Object, StackTrace)? handoffFailure;
+
+    if (realProfile == null || realProfile.yaml.trim().isEmpty) {
+      if (!await current()) {
+        await finishUnregisteredStart();
+        return _SetupTaskResult.superseded;
+      }
+      await finishUnregisteredStart();
+      await ref.read(configStateProvider.notifier).refresh();
+      ref.read(configStateProvider.notifier).markBuildFailure();
+      return _SetupTaskResult.failed;
+    }
+    if (!await current()) {
+      await finishUnregisteredStart();
+      return _SetupTaskResult.superseded;
+    }
+    final yamlString = realProfile.yaml;
+    final yamlMd5 = realProfile.md5;
     var setupFailed = false;
+    var superseded = false;
     await globalState.loadingRun(
       () async {
+        ConfigInput? input;
+        ConfigApplyResult? recoveryPending;
+        int? recoveryRequestId;
+        var submittedToCore = false;
         try {
-          final configFilePath = await appPath.configFilePath;
-          await request.mutate(() async {
+          final runtimeEpoch = (await _core.getConfigState()).runtimeEpoch;
+          await _requests.mutate(() async {
             if (!await current()) {
               throw const RequestUnavailable('request_cancelled');
             }
-            if (system.isAndroid) {
+            if (_isAndroid) {
               globalState.lastVpnState = ref.read(vpnStateProvider);
-              if (!await preferences.saveShareState(
-                ref.read(sharedStateProvider),
-              )) {
+              final desired = ref.read(sharedStateProvider);
+              if (!await preferences.saveShareState(desired)) {
                 throw const RequestUnavailable('preferences_save_failed');
               }
+              if ((await _service!.syncState(desired)).isNotEmpty) {
+                throw StateError('Service state synchronization failed');
+              }
             }
-            final staged = File('$configFilePath.pending');
-            try {
-              await staged.writeAsString(yamlString, flush: true);
-              await staged.rename(configFilePath);
-            } finally {
-              await staged.safeDelete();
-            }
+            input = await ConfigInput.write(
+              home: await appPath.homeDirPath,
+              yaml: yamlString,
+              runtimeEpoch: runtimeEpoch,
+              profileId: profile!.id,
+              profileName: profile.realLabel,
+              selectedMap: selectedMap,
+              testUrl: testUrl,
+              sources: sources,
+            );
           });
           final profileId = profile?.id;
           if (profileId != null) {
@@ -708,21 +858,94 @@ class SetupAction extends _$SetupAction {
             if (!await current()) {
               throw const RequestUnavailable('request_cancelled');
             }
-            final message = await _core.setupConfig(
-              params: _setupParams,
-              preloadInvoke: preloadInvoke,
+            if (_isAndroid) {
+              recoveryRequestId =
+                  ((await _service!.getRequestState())['intentRevision']
+                          as num?)
+                      ?.toInt();
+            }
+            submittedToCore = true;
+            final result = await _core.applyConfigInput(
+              input!.toRequest(
+                requestId: RunRequestScope.current,
+                active:
+                    !ref.read(safeModeProvider) &&
+                    (_latestRunRequest?.running ?? _isRunning) &&
+                    !ref.read(suspendProvider),
+              ),
             );
-            if (message.isEmpty) break;
-            if (attempt >= 4 || !await request.recoverMissingGeo(_core)) {
-              throw MessageException(message);
+            ref
+                .read(configStateProvider.notifier)
+                .accept(result.fact, authoritative: true);
+            if (result.status != 'superseded' && !result.fact.businessActive) {
+              _setLocalRunning(false);
+            }
+            if (result.succeeded) {
+              recoveryPending = null;
+              if (!await current()) {
+                throw const RequestUnavailable('request_cancelled');
+              }
+              if (_isAndroid && result.fact.businessActive) {
+                final native = await _service!.getRequestState();
+                ref
+                    .read(nativeRequestStateProvider.notifier)
+                    .onRequestState(native);
+                await _syncNativeRuntime(native);
+              }
+              break;
+            }
+            if (result.status == 'superseded') {
+              superseded = true;
+              throw const RequestUnavailable('request_cancelled');
+            }
+            recoveryPending = result.status == 'bootstrapRequired'
+                ? result
+                : null;
+            if (attempt >= 4 || !await _requests.recoverMissingGeo(_core)) {
+              throw MessageException(result.message);
             }
           }
-        } catch (e, s) {
-          setupFailed = true;
-          if (preloadInvoke != null) {
-            handoffFailure = (e, s);
+        } catch (_) {
+          superseded = superseded || !await current();
+          setupFailed = !superseded;
+          final pending = recoveryPending;
+          final requestId = recoveryRequestId;
+          if (pending != null && requestId != null) {
+            Future<void> cleanup() async {
+              final result = await _service!.failRunIntent(
+                requestId,
+                token: pending.fact.token,
+              );
+              if (result['status'] == 'cleanupFailed') {
+                throw StateError('Owned service cleanup failed');
+              }
+            }
+
+            await finishOrDefer(cleanup);
+          } else if (!submittedToCore) {
+            await finishUnregisteredStart();
           }
+          if (superseded) return;
           rethrow;
+        } finally {
+          final submitted = input;
+          if (submitted != null) {
+            try {
+              await _core.releaseConfigInput(submitted.markerName);
+            } catch (error) {
+              commonPrint.log(
+                'Configuration input cleanup: ${compactError(error)}',
+              );
+            } finally {
+              try {
+                await submitted.releaseMarker();
+              } catch (error) {
+                commonPrint.log(
+                  'Configuration candidate cleanup: ${compactError(error)}',
+                );
+              }
+            }
+          }
         }
         globalState.lastConfigMd5 = yamlMd5;
         await onUpdated?.call();
@@ -730,10 +953,8 @@ class SetupAction extends _$SetupAction {
       silence: true,
       tag: !silence ? LoadingTag.proxies : null,
     );
-    if (handoffFailure != null) {
-      Error.throwWithStackTrace(handoffFailure!.$1, handoffFailure!.$2);
-    }
-    if (setupFailed || profileFailed) {
+    if (superseded) return _SetupTaskResult.superseded;
+    if (setupFailed) {
       return _SetupTaskResult.failed;
     }
     return _SetupTaskResult.completed;

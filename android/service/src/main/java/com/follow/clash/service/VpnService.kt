@@ -147,7 +147,7 @@ class VpnService : SystemVpnService(), ManagedService, RequestProtection {
         // Android starts always-on VPN through this callback instead of FlClash's bound-service
         // path. Notify the app layer so it can restore Core and fully initialize the VPN service.
         val requestId = RequestObservations.handler?.onVpnStartRequested(requestIdentity.serviceId) ?: 0
-        if (requestId > 0) requestIdentity = requestIdentity.copy(requestId = requestId)
+        if (requestId > 0) tunTransitionLock.withLock { requestIdentity = requestIdentity.copy(requestId = requestId) }
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -293,7 +293,8 @@ class VpnService : SystemVpnService(), ManagedService, RequestProtection {
         }
     }
 
-    override fun start() {
+    override fun start() = tunTransitionLock.withLock {
+        check(!destroyed) { "Service instance was destroyed" }
         try {
             modules.start()
             handleStart(requireNotNull(ServiceConfig.vpnOptions) { "VPN options are missing" })
@@ -301,6 +302,13 @@ class VpnService : SystemVpnService(), ManagedService, RequestProtection {
             stop()
             throw error
         }
+    }
+
+    override fun stopOwned(expected: RequestServiceIdentity): Boolean = tunTransitionLock.withLock {
+        if (requestIdentity != expected) return@withLock false
+        if (destroyed) return@withLock true
+        stop()
+        true
     }
 
     override fun stop() {

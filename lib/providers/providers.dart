@@ -7,3 +7,4 @@ export 'route_state.dart';
 export 'state.dart';
 
 export 'request_state.dart';
+export 'config_state.dart';

@@ -214,6 +214,9 @@ SharedState sharedState(Ref ref) {
   final port = clashConfig.mixedPort;
   return SharedState(
     currentProfileName: currentProfileName,
+    systemProxyRequested: vpnSetting.systemProxy && !safeMode,
+    configInactiveTip: currentAppLocalizations.configInactive,
+    configApplyingTip: currentAppLocalizations.configApplying,
     onlyStatisticsProxy: onlyStatisticsProxy,
     showStopAction: appSetting.showStopAction,
     stopText: currentAppLocalizations.stop,

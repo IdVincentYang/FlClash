@@ -163,8 +163,8 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
   queue and must stay that way: reaching it means the host stopped reading, which `logDeliveryError` already reports,
   and reporting it from the message layer feeds the same batcher.
 - `jni_get_string` in `android/core/src/main/cpp/jni_helper.cpp` `malloc`s and hands ownership to Go, which frees through
-  `free_string_func`. `quickSetup` relies on that: it reads its `*C.char` arguments inside a goroutine, after the JNI
-  wrapper has already returned. Switching the wrapper to `GetStringUTFChars`/`ReleaseStringUTFChars`, or freeing on the
+  `free_string_func`. Asynchronous Core calls can consume their `*C.char` arguments after the JNI wrapper has returned.
+  Switching the wrapper to `GetStringUTFChars`/`ReleaseStringUTFChars`, or freeing on the
   C side, turns that read into a use-after-free.
 - Go goroutines reach Java through `ATTACH_JNI()`, which attaches once with `AttachCurrentThreadAsDaemon` and detaches
   from a `pthread_key` destructor at thread death. Do not restore a detach-per-call: `protect` runs once per outbound
@@ -230,12 +230,12 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
   scheduler needs its in-flight guard on the FlClash side. `updater.UpdateMMDB` and its siblings have none — only the
   batch `UpdateGeoDatabases` does — and two concurrent runs close the mmap'd database twice, so `handleUpdateGeoData`
   claims per resource and `updater.GeoUpdateHook` releases.
-- A failed `applyConfig` rolls the tunnel back to the default config, and that rollback is the whole recovery:
-  `handleSetupConfig` returns the error and stops there. Do not add a teardown on top of it — stopping the listeners
-  takes the app offline over a profile the user can still switch away from, and the error already reaches the host,
-  which is what surfaces the failure (`MessageException` on the Flutter side, the config-error toast on Android). Keep
-  an empty `config.yaml` out of the failure path — it is how the app says "no profile selected", and `loadConfig`
-  resolves it to the defaults.
+- Full configuration changes use immutable ConfigInput receipts through prepare, service preparation, install and
+  activation. Rejection before replacement retains an applicable old configuration; failure after retiring its Owner
+  blocks ordinary business and awaits identity-owned Android cleanup. Never apply defaults or an empty config on failure,
+  reopen listeners through legacy setup/start calls, or report running before activation. Recoverable Geo bootstrap may
+  retain the prepared service for INNER work until retry or terminal cleanup. See
+  `docs/features/security/loop2/l2_t01_plan.md` for the configuration and controller mutation contract.
 - Package `init` in the Android library runs while the `.so` is being loaded, so a panic there takes the application
   down before it can report anything. `platform/limit.go` arms an fd-pressure probe and degrades to never blocking when
   it cannot; keep that shape for anything else `init` sets up that correctness does not depend on.

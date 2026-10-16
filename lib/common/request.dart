@@ -437,6 +437,19 @@ class Request with ServiceListener {
         ].every((field) => source.snapshot[field] == snapshot[field]);
   }
 
+  Future<bool> configSourceCurrent(RequestSource source) async {
+    if (!_localSourceCurrent(source)) return false;
+    if (!_isAndroid) return true;
+    final current = await _control({
+      'action': 'inspect',
+      'client': _client,
+      'key': source.key,
+    });
+    return _localSourceCurrent(source) &&
+        current['dataset'] == source.snapshot['dataset'] &&
+        current['sourceRevision'] == source.snapshot['sourceRevision'];
+  }
+
   Future<bool> sourceCurrent(RequestSource source) async {
     if (!_localSourceCurrent(source)) return false;
     if (!_isAndroid) return true;
