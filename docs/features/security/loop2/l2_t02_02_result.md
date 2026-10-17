@@ -1,12 +1,12 @@
 # L2-T02-02：Profile 策略草稿验证记录
 
-本项已实现真实 Profile 草稿页面、独立持久化、旧材料提取、生成预览及备份恢复。本轮修订后的 65 项本项消费者及 46 项既有 01 模型／编译测试通过
-；上轮扩大回归为 718 项通过、3 项基线既有失败，未受影响证据沿用，详见下文。M1 已通过 R1／Q1 修订与补证的实现复审，当前进行本地提交和合入，本项尚
-未完成本地交付，整个 L2-T02 未结束。
+本项已实现真实 Profile 草稿页面、独立持久化、旧材料提取、生成预览及备份恢复。本轮修订后的 65 项本项消费者及 46 项既有 01
+模型／编译测试通过；上轮扩大回归为 718 项通过、3 项基线既有失败，未受影响证据沿用，详见下文。M1 已通过 R1／Q1 修订与补证的实现复审，
+源码已快进合入本地 `security/android`，本项已完成本地交付；整个 L2-T02 未结束。
 
-设计与边界见[本项设计](l2_t02_02_plan.md)，状态由
-[任务清单](l2_t02_tasks.md#l2-t02-02-profile-策略编辑持久化与迁移)维护。**保存仅产生草稿，不代表生成配置正在运行或应用已
-受管。** 最终应用及来源资格仍由 03 接续。
+设计与边界见[本项设计](l2_t02_02_plan.md)，
+状态由[任务清单](l2_t02_tasks.md#l2-t02-02-profile-策略编辑持久化与迁移)维护。
+**保存仅产生草稿，不代表生成配置正在运行或应用已受管。** 最终应用及来源资格仍由 03 接续。
 
 ## 1. 已验证的用户入口
 
@@ -37,24 +37,25 @@ bootstrap。普通 Profile 编辑、传统预览与运行配置继续沿原路�
 | 既有 `test/common/managed_profile_test.dart` | 46 | 0／0 |
 | 本轮消费者合计 | 111 | 0／0 |
 
-测试使用临时 SQLite DB／归档、合成凭据及 fake Clipboard／deliver。保存、退出和预览的 Core mock 无交互，setup 自
-动应用计数为零；当前 Profile 选择不变。真实 WebDAV 传输未执行。
+测试使用临时 SQLite DB／归档、合成凭据及 fake Clipboard／deliver。保存、退出和预览的 Core mock 无交互，setup
+自动应用计数为零；当前 Profile 选择不变。真实 WebDAV 传输未执行。
 
 DB 矩阵包括 schema 11→12、表已存在时重复升级、普通 upsert 保留、删除级联、同值 CAS 仍允许写入、merge 缺行保留、
-override 非空实体替换、onlyProfiles、未知正文、孤儿／重复拒绝及事务回滚。Config-only 和有效空 DB 归档都沿用全实体空输入保留
-语义；v0 经旧转换产生非空实体时仍进入原覆盖路径。
+override 非空实体替换、onlyProfiles、未知正文、孤儿／重复拒绝及事务回滚。Config-only 和有效空 DB
+归档都沿用全实体空输入保留语义；v0 经旧转换产生非空实体时仍进入原覆盖路径。
 
 普通保存的 SQL 错误只返回固定失败类别；涉及草稿的恢复错误使用固定提示，保留原有 partial-commit 恢复语义。关联错误在请求 mutation
 前拒绝。最终消费者及上轮回归日志中合成秘密标记未出现，不能据此推导所有旧诊断入口都已脱敏。
 
-本轮针对 M1 的 R1，原迁移快照的资源投影直接复用 01 的节点／静态组解析器。原值中的域名地址、缺 server／port、越界 port、认证半对或空值
-、非法／null UDP、空组、重复成员及非列表材料共 12 个反例产生资源位置问题，提示不包含名称、认证或解析异常正文。原始字节和快照保持不变；即使修好候选，
-或删除候选后保存重开，预览仍被历史材料阻断。真实页面另验证“创建独立草稿”的取消与明确确认；确认后才在待保存的新草稿中放弃迁移材料，不修改原 Profile。
+本轮针对 M1 的 R1，原迁移快照的资源投影直接复用 01 的节点／静态组解析器。原值中的域名地址、缺 server／port、越界 port、
+认证半对或空值、非法／null UDP、空组、重复成员及非列表材料共 12 个反例产生资源位置问题，提示不包含名称、认证或解析异常正文。原始字节和快照保持不变；
+即使修好候选，或删除候选后保存重开，预览仍被历史材料阻断。真实页面另验证“创建独立草稿”的取消与明确确认；确认后才在待保存的新草稿中放弃迁移材料，不修改原
+Profile。
 
-Q1 使用真实 Profile 菜单路由、系统 back／PopScope、页面返回按钮及生产 action／SQLite DAO：取消继续编辑、放弃不落库、保
-存成功退出；SQL 失败与 CAS 冲突仍保留输入且 loading 收敛。真实 DB 事务 barrier 挂起保存时，普通编辑和两种返回均不生效。另在离页保
-存期间强制销毁旧路由并打开另一 Profile，释放 barrier 后旧保存完成无 disposed 异常，新页面保持自身原选择，并以自己的 raw CAS
-成功保存。未因此修改页面生产代码。
+Q1 使用真实 Profile 菜单路由、系统 back／PopScope、页面返回按钮及生产 action／SQLite DAO：取消继续编辑、放弃不落库、
+保存成功退出；SQL 失败与 CAS 冲突仍保留输入且 loading 收敛。真实 DB 事务 barrier 挂起保存时，普通编辑和两种返回均不生效。
+另在离页保存期间强制销毁旧路由并打开另一 Profile，释放 barrier 后旧保存完成无 disposed 异常，新页面保持自身原选择，并以自己的
+raw CAS 成功保存。未因此修改页面生产代码。
 
 ## 3. 扩大回归与静态检查
 
@@ -69,11 +70,12 @@ Q1 使用真实 Profile 菜单路由、系统 back／PopScope、页面返回按�
 上轮回归覆盖既有 DB 迁移／DAO、备份与应用迁移、旧配置合成及 DNS／NTP 覆写、Profile provider、Overwrite 相关页面、
 widgets、l10n 和 lint。schema 升级测试的当前目标断言同步为 12。
 
-三个失败均来自未修改的 `test/widgets/update_dialog_test.dart`：分组发布说明、分组标题本地化和旧 bullets 回退。旧
-用例直接提交构造的 release Map，被现有 `Request.validateVersionResult` 的查询会话校验拒绝。已从 `12e694c`
-提取原始 Dart 源码并单独复现：4 项中 1 通过、同样 3 项失败；请求、处理逻辑及该测试的内容与当前源码一致。
+三个失败均来自未修改的 `test/widgets/update_dialog_test.dart`：分组发布说明、分组标题本地化和旧 bullets 回退。
+旧用例直接提交构造的 release Map，被现有 `Request.validateVersionResult` 的查询会话校验拒绝。已从
+`12e694c` 提取原始 Dart 源码并单独复现：4 项中 1 通过、同样 3 项失败；请求、处理逻辑及该测试的内容与当前源码一致。
 
-这三项没有记为通过或跳过，也未在本项改动它们。基线条件与原始日志见
+这三项没有记为通过或跳过，也未在本项改动它们。
+基线条件与原始日志见
 [基线绑定](../../../../build/verification/l2-t02/subtask_02/implementation_v1/update_dialog_baseline_binding.json)
 及
 [基线结果](../../../../build/verification/l2-t02/subtask_02/implementation_v1/update_dialog_baseline.jsonl)
@@ -81,53 +83,69 @@ widgets、l10n 和 lint。schema 升级测试的当前目标断言同步为 12�
 
 ## 4. 环境、产物与复现
 
-本轮为 macOS 27.0.1／arm64，Flutter 3.47.4、Dart 3.13.3、Go 1.26.4、Rust／Cargo 1.98.1。本项
-源码基线为 `12e694c94e94adb197a8637313b735d912b398d9`，Core 仍为
+本轮为 macOS 27.0.1／arm64，Flutter 3.47.4、Dart 3.13.3、Go 1.26.4、Rust／Cargo 1.98.1。
+本项源码基线为 `12e694c94e94adb197a8637313b735d912b398d9`，Core 仍为
 `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`，Core、gitlink 和 carrier 未改。
 
 本机现有 Rust dylib 出现 LINKEDIT 对齐错误。使用项目锁定版本及相同 29 份 Rust 输入，以 locked／offline、
-release strip=none 构建可加载的本地测试库；经 dlopen 和真实编辑器用例验证。生产 Rust 源码、pubspec 和打包参数未改。现象
-与 [Rust 上游记录](https://github.com/rust-lang/rust/issues/157750)一致；本项没有宣称修复默认
-macOS 打包链。本轮继续复用该同源测试库；只提取复用 01 的现有资源解析函数，未改变其校验语义。46 项既有模型／编译测试重新运行，Core／真实 DNS
-消费者未重跑。
+release strip=none 构建可加载的本地测试库；经 dlopen 和真实编辑器用例验证。生产 Rust 源码、pubspec 和打包参数未改。
+现象与 [Rust 上游记录](https://github.com/rust-lang/rust/issues/157750)一致；本项没有宣称修复默认
+macOS 打包链。本轮继续复用该同源测试库；只提取复用 01 的现有资源解析函数，未改变其校验语义。46 项既有模型／编译测试重新运行，Core／真实
+DNS 消费者未重跑。
 
 本地证据位于忽略目录，不随源码提交或上传：
 
--
-  [检查命令与环境](../../../../build/verification/l2-t02/subtask_02/implementation_v2/checks.json)
+- [检查命令与环境](../../../../build/verification/l2-t02/subtask_02/implementation_v2/checks.json)
   、
   [复验脚本](../../../../build/verification/l2-t02/subtask_02/implementation_v2/verify.py)
-  。脚本从仓库根执行，可按检查名选择增量范围；本轮只运行记录中的消费者、生成、格式及分析。锁定依赖解析和扩大回归命令沿
+  。脚本从仓库根执行，可按检查名选择增量范围；本轮只运行记录中的消费者、生成、格式及分析。
+  锁定依赖解析和扩大回归命令沿
   [上轮检查记录](../../../../build/verification/l2-t02/subtask_02/implementation_v1/checks.json)
   ；上轮回归仍因上述三项返回非零。
--
-  [本项消费者](../../../../build/verification/l2-t02/subtask_02/implementation_v2/consumers_final.jsonl)
+- [本项消费者](../../../../build/verification/l2-t02/subtask_02/implementation_v2/consumers_final.jsonl)
   、
   [扩大回归](../../../../build/verification/l2-t02/subtask_02/implementation_v1/regression.jsonl)
   、
   [汇总](../../../../build/verification/l2-t02/subtask_02/implementation_v2/summary.json)
   。计数按非 hidden 的 testDone，fixture／loading 不纳入，基线复验不并入本项计数。
--
-  [Rust 制品绑定](../../../../build/verification/l2-t02/subtask_02/implementation_v1/rust_artifact.json)
+- [Rust 制品绑定](../../../../build/verification/l2-t02/subtask_02/implementation_v1/rust_artifact.json)
   及
   [源码输入](../../../../build/verification/l2-t02/subtask_02/implementation_v1/rust_source_binding.json)
   。直接运行保留库限当前宿主 ABI；其它环境需要从同源重建。测试通过项目已有的
   `FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR` 选择库目录。
--
-  [窄屏布局截图](../../../../build/verification/l2-t02/subtask_02/implementation_v1/policy_draft_narrow.png)
+- [窄屏布局截图](../../../../build/verification/l2-t02/subtask_02/implementation_v1/policy_draft_narrow.png)
   仅作 Flutter test 字体下的几何观察，不代表真机字体效果；临时捕获源保存在
   [capture 绑定](../../../../build/verification/l2-t02/subtask_02/implementation_v1/capture_binding.json)
   ，正式测试保留布局／点击断言。
 
-原实现包保留在 `implementation_v1/`。源文件、相对原受检树的修订、变更快照和证据校验值由
+原实现包保留在 `implementation_v1/`。源文件、相对原受检树的修订、
+变更快照和证据校验值由
 [本轮绑定](../../../../build/verification/l2-t02/subtask_02/implementation_v2/binding.json)
 维护；M1 的原三份文档及已审设计快照仍保留。
 
 ## 5. 限制与交付阶段
 
 - 结果只证明草稿、迁移和预览消费者；没有最终 setup／T01 受管应用、运行资格或新来源撤销能力。历史迁移材料及“预览已校验”不能成为 03 的运行许可。
-- 没有读取真实用户 DB、备份、订阅或凭据；没有安装／启动用户应用、操作设备、修改宿主 TUN／系统代理或发送外部测试流量。未构建 APK，未验证设备 IME
-  、真实剪贴板或 WebDAV 上传。
-- 01 的协议、RuleHost 和 DNS／路由剩余限制沿[首项结果](l2_t02_01_result.md)及
-  [总体设计](l2_t02_plan.md#10-残留风险与不再承诺的能力)承接，没有重复改写为本项重新证明。
-- M1 已通过实现复审；当前按约定完成本地提交、合入 `security/android` 与临时分支清理。整个 L2-T02 完成前不推送。
+- 没有读取真实用户 DB、备份、订阅或凭据；没有安装／启动用户应用、操作设备、修改宿主 TUN／系统代理或发送外部测试流量。未构建 APK，未验证设备
+  IME、真实剪贴板或 WebDAV 上传。
+- 01 的协议、RuleHost 和 DNS／路由剩余限制沿[首项结果](l2_t02_01_result.md)
+  及[总体设计](l2_t02_plan.md#10-残留风险与不再承诺的能力)承接，没有重复改写为本项重新证明。
+- M1 已通过实现复审；源码已本地合入 `security/android`，最终交接及临时分支清理见下节。整个 L2-T02 完成前不推送。
+
+## 6. 本地交付
+
+源码提交 `6b511a8dfd78fe1219016a2964df70a827a2bb73` 已快进合入本地 `security/android`；M1
+通过的实现树为 `2e0dc3b090ca5689ab0902d800fb165ccb8daa12`。本轮收尾只更新文档阶段和格式，以及用项目 Dart
+formatter 调整两份 intl 生成文件的缩进，后者的非空白内容与受检版本一致。没有手工改写生成值或产品行为。
+
+结构检查覆盖草稿模型、DAO／action、迁移与共享解析器、预览、页面／表单和备份恢复职责，未发现需额外整理的问题。全部变更 Dart 格式、
+comment-density、提交信息检查及必要引用核对通过；本地化增量验证 3 项通过。Markdown lint 保留 GFM 表格单行，不限制表格行长，
+正文按 80 列检查；5 份手写文档通过。另以本地 Markdown 解析器核对换行前后结构、代码及链接保持一致，不把该检查称为图形预览。
+
+最终提交、
+等价核对及本项临时分支清理结果见忽略目录中的
+[本地交付绑定](../../../../build/verification/l2-t02/subtask_02/delivery/binding.json)
+；
+[收尾检查](../../../../build/verification/l2-t02/subtask_02/delivery/precommit.json)
+和[本地化日志](../../../../build/verification/l2-t02/subtask_02/delivery/l10n.jsonl)
+保留。共享 checkout、独立聊天、已审设计与实现快照及必要本地证据继续保留；没有推送或上传，也不启动 03–05。
