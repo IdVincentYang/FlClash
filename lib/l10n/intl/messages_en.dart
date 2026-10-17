@@ -125,39 +125,45 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m41(count) =>
       "${count} items have problems, and applying this override may fail";
 
-  static String m42(label) => "${label} must be between 1024 and 49151";
+  static String m42(location) =>
+      "Check ${location}. Complete or correct this field before previewing.";
 
-  static String m43(label, profiles) =>
+  static String m43(locations) =>
+      "This resource is used at: ${locations}. Change those references before deleting it.";
+
+  static String m44(label) => "${label} must be between 1024 and 49151";
+
+  static String m45(label, profiles) =>
       "${label} is still used by the custom proxy groups or rules of ${profiles}. Remove it there first";
 
-  static String m44(profiles, label) =>
+  static String m46(profiles, label) =>
       "The subscriptions of ${profiles} already have ${label}, so those profiles would switch to theirs. Choose another name";
 
-  static String m45(count) =>
+  static String m47(count) =>
       "${Intl.plural(count, one: '1 proxy', other: '${count} proxies')}";
 
-  static String m46(host) =>
+  static String m48(host) =>
       "The current configuration cannot fetch this item. Allow this operation to connect directly to ${host}? This permission ends when the operation finishes or its source changes.";
 
-  static String m47(target) => "GLOBAL (current selection: ${target})";
-
-  static String m48(count) =>
-      "${Intl.plural(count, one: '1 rule', other: '${count} rules')}";
-
-  static String m49(appName) => "${appName} (Safe mode)";
+  static String m49(target) => "GLOBAL (current selection: ${target})";
 
   static String m50(count) =>
+      "${Intl.plural(count, one: '1 rule', other: '${count} rules')}";
+
+  static String m51(appName) => "${appName} (Safe mode)";
+
+  static String m52(count) =>
       "${Intl.plural(count, one: '1 second', other: '${count} seconds')}";
 
-  static String m51(count) => "${count} selected";
+  static String m53(count) => "${count} selected";
 
-  static String m52(time) => "Checked at ${time}";
+  static String m54(time) => "Checked at ${time}";
 
-  static String m53(label) => "${label} must be a single item";
+  static String m55(label) => "${label} must be a single item";
 
-  static String m54(label) => "${label} must be a URL";
+  static String m56(label) => "${label} must be a URL";
 
-  static String m55(count) =>
+  static String m57(count) =>
       "${Intl.plural(count, one: '1 year ago', other: '${count} years ago')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1011,11 +1017,159 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "Please upload a valid QR code",
     ),
+    "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
+      "Use username and password",
+    ),
+    "policyDraftBackupConsent": MessageLookupByLibrary.simpleMessage(
+      "This frozen backup contains policy drafts and may contain credentials and original migration materials. Confirm a new backup before exporting it.",
+    ),
+    "policyDraftBackupLocal": MessageLookupByLibrary.simpleMessage(
+      "The unencrypted ZIP saved to your chosen local file will include complete policy drafts, credentials, and migration materials. Continue?",
+    ),
+    "policyDraftBackupWebDav": MessageLookupByLibrary.simpleMessage(
+      "The unencrypted ZIP uploaded to your selected WebDAV service will include complete policy drafts, credentials, and migration materials. Continue?",
+    ),
+    "policyDraftBootstrap": MessageLookupByLibrary.simpleMessage(
+      "Bootstrap DNS (DIRECT)",
+    ),
+    "policyDraftConflict": MessageLookupByLibrary.simpleMessage(
+      "The stored draft changed. Your input is preserved; reload before replacing it.",
+    ),
+    "policyDraftCopyFull": MessageLookupByLibrary.simpleMessage(
+      "Copy full generated configuration",
+    ),
+    "policyDraftCopyFullConfirm": MessageLookupByLibrary.simpleMessage(
+      "Copy the full generated configuration, including any usernames and passwords, to the clipboard?",
+    ),
+    "policyDraftDeleted": MessageLookupByLibrary.simpleMessage(
+      "Policy draft deleted",
+    ),
+    "policyDraftDirectWarning": MessageLookupByLibrary.simpleMessage(
+      "An explicit DIRECT domain default also sends DNS for unmatched domains directly to its selected DNS service.",
+    ),
+    "policyDraftDiscard": MessageLookupByLibrary.simpleMessage(
+      "Discard unsaved changes?",
+    ),
+    "policyDraftDnsServices": MessageLookupByLibrary.simpleMessage(
+      "DNS services",
+    ),
+    "policyDraftDomainDefault": MessageLookupByLibrary.simpleMessage(
+      "Default for unmatched domains",
+    ),
+    "policyDraftDomainRules": MessageLookupByLibrary.simpleMessage(
+      "Domain rules",
+    ),
+    "policyDraftExtract": MessageLookupByLibrary.simpleMessage(
+      "Extract from saved configuration",
+    ),
+    "policyDraftExtractConfirm": MessageLookupByLibrary.simpleMessage(
+      "Replace the editor contents with a draft extracted from local saved materials? Scripts are not executed. Unsupported rules remain blocked. This does not apply a configuration.",
+    ),
+    "policyDraftExtractFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not extract local saved materials. The draft is unchanged.",
+    ),
+    "policyDraftGeneratePreview": MessageLookupByLibrary.simpleMessage(
+      "Generated draft preview",
+    ),
+    "policyDraftGroups": MessageLookupByLibrary.simpleMessage(
+      "Static proxy groups",
+    ),
+    "policyDraftIncomplete": m42,
+    "policyDraftIpDefault": MessageLookupByLibrary.simpleMessage(
+      "Default for unmatched IPs",
+    ),
+    "policyDraftIpRules": MessageLookupByLibrary.simpleMessage("IP rules"),
+    "policyDraftListeners": MessageLookupByLibrary.simpleMessage(
+      "Preview listener ports",
+    ),
+    "policyDraftLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not load the draft. Retry to reload it.",
+    ),
+    "policyDraftMembers": MessageLookupByLibrary.simpleMessage(
+      "Select fixed node members",
+    ),
+    "policyDraftMigration": MessageLookupByLibrary.simpleMessage(
+      "Historical migration materials",
+    ),
+    "policyDraftMigrationBlocked": MessageLookupByLibrary.simpleMessage(
+      "Migration is blocked. Original materials and rule positions are preserved. Editing extracted rows or defaults cannot remove the block.",
+    ),
+    "policyDraftMigrationChoices": MessageLookupByLibrary.simpleMessage(
+      "Extracted rows are candidates. Choose both defaults, DNS and bootstrap services explicitly. The original Profile, overwrite settings and global DNS keep using the traditional configuration path. This preview is not the current running configuration.",
+    ),
+    "policyDraftMigrationIp": MessageLookupByLibrary.simpleMessage(
+      "Destination-IP rules may also restrict domain connections. Splitting them cannot preserve that protection.",
+    ),
+    "policyDraftMigrationMatch": MessageLookupByLibrary.simpleMessage(
+      "A MATCH occurs before later rules. Its position cannot become an end-of-table default.",
+    ),
+    "policyDraftMigrationScript": MessageLookupByLibrary.simpleMessage(
+      "Script output is unknown because scripts are not executed during extraction.",
+    ),
+    "policyDraftMigrationUnsupported": MessageLookupByLibrary.simpleMessage(
+      "This rule, resource, or configuration is outside the supported migration scope.",
+    ),
+    "policyDraftMissing": MessageLookupByLibrary.simpleMessage(
+      "This profile no longer exists. Your input has not been saved.",
+    ),
+    "policyDraftMoveDown": MessageLookupByLibrary.simpleMessage("Move down"),
+    "policyDraftMoveUp": MessageLookupByLibrary.simpleMessage("Move up"),
+    "policyDraftNeedsPreview": MessageLookupByLibrary.simpleMessage(
+      "Inputs still need generated preview validation",
+    ),
+    "policyDraftNodes": MessageLookupByLibrary.simpleMessage(
+      "Fixed SOCKS5 nodes",
+    ),
+    "policyDraftProtocol": MessageLookupByLibrary.simpleMessage("Protocol"),
+    "policyDraftReadOnly": MessageLookupByLibrary.simpleMessage(
+      "Unknown version or unsupported structure. The original content is preserved and cannot be previewed or edited.",
+    ),
+    "policyDraftReady": MessageLookupByLibrary.simpleMessage(
+      "Draft preview validated; not applied",
+    ),
+    "policyDraftRebuild": MessageLookupByLibrary.simpleMessage(
+      "Create an independent draft",
+    ),
+    "policyDraftRebuildConfirm": MessageLookupByLibrary.simpleMessage(
+      "Discard this draft and any migration materials? The new policy will not preserve the old configuration’s protections. The original profile and running configuration stay unchanged.",
+    ),
+    "policyDraftReferenced": m43,
+    "policyDraftReload": MessageLookupByLibrary.simpleMessage(
+      "Reload stored draft",
+    ),
+    "policyDraftRestoreFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not complete restore. Reload to check the stored data. Any recovery notice still applies.",
+    ),
+    "policyDraftRestoreWarning": MessageLookupByLibrary.simpleMessage(
+      "Override restore replaces entities when the archive contains entity data. Drafts absent from that backup may be removed. Archives with no entities preserve existing entities. Continue?",
+    ),
+    "policyDraftRevealCredentials": MessageLookupByLibrary.simpleMessage(
+      "Show credentials",
+    ),
+    "policyDraftSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not save the draft. Your input and the stored draft were preserved.",
+    ),
+    "policyDraftSaved": MessageLookupByLibrary.simpleMessage(
+      "Draft saved; not applied",
+    ),
+    "policyDraftStorage": MessageLookupByLibrary.simpleMessage(
+      "Drafts may contain credentials. They use the existing database directory (private app storage on Android). Backups are unencrypted ZIP files. Saving does not apply the draft.",
+    ),
+    "policyDraftTarget": MessageLookupByLibrary.simpleMessage("Routing target"),
+    "policyDraftTitle": MessageLookupByLibrary.simpleMessage("Policy draft"),
+    "policyDraftUdp": MessageLookupByLibrary.simpleMessage(
+      "Enable UDP for this node",
+    ),
+    "policyDraftUnsaved": MessageLookupByLibrary.simpleMessage(
+      "Unsaved draft; not applied",
+    ),
+    "policyDraftUnset": MessageLookupByLibrary.simpleMessage("Not configured"),
+    "policyDraftUsername": MessageLookupByLibrary.simpleMessage("Username"),
     "port": MessageLookupByLibrary.simpleMessage("Port"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage(
       "Please enter a different port",
     ),
-    "portTip": m42,
+    "portTip": m44,
     "prerequisites": MessageLookupByLibrary.simpleMessage("Prerequisites"),
     "pressKeyboard": MessageLookupByLibrary.simpleMessage(
       "Press a key combination",
@@ -1045,8 +1199,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "profiles": MessageLookupByLibrary.simpleMessage("Profiles"),
     "profilesSort": MessageLookupByLibrary.simpleMessage("Sort profiles"),
     "project": MessageLookupByLibrary.simpleMessage("Project"),
-    "providerInUse": m43,
-    "providerRenameShadowed": m44,
+    "providerInUse": m45,
+    "providerRenameShadowed": m46,
     "providerSourceSubscription": MessageLookupByLibrary.simpleMessage(
       "Subscription",
     ),
@@ -1055,7 +1209,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "providers": MessageLookupByLibrary.simpleMessage("External resources"),
     "proxies": MessageLookupByLibrary.simpleMessage("Proxies"),
-    "proxiesCount": m45,
+    "proxiesCount": m47,
     "proxiesEmpty": MessageLookupByLibrary.simpleMessage("Proxies are empty"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("Proxy chain"),
     "proxyDefinition": MessageLookupByLibrary.simpleMessage(
@@ -1108,7 +1262,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replace": MessageLookupByLibrary.simpleMessage("Replace"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("Replace all"),
     "request": MessageLookupByLibrary.simpleMessage("Request"),
-    "requestDirectRecoveryMessage": m46,
+    "requestDirectRecoveryMessage": m48,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
       "Restore this item using Direct?",
     ),
@@ -1122,7 +1276,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
       "Some local changes could not be restored. Recovery files have been retained; automatic updates are blocked.",
     ),
-    "requestProxyDefault": m47,
+    "requestProxyDefault": m49,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Proxy target"),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "The selected request route is unavailable.",
@@ -1297,10 +1451,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("Rule set"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("Rule target"),
     "rules": MessageLookupByLibrary.simpleMessage("Rules"),
-    "rulesCount": m48,
+    "rulesCount": m50,
     "runTime": MessageLookupByLibrary.simpleMessage("Run time"),
     "safeMode": MessageLookupByLibrary.simpleMessage("Safe mode"),
-    "safeModeAppTitle": m49,
+    "safeModeAppTitle": m51,
     "save": MessageLookupByLibrary.simpleMessage("Save"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("Save the changes?"),
     "script": MessageLookupByLibrary.simpleMessage("Script"),
@@ -1312,7 +1466,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Search"),
     "seconds": MessageLookupByLibrary.simpleMessage("seconds"),
-    "secondsCount": m50,
+    "secondsCount": m52,
     "selectAll": MessageLookupByLibrary.simpleMessage("Select all"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Select proxies"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1328,13 +1482,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Please select a sub-rule",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Selected"),
-    "selectedCountTitle": m51,
+    "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("Server"),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("Available"),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("Blocked"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Check"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Check all"),
-    "serviceCheckedAt": m52,
+    "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Coming soon"),
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Disallowed ISP",
@@ -1371,7 +1525,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Start without showing the window",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("Single add"),
-    "singleValueTip": m53,
+    "singleValueTip": m55,
     "size": MessageLookupByLibrary.simpleMessage("Size"),
     "slide": MessageLookupByLibrary.simpleMessage("Slide"),
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKS port"),
@@ -1473,7 +1627,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "urlDesc": MessageLookupByLibrary.simpleMessage(
       "Obtain a profile from a URL",
     ),
-    "urlTip": m54,
+    "urlTip": m56,
     "useHosts": MessageLookupByLibrary.simpleMessage("Use hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("Use system hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Used traffic"),
@@ -1498,7 +1652,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Also set the system clock; Android ignores it",
     ),
-    "yearsAgo": m55,
+    "yearsAgo": m57,
     "yes": MessageLookupByLibrary.simpleMessage("Yes"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Simplified Chinese"),
   };

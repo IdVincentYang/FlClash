@@ -94,6 +94,27 @@ Future<MigrationData> _restoreTask(RestoreArchiveRequest request) {
   );
 }
 
+Database _openBackupDatabase(File file) {
+  return Database(
+    driftDatabase(
+      name: basenameWithoutExtension(file.path),
+      native: DriftNativeOptions(
+        databaseDirectory: () async => file.parent,
+        tempDirectoryPath: () async => file.parent.path,
+      ),
+    ),
+  );
+}
+
+Future<bool> backupSnapshotHasPolicyDrafts(String path) async {
+  final snapshot = _openBackupDatabase(File(path));
+  try {
+    return await snapshot.profilePolicyDraftsDao.hasAny();
+  } finally {
+    await snapshot.close();
+  }
+}
+
 @visibleForTesting
 Future<void> writeBackupArchive({
   required String archivePath,
@@ -151,17 +172,7 @@ Future<MigrationData> readBackupArchive({
     return MigrationData(configMap: configMap);
   }
   final schemaVersion = await _readSchemaVersion(databaseFile);
-  final database = Database(
-    driftDatabase(
-      name: basenameWithoutExtension(backupDatabaseName),
-      // Left unset, drift asks path_provider for a temp directory, and this
-      // isolate has no platform channel to answer it.
-      native: DriftNativeOptions(
-        databaseDirectory: () async => Directory(stagingDirPath),
-        tempDirectoryPath: () async => stagingDirPath,
-      ),
-    ),
-  );
+  final database = _openBackupDatabase(databaseFile);
   try {
     if (schemaVersion > database.schemaVersion) {
       throw const BackupException(BackupFailure.newerVersion);
@@ -186,7 +197,15 @@ Future<MigrationData> readBackupArchive({
           ]))
           .map((item) => item.toCustomProxy())
           .get(),
+      database.profilePolicyDraftsDao.query().get(),
     ]);
+    final drafts = results[7].cast<ProfilePolicyDraft>();
+    if (!validPolicyDraftRelations(
+      drafts,
+      results[0].cast<Profile>().map((p) => p.id),
+    )) {
+      throw const BackupException(BackupFailure.invalid);
+    }
     return MigrationData(
       configMap: configMap,
       profiles: results[0].cast<Profile>(),
@@ -196,6 +215,7 @@ Future<MigrationData> readBackupArchive({
       proxyGroups: results[4].cast<ProxyGroup>(),
       clashProviders: results[5].cast<ClashProvider>(),
       customProxies: results[6].cast<CustomProxy>(),
+      policyDrafts: drafts,
     );
   } finally {
     await database.close();

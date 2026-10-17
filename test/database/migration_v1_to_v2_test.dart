@@ -127,7 +127,7 @@ void main() {
 
     await openAndMigrate();
 
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
   });
 
   test('the v3 upgrade adds match_target to profiles', () async {
@@ -137,7 +137,7 @@ void main() {
     await openAndMigrate();
 
     expect(_columnsOf(raw, 'profiles'), contains('match_target'));
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
   });
 
   test('the v4 upgrade adds url to scripts', () async {
@@ -151,7 +151,7 @@ void main() {
     final database = await openAndMigrate();
 
     expect(_columnsOf(raw, 'scripts'), contains('url'));
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
     final scripts = await database.scriptsDao.query().get();
     expect(scripts.single.label, 'Local');
     expect(scripts.single.url, isNull);
@@ -168,7 +168,7 @@ void main() {
     final database = await openAndMigrate();
 
     expect(_columnsOf(raw, 'scripts'), contains('order'));
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
     final scripts = await database.scriptsDao.query().get();
     expect(scripts.map((item) => item.label), ['First', 'Second']);
     expect(scripts.map((item) => item.order), [null, null]);
@@ -183,7 +183,7 @@ void main() {
       await openAndMigrate();
 
       expect(_columnsOf(raw, 'profiles'), contains('match_target'));
-      expect(_userVersion(raw), 11);
+      expect(_userVersion(raw), 12);
     },
   );
 
@@ -194,7 +194,7 @@ void main() {
     final database = await openAndMigrate();
 
     expect(_hasTable(raw, 'clash_providers'), isTrue);
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
     expect(
       await database.clashProvidersDao.query(ProviderKind.proxy).get(),
       isEmpty,
@@ -210,7 +210,7 @@ void main() {
       await openAndMigrate();
 
       expect(_hasTable(raw, 'clash_providers'), isTrue);
-      expect(_userVersion(raw), 11);
+      expect(_userVersion(raw), 12);
     },
   );
 
@@ -224,7 +224,7 @@ void main() {
       _columnsOf(raw, 'proxy_groups'),
       containsAll(['tolerance', 'strategy']),
     );
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
   });
 
   test(
@@ -236,7 +236,7 @@ void main() {
       await openAndMigrate();
 
       expect(_columnsOf(raw, 'proxy_groups'), contains('strategy'));
-      expect(_userVersion(raw), 11);
+      expect(_userVersion(raw), 12);
     },
   );
 
@@ -261,7 +261,7 @@ void main() {
         _columnsOf(raw, 'clash_providers'),
         isNot(anyOf(contains('interval'), contains('filter'))),
       );
-      expect(_userVersion(raw), 11);
+      expect(_userVersion(raw), 12);
       expect(
         (await database.clashProvidersDao.queryAll().get()).single.label,
         'Kept',
@@ -382,7 +382,7 @@ void main() {
       ),
       isNotEmpty,
     );
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
     expect(await database.customProxiesDao.query(1).get(), isEmpty);
   });
 
@@ -391,7 +391,7 @@ void main() {
 
     final database = await openAndMigrate();
 
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
     expect(await database.customSelect('SELECT * FROM rules').get(), isEmpty);
   });
 
@@ -401,7 +401,7 @@ void main() {
     await openAndMigrate();
 
     expect(_columnsOf(raw, 'rules'), before);
-    expect(_userVersion(raw), 11);
+    expect(_userVersion(raw), 12);
     expect(_hasTable(raw, 'proxy_groups'), isTrue);
   });
 }

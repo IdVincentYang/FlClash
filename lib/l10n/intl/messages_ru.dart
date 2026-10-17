@@ -126,39 +126,45 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m41(count) =>
       "Проблем: ${count}, применение переопределения может завершиться ошибкой";
 
-  static String m42(label) =>
+  static String m42(location) =>
+      "Проверьте ${location}. Заполните или исправьте поле перед просмотром.";
+
+  static String m43(locations) =>
+      "Ресурс используется в ${locations}. Измените ссылки перед удалением.";
+
+  static String m44(label) =>
       "Значение «${label}» должно быть от 1024 до 49151";
 
-  static String m43(label, profiles) =>
+  static String m45(label, profiles) =>
       "«${label}» всё ещё используется в пользовательских группах прокси или правилах профилей: ${profiles}. Сначала уберите его оттуда";
 
-  static String m44(profiles, label) =>
+  static String m46(profiles, label) =>
       "В подписках профилей ${profiles} уже есть «${label}», и после переименования они будут использовать его. Выберите другое имя";
 
-  static String m45(count) => "${count} прокси";
+  static String m47(count) => "${count} прокси";
 
-  static String m46(host) =>
+  static String m48(host) =>
       "Текущая конфигурация не позволяет загрузить этот объект. Разрешить этой операции прямое соединение с ${host}? Разрешение истечёт после завершения операции или изменения источника.";
 
-  static String m47(target) => "GLOBAL (текущий выбор: ${target})";
-
-  static String m48(count) =>
-      "${Intl.plural(count, one: '${count} правило', few: '${count} правила', many: '${count} правил', other: '${count} правила')}";
-
-  static String m49(appName) => "${appName} (Безопасный режим)";
+  static String m49(target) => "GLOBAL (текущий выбор: ${target})";
 
   static String m50(count) =>
+      "${Intl.plural(count, one: '${count} правило', few: '${count} правила', many: '${count} правил', other: '${count} правила')}";
+
+  static String m51(appName) => "${appName} (Безопасный режим)";
+
+  static String m52(count) =>
       "${Intl.plural(count, one: '${count} секунда', few: '${count} секунды', many: '${count} секунд', other: '${count} секунды')}";
 
-  static String m51(count) => "Выбрано: ${count}";
+  static String m53(count) => "Выбрано: ${count}";
 
-  static String m52(time) => "Проверено в ${time}";
+  static String m54(time) => "Проверено в ${time}";
 
-  static String m53(label) => "«${label}» — только одно значение";
+  static String m55(label) => "«${label}» — только одно значение";
 
-  static String m54(label) => "Значение «${label}» должно быть URL";
+  static String m56(label) => "Значение «${label}» должно быть URL";
 
-  static String m55(count) =>
+  static String m57(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1062,11 +1068,165 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "Загрузите корректный QR-код",
     ),
+    "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
+      "Использовать имя пользователя и пароль",
+    ),
+    "policyDraftBackupConsent": MessageLookupByLibrary.simpleMessage(
+      "Снимок содержит черновики и может содержать учётные данные и исходные материалы. Повторно подтвердите резервное копирование перед экспортом.",
+    ),
+    "policyDraftBackupLocal": MessageLookupByLibrary.simpleMessage(
+      "В выбранный локальный файл будет сохранён незашифрованный ZIP с полными черновиками, учётными данными и материалами миграции. Продолжить?",
+    ),
+    "policyDraftBackupWebDav": MessageLookupByLibrary.simpleMessage(
+      "В выбранную службу WebDAV будет отправлен незашифрованный ZIP с полными черновиками, учётными данными и материалами миграции. Продолжить?",
+    ),
+    "policyDraftBootstrap": MessageLookupByLibrary.simpleMessage(
+      "Начальный DNS (DIRECT)",
+    ),
+    "policyDraftConflict": MessageLookupByLibrary.simpleMessage(
+      "Сохранённый черновик изменился. Ввод сохранён; загрузите актуальную версию.",
+    ),
+    "policyDraftCopyFull": MessageLookupByLibrary.simpleMessage(
+      "Копировать полную конфигурацию",
+    ),
+    "policyDraftCopyFullConfirm": MessageLookupByLibrary.simpleMessage(
+      "Копировать в буфер обмена полную конфигурацию, включая имена пользователей и пароли?",
+    ),
+    "policyDraftDeleted": MessageLookupByLibrary.simpleMessage(
+      "Черновик политики удалён",
+    ),
+    "policyDraftDirectWarning": MessageLookupByLibrary.simpleMessage(
+      "DIRECT по умолчанию отправляет DNS-запросы доменов без совпадений напрямую выбранной службе DNS.",
+    ),
+    "policyDraftDiscard": MessageLookupByLibrary.simpleMessage(
+      "Отменить несохранённые изменения?",
+    ),
+    "policyDraftDnsServices": MessageLookupByLibrary.simpleMessage(
+      "Службы DNS",
+    ),
+    "policyDraftDomainDefault": MessageLookupByLibrary.simpleMessage(
+      "Политика для доменов без совпадений",
+    ),
+    "policyDraftDomainRules": MessageLookupByLibrary.simpleMessage(
+      "Доменные правила",
+    ),
+    "policyDraftExtract": MessageLookupByLibrary.simpleMessage(
+      "Извлечь из сохранённой конфигурации",
+    ),
+    "policyDraftExtractConfirm": MessageLookupByLibrary.simpleMessage(
+      "Заменить содержимое редактора черновиком из локальных материалов? Скрипты не выполняются. Неподдерживаемые правила блокируют миграцию. Конфигурация не применяется.",
+    ),
+    "policyDraftExtractFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось извлечь локальные материалы. Черновик не изменён.",
+    ),
+    "policyDraftGeneratePreview": MessageLookupByLibrary.simpleMessage(
+      "Просмотр сгенерированного черновика",
+    ),
+    "policyDraftGroups": MessageLookupByLibrary.simpleMessage(
+      "Статические группы прокси",
+    ),
+    "policyDraftIncomplete": m42,
+    "policyDraftIpDefault": MessageLookupByLibrary.simpleMessage(
+      "Политика для IP без совпадений",
+    ),
+    "policyDraftIpRules": MessageLookupByLibrary.simpleMessage("Правила IP"),
+    "policyDraftListeners": MessageLookupByLibrary.simpleMessage(
+      "Порты прослушивания для просмотра",
+    ),
+    "policyDraftLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось загрузить черновик. Повторите загрузку.",
+    ),
+    "policyDraftMembers": MessageLookupByLibrary.simpleMessage(
+      "Выберите фиксированные узлы",
+    ),
+    "policyDraftMigration": MessageLookupByLibrary.simpleMessage(
+      "Исторические материалы миграции",
+    ),
+    "policyDraftMigrationBlocked": MessageLookupByLibrary.simpleMessage(
+      "Миграция заблокирована. Исходные материалы и позиции правил сохранены. Изменение извлечённых строк или значений по умолчанию не снимает блокировку.",
+    ),
+    "policyDraftMigrationChoices": MessageLookupByLibrary.simpleMessage(
+      "Извлечённые строки — кандидаты. Явно выберите обе политики по умолчанию, DNS и начальный DNS. Исходный профиль, переопределения и глобальный DNS используют прежний путь конфигурации. Предпросмотр не является действующей конфигурацией.",
+    ),
+    "policyDraftMigrationIp": MessageLookupByLibrary.simpleMessage(
+      "Правила IP назначения могут ограничивать и доменные подключения; разделение не сохраняет эту защиту.",
+    ),
+    "policyDraftMigrationMatch": MessageLookupByLibrary.simpleMessage(
+      "После MATCH есть другие правила. Его позицию нельзя заменить правилом по умолчанию в конце.",
+    ),
+    "policyDraftMigrationScript": MessageLookupByLibrary.simpleMessage(
+      "При извлечении скрипты не выполняются; их вывод неизвестен.",
+    ),
+    "policyDraftMigrationUnsupported": MessageLookupByLibrary.simpleMessage(
+      "Правило, ресурс или конфигурация не поддерживаются при миграции.",
+    ),
+    "policyDraftMissing": MessageLookupByLibrary.simpleMessage(
+      "Этот профиль больше не существует. Ввод не сохранён.",
+    ),
+    "policyDraftMoveDown": MessageLookupByLibrary.simpleMessage("Вниз"),
+    "policyDraftMoveUp": MessageLookupByLibrary.simpleMessage("Вверх"),
+    "policyDraftNeedsPreview": MessageLookupByLibrary.simpleMessage(
+      "Данные ещё требуют проверки при генерации предпросмотра",
+    ),
+    "policyDraftNodes": MessageLookupByLibrary.simpleMessage(
+      "Фиксированные узлы SOCKS5",
+    ),
+    "policyDraftProtocol": MessageLookupByLibrary.simpleMessage("Протокол"),
+    "policyDraftReadOnly": MessageLookupByLibrary.simpleMessage(
+      "Неизвестная версия или неподдерживаемая структура. Исходное содержимое сохранено; изменение и просмотр недоступны.",
+    ),
+    "policyDraftReady": MessageLookupByLibrary.simpleMessage(
+      "Предпросмотр черновика проверен; не применён",
+    ),
+    "policyDraftRebuild": MessageLookupByLibrary.simpleMessage(
+      "Создать независимый черновик",
+    ),
+    "policyDraftRebuildConfirm": MessageLookupByLibrary.simpleMessage(
+      "Отбросить черновик и материалы миграции? Новая политика не гарантирует сохранение защиты старой конфигурации. Исходный профиль и действующая конфигурация не изменятся.",
+    ),
+    "policyDraftReferenced": m43,
+    "policyDraftReload": MessageLookupByLibrary.simpleMessage(
+      "Загрузить сохранённый черновик",
+    ),
+    "policyDraftRestoreFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось завершить восстановление. Повторно загрузите данные для проверки. Уведомления о необходимости восстановления остаются в силе.",
+    ),
+    "policyDraftRestoreWarning": MessageLookupByLibrary.simpleMessage(
+      "При перезаписи объекты заменяются, если архив содержит их данные; отсутствующие черновики могут быть удалены. Архив без объектов сохраняет существующие объекты. Продолжить?",
+    ),
+    "policyDraftRevealCredentials": MessageLookupByLibrary.simpleMessage(
+      "Показать учётные данные",
+    ),
+    "policyDraftSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось сохранить. Ввод и ранее сохранённый черновик сохранены.",
+    ),
+    "policyDraftSaved": MessageLookupByLibrary.simpleMessage(
+      "Черновик сохранён; не применён",
+    ),
+    "policyDraftStorage": MessageLookupByLibrary.simpleMessage(
+      "Черновики могут содержать учётные данные. Они хранятся в каталоге БД (в Android — в закрытом каталоге приложения). ZIP-копии не шифруются. Сохранение не применяет черновик.",
+    ),
+    "policyDraftTarget": MessageLookupByLibrary.simpleMessage(
+      "Направление трафика",
+    ),
+    "policyDraftTitle": MessageLookupByLibrary.simpleMessage(
+      "Черновик политики",
+    ),
+    "policyDraftUdp": MessageLookupByLibrary.simpleMessage(
+      "Включить UDP для узла",
+    ),
+    "policyDraftUnsaved": MessageLookupByLibrary.simpleMessage(
+      "Черновик не сохранён и не применён",
+    ),
+    "policyDraftUnset": MessageLookupByLibrary.simpleMessage("Не настроено"),
+    "policyDraftUsername": MessageLookupByLibrary.simpleMessage(
+      "Имя пользователя",
+    ),
     "port": MessageLookupByLibrary.simpleMessage("Порт"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage(
       "Введите другой порт",
     ),
-    "portTip": m42,
+    "portTip": m44,
     "prerequisites": MessageLookupByLibrary.simpleMessage(
       "Предварительные условия",
     ),
@@ -1098,8 +1258,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "profiles": MessageLookupByLibrary.simpleMessage("Профили"),
     "profilesSort": MessageLookupByLibrary.simpleMessage("Сортировка профилей"),
     "project": MessageLookupByLibrary.simpleMessage("Проект"),
-    "providerInUse": m43,
-    "providerRenameShadowed": m44,
+    "providerInUse": m45,
+    "providerRenameShadowed": m46,
     "providerSourceSubscription": MessageLookupByLibrary.simpleMessage(
       "Подписка",
     ),
@@ -1108,7 +1268,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "providers": MessageLookupByLibrary.simpleMessage("Внешние ресурсы"),
     "proxies": MessageLookupByLibrary.simpleMessage("Прокси"),
-    "proxiesCount": m45,
+    "proxiesCount": m47,
     "proxiesEmpty": MessageLookupByLibrary.simpleMessage("Список прокси пуст"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("Цепочка прокси"),
     "proxyDefinition": MessageLookupByLibrary.simpleMessage(
@@ -1161,7 +1321,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replace": MessageLookupByLibrary.simpleMessage("Заменить"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("Заменить все"),
     "request": MessageLookupByLibrary.simpleMessage("Запрос"),
-    "requestDirectRecoveryMessage": m46,
+    "requestDirectRecoveryMessage": m48,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
       "Восстановить через прямое соединение?",
     ),
@@ -1175,7 +1335,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
       "Часть локальных изменений не удалось отменить. Файлы восстановления сохранены; автоматические обновления заблокированы.",
     ),
-    "requestProxyDefault": m47,
+    "requestProxyDefault": m49,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Цель прокси"),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "Выбранный маршрут запросов недоступен.",
@@ -1366,10 +1526,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("Набор правил"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("Цель правила"),
     "rules": MessageLookupByLibrary.simpleMessage("Правила"),
-    "rulesCount": m48,
+    "rulesCount": m50,
     "runTime": MessageLookupByLibrary.simpleMessage("Время работы"),
     "safeMode": MessageLookupByLibrary.simpleMessage("Безопасный режим"),
-    "safeModeAppTitle": m49,
+    "safeModeAppTitle": m51,
     "save": MessageLookupByLibrary.simpleMessage("Сохранить"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("Сохранить изменения?"),
     "script": MessageLookupByLibrary.simpleMessage("Скрипт"),
@@ -1381,7 +1541,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Поиск"),
     "seconds": MessageLookupByLibrary.simpleMessage("секунд"),
-    "secondsCount": m50,
+    "secondsCount": m52,
     "selectAll": MessageLookupByLibrary.simpleMessage("Выбрать всё"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Выбрать прокси"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1397,13 +1557,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Выберите подправило",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Выбрано"),
-    "selectedCountTitle": m51,
+    "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("Сервер"),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("Доступен"),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("Заблокировано"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Проверить"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Проверить все"),
-    "serviceCheckedAt": m52,
+    "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Скоро появится"),
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Недопустимый провайдер",
@@ -1444,7 +1604,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Запускаться без показа окна",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("По одному"),
-    "singleValueTip": m53,
+    "singleValueTip": m55,
     "size": MessageLookupByLibrary.simpleMessage("Размер"),
     "slide": MessageLookupByLibrary.simpleMessage("Сдвиг"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Порт SOCKS"),
@@ -1552,7 +1712,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("Получить профиль по URL"),
-    "urlTip": m54,
+    "urlTip": m56,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системный hosts",
@@ -1585,7 +1745,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Также устанавливать системные часы; Android это игнорирует",
     ),
-    "yearsAgo": m55,
+    "yearsAgo": m57,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

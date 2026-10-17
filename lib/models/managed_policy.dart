@@ -124,19 +124,8 @@ final class ManagedPolicy {
         root.required('bootstrapDns'),
         'policy.bootstrapDns',
       ),
-      proxies: _objects(root, 'proxies', _proxy),
-      groups: _objects(root, 'groups', (value, location) {
-        if (value is! List || value.isEmpty) {
-          _invalid(location, 'expected nonempty proxy member list');
-        }
-        final members = <String>[];
-        for (final (index, member) in value.indexed) {
-          final id = _id(member, '$location[$index]');
-          if (members.contains(id)) _invalid(location, 'duplicate member');
-          members.add(id);
-        }
-        return List<String>.unmodifiable(members);
-      }),
+      proxies: _objects(root, 'proxies', parseManagedProxy),
+      groups: _objects(root, 'groups', parseManagedProxyGroup),
       mixedPort: mixedPort,
       dnsPort: dnsPort,
     );
@@ -201,7 +190,20 @@ ManagedDnsService _service(Object? value, String location) {
   );
 }
 
-ManagedProxy _proxy(Object? value, String location) {
+List<String> parseManagedProxyGroup(Object? value, String location) {
+  if (value is! List || value.isEmpty) {
+    _invalid(location, 'expected nonempty proxy member list');
+  }
+  final members = <String>[];
+  for (final (index, member) in value.indexed) {
+    final id = _id(member, '$location[$index]');
+    if (members.contains(id)) _invalid(location, 'duplicate member');
+    members.add(id);
+  }
+  return List<String>.unmodifiable(members);
+}
+
+ManagedProxy parseManagedProxy(Object? value, String location) {
   final entry = _Fields(value, location, {
     'type',
     'address',

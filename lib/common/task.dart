@@ -292,54 +292,12 @@ Future<({String yaml, String md5})> _makeRealProfileTask(
       };
     }
   }
-  List<String> rules = [];
-  if (data.rules.isEmpty) {
-    if (rawConfig['rules'] != null) {
-      rules = List<String>.from(rawConfig['rules']);
-    }
-    if (addedRules.isNotEmpty) {
-      final hasMatchPlaceholder = addedRules.any(
-        (item) => item.ruleTarget?.toUpperCase() == 'MATCH',
-      );
-      String? replacementTarget = data.matchTarget?.trim();
-      if (replacementTarget?.isEmpty == true) {
-        replacementTarget = null;
-      }
-
-      if (hasMatchPlaceholder && replacementTarget == null) {
-        for (int i = rules.length - 1; i >= 0; i--) {
-          final parsed = Rule.parse(rules[i]);
-          if (parsed.ruleAction == RuleAction.MATCH) {
-            final target = parsed.ruleTarget;
-            if (target != null && target.isNotEmpty) {
-              replacementTarget = target;
-              break;
-            }
-          }
-        }
-      }
-      final List<String> finalAddedRules;
-
-      if (replacementTarget?.isNotEmpty == true) {
-        finalAddedRules = [];
-        for (int i = 0; i < addedRules.length; i++) {
-          final parsed = addedRules[i];
-          if (parsed.ruleTarget?.toUpperCase() == 'MATCH') {
-            finalAddedRules.add(
-              parsed.copyWith(ruleTarget: replacementTarget).rawValue,
-            );
-          } else {
-            finalAddedRules.add(addedRules[i].rawValue);
-          }
-        }
-      } else {
-        finalAddedRules = addedRules.map((e) => e.rawValue).toList();
-      }
-      rules = [...finalAddedRules, ...rules];
-    }
-  } else {
-    rules = data.rules.map((item) => item.rawValue).toList();
-  }
+  final rules = composeProfileRules(
+    sourceRules: rawConfig['rules'],
+    customRules: data.rules,
+    addedRules: addedRules,
+    matchTarget: data.matchTarget,
+  );
   if (data.proxies.isNotEmpty) {
     rawConfig['proxies'] = data.proxies.map((item) => item.definition).toList();
   }
@@ -620,4 +578,61 @@ Future<List<T>> _mapListTask<T, S>(
   ({List<S> results, T Function(S) mapper}) args,
 ) async {
   return args.results.map((item) => args.mapper(item)).toList();
+}
+
+List<String> composeProfileRules({
+  required Object? sourceRules,
+  required List<Rule> customRules,
+  required List<Rule> addedRules,
+  String? matchTarget,
+}) {
+  List<String> rules = [];
+  if (customRules.isEmpty) {
+    if (sourceRules != null) {
+      rules = List<String>.from(sourceRules as Iterable);
+    }
+    if (addedRules.isNotEmpty) {
+      final hasMatchPlaceholder = addedRules.any(
+        (item) => item.ruleTarget?.toUpperCase() == 'MATCH',
+      );
+      String? replacementTarget = matchTarget?.trim();
+      if (replacementTarget?.isEmpty == true) {
+        replacementTarget = null;
+      }
+
+      if (hasMatchPlaceholder && replacementTarget == null) {
+        for (int i = rules.length - 1; i >= 0; i--) {
+          final parsed = Rule.parse(rules[i]);
+          if (parsed.ruleAction == RuleAction.MATCH) {
+            final target = parsed.ruleTarget;
+            if (target != null && target.isNotEmpty) {
+              replacementTarget = target;
+              break;
+            }
+          }
+        }
+      }
+      final List<String> finalAddedRules;
+
+      if (replacementTarget?.isNotEmpty == true) {
+        finalAddedRules = [];
+        for (int i = 0; i < addedRules.length; i++) {
+          final parsed = addedRules[i];
+          if (parsed.ruleTarget?.toUpperCase() == 'MATCH') {
+            finalAddedRules.add(
+              parsed.copyWith(ruleTarget: replacementTarget).rawValue,
+            );
+          } else {
+            finalAddedRules.add(addedRules[i].rawValue);
+          }
+        }
+      } else {
+        finalAddedRules = addedRules.map((e) => e.rawValue).toList();
+      }
+      rules = [...finalAddedRules, ...rules];
+    }
+  } else {
+    rules = customRules.map((item) => item.rawValue).toList();
+  }
+  return rules;
 }

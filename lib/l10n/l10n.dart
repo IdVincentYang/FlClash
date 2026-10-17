@@ -6457,6 +6457,566 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Policy draft`
+  String get policyDraftTitle {
+    return Intl.message(
+      'Policy draft',
+      name: 'policyDraftTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Draft saved; not applied`
+  String get policyDraftSaved {
+    return Intl.message(
+      'Draft saved; not applied',
+      name: 'policyDraftSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unsaved draft; not applied`
+  String get policyDraftUnsaved {
+    return Intl.message(
+      'Unsaved draft; not applied',
+      name: 'policyDraftUnsaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Drafts may contain credentials. They use the existing database directory (private app storage on Android). Backups are unencrypted ZIP files. Saving does not apply the draft.`
+  String get policyDraftStorage {
+    return Intl.message(
+      'Drafts may contain credentials. They use the existing database directory (private app storage on Android). Backups are unencrypted ZIP files. Saving does not apply the draft.',
+      name: 'policyDraftStorage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unknown version or unsupported structure. The original content is preserved and cannot be previewed or edited.`
+  String get policyDraftReadOnly {
+    return Intl.message(
+      'Unknown version or unsupported structure. The original content is preserved and cannot be previewed or edited.',
+      name: 'policyDraftReadOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not load the draft. Retry to reload it.`
+  String get policyDraftLoadFailed {
+    return Intl.message(
+      'Could not load the draft. Retry to reload it.',
+      name: 'policyDraftLoadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not save the draft. Your input and the stored draft were preserved.`
+  String get policyDraftSaveFailed {
+    return Intl.message(
+      'Could not save the draft. Your input and the stored draft were preserved.',
+      name: 'policyDraftSaveFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The stored draft changed. Your input is preserved; reload before replacing it.`
+  String get policyDraftConflict {
+    return Intl.message(
+      'The stored draft changed. Your input is preserved; reload before replacing it.',
+      name: 'policyDraftConflict',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This profile no longer exists. Your input has not been saved.`
+  String get policyDraftMissing {
+    return Intl.message(
+      'This profile no longer exists. Your input has not been saved.',
+      name: 'policyDraftMissing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Discard unsaved changes?`
+  String get policyDraftDiscard {
+    return Intl.message(
+      'Discard unsaved changes?',
+      name: 'policyDraftDiscard',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Create an independent draft`
+  String get policyDraftRebuild {
+    return Intl.message(
+      'Create an independent draft',
+      name: 'policyDraftRebuild',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Discard this draft and any migration materials? The new policy will not preserve the old configuration’s protections. The original profile and running configuration stay unchanged.`
+  String get policyDraftRebuildConfirm {
+    return Intl.message(
+      'Discard this draft and any migration materials? The new policy will not preserve the old configuration’s protections. The original profile and running configuration stay unchanged.',
+      name: 'policyDraftRebuildConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Extract from saved configuration`
+  String get policyDraftExtract {
+    return Intl.message(
+      'Extract from saved configuration',
+      name: 'policyDraftExtract',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Replace the editor contents with a draft extracted from local saved materials? Scripts are not executed. Unsupported rules remain blocked. This does not apply a configuration.`
+  String get policyDraftExtractConfirm {
+    return Intl.message(
+      'Replace the editor contents with a draft extracted from local saved materials? Scripts are not executed. Unsupported rules remain blocked. This does not apply a configuration.',
+      name: 'policyDraftExtractConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not extract local saved materials. The draft is unchanged.`
+  String get policyDraftExtractFailed {
+    return Intl.message(
+      'Could not extract local saved materials. The draft is unchanged.',
+      name: 'policyDraftExtractFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Historical migration materials`
+  String get policyDraftMigration {
+    return Intl.message(
+      'Historical migration materials',
+      name: 'policyDraftMigration',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Migration is blocked. Original materials and rule positions are preserved. Editing extracted rows or defaults cannot remove the block.`
+  String get policyDraftMigrationBlocked {
+    return Intl.message(
+      'Migration is blocked. Original materials and rule positions are preserved. Editing extracted rows or defaults cannot remove the block.',
+      name: 'policyDraftMigrationBlocked',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Destination-IP rules may also restrict domain connections. Splitting them cannot preserve that protection.`
+  String get policyDraftMigrationIp {
+    return Intl.message(
+      'Destination-IP rules may also restrict domain connections. Splitting them cannot preserve that protection.',
+      name: 'policyDraftMigrationIp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `A MATCH occurs before later rules. Its position cannot become an end-of-table default.`
+  String get policyDraftMigrationMatch {
+    return Intl.message(
+      'A MATCH occurs before later rules. Its position cannot become an end-of-table default.',
+      name: 'policyDraftMigrationMatch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Script output is unknown because scripts are not executed during extraction.`
+  String get policyDraftMigrationScript {
+    return Intl.message(
+      'Script output is unknown because scripts are not executed during extraction.',
+      name: 'policyDraftMigrationScript',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This rule, resource, or configuration is outside the supported migration scope.`
+  String get policyDraftMigrationUnsupported {
+    return Intl.message(
+      'This rule, resource, or configuration is outside the supported migration scope.',
+      name: 'policyDraftMigrationUnsupported',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Domain rules`
+  String get policyDraftDomainRules {
+    return Intl.message(
+      'Domain rules',
+      name: 'policyDraftDomainRules',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `IP rules`
+  String get policyDraftIpRules {
+    return Intl.message(
+      'IP rules',
+      name: 'policyDraftIpRules',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Default for unmatched domains`
+  String get policyDraftDomainDefault {
+    return Intl.message(
+      'Default for unmatched domains',
+      name: 'policyDraftDomainDefault',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Default for unmatched IPs`
+  String get policyDraftIpDefault {
+    return Intl.message(
+      'Default for unmatched IPs',
+      name: 'policyDraftIpDefault',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An explicit DIRECT domain default also sends DNS for unmatched domains directly to its selected DNS service.`
+  String get policyDraftDirectWarning {
+    return Intl.message(
+      'An explicit DIRECT domain default also sends DNS for unmatched domains directly to its selected DNS service.',
+      name: 'policyDraftDirectWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `DNS services`
+  String get policyDraftDnsServices {
+    return Intl.message(
+      'DNS services',
+      name: 'policyDraftDnsServices',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Bootstrap DNS (DIRECT)`
+  String get policyDraftBootstrap {
+    return Intl.message(
+      'Bootstrap DNS (DIRECT)',
+      name: 'policyDraftBootstrap',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Fixed SOCKS5 nodes`
+  String get policyDraftNodes {
+    return Intl.message(
+      'Fixed SOCKS5 nodes',
+      name: 'policyDraftNodes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Static proxy groups`
+  String get policyDraftGroups {
+    return Intl.message(
+      'Static proxy groups',
+      name: 'policyDraftGroups',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Preview listener ports`
+  String get policyDraftListeners {
+    return Intl.message(
+      'Preview listener ports',
+      name: 'policyDraftListeners',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Routing target`
+  String get policyDraftTarget {
+    return Intl.message(
+      'Routing target',
+      name: 'policyDraftTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Not configured`
+  String get policyDraftUnset {
+    return Intl.message(
+      'Not configured',
+      name: 'policyDraftUnset',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check {location}. Complete or correct this field before previewing.`
+  String policyDraftIncomplete(Object location) {
+    return Intl.message(
+      'Check $location. Complete or correct this field before previewing.',
+      name: 'policyDraftIncomplete',
+      desc: '',
+      args: [location],
+    );
+  }
+
+  /// `Generated draft preview`
+  String get policyDraftGeneratePreview {
+    return Intl.message(
+      'Generated draft preview',
+      name: 'policyDraftGeneratePreview',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Copy full generated configuration`
+  String get policyDraftCopyFull {
+    return Intl.message(
+      'Copy full generated configuration',
+      name: 'policyDraftCopyFull',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Copy the full generated configuration, including any usernames and passwords, to the clipboard?`
+  String get policyDraftCopyFullConfirm {
+    return Intl.message(
+      'Copy the full generated configuration, including any usernames and passwords, to the clipboard?',
+      name: 'policyDraftCopyFullConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This frozen backup contains policy drafts and may contain credentials and original migration materials. Confirm a new backup before exporting it.`
+  String get policyDraftBackupConsent {
+    return Intl.message(
+      'This frozen backup contains policy drafts and may contain credentials and original migration materials. Confirm a new backup before exporting it.',
+      name: 'policyDraftBackupConsent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The unencrypted ZIP saved to your chosen local file will include complete policy drafts, credentials, and migration materials. Continue?`
+  String get policyDraftBackupLocal {
+    return Intl.message(
+      'The unencrypted ZIP saved to your chosen local file will include complete policy drafts, credentials, and migration materials. Continue?',
+      name: 'policyDraftBackupLocal',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The unencrypted ZIP uploaded to your selected WebDAV service will include complete policy drafts, credentials, and migration materials. Continue?`
+  String get policyDraftBackupWebDav {
+    return Intl.message(
+      'The unencrypted ZIP uploaded to your selected WebDAV service will include complete policy drafts, credentials, and migration materials. Continue?',
+      name: 'policyDraftBackupWebDav',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Override restore replaces entities when the archive contains entity data. Drafts absent from that backup may be removed. Archives with no entities preserve existing entities. Continue?`
+  String get policyDraftRestoreWarning {
+    return Intl.message(
+      'Override restore replaces entities when the archive contains entity data. Drafts absent from that backup may be removed. Archives with no entities preserve existing entities. Continue?',
+      name: 'policyDraftRestoreWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This resource is used at: {locations}. Change those references before deleting it.`
+  String policyDraftReferenced(Object locations) {
+    return Intl.message(
+      'This resource is used at: $locations. Change those references before deleting it.',
+      name: 'policyDraftReferenced',
+      desc: '',
+      args: [locations],
+    );
+  }
+
+  /// `Move up`
+  String get policyDraftMoveUp {
+    return Intl.message(
+      'Move up',
+      name: 'policyDraftMoveUp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Move down`
+  String get policyDraftMoveDown {
+    return Intl.message(
+      'Move down',
+      name: 'policyDraftMoveDown',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Protocol`
+  String get policyDraftProtocol {
+    return Intl.message(
+      'Protocol',
+      name: 'policyDraftProtocol',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Username`
+  String get policyDraftUsername {
+    return Intl.message(
+      'Username',
+      name: 'policyDraftUsername',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use username and password`
+  String get policyDraftAuthentication {
+    return Intl.message(
+      'Use username and password',
+      name: 'policyDraftAuthentication',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enable UDP for this node`
+  String get policyDraftUdp {
+    return Intl.message(
+      'Enable UDP for this node',
+      name: 'policyDraftUdp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Select fixed node members`
+  String get policyDraftMembers {
+    return Intl.message(
+      'Select fixed node members',
+      name: 'policyDraftMembers',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reload stored draft`
+  String get policyDraftReload {
+    return Intl.message(
+      'Reload stored draft',
+      name: 'policyDraftReload',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Show credentials`
+  String get policyDraftRevealCredentials {
+    return Intl.message(
+      'Show credentials',
+      name: 'policyDraftRevealCredentials',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Policy draft deleted`
+  String get policyDraftDeleted {
+    return Intl.message(
+      'Policy draft deleted',
+      name: 'policyDraftDeleted',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Draft preview validated; not applied`
+  String get policyDraftReady {
+    return Intl.message(
+      'Draft preview validated; not applied',
+      name: 'policyDraftReady',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Inputs still need generated preview validation`
+  String get policyDraftNeedsPreview {
+    return Intl.message(
+      'Inputs still need generated preview validation',
+      name: 'policyDraftNeedsPreview',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Extracted rows are candidates. Choose both defaults, DNS and bootstrap services explicitly. The original Profile, overwrite settings and global DNS keep using the traditional configuration path. This preview is not the current running configuration.`
+  String get policyDraftMigrationChoices {
+    return Intl.message(
+      'Extracted rows are candidates. Choose both defaults, DNS and bootstrap services explicitly. The original Profile, overwrite settings and global DNS keep using the traditional configuration path. This preview is not the current running configuration.',
+      name: 'policyDraftMigrationChoices',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not complete restore. Reload to check the stored data. Any recovery notice still applies.`
+  String get policyDraftRestoreFailed {
+    return Intl.message(
+      'Could not complete restore. Reload to check the stored data. Any recovery notice still applies.',
+      name: 'policyDraftRestoreFailed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

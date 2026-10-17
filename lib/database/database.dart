@@ -18,6 +18,7 @@ part 'groups.dart';
 part 'icons.dart';
 part 'links.dart';
 part 'profiles.dart';
+part 'policy_drafts.dart';
 part 'rules.dart';
 part 'scripts.dart';
 
@@ -31,6 +32,7 @@ part 'scripts.dart';
     IconRecords,
     ClashProviders,
     CustomProxies,
+    ProfilePolicyDrafts,
   ],
   daos: [
     ProfilesDao,
@@ -40,13 +42,14 @@ part 'scripts.dart';
     IconRecordsDao,
     ClashProvidersDao,
     CustomProxiesDao,
+    ProfilePolicyDraftsDao,
   ],
 )
 class Database extends _$Database {
   Database([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -89,6 +92,9 @@ class Database extends _$Database {
           if (await _createTableIfMissing(m, customProxies)) {
             await m.createIndex(idxCustomProxiesProfileOrder);
           }
+        }
+        if (from < 12) {
+          await _createTableIfMissing(m, profilePolicyDrafts);
         }
         if (from < 9) {
           await _purgeOrphans();
@@ -193,16 +199,21 @@ class Database extends _$Database {
     List<ProxyGroup> proxyGroups, {
     List<ClashProvider> clashProviders = const [],
     List<CustomProxy> customProxies = const [],
+    List<ProfilePolicyDraft> policyDrafts = const [],
     bool isOverride = false,
     Future<void> Function()? beforeCommit,
   }) async {
+    if (!validPolicyDraftRelations(policyDrafts, profiles.map((p) => p.id))) {
+      throw const PolicyDraftRestoreException();
+    }
     if (profiles.isEmpty &&
         scripts.isEmpty &&
         rules.isEmpty &&
         links.isEmpty &&
         proxyGroups.isEmpty &&
         clashProviders.isEmpty &&
-        customProxies.isEmpty) {
+        customProxies.isEmpty &&
+        policyDrafts.isEmpty) {
       await beforeCommit?.call();
       return;
     }
@@ -217,6 +228,11 @@ class Database extends _$Database {
           proxyGroupsDao.setAllWithBatch(null, b, proxyGroups);
           customProxiesDao.setAllWithBatch(null, b, customProxies);
           clashProvidersDao.setAllWithBatch(b, clashProviders);
+          profilePolicyDraftsDao.restoreWithBatch(
+            b,
+            policyDrafts,
+            isOverride: true,
+          );
           return;
         }
         profilesDao.putAllWithBatch(
@@ -228,6 +244,11 @@ class Database extends _$Database {
         proxyGroupsDao.putAllWithBatch(b, proxyGroups);
         customProxiesDao.putAllWithBatch(b, customProxies);
         clashProvidersDao.putAllWithBatch(b, clashProviders);
+        profilePolicyDraftsDao.restoreWithBatch(
+          b,
+          policyDrafts,
+          isOverride: false,
+        );
       });
       await _purgeOrphans();
       await beforeCommit?.call();
@@ -254,6 +275,9 @@ class Database extends _$Database {
     );
     await customProxies.remove(
       (t) => t.profileId.isNotNull() & t.profileId.isNotInQuery(profileIds),
+    );
+    await profilePolicyDrafts.remove(
+      (t) => t.profileId.isNotInQuery(profileIds),
     );
     await rulesDao.delUnlinkedRules();
   }

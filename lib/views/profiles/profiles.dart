@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'add.dart';
 import 'edit.dart';
 import 'preview.dart';
+import 'policy_draft.dart';
 
 class ProfilesView extends ConsumerStatefulWidget {
   const ProfilesView({super.key});
@@ -350,6 +351,12 @@ class ProfileItem extends ConsumerWidget {
         onPressed: () {
           _handlePreview(context);
         },
+      ),
+      CommonPopupMenuItem(
+        glyph: AppGlyphs.puzzle,
+        label: appLocalizations.policyDraftTitle,
+        onPressed: () =>
+            BaseNavigator.push(context, PolicyDraftView(profile: profile)),
       ),
       if (isUrl)
         CommonPopupMenuItem(

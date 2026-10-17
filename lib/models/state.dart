@@ -9,6 +9,7 @@ import 'common.dart';
 import 'config.dart';
 import 'core.dart';
 import 'profile.dart';
+import 'policy_draft.dart';
 
 part 'generated/state.freezed.dart';
 part 'generated/state.g.dart';
@@ -370,6 +371,7 @@ abstract class MigrationData with _$MigrationData {
     @Default([]) List<ProxyGroup> proxyGroups,
     @Default([]) List<ClashProvider> clashProviders,
     @Default([]) List<CustomProxy> customProxies,
+    @Default([]) List<ProfilePolicyDraft> policyDrafts,
   }) = _MigrationData;
 }
 

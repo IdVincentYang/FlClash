@@ -74,7 +74,7 @@ void main() {
             .data
             .values
             .single,
-        11,
+        12,
       );
     } finally {
       await database.close();

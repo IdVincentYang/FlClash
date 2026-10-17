@@ -107,35 +107,39 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m41(count) => "${count} 项存在问题，应用覆写可能失败";
 
-  static String m42(label) => "${label} 必须在 1024 到 49151 之间";
+  static String m42(location) => "请检查 ${location}，补齐或修正后才能预览。";
 
-  static String m43(label, profiles) =>
+  static String m43(locations) => "资源被以下位置引用：${locations}。请先修改引用再删除。";
+
+  static String m44(label) => "${label} 必须在 1024 到 49151 之间";
+
+  static String m45(label, profiles) =>
       "${label} 仍被 ${profiles} 的自定义策略组或规则使用，请先在那里移除";
 
-  static String m44(profiles, label) =>
+  static String m46(profiles, label) =>
       "${profiles} 的订阅里已有 ${label}，改名后这些配置会改用订阅里的那个，请换一个名称";
 
-  static String m45(count) => "${count} 个代理";
+  static String m47(count) => "${count} 个代理";
 
-  static String m46(host) => "当前配置无法获取此对象。是否允许本次操作直连 ${host}？许可在操作结束或来源变化后失效。";
+  static String m48(host) => "当前配置无法获取此对象。是否允许本次操作直连 ${host}？许可在操作结束或来源变化后失效。";
 
-  static String m47(target) => "GLOBAL（当前选择：${target}）";
+  static String m49(target) => "GLOBAL（当前选择：${target}）";
 
-  static String m48(count) => "${count} 条规则";
+  static String m50(count) => "${count} 条规则";
 
-  static String m49(appName) => "${appName}（安全模式）";
+  static String m51(appName) => "${appName}（安全模式）";
 
-  static String m50(count) => "${count} 秒";
+  static String m52(count) => "${count} 秒";
 
-  static String m51(count) => "已选择 ${count} 项";
+  static String m53(count) => "已选择 ${count} 项";
 
-  static String m52(time) => "检测于 ${time}";
+  static String m54(time) => "检测于 ${time}";
 
-  static String m53(label) => "${label}只能是一项";
+  static String m55(label) => "${label}只能是一项";
 
-  static String m54(label) => "${label}必须为URL";
+  static String m56(label) => "${label}必须为URL";
 
-  static String m55(count) => "${count} 年前";
+  static String m57(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -761,9 +765,123 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "请上传有效的二维码",
     ),
+    "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
+      "使用用户名和密码",
+    ),
+    "policyDraftBackupConsent": MessageLookupByLibrary.simpleMessage(
+      "此冻结备份包含策略草稿，可能含凭据和原始迁移材料。请重新确认备份后再导出。",
+    ),
+    "policyDraftBackupLocal": MessageLookupByLibrary.simpleMessage(
+      "所选本地文件将保存未加密 ZIP，包含完整策略草稿、凭据和迁移材料。继续？",
+    ),
+    "policyDraftBackupWebDav": MessageLookupByLibrary.simpleMessage(
+      "将向所选 WebDAV 服务上传未加密 ZIP，包含完整策略草稿、凭据和迁移材料。继续？",
+    ),
+    "policyDraftBootstrap": MessageLookupByLibrary.simpleMessage(
+      "启动 DNS（DIRECT）",
+    ),
+    "policyDraftConflict": MessageLookupByLibrary.simpleMessage(
+      "已保存的草稿发生变化。输入已保留，请重新载入后再修改。",
+    ),
+    "policyDraftCopyFull": MessageLookupByLibrary.simpleMessage("复制完整生成配置"),
+    "policyDraftCopyFullConfirm": MessageLookupByLibrary.simpleMessage(
+      "将完整生成配置（可能含用户名和密码）复制到剪贴板？",
+    ),
+    "policyDraftDeleted": MessageLookupByLibrary.simpleMessage("策略草稿已删除"),
+    "policyDraftDirectWarning": MessageLookupByLibrary.simpleMessage(
+      "显式默认 DIRECT 也会把未命中域名的 DNS 直连发送给所选解析服务。",
+    ),
+    "policyDraftDiscard": MessageLookupByLibrary.simpleMessage("放弃未保存的修改？"),
+    "policyDraftDnsServices": MessageLookupByLibrary.simpleMessage("DNS 服务"),
+    "policyDraftDomainDefault": MessageLookupByLibrary.simpleMessage(
+      "未命中域名的默认策略",
+    ),
+    "policyDraftDomainRules": MessageLookupByLibrary.simpleMessage("域名规则"),
+    "policyDraftExtract": MessageLookupByLibrary.simpleMessage("从已保存配置提取"),
+    "policyDraftExtractConfirm": MessageLookupByLibrary.simpleMessage(
+      "用本地已保存材料提取的草稿替换当前编辑内容？不会执行脚本；不支持的规则仍会阻断迁移，不会应用配置。",
+    ),
+    "policyDraftExtractFailed": MessageLookupByLibrary.simpleMessage(
+      "无法提取本地已保存材料，草稿未变。",
+    ),
+    "policyDraftGeneratePreview": MessageLookupByLibrary.simpleMessage(
+      "生成草稿预览",
+    ),
+    "policyDraftGroups": MessageLookupByLibrary.simpleMessage("静态代理组"),
+    "policyDraftIncomplete": m42,
+    "policyDraftIpDefault": MessageLookupByLibrary.simpleMessage(
+      "未命中 IP 的默认策略",
+    ),
+    "policyDraftIpRules": MessageLookupByLibrary.simpleMessage("IP 规则"),
+    "policyDraftListeners": MessageLookupByLibrary.simpleMessage("预览监听端口"),
+    "policyDraftLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "无法读取草稿，可重试载入。",
+    ),
+    "policyDraftMembers": MessageLookupByLibrary.simpleMessage("选择固定节点成员"),
+    "policyDraftMigration": MessageLookupByLibrary.simpleMessage("历史迁移材料"),
+    "policyDraftMigrationBlocked": MessageLookupByLibrary.simpleMessage(
+      "迁移已阻断，原始材料和规则位置已保留。修改提取行或默认策略不能解除阻断。",
+    ),
+    "policyDraftMigrationChoices": MessageLookupByLibrary.simpleMessage(
+      "提取行只是候选，两个默认、DNS 和启动解析服务仍需明确选择。原 Profile、覆写和全局 DNS 继续沿传统配置路径生效；此预览不是当前运行配置。",
+    ),
+    "policyDraftMigrationIp": MessageLookupByLibrary.simpleMessage(
+      "目的 IP 规则也可能限制域名连接，分表不能保证保留该保护。",
+    ),
+    "policyDraftMigrationMatch": MessageLookupByLibrary.simpleMessage(
+      "MATCH 后还有规则，不能把它的位置改成表尾默认。",
+    ),
+    "policyDraftMigrationScript": MessageLookupByLibrary.simpleMessage(
+      "提取时不执行脚本，其输出未知。",
+    ),
+    "policyDraftMigrationUnsupported": MessageLookupByLibrary.simpleMessage(
+      "此规则、资源或配置超出迁移支持范围。",
+    ),
+    "policyDraftMissing": MessageLookupByLibrary.simpleMessage(
+      "此 Profile 已不存在，当前输入尚未保存。",
+    ),
+    "policyDraftMoveDown": MessageLookupByLibrary.simpleMessage("下移"),
+    "policyDraftMoveUp": MessageLookupByLibrary.simpleMessage("上移"),
+    "policyDraftNeedsPreview": MessageLookupByLibrary.simpleMessage(
+      "输入尚需生成预览校验",
+    ),
+    "policyDraftNodes": MessageLookupByLibrary.simpleMessage("固定 SOCKS5 节点"),
+    "policyDraftProtocol": MessageLookupByLibrary.simpleMessage("协议"),
+    "policyDraftReadOnly": MessageLookupByLibrary.simpleMessage(
+      "版本未知或结构不支持。原文已保留，不能编辑或预览。",
+    ),
+    "policyDraftReady": MessageLookupByLibrary.simpleMessage("草稿预览已校验，尚未应用"),
+    "policyDraftRebuild": MessageLookupByLibrary.simpleMessage("新建独立草稿"),
+    "policyDraftRebuildConfirm": MessageLookupByLibrary.simpleMessage(
+      "放弃此草稿及迁移材料并新建？新策略不代表保留了旧配置的保护。原 Profile 和运行配置不变。",
+    ),
+    "policyDraftReferenced": m43,
+    "policyDraftReload": MessageLookupByLibrary.simpleMessage("重新载入已保存草稿"),
+    "policyDraftRestoreFailed": MessageLookupByLibrary.simpleMessage(
+      "未能完成恢复，请重新载入核对已保存的数据；如有恢复提示，仍需处理。",
+    ),
+    "policyDraftRestoreWarning": MessageLookupByLibrary.simpleMessage(
+      "覆盖恢复在归档含实体数据时替换实体，备份中没有的草稿可能被清除；实体全空的归档保留现有实体。继续？",
+    ),
+    "policyDraftRevealCredentials": MessageLookupByLibrary.simpleMessage(
+      "显示凭据",
+    ),
+    "policyDraftSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "保存失败，输入和原有草稿已保留。",
+    ),
+    "policyDraftSaved": MessageLookupByLibrary.simpleMessage("已保存草稿，尚未应用"),
+    "policyDraftStorage": MessageLookupByLibrary.simpleMessage(
+      "草稿可能含凭据，沿现有数据库目录保存（Android 为应用私有目录）。备份 ZIP 不加密。保存不会应用草稿。",
+    ),
+    "policyDraftTarget": MessageLookupByLibrary.simpleMessage("分流目标"),
+    "policyDraftTitle": MessageLookupByLibrary.simpleMessage("策略草稿"),
+    "policyDraftUdp": MessageLookupByLibrary.simpleMessage("为此节点启用 UDP"),
+    "policyDraftUnsaved": MessageLookupByLibrary.simpleMessage("未保存草稿，尚未应用"),
+    "policyDraftUnset": MessageLookupByLibrary.simpleMessage("未配置"),
+    "policyDraftUsername": MessageLookupByLibrary.simpleMessage("用户名"),
     "port": MessageLookupByLibrary.simpleMessage("端口"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage("请输入不同的端口"),
-    "portTip": m42,
+    "portTip": m44,
     "prerequisites": MessageLookupByLibrary.simpleMessage("前置条件"),
     "pressKeyboard": MessageLookupByLibrary.simpleMessage("请按下组合键"),
     "preview": MessageLookupByLibrary.simpleMessage("预览"),
@@ -789,13 +907,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "profiles": MessageLookupByLibrary.simpleMessage("配置"),
     "profilesSort": MessageLookupByLibrary.simpleMessage("配置排序"),
     "project": MessageLookupByLibrary.simpleMessage("项目"),
-    "providerInUse": m43,
-    "providerRenameShadowed": m44,
+    "providerInUse": m45,
+    "providerRenameShadowed": m46,
     "providerSourceSubscription": MessageLookupByLibrary.simpleMessage("订阅"),
     "providerUrlTip": MessageLookupByLibrary.simpleMessage("仅支持远程资源"),
     "providers": MessageLookupByLibrary.simpleMessage("外部资源"),
     "proxies": MessageLookupByLibrary.simpleMessage("代理"),
-    "proxiesCount": m45,
+    "proxiesCount": m47,
     "proxiesEmpty": MessageLookupByLibrary.simpleMessage("代理为空"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("代理链"),
     "proxyDefinition": MessageLookupByLibrary.simpleMessage("完整配置"),
@@ -832,7 +950,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replace": MessageLookupByLibrary.simpleMessage("替换"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("全部替换"),
     "request": MessageLookupByLibrary.simpleMessage("请求"),
-    "requestDirectRecoveryMessage": m46,
+    "requestDirectRecoveryMessage": m48,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
       "本次通过直连恢复？",
     ),
@@ -846,7 +964,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
       "部分本地修改未能恢复。已保留恢复文件，并阻止自动更新。",
     ),
-    "requestProxyDefault": m47,
+    "requestProxyDefault": m49,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("代理目标"),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "所选请求出口当前不可用。",
@@ -981,10 +1099,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("规则集"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("规则目标"),
     "rules": MessageLookupByLibrary.simpleMessage("规则"),
-    "rulesCount": m48,
+    "rulesCount": m50,
     "runTime": MessageLookupByLibrary.simpleMessage("启动时间"),
     "safeMode": MessageLookupByLibrary.simpleMessage("安全模式"),
-    "safeModeAppTitle": m49,
+    "safeModeAppTitle": m51,
     "save": MessageLookupByLibrary.simpleMessage("保存"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("是否保存更改？"),
     "script": MessageLookupByLibrary.simpleMessage("脚本"),
@@ -994,7 +1112,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "scrollToSelected": MessageLookupByLibrary.simpleMessage("滚动到已选"),
     "search": MessageLookupByLibrary.simpleMessage("搜索"),
     "seconds": MessageLookupByLibrary.simpleMessage("秒"),
-    "secondsCount": m50,
+    "secondsCount": m52,
     "selectAll": MessageLookupByLibrary.simpleMessage("全选"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("选择代理"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage("选择代理集"),
@@ -1002,13 +1120,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "selectSplitStrategy": MessageLookupByLibrary.simpleMessage("请选择分流策略"),
     "selectSubRule": MessageLookupByLibrary.simpleMessage("请选择子规则"),
     "selected": MessageLookupByLibrary.simpleMessage("已选择"),
-    "selectedCountTitle": m51,
+    "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("服务器"),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("可用"),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("已被封禁"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("检测"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("全部检测"),
-    "serviceCheckedAt": m52,
+    "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("即将上线"),
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage("不允许的 ISP"),
     "serviceFailed": MessageLookupByLibrary.simpleMessage("检测失败"),
@@ -1033,7 +1151,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunch": MessageLookupByLibrary.simpleMessage("静默启动"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage("启动时不显示窗口"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("单条添加"),
-    "singleValueTip": m53,
+    "singleValueTip": m55,
     "size": MessageLookupByLibrary.simpleMessage("尺寸"),
     "slide": MessageLookupByLibrary.simpleMessage("滑动"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Socks端口"),
@@ -1113,7 +1231,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("上传"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("通过URL获取配置文件"),
-    "urlTip": m54,
+    "urlTip": m56,
     "useHosts": MessageLookupByLibrary.simpleMessage("使用Hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("使用系统Hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("已用流量"),
@@ -1134,7 +1252,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "同时设置系统时钟，Android上不生效",
     ),
-    "yearsAgo": m55,
+    "yearsAgo": m57,
     "yes": MessageLookupByLibrary.simpleMessage("是"),
     "zhCN": MessageLookupByLibrary.simpleMessage("中文简体"),
   };

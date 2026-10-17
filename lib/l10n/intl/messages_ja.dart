@@ -110,36 +110,41 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m41(count) => "${count} 件に問題があり、上書きの適用に失敗する可能性があります";
 
-  static String m42(label) => "${label} は 1024〜49151 の範囲で指定してください";
+  static String m42(location) => "${location} を確認し、入力・修正してからプレビューしてください。";
 
-  static String m43(label, profiles) =>
+  static String m43(locations) =>
+      "このリソースは ${locations} で使用されています。参照を変更してから削除してください。";
+
+  static String m44(label) => "${label} は 1024〜49151 の範囲で指定してください";
+
+  static String m45(label, profiles) =>
       "${label} は ${profiles} のカスタムプロキシグループまたはルールでまだ使用されています。先にそこから外してください";
 
-  static String m44(profiles, label) =>
+  static String m46(profiles, label) =>
       "${profiles} のサブスクリプションには既に ${label} があるため、名前を変えるとそちらが使われます。別の名前にしてください";
 
-  static String m45(count) => "プロキシ ${count} 件";
+  static String m47(count) => "プロキシ ${count} 件";
 
-  static String m46(host) =>
+  static String m48(host) =>
       "現在の設定ではこの項目を取得できません。今回の操作で ${host} への直接接続を許可しますか？操作の完了または接続先の変更で許可は失効します。";
 
-  static String m47(target) => "GLOBAL（現在の選択：${target}）";
+  static String m49(target) => "GLOBAL（現在の選択：${target}）";
 
-  static String m48(count) => "ルール ${count} 件";
+  static String m50(count) => "ルール ${count} 件";
 
-  static String m49(appName) => "${appName}（セーフモード）";
+  static String m51(appName) => "${appName}（セーフモード）";
 
-  static String m50(count) => "${count} 秒";
+  static String m52(count) => "${count} 秒";
 
-  static String m51(count) => "${count} 件選択中";
+  static String m53(count) => "${count} 件選択中";
 
-  static String m52(time) => "${time} に検査";
+  static String m54(time) => "${time} に検査";
 
-  static String m53(label) => "${label}は1項目のみ指定できます";
+  static String m55(label) => "${label}は1項目のみ指定できます";
 
-  static String m54(label) => "${label}はURLである必要があります";
+  static String m56(label) => "${label}はURLである必要があります";
 
-  static String m55(count) => "${count} 年前";
+  static String m57(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -855,9 +860,131 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "有効なQRコードをアップロードしてください",
     ),
+    "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
+      "ユーザー名とパスワードを使用",
+    ),
+    "policyDraftBackupConsent": MessageLookupByLibrary.simpleMessage(
+      "このバックアップには下書き、認証情報、元の移行資料が含まれる場合があります。改めて確認してから出力してください。",
+    ),
+    "policyDraftBackupLocal": MessageLookupByLibrary.simpleMessage(
+      "選択したローカルファイルへ、下書き・認証情報・移行資料を含む暗号化されていないZIPを保存します。続行しますか？",
+    ),
+    "policyDraftBackupWebDav": MessageLookupByLibrary.simpleMessage(
+      "選択したWebDAVサービスへ、下書き・認証情報・移行資料を含む暗号化されていないZIPを送信します。続行しますか？",
+    ),
+    "policyDraftBootstrap": MessageLookupByLibrary.simpleMessage(
+      "起動用DNS（DIRECT）",
+    ),
+    "policyDraftConflict": MessageLookupByLibrary.simpleMessage(
+      "保存済みの下書きが変更されました。入力は保持されています。再読み込みしてください。",
+    ),
+    "policyDraftCopyFull": MessageLookupByLibrary.simpleMessage("生成設定をすべてコピー"),
+    "policyDraftCopyFullConfirm": MessageLookupByLibrary.simpleMessage(
+      "ユーザー名やパスワードを含む生成設定全体をクリップボードへコピーしますか？",
+    ),
+    "policyDraftDeleted": MessageLookupByLibrary.simpleMessage(
+      "ポリシーの下書きを削除しました",
+    ),
+    "policyDraftDirectWarning": MessageLookupByLibrary.simpleMessage(
+      "ドメインの既定値DIRECTは未一致ドメインのDNSも選択したDNSサービスへ直接送信します。",
+    ),
+    "policyDraftDiscard": MessageLookupByLibrary.simpleMessage(
+      "未保存の変更を破棄しますか？",
+    ),
+    "policyDraftDnsServices": MessageLookupByLibrary.simpleMessage("DNSサービス"),
+    "policyDraftDomainDefault": MessageLookupByLibrary.simpleMessage(
+      "未一致ドメインの既定ポリシー",
+    ),
+    "policyDraftDomainRules": MessageLookupByLibrary.simpleMessage("ドメインルール"),
+    "policyDraftExtract": MessageLookupByLibrary.simpleMessage("保存済み設定から抽出"),
+    "policyDraftExtractConfirm": MessageLookupByLibrary.simpleMessage(
+      "ローカルの保存済み資料から抽出した下書きで編集内容を置き換えますか？スクリプトは実行せず、未対応ルールは移行を阻止します。設定は適用されません。",
+    ),
+    "policyDraftExtractFailed": MessageLookupByLibrary.simpleMessage(
+      "保存済みのローカル資料を抽出できませんでした。下書きは変更されていません。",
+    ),
+    "policyDraftGeneratePreview": MessageLookupByLibrary.simpleMessage(
+      "生成した下書きのプレビュー",
+    ),
+    "policyDraftGroups": MessageLookupByLibrary.simpleMessage("静的プロキシグループ"),
+    "policyDraftIncomplete": m42,
+    "policyDraftIpDefault": MessageLookupByLibrary.simpleMessage(
+      "未一致IPの既定ポリシー",
+    ),
+    "policyDraftIpRules": MessageLookupByLibrary.simpleMessage("IPルール"),
+    "policyDraftListeners": MessageLookupByLibrary.simpleMessage("プレビューの待受ポート"),
+    "policyDraftLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "下書きを読み込めませんでした。再読み込みしてください。",
+    ),
+    "policyDraftMembers": MessageLookupByLibrary.simpleMessage("固定ノードを選択"),
+    "policyDraftMigration": MessageLookupByLibrary.simpleMessage("過去の移行資料"),
+    "policyDraftMigrationBlocked": MessageLookupByLibrary.simpleMessage(
+      "移行は保留中です。元の資料とルール位置は保持されています。抽出行や既定値の変更では解除できません。",
+    ),
+    "policyDraftMigrationChoices": MessageLookupByLibrary.simpleMessage(
+      "抽出行は候補です。両方の既定値、DNS、起動用DNSを明示的に選んでください。元のプロファイル・上書き・グローバルDNSは従来の設定経路を使用し、このプレビューは動作中の設定ではありません。",
+    ),
+    "policyDraftMigrationIp": MessageLookupByLibrary.simpleMessage(
+      "宛先IPルールはドメイン接続も制限する場合があり、分離では保護を維持できません。",
+    ),
+    "policyDraftMigrationMatch": MessageLookupByLibrary.simpleMessage(
+      "後続ルールより前にMATCHがあります。末尾の既定値には置き換えられません。",
+    ),
+    "policyDraftMigrationScript": MessageLookupByLibrary.simpleMessage(
+      "抽出時にスクリプトを実行しないため、出力は不明です。",
+    ),
+    "policyDraftMigrationUnsupported": MessageLookupByLibrary.simpleMessage(
+      "このルール・リソース・設定は移行の対応範囲外です。",
+    ),
+    "policyDraftMissing": MessageLookupByLibrary.simpleMessage(
+      "このプロファイルは存在しません。入力内容は保存されていません。",
+    ),
+    "policyDraftMoveDown": MessageLookupByLibrary.simpleMessage("下へ"),
+    "policyDraftMoveUp": MessageLookupByLibrary.simpleMessage("上へ"),
+    "policyDraftNeedsPreview": MessageLookupByLibrary.simpleMessage(
+      "入力は生成プレビューでの検証が必要です",
+    ),
+    "policyDraftNodes": MessageLookupByLibrary.simpleMessage("固定SOCKS5ノード"),
+    "policyDraftProtocol": MessageLookupByLibrary.simpleMessage("プロトコル"),
+    "policyDraftReadOnly": MessageLookupByLibrary.simpleMessage(
+      "不明なバージョンまたは未対応の構造です。元の内容は保持され、編集・プレビューはできません。",
+    ),
+    "policyDraftReady": MessageLookupByLibrary.simpleMessage(
+      "下書きのプレビューを検証済み。未適用です",
+    ),
+    "policyDraftRebuild": MessageLookupByLibrary.simpleMessage("独立した下書きを作成"),
+    "policyDraftRebuildConfirm": MessageLookupByLibrary.simpleMessage(
+      "この下書きと移行資料を破棄しますか？新しいポリシーは旧設定の保護を引き継ぐものではありません。元のプロファイルと動作中の設定は変更されません。",
+    ),
+    "policyDraftReferenced": m43,
+    "policyDraftReload": MessageLookupByLibrary.simpleMessage("保存済み下書きを再読み込み"),
+    "policyDraftRestoreFailed": MessageLookupByLibrary.simpleMessage(
+      "復元を完了できませんでした。再読み込みして保存済みデータを確認してください。復旧の案内がある場合は対応してください。",
+    ),
+    "policyDraftRestoreWarning": MessageLookupByLibrary.simpleMessage(
+      "上書き復元は資料にエンティティがある場合に置換し、含まれない下書きを削除する場合があります。エンティティが空なら保持します。続行しますか？",
+    ),
+    "policyDraftRevealCredentials": MessageLookupByLibrary.simpleMessage(
+      "認証情報を表示",
+    ),
+    "policyDraftSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "保存できませんでした。入力内容と保存済みの下書きは保持されています。",
+    ),
+    "policyDraftSaved": MessageLookupByLibrary.simpleMessage(
+      "下書きを保存しました。未適用です",
+    ),
+    "policyDraftStorage": MessageLookupByLibrary.simpleMessage(
+      "下書きには認証情報が含まれる場合があります。既存のDB領域（Androidではアプリ専用領域）に保存され、ZIPバックアップは暗号化されません。保存しても適用されません。",
+    ),
+    "policyDraftTarget": MessageLookupByLibrary.simpleMessage("転送先"),
+    "policyDraftTitle": MessageLookupByLibrary.simpleMessage("ポリシーの下書き"),
+    "policyDraftUdp": MessageLookupByLibrary.simpleMessage("このノードでUDPを有効化"),
+    "policyDraftUnsaved": MessageLookupByLibrary.simpleMessage("未保存の下書き。未適用です"),
+    "policyDraftUnset": MessageLookupByLibrary.simpleMessage("未設定"),
+    "policyDraftUsername": MessageLookupByLibrary.simpleMessage("ユーザー名"),
     "port": MessageLookupByLibrary.simpleMessage("ポート"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage("別のポートを入力してください"),
-    "portTip": m42,
+    "portTip": m44,
     "prerequisites": MessageLookupByLibrary.simpleMessage("前提条件"),
     "pressKeyboard": MessageLookupByLibrary.simpleMessage("キーの組み合わせを押してください"),
     "preview": MessageLookupByLibrary.simpleMessage("プレビュー"),
@@ -883,15 +1010,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "profiles": MessageLookupByLibrary.simpleMessage("プロファイル"),
     "profilesSort": MessageLookupByLibrary.simpleMessage("プロファイルの並べ替え"),
     "project": MessageLookupByLibrary.simpleMessage("プロジェクト"),
-    "providerInUse": m43,
-    "providerRenameShadowed": m44,
+    "providerInUse": m45,
+    "providerRenameShadowed": m46,
     "providerSourceSubscription": MessageLookupByLibrary.simpleMessage(
       "サブスクリプション",
     ),
     "providerUrlTip": MessageLookupByLibrary.simpleMessage("リモートリソースのみ対応しています"),
     "providers": MessageLookupByLibrary.simpleMessage("外部リソース"),
     "proxies": MessageLookupByLibrary.simpleMessage("プロキシ"),
-    "proxiesCount": m45,
+    "proxiesCount": m47,
     "proxiesEmpty": MessageLookupByLibrary.simpleMessage("プロキシが空です"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("プロキシチェーン"),
     "proxyDefinition": MessageLookupByLibrary.simpleMessage("完全な設定"),
@@ -938,7 +1065,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replace": MessageLookupByLibrary.simpleMessage("置換"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("すべて置換"),
     "request": MessageLookupByLibrary.simpleMessage("リクエスト"),
-    "requestDirectRecoveryMessage": m46,
+    "requestDirectRecoveryMessage": m48,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
       "今回のみ直接接続で復元しますか？",
     ),
@@ -952,7 +1079,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
       "一部のローカル変更を復元できませんでした。復旧用ファイルを保持し、自動更新を停止しました。",
     ),
-    "requestProxyDefault": m47,
+    "requestProxyDefault": m49,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("プロキシの接続先"),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "選択した通信経路は現在利用できません。",
@@ -1105,10 +1232,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("ルールセット"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("ルールターゲット"),
     "rules": MessageLookupByLibrary.simpleMessage("ルール"),
-    "rulesCount": m48,
+    "rulesCount": m50,
     "runTime": MessageLookupByLibrary.simpleMessage("起動時間"),
     "safeMode": MessageLookupByLibrary.simpleMessage("セーフモード"),
-    "safeModeAppTitle": m49,
+    "safeModeAppTitle": m51,
     "save": MessageLookupByLibrary.simpleMessage("保存"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("変更を保存しますか？"),
     "script": MessageLookupByLibrary.simpleMessage("スクリプト"),
@@ -1118,7 +1245,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "scrollToSelected": MessageLookupByLibrary.simpleMessage("選択項目へスクロール"),
     "search": MessageLookupByLibrary.simpleMessage("検索"),
     "seconds": MessageLookupByLibrary.simpleMessage("秒"),
-    "secondsCount": m50,
+    "secondsCount": m52,
     "selectAll": MessageLookupByLibrary.simpleMessage("すべて選択"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("プロキシを選択"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1130,13 +1257,13 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "selectSubRule": MessageLookupByLibrary.simpleMessage("サブルールを選択してください"),
     "selected": MessageLookupByLibrary.simpleMessage("選択済み"),
-    "selectedCountTitle": m51,
+    "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("サーバー"),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("利用可能"),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("ブロック済み"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("検査"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("すべて検査"),
-    "serviceCheckedAt": m52,
+    "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("近日提供予定"),
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "許可されていない ISP",
@@ -1167,7 +1294,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "起動時にウィンドウを表示しません",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("個別追加"),
-    "singleValueTip": m53,
+    "singleValueTip": m55,
     "size": MessageLookupByLibrary.simpleMessage("サイズ"),
     "slide": MessageLookupByLibrary.simpleMessage("スライド"),
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKSポート"),
@@ -1251,7 +1378,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("アップロード"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("URLからプロファイルを取得します"),
-    "urlTip": m54,
+    "urlTip": m56,
     "useHosts": MessageLookupByLibrary.simpleMessage("Hostsを使用"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("システムのHostsを使用"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("使用済みトラフィック"),
@@ -1272,7 +1399,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "システムクロックも設定します。Androidでは無視されます",
     ),
-    "yearsAgo": m55,
+    "yearsAgo": m57,
     "yes": MessageLookupByLibrary.simpleMessage("はい"),
     "zhCN": MessageLookupByLibrary.simpleMessage("簡体字中国語"),
   };

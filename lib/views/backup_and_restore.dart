@@ -80,18 +80,45 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     );
   }
 
-  Future<void> _backup(BackupDelivery deliver) {
+  Future<void> _backup(BackupDelivery deliver, {bool isRemote = false}) async {
     final appLocalizations = context.appLocalizations;
-    return _run(
+    final action = ref.read(backupActionProvider.notifier);
+    var confirmed = false;
+    if (await action.hasPolicyDrafts()) {
+      if (!mounted) return;
+      confirmed =
+          await dialogs.showMessage(
+            context: context,
+            title: appLocalizations.backup,
+            message: TextSpan(
+              text: isRemote
+                  ? appLocalizations.policyDraftBackupWebDav
+                  : appLocalizations.policyDraftBackupLocal,
+            ),
+          ) ==
+          true;
+      if (!confirmed) return;
+    }
+    if (!mounted) return;
+    await _run(
       title: appLocalizations.backup,
       successMessage: appLocalizations.backupSuccess,
-      task: () => ref.read(backupActionProvider.notifier).backup(deliver),
+      task: () => action.backup(deliver, policyDraftsConfirmed: confirmed),
     );
   }
 
-  Future<void> _restore(RestoreOption option, BackupFetch fetch) {
+  Future<void> _restore(RestoreOption option, BackupFetch fetch) async {
     final appLocalizations = context.appLocalizations;
-    return _run(
+    if (ref.read(appSettingProvider).restoreStrategy ==
+        RestoreStrategy.override) {
+      final confirmed = await dialogs.showMessage(
+        context: context,
+        title: appLocalizations.restore,
+        message: TextSpan(text: appLocalizations.policyDraftRestoreWarning),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    await _run(
       title: appLocalizations.restore,
       successMessage: appLocalizations.restoreSuccess,
       task: () =>
@@ -113,7 +140,7 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
       (_) => _backup((archivePath) async {
         await client.upload(archivePath);
         return true;
-      }),
+      }, isRemote: true),
     );
   }
 

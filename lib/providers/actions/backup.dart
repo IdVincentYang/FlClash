@@ -30,9 +30,14 @@ class BackupAction extends _$BackupAction {
     }
   });
 
-  Future<bool> backup(BackupDelivery deliver) {
+  Future<bool> backup(
+    BackupDelivery deliver, {
+    bool policyDraftsConfirmed = false,
+  }) {
     return _withWorkDir((workDir) async {
-      final archive = await requestClient.mutate(() => _createArchive(workDir));
+      final archive = await requestClient.mutate(
+        () => _createArchive(workDir, policyDraftsConfirmed),
+      );
       await RequestSession.current?.check();
       return deliver(archive);
     });
@@ -86,9 +91,18 @@ class BackupAction extends _$BackupAction {
     await Directory(join(homeDirPath, 'restore')).safeDelete(recursive: true);
   }
 
-  Future<String> _createArchive(String workDir) async {
+  Future<bool> hasPolicyDrafts() => database.profilePolicyDraftsDao.hasAny();
+
+  Future<String> _createArchive(
+    String workDir,
+    bool policyDraftsConfirmed,
+  ) async {
     final databaseSnapshotPath = join(workDir, backupDatabaseName);
     await database.customStatement('VACUUM INTO ?', [databaseSnapshotPath]);
+    if (await backupSnapshotHasPolicyDrafts(databaseSnapshotPath) &&
+        !policyDraftsConfirmed) {
+      throw MessageException(currentAppLocalizations.policyDraftBackupConsent);
+    }
     final (profileIds, scriptIds, providers) = await (
       database.profilesDao.query().map((item) => item.id).get(),
       database.scriptsDao.query().map((item) => item.id).get(),
@@ -117,6 +131,14 @@ class BackupAction extends _$BackupAction {
     RestoreOption option, {
     String? stagingDirPath,
   }) {
+    if (!validPolicyDraftRelations(
+      data.policyDrafts,
+      data.profiles.map((p) => p.id),
+    )) {
+      return Future<void>.error(
+        MessageException(currentAppLocalizations.invalidBackupFile),
+      );
+    }
     final session = RequestSession.current;
     Future<void> apply() =>
         _applyRestore(data, option, stagingDirPath: stagingDirPath);
@@ -130,6 +152,9 @@ class BackupAction extends _$BackupAction {
     RestoreOption option, {
     String? stagingDirPath,
   }) async {
+    final hasPolicyDrafts =
+        data.policyDrafts.isNotEmpty ||
+        await database.profilePolicyDraftsDao.hasAny();
     final configMap = data.configMap;
     final config = option == RestoreOption.onlyProfiles || configMap == null
         ? null
@@ -154,6 +179,7 @@ class BackupAction extends _$BackupAction {
         data.proxyGroups,
         clashProviders: data.clashProviders,
         customProxies: data.customProxies,
+        policyDrafts: data.policyDrafts,
         isOverride: isOverride,
         beforeCommit: () async {
           if (stagingDirPath != null) {
@@ -177,6 +203,11 @@ class BackupAction extends _$BackupAction {
       } catch (_) {
         await requestClient.markPartialCommit();
         throw const RequestUnavailable('request_partial_commit');
+      }
+      if (hasPolicyDrafts && error is! RequestUnavailable) {
+        throw MessageException(
+          currentAppLocalizations.policyDraftRestoreFailed,
+        );
       }
       Error.throwWithStackTrace(error, stack);
     }

@@ -142,9 +142,61 @@ final class BackupActionProvider extends $NotifierProvider<BackupAction, void> {
   }
 }
 
-String _$backupActionHash() => r'c4632fe29f3baf74e2027b885170699804c093dd';
+String _$backupActionHash() => r'7151ac59c8a0fb2b2f937a1dea5121c1c9b5ca9e';
 
 abstract class _$BackupAction extends $Notifier<void> {
+  void build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<void, void>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<void, void>,
+              void,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(PolicyDraftAction)
+final policyDraftActionProvider = PolicyDraftActionProvider._();
+
+final class PolicyDraftActionProvider
+    extends $NotifierProvider<PolicyDraftAction, void> {
+  PolicyDraftActionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'policyDraftActionProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$policyDraftActionHash();
+
+  @$internal
+  @override
+  PolicyDraftAction create() => PolicyDraftAction();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(void value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<void>(value),
+    );
+  }
+}
+
+String _$policyDraftActionHash() => r'0090a251ea1a8147d8b61b133524709906a564cc';
+
+abstract class _$PolicyDraftAction extends $Notifier<void> {
   void build();
   @$mustCallSuper
   @override
