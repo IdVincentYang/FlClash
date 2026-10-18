@@ -69,6 +69,13 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     .onSuccess { pending -> scope.launch { result.success(gson.toJson(pending.await())) } }
                     .onFailure { result.error("CONFIGURATION_FAILED", it.message, null) }
             }
+            "failConfigBuild" -> scope.launch {
+                val input = runCatching { JsonParser.parseString(call.arguments as? String).asJsonObject }.getOrNull()
+                if (input == null) result.error("INVALID_ARGUMENT", "Missing configuration identity", null)
+                else runCatching { ServiceState.failConfigBuild(input) }
+                    .onSuccess { result.success(gson.toJson(it)) }
+                    .onFailure { result.error("CONFIGURATION_FAILED", it.message, null) }
+            }
             "initializeRequestState" -> initializeRequestState(call, result)
             "requestControl" -> requestControl(call, result)
             else -> result.notImplemented()
@@ -101,7 +108,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             return
         }
         val method = runCatching { JsonParser.parseString(data).asJsonObject.get("method").asString }.getOrNull()
-        if (method in setOf("registerConfigInput", "prepareConfig", "installConfig", "activateConfig", "abortConfig", "getReplayInput", "setupConfig", "startListener")) {
+        if (method in setOf("registerConfigInput", "prepareConfig", "installConfig", "activateConfig", "abortConfig", "failConfigBuild", "getReplayInput", "setupConfig", "startListener")) {
             result.error("INVALID_ARGUMENT", "Configuration must use the service apply pipeline", null)
             return
         }

@@ -183,6 +183,7 @@ func updateListenersChecked(cfg *config.Config, target constant.Tunnel, mixed *l
 }
 
 func stopBusinessListeners() {
+	ordinaryDNS.Swap(nil).close()
 	listener.StopListener()
 	listener.PatchInboundListeners(nil, tunnel.Tunnel, true)
 	_ = listener.PatchTunnelChecked(nil, tunnel.Tunnel)
@@ -303,6 +304,9 @@ func updateConfigOwned(params *UpdateParams, expected *controllerConfigMutation)
 	}
 	if currentConfig == nil || pendingConfig != nil && configFact.Phase != "ready" {
 		return errConfigNotApplied
+	}
+	if err := validateManagedUpdate(appliedConfig, params); err != nil {
+		return err
 	}
 
 	general := currentConfig.General

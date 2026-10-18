@@ -1,3 +1,8 @@
+import '../helpers/commit_tap.dart';
+import 'package:fl_clash/common/common.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fl_clash/providers/config_state.dart';
+import '../helpers/test_config_state.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -66,13 +71,23 @@ final _toggleCases = <_ToggleCase>[
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
+  TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container.read(viewSizeProvider.notifier).value = const Size(1200, 1000);
   });
@@ -103,11 +118,11 @@ void main() {
 
         expect(testCase.read(container), testCase.initial);
 
-        await tester.tap(find.byType(Switch));
+        await tapAndCommit(tester, find.byType(Switch));
         await tester.pumpAndSettle();
         expect(testCase.read(container), !testCase.initial);
 
-        await tester.tap(find.byType(Switch));
+        await tapAndCommit(tester, find.byType(Switch));
         await tester.pumpAndSettle();
         expect(testCase.read(container), testCase.initial);
       });
@@ -120,9 +135,9 @@ void main() {
       final initial = container.read(patchClashConfigProvider).tun.stack;
       final target = TunStack.values.firstWhere((item) => item != initial);
 
-      await tester.tap(find.byType(ListTile).first);
+      await tapAndCommit(tester, find.byType(ListTile).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(target.name).last);
+      await tapAndCommit(tester, find.text(target.name).last);
       await tester.pumpAndSettle();
 
       expect(container.read(patchClashConfigProvider).tun.stack, target);
@@ -133,9 +148,9 @@ void main() {
       final initial = container.read(networkSettingProvider).routeMode;
       final target = RouteMode.values.firstWhere((item) => item != initial);
 
-      await tester.tap(find.byType(ListTile).first);
+      await tapAndCommit(tester, find.byType(ListTile).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(_routeModeLabel(target)).last);
+      await tapAndCommit(tester, find.text(_routeModeLabel(target)).last);
       await tester.pumpAndSettle();
 
       expect(container.read(networkSettingProvider).routeMode, target);
@@ -152,9 +167,12 @@ void main() {
         (item) => item != initial,
       );
 
-      await tester.tap(find.byType(ListTile).first);
+      await tapAndCommit(tester, find.byType(ListTile).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(_interfaceNameModeLabel(target)).last);
+      await tapAndCommit(
+        tester,
+        find.text(_interfaceNameModeLabel(target)).last,
+      );
       await tester.pumpAndSettle();
 
       expect(

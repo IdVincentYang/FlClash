@@ -27,9 +27,16 @@ class OutboundMode extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(
-      patchClashConfigProvider.select((state) => state.mode),
-    );
+    final id = ref.watch(currentProfileIdProvider);
+    final selection = id == null
+        ? null
+        : ref.watch(policySelectionProvider(id));
+    final managed =
+        selection?.value != null ||
+        ref.watch(configStateProvider).fact.isManaged;
+    final mode = managed
+        ? Mode.rule
+        : ref.watch(patchClashConfigProvider.select((state) => state.mode));
     final inset = DashboardWidgetMetrics.insetOf(context);
     final radius = DashboardWidgetMetrics.radiusOf(context);
     final pillInset = min(_pillInset.mAp, inset);
@@ -59,6 +66,12 @@ class OutboundMode extends ConsumerWidget {
               inset: inset,
               pillInset: pillInset,
               onSelect: (item) {
+                if (managed) {
+                  context.showNotifier(
+                    context.appLocalizations.policyManagedEditRequired,
+                  );
+                  return;
+                }
                 ref.read(setupActionProvider.notifier).changeMode(item);
               },
             ),

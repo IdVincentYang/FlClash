@@ -123,21 +123,21 @@ class _HotKeyManagerState extends ConsumerState<HotKeyManager> {
     final setupAction = ref.read(setupActionProvider.notifier);
     switch (action) {
       case HotAction.mode:
-        commonAction.updateMode();
+        await globalState.safeRun(commonAction.updateMode);
       case HotAction.start:
         commonAction.toggleRunning();
       case HotAction.view:
         unawaited(systemAction.updateVisible());
       case HotAction.proxy:
-        systemAction.updateSystemProxy();
+        await globalState.safeRun(systemAction.updateSystemProxy);
       case HotAction.tun:
-        systemAction.updateTun();
+        await globalState.safeRun(systemAction.updateTun);
       case HotAction.ruleMode:
-        setupAction.changeMode(Mode.rule);
+        await globalState.safeRun(() => setupAction.changeMode(Mode.rule));
       case HotAction.globalMode:
-        setupAction.changeMode(Mode.global);
+        await globalState.safeRun(() => setupAction.changeMode(Mode.global));
       case HotAction.directMode:
-        setupAction.changeMode(Mode.direct);
+        await globalState.safeRun(() => setupAction.changeMode(Mode.direct));
       case HotAction.delayTest:
         unawaited(
           ref

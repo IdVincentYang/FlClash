@@ -4840,6 +4840,226 @@ class ProfilePolicyDraftsCompanion
   }
 }
 
+class $ProfilePolicySelectionsTable extends ProfilePolicySelections
+    with TableInfo<$ProfilePolicySelectionsTable, RawProfilePolicySelection> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProfilePolicySelectionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<int> profileId = GeneratedColumn<int>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES profiles (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _rawContentMeta = const VerificationMeta(
+    'rawContent',
+  );
+  @override
+  late final GeneratedColumn<String> rawContent = GeneratedColumn<String>(
+    'raw_content',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [profileId, rawContent];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'profile_policy_selections';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RawProfilePolicySelection> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    }
+    if (data.containsKey('raw_content')) {
+      context.handle(
+        _rawContentMeta,
+        rawContent.isAcceptableOrUnknown(data['raw_content']!, _rawContentMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {profileId};
+  @override
+  RawProfilePolicySelection map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RawProfilePolicySelection(
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      rawContent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}raw_content'],
+      ),
+    );
+  }
+
+  @override
+  $ProfilePolicySelectionsTable createAlias(String alias) {
+    return $ProfilePolicySelectionsTable(attachedDatabase, alias);
+  }
+}
+
+class RawProfilePolicySelection extends DataClass
+    implements Insertable<RawProfilePolicySelection> {
+  final int profileId;
+  final String? rawContent;
+  const RawProfilePolicySelection({required this.profileId, this.rawContent});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['profile_id'] = Variable<int>(profileId);
+    if (!nullToAbsent || rawContent != null) {
+      map['raw_content'] = Variable<String>(rawContent);
+    }
+    return map;
+  }
+
+  ProfilePolicySelectionsCompanion toCompanion(bool nullToAbsent) {
+    return ProfilePolicySelectionsCompanion(
+      profileId: Value(profileId),
+      rawContent: rawContent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rawContent),
+    );
+  }
+
+  factory RawProfilePolicySelection.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RawProfilePolicySelection(
+      profileId: serializer.fromJson<int>(json['profileId']),
+      rawContent: serializer.fromJson<String?>(json['rawContent']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'profileId': serializer.toJson<int>(profileId),
+      'rawContent': serializer.toJson<String?>(rawContent),
+    };
+  }
+
+  RawProfilePolicySelection copyWith({
+    int? profileId,
+    Value<String?> rawContent = const Value.absent(),
+  }) => RawProfilePolicySelection(
+    profileId: profileId ?? this.profileId,
+    rawContent: rawContent.present ? rawContent.value : this.rawContent,
+  );
+  RawProfilePolicySelection copyWithCompanion(
+    ProfilePolicySelectionsCompanion data,
+  ) {
+    return RawProfilePolicySelection(
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      rawContent: data.rawContent.present
+          ? data.rawContent.value
+          : this.rawContent,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RawProfilePolicySelection(')
+          ..write('profileId: $profileId, ')
+          ..write('rawContent: $rawContent')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(profileId, rawContent);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RawProfilePolicySelection &&
+          other.profileId == this.profileId &&
+          other.rawContent == this.rawContent);
+}
+
+class ProfilePolicySelectionsCompanion
+    extends UpdateCompanion<RawProfilePolicySelection> {
+  final Value<int> profileId;
+  final Value<String?> rawContent;
+  const ProfilePolicySelectionsCompanion({
+    this.profileId = const Value.absent(),
+    this.rawContent = const Value.absent(),
+  });
+  ProfilePolicySelectionsCompanion.insert({
+    this.profileId = const Value.absent(),
+    this.rawContent = const Value.absent(),
+  });
+  static Insertable<RawProfilePolicySelection> custom({
+    Expression<int>? profileId,
+    Expression<String>? rawContent,
+  }) {
+    return RawValuesInsertable({
+      if (profileId != null) 'profile_id': profileId,
+      if (rawContent != null) 'raw_content': rawContent,
+    });
+  }
+
+  ProfilePolicySelectionsCompanion copyWith({
+    Value<int>? profileId,
+    Value<String?>? rawContent,
+  }) {
+    return ProfilePolicySelectionsCompanion(
+      profileId: profileId ?? this.profileId,
+      rawContent: rawContent ?? this.rawContent,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (profileId.present) {
+      map['profile_id'] = Variable<int>(profileId.value);
+    }
+    if (rawContent.present) {
+      map['raw_content'] = Variable<String>(rawContent.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProfilePolicySelectionsCompanion(')
+          ..write('profileId: $profileId, ')
+          ..write('rawContent: $rawContent')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
@@ -4855,6 +5075,8 @@ abstract class _$Database extends GeneratedDatabase {
   late final $CustomProxiesTable customProxies = $CustomProxiesTable(this);
   late final $ProfilePolicyDraftsTable profilePolicyDrafts =
       $ProfilePolicyDraftsTable(this);
+  late final $ProfilePolicySelectionsTable profilePolicySelections =
+      $ProfilePolicySelectionsTable(this);
   late final Index idxRuleTarget = Index(
     'idx_rule_target',
     'CREATE INDEX idx_rule_target ON rules (rule_target)',
@@ -4888,6 +5110,8 @@ abstract class _$Database extends GeneratedDatabase {
   );
   late final ProfilePolicyDraftsDao profilePolicyDraftsDao =
       ProfilePolicyDraftsDao(this as Database);
+  late final ProfilePolicySelectionsDao profilePolicySelectionsDao =
+      ProfilePolicySelectionsDao(this as Database);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4902,6 +5126,7 @@ abstract class _$Database extends GeneratedDatabase {
     clashProviders,
     customProxies,
     profilePolicyDrafts,
+    profilePolicySelections,
     idxRuleTarget,
     idxProfileSceneOrder,
     idxProfileNameOrder,
@@ -4944,6 +5169,15 @@ abstract class _$Database extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('profile_policy_drafts', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'profiles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('profile_policy_selections', kind: UpdateKind.delete),
+      ],
     ),
   ]);
 }
@@ -5064,6 +5298,31 @@ final class $$ProfilesTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _profilePolicyDraftsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $ProfilePolicySelectionsTable,
+    List<RawProfilePolicySelection>
+  >
+  _profilePolicySelectionsRefsTable(_$Database db) =>
+      MultiTypedResultKey.fromTable(
+        db.profilePolicySelections,
+        aliasName: 'profiles__id__profile_policy_selections__profile_id',
+      );
+
+  $$ProfilePolicySelectionsTableProcessedTableManager
+  get profilePolicySelectionsRefs {
+    final manager = $$ProfilePolicySelectionsTableTableManager(
+      $_db,
+      $_db.profilePolicySelections,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _profilePolicySelectionsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -5265,6 +5524,32 @@ class $$ProfilesTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> profilePolicySelectionsRefs(
+    Expression<bool> Function($$ProfilePolicySelectionsTableFilterComposer f) f,
+  ) {
+    final $$ProfilePolicySelectionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.profilePolicySelections,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ProfilePolicySelectionsTableFilterComposer(
+                $db: $db,
+                $table: $db.profilePolicySelections,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -5539,6 +5824,33 @@ class $$ProfilesTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> profilePolicySelectionsRefs<T extends Object>(
+    Expression<T> Function($$ProfilePolicySelectionsTableAnnotationComposer a)
+    f,
+  ) {
+    final $$ProfilePolicySelectionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.profilePolicySelections,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ProfilePolicySelectionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.profilePolicySelections,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ProfilesTableTableManager
@@ -5559,6 +5871,7 @@ class $$ProfilesTableTableManager
             bool proxyGroupsRefs,
             bool customProxiesRefs,
             bool profilePolicyDraftsRefs,
+            bool profilePolicySelectionsRefs,
           })
         > {
   $$ProfilesTableTableManager(_$Database db, $ProfilesTable table)
@@ -5660,6 +5973,7 @@ class $$ProfilesTableTableManager
                 proxyGroupsRefs = false,
                 customProxiesRefs = false,
                 profilePolicyDraftsRefs = false,
+                profilePolicySelectionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5668,6 +5982,7 @@ class $$ProfilesTableTableManager
                     if (proxyGroupsRefs) db.proxyGroups,
                     if (customProxiesRefs) db.customProxies,
                     if (profilePolicyDraftsRefs) db.profilePolicyDrafts,
+                    if (profilePolicySelectionsRefs) db.profilePolicySelections,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5756,6 +6071,27 @@ class $$ProfilesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (profilePolicySelectionsRefs)
+                        await $_getPrefetchedData<
+                          RawProfile,
+                          $ProfilesTable,
+                          RawProfilePolicySelection
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProfilesTableReferences
+                              ._profilePolicySelectionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProfilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).profilePolicySelectionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.profileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5781,6 +6117,7 @@ typedef $$ProfilesTableProcessedTableManager =
         bool proxyGroupsRefs,
         bool customProxiesRefs,
         bool profilePolicyDraftsRefs,
+        bool profilePolicySelectionsRefs,
       })
     >;
 typedef $$ScriptsTableCreateCompanionBuilder =
@@ -8442,6 +8779,284 @@ typedef $$ProfilePolicyDraftsTableProcessedTableManager =
       RawProfilePolicyDraft,
       PrefetchHooks Function({bool profileId})
     >;
+typedef $$ProfilePolicySelectionsTableCreateCompanionBuilder =
+    ProfilePolicySelectionsCompanion Function({
+      Value<int> profileId,
+      Value<String?> rawContent,
+    });
+typedef $$ProfilePolicySelectionsTableUpdateCompanionBuilder =
+    ProfilePolicySelectionsCompanion Function({
+      Value<int> profileId,
+      Value<String?> rawContent,
+    });
+
+final class $$ProfilePolicySelectionsTableReferences
+    extends
+        BaseReferences<
+          _$Database,
+          $ProfilePolicySelectionsTable,
+          RawProfilePolicySelection
+        > {
+  $$ProfilePolicySelectionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ProfilesTable _profileIdTable(_$Database db) => db.profiles
+      .createAlias('profile_policy_selections__profile_id__profiles__id');
+
+  $$ProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<int>('profile_id')!;
+
+    final manager = $$ProfilesTableTableManager(
+      $_db,
+      $_db.profiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ProfilePolicySelectionsTableFilterComposer
+    extends Composer<_$Database, $ProfilePolicySelectionsTable> {
+  $$ProfilePolicySelectionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get rawContent => $composableBuilder(
+    column: $table.rawContent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ProfilesTableFilterComposer get profileId {
+    final $$ProfilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.profiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProfilesTableFilterComposer(
+            $db: $db,
+            $table: $db.profiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProfilePolicySelectionsTableOrderingComposer
+    extends Composer<_$Database, $ProfilePolicySelectionsTable> {
+  $$ProfilePolicySelectionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get rawContent => $composableBuilder(
+    column: $table.rawContent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ProfilesTableOrderingComposer get profileId {
+    final $$ProfilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.profiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProfilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.profiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProfilePolicySelectionsTableAnnotationComposer
+    extends Composer<_$Database, $ProfilePolicySelectionsTable> {
+  $$ProfilePolicySelectionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get rawContent => $composableBuilder(
+    column: $table.rawContent,
+    builder: (column) => column,
+  );
+
+  $$ProfilesTableAnnotationComposer get profileId {
+    final $$ProfilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.profiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProfilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.profiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProfilePolicySelectionsTableTableManager
+    extends
+        RootTableManager<
+          _$Database,
+          $ProfilePolicySelectionsTable,
+          RawProfilePolicySelection,
+          $$ProfilePolicySelectionsTableFilterComposer,
+          $$ProfilePolicySelectionsTableOrderingComposer,
+          $$ProfilePolicySelectionsTableAnnotationComposer,
+          $$ProfilePolicySelectionsTableCreateCompanionBuilder,
+          $$ProfilePolicySelectionsTableUpdateCompanionBuilder,
+          (RawProfilePolicySelection, $$ProfilePolicySelectionsTableReferences),
+          RawProfilePolicySelection,
+          PrefetchHooks Function({bool profileId})
+        > {
+  $$ProfilePolicySelectionsTableTableManager(
+    _$Database db,
+    $ProfilePolicySelectionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProfilePolicySelectionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ProfilePolicySelectionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ProfilePolicySelectionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> profileId = const Value.absent(),
+                Value<String?> rawContent = const Value.absent(),
+              }) => ProfilePolicySelectionsCompanion(
+                profileId: profileId,
+                rawContent: rawContent,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> profileId = const Value.absent(),
+                Value<String?> rawContent = const Value.absent(),
+              }) => ProfilePolicySelectionsCompanion.insert(
+                profileId: profileId,
+                rawContent: rawContent,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ProfilePolicySelectionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({profileId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (profileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.profileId,
+                                referencedTable:
+                                    $$ProfilePolicySelectionsTableReferences
+                                        ._profileIdTable(db),
+                                referencedColumn:
+                                    $$ProfilePolicySelectionsTableReferences
+                                        ._profileIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ProfilePolicySelectionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$Database,
+      $ProfilePolicySelectionsTable,
+      RawProfilePolicySelection,
+      $$ProfilePolicySelectionsTableFilterComposer,
+      $$ProfilePolicySelectionsTableOrderingComposer,
+      $$ProfilePolicySelectionsTableAnnotationComposer,
+      $$ProfilePolicySelectionsTableCreateCompanionBuilder,
+      $$ProfilePolicySelectionsTableUpdateCompanionBuilder,
+      (RawProfilePolicySelection, $$ProfilePolicySelectionsTableReferences),
+      RawProfilePolicySelection,
+      PrefetchHooks Function({bool profileId})
+    >;
 
 class $DatabaseManager {
   final _$Database _db;
@@ -8464,6 +9079,11 @@ class $DatabaseManager {
       $$CustomProxiesTableTableManager(_db, _db.customProxies);
   $$ProfilePolicyDraftsTableTableManager get profilePolicyDrafts =>
       $$ProfilePolicyDraftsTableTableManager(_db, _db.profilePolicyDrafts);
+  $$ProfilePolicySelectionsTableTableManager get profilePolicySelections =>
+      $$ProfilePolicySelectionsTableTableManager(
+        _db,
+        _db.profilePolicySelections,
+      );
 }
 
 mixin _$ProfilesDaoMixin on DatabaseAccessor<Database> {
@@ -8586,5 +9206,25 @@ class ProfilePolicyDraftsDaoManager {
       $$ProfilePolicyDraftsTableTableManager(
         _db.attachedDatabase,
         _db.profilePolicyDrafts,
+      );
+}
+
+mixin _$ProfilePolicySelectionsDaoMixin on DatabaseAccessor<Database> {
+  $ProfilesTable get profiles => attachedDatabase.profiles;
+  $ProfilePolicySelectionsTable get profilePolicySelections =>
+      attachedDatabase.profilePolicySelections;
+  ProfilePolicySelectionsDaoManager get managers =>
+      ProfilePolicySelectionsDaoManager(this);
+}
+
+class ProfilePolicySelectionsDaoManager {
+  final _$ProfilePolicySelectionsDaoMixin _db;
+  ProfilePolicySelectionsDaoManager(this._db);
+  $$ProfilesTableTableManager get profiles =>
+      $$ProfilesTableTableManager(_db.attachedDatabase, _db.profiles);
+  $$ProfilePolicySelectionsTableTableManager get profilePolicySelections =>
+      $$ProfilePolicySelectionsTableTableManager(
+        _db.attachedDatabase,
+        _db.profilePolicySelections,
       );
 }

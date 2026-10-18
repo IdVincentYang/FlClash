@@ -1,3 +1,6 @@
+import 'package:fl_clash/common/preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../helpers/commit_tap.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -24,16 +27,19 @@ Future<ProviderContainer> _openDialog(WidgetTester tester, Widget item) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 
   final container = ProviderContainer(
-    overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+    overrides: [
+      profilesProvider.overrideWith(TestProfiles.new),
+      networkSettingProvider.overrideWithBuild(
+        (_, _) => const NetworkProps(authentication: _initial),
+      ),
+    ],
   );
   addTearDown(container.dispose);
+  container.listen(configProvider, (_, _) {});
   globalState.container = container;
   container
       .read(viewSizeProvider.notifier)
       .update((_) => const Size(1000, 900));
-  container
-      .read(networkSettingProvider.notifier)
-      .update((state) => state.copyWith(authentication: _initial));
 
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -45,7 +51,7 @@ Future<ProviderContainer> _openDialog(WidgetTester tester, Widget item) async {
   );
   await tester.pump();
 
-  await tester.tap(find.byWidget(item));
+  await tapAndCommit(tester, find.byWidget(item));
   await tester.pumpAndSettle();
   return container;
 }
@@ -53,11 +59,16 @@ Future<ProviderContainer> _openDialog(WidgetTester tester, Widget item) async {
 Future<void> _submit(WidgetTester tester, String text) async {
   await tester.enterText(find.byType(TextFormField), text);
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Submit'));
+  await tapAndCommit(tester, find.text('Submit'));
   await tester.pumpAndSettle();
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
   testWidgets('rejects an account that is empty once colons are stripped', (
     tester,
   ) async {

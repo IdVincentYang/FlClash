@@ -1,3 +1,6 @@
+import 'package:fl_clash/common/common.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../helpers/test_config_state.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -13,13 +16,23 @@ import '../../helpers/test_profiles.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
+  TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container.read(viewSizeProvider.notifier).value = const Size(1200, 1000);
   });

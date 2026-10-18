@@ -51,8 +51,10 @@ void main() {
     await testDatabase.close();
   });
 
-  ProviderContainer buildContainer() {
-    final container = ProviderContainer();
+  ProviderContainer buildContainer({Config? config}) {
+    final container = ProviderContainer(
+      overrides: config == null ? [] : buildConfigOverrides(config),
+    );
     container.listen(configProvider, (_, _) {});
     addTearDown(container.dispose);
     return container;
@@ -330,16 +332,18 @@ void main() {
 
   group('applyRestore writes the settings providers', () {
     test('restores every settings provider the config carries', () async {
-      final source = buildContainer();
+      final source = buildContainer(
+        config: const Config(
+          themeProps: defaultThemeProps,
+          patchClashConfig: PatchClashConfig(mixedPort: 7899),
+          overrideDns: true,
+          overrideNtp: true,
+        ),
+      );
       source
           .read(appSettingProvider.notifier)
           .update((state) => state.copyWith(autoLaunch: true));
       source.read(currentProfileIdProvider.notifier).value = 42;
-      source
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith(mixedPort: 7899));
-      source.read(overrideDnsProvider.notifier).value = true;
-      source.read(overrideNtpProvider.notifier).value = true;
       final configMap = configMapOf(source);
 
       final target = buildContainer();

@@ -287,6 +287,14 @@ func changeProxyOwned(params *ChangeProxyParams, expected *controllerConfigMutat
 	if pendingConfig != nil && configFact.Phase != "ready" {
 		return &ChangeProxyResult{Message: errConfigNotApplied.Error()}
 	}
+	if params.Owner != 0 && (params.Owner != configFact.Owner || params.Token != configFact.Token) {
+		return &ChangeProxyResult{Message: errConfigSuperseded.Error()}
+	}
+	if appliedConfig != nil && appliedConfig.manifest.ManagedPolicy != nil {
+		if expected == nil && (params.Owner != configFact.Owner || params.Token != configFact.Token) || clear || !slices.Contains(managedGroup(appliedConfig.raw, params.GroupName), params.ProxyName) {
+			return &ChangeProxyResult{Message: errManagedPolicy.Error()}
+		}
+	}
 	owner := configFact.Owner
 
 	selector, err := selectableGroup(params.GroupName)
@@ -327,6 +335,11 @@ func changeProxyOwned(params *ChangeProxyParams, expected *controllerConfigMutat
 	locked = false
 	configMu.Lock()
 	checkpointMu.Lock()
+	if configFact.Owner != owner {
+		checkpointMu.Unlock()
+		configMu.Unlock()
+		return &ChangeProxyResult{Message: errConfigSuperseded.Error(), Changed: changed}
+	}
 	configFact.Version = configFactSequence.Add(1)
 	checkpointMu.Unlock()
 	err = saveAcceptedConfigChanges(nil, nil)
@@ -735,6 +748,9 @@ func providerRequestMethodError(
 }
 
 func handleUpdateExternalProvider(providerName string) *MethodError {
+	if managedProviderMutationBlocked() {
+		return providerMethodError("managed_policy", providerName, errManagedPolicy)
+	}
 	p, exist := lookupExternalProvider(providerName)
 	if !exist {
 		return providerMethodError(
@@ -763,6 +779,9 @@ func handleUpdateExternalProvider(providerName string) *MethodError {
 }
 
 func handleSideLoadExternalProvider(providerName string, data []byte) *MethodError {
+	if managedProviderMutationBlocked() {
+		return providerMethodError("managed_policy", providerName, errManagedPolicy)
+	}
 	p, exist := lookupExternalProvider(providerName)
 	if !exist {
 		return providerMethodError(

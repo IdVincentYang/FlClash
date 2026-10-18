@@ -56,6 +56,8 @@ type SideLoadParams struct {
 type ChangeProxyParams struct {
 	GroupName string `json:"group-name"`
 	ProxyName string `json:"proxy-name"`
+	Owner     uint64 `json:"owner"`
+	Token     uint64 `json:"token"`
 }
 
 type ChangeProxyResult struct {
@@ -219,6 +221,7 @@ const (
 	activateConfigMethod      CoreMethod  = "activateConfig"
 	abortConfigMethod         CoreMethod  = "abortConfig"
 	getConfigStateMethod      CoreMethod  = "getConfigState"
+	failConfigBuildMethod     CoreMethod  = "failConfigBuild"
 	getReplayInputMethod      CoreMethod  = "getReplayInput"
 	ConfigStateMessage        MessageType = "configState"
 )

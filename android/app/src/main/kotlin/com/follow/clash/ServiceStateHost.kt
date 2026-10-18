@@ -76,6 +76,8 @@ internal interface ServiceStateHost {
 
     suspend fun configPhase(method: String, receipt: ConfigReceipt): ConfigApplyResult = error("Configuration phase unavailable")
 
+    suspend fun failConfigBuild(input: JsonObject): ConfigApplyResult = error("Configuration cleanup unavailable")
+
     suspend fun replayConfigInput(): JsonObject = error("Configuration checkpoint unavailable")
 
     suspend fun stopOwnedService(identity: RequestServiceIdentity): Boolean = false
@@ -199,6 +201,9 @@ internal object AndroidServiceStateHost : ServiceStateHost {
 
     override suspend fun configPhase(method: String, receipt: ConfigReceipt): ConfigApplyResult =
         Gson().fromJson(ServiceController.configCall(method, Gson().toJsonTree(receipt)), ConfigApplyResult::class.java)
+
+    override suspend fun failConfigBuild(input: JsonObject): ConfigApplyResult =
+        Gson().fromJson(ServiceController.configCall("failConfigBuild", input), ConfigApplyResult::class.java)
 
     override suspend fun replayConfigInput(): JsonObject = ServiceController.configCall(
         "getReplayInput", JsonParser.parseString(ServiceStateMachine.initParams(homeDirPath, sdkInt)),

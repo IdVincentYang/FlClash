@@ -95,6 +95,7 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   void changeProxyDebounce(String groupName, String proxyName) {
+    final observed = ref.read(configStateProvider).fact;
     _pendingSelectedRollback.putIfAbsent(
       groupName,
       () => _currentSelectedName(groupName),
@@ -106,7 +107,11 @@ class ProxiesAction extends _$ProxiesAction {
       String groupName,
       String proxyName,
     ) async {
-      await changeProxy(groupName: groupName, proxyName: proxyName);
+      await changeProxy(
+        groupName: groupName,
+        proxyName: proxyName,
+        observed: observed,
+      );
       updateGroupsDebounce();
     }, args: [groupName, proxyName]);
   }
@@ -192,7 +197,9 @@ class ProxiesAction extends _$ProxiesAction {
   Future<void> changeProxy({
     required String groupName,
     required String proxyName,
+    ConfigFact? observed,
   }) async {
+    final fact = observed ?? ref.read(configStateProvider).fact;
     final profilesAction = ref.read(profilesActionProvider.notifier);
     final rollbackName =
         _pendingSelectedRollback.remove(groupName) ??
@@ -201,7 +208,12 @@ class ProxiesAction extends _$ProxiesAction {
     final ChangeProxyResult result;
     try {
       result = await _core.changeProxy(
-        ChangeProxyParams(groupName: groupName, proxyName: proxyName),
+        ChangeProxyParams(
+          groupName: groupName,
+          proxyName: proxyName,
+          owner: fact.owner,
+          token: fact.token,
+        ),
       );
       if (result.message.isNotEmpty) {
         throw MessageException(result.message);

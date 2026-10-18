@@ -1068,6 +1068,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "Загрузите корректный QR-код",
     ),
+    "policyActualPreview": MessageLookupByLibrary.simpleMessage(
+      "Фактически принятая конфигурация",
+    ),
+    "policyAndroidRequired": MessageLookupByLibrary.simpleMessage(
+      "Применение управляемых политик пока доступно только на Android. Редактирование черновиков и просмотр остаются доступны.",
+    ),
+    "policyApply": MessageLookupByLibrary.simpleMessage(
+      "Сохранить и запросить применение",
+    ),
+    "policyApplyConfirm": MessageLookupByLibrary.simpleMessage(
+      "Эта политика задаёт маршрутизацию и DNS, включая явный DIRECT. Исходные правила, DNS, провайдеры и специальные переопределения не используются. Выбор управляемых узлов будет сброшен. Остановленный прокси не запускается.",
+    ),
+    "policyApplyRequested": MessageLookupByLibrary.simpleMessage(
+      "Выбор сохранён, применение запрошено. Проверьте фактическое состояние конфигурации.",
+    ),
     "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
       "Использовать имя пользователя и пароль",
     ),
@@ -1221,6 +1236,42 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyDraftUnset": MessageLookupByLibrary.simpleMessage("Не настроено"),
     "policyDraftUsername": MessageLookupByLibrary.simpleMessage(
       "Имя пользователя",
+    ),
+    "policyFinalPreview": MessageLookupByLibrary.simpleMessage(
+      "Итоговая сформированная конфигурация",
+    ),
+    "policyMaintenanceNone": MessageLookupByLibrary.simpleMessage(
+      "Без служебного прокси по умолчанию",
+    ),
+    "policyMaintenanceRequired": MessageLookupByLibrary.simpleMessage(
+      "Выберите и примените служебную группу или узел либо явно выберите Auto или Direct для запроса. Прежняя цель могла исчезнуть.",
+    ),
+    "policyMaintenanceTarget": MessageLookupByLibrary.simpleMessage(
+      "Прокси для служебных запросов",
+    ),
+    "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
+      "Профиль использует управляемую политику. Измените маршрутизацию и DNS в черновике и явно запросите применение.",
+    ),
+    "policyOriginal": MessageLookupByLibrary.simpleMessage(
+      "Использовать исходный профиль",
+    ),
+    "policyOriginalConfirm": MessageLookupByLibrary.simpleMessage(
+      "Выйти из управляемого режима и использовать исходные правила, DNS и переопределения? Путь трафика может измениться.",
+    ),
+    "policyOriginalStatus": MessageLookupByLibrary.simpleMessage(
+      "Выбран исходный профиль",
+    ),
+    "policySelectedStatus": MessageLookupByLibrary.simpleMessage(
+      "Политика выбрана; фактическое принятие показано отдельно",
+    ),
+    "policySelectionPending": MessageLookupByLibrary.simpleMessage(
+      "Выбранная политика отличается от фактически принятой конфигурации.",
+    ),
+    "policySelectionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Требуется управляемая политика, но она недоступна. Выберите допустимую политику.",
+    ),
+    "policyUnappliedEdits": MessageLookupByLibrary.simpleMessage(
+      "Черновик отличается от выбранной политики; изменения не применены",
     ),
     "port": MessageLookupByLibrary.simpleMessage("Порт"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage(

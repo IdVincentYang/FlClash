@@ -133,6 +133,15 @@ abstract class CoreHandlerInterface with CoreInterface {
     throw StateError('Configuration did not reach activation');
   }
 
+  Future<ConfigApplyResult> failConfigBuild(Map<String, Object?> input) async {
+    final result = await invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.failConfigBuild,
+      arguments: input,
+    );
+    if (result == null) throw StateError('Configuration cleanup unavailable');
+    return ConfigApplyResult.fromJson(result);
+  }
+
   Future<T?> _invokeMethod<T>({
     required CoreMethod method,
     Object? arguments,

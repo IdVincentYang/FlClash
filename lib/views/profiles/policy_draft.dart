@@ -1,18 +1,21 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/policy_draft.dart';
 import 'package:fl_clash/common/policy_migration.dart';
+import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
-import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'policy_draft_form.dart';
+import 'preview.dart';
 
 class PolicyDraftView extends ConsumerStatefulWidget {
   final Profile profile;
@@ -28,6 +31,7 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
   String? _storedRaw;
   String? _storedEncoding;
   String? _problemLocation;
+  ProfilePolicySelection? _selected;
   bool _previewed = false;
   bool _busy = true;
   bool _leaving = false;
@@ -52,12 +56,16 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     setState(() => _busy = true);
     try {
       final row = await _action.load(widget.profile.id);
+      final selected = await ref
+          .read(policySelectionActionProvider.notifier)
+          .load(widget.profile.id);
       if (!mounted || operation != _operation) return;
       final draft = row == null
           ? PolicyDraftDocument.empty()
           : PolicyDraftDocument.decode(row.rawContent);
       setState(() {
         _storedRaw = row?.rawContent;
+        _selected = selected;
         _draft = draft;
         _storedEncoding = draft.encode();
         _problemLocation = null;
@@ -130,6 +138,139 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
       return;
     }
     if (mounted) await _load();
+  }
+
+  Future<void> _apply() async {
+    if (_busy || _draft == null || _draft!.isReadOnly) return;
+    if (_dirty || _storedRaw == null) {
+      if (!await _save()) return;
+    }
+    if (!mounted || _previewSnapshot() == null) return;
+    final l = context.appLocalizations;
+    final expected = _selected;
+    final draftRaw = _storedRaw!;
+    final draft = PolicyDraftDocument.decode(draftRaw);
+    final targets = <String, String>{
+      'none': l.policyMaintenanceNone,
+      for (final id in draft.resources('groups').keys)
+        'group:$id': '${l.proxyGroup}: ${draft.label(id)}',
+      for (final id in draft.resources('proxies').keys)
+        'proxy:$id': '${l.proxies}: ${draft.label(id)}',
+    };
+    final target = await dialogs.showCommonDialog<String>(
+      context: context,
+      child: CommonDialog(
+        title: l.policyMaintenanceTarget,
+        child: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final entry in targets.entries)
+                  ListTile(
+                    title: Text(entry.value),
+                    onTap: () => Navigator.of(context).pop(entry.key),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (target == null || !mounted) return;
+    final raw = selectPolicyDraft(
+      draft,
+      maintenanceProxyTarget: target == 'none'
+          ? null
+          : {
+              'kind': target.substring(0, target.indexOf(':')),
+              'id': target.substring(target.indexOf(':') + 1),
+            },
+    );
+    if (!await _confirm(
+      '${l.policyApplyConfirm}\n\n'
+      '${l.policyMaintenanceTarget}: ${targets[target]}',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _busy = true);
+    try {
+      final result = await ref
+          .read(policySelectionActionProvider.notifier)
+          .selectConfirmed(
+            widget.profile.id,
+            expected: expected,
+            draftRaw: draftRaw,
+            selectionRaw: raw,
+          );
+      if (!mounted) return;
+      if (result == PolicyDraftWriteResult.saved) {
+        setState(
+          () => _selected = ProfilePolicySelection(
+            profileId: widget.profile.id,
+            rawContent: raw,
+          ),
+        );
+        _notify(l.policyApplyRequested);
+      } else {
+        _notify(
+          result == PolicyDraftWriteResult.conflict
+              ? l.policyDraftConflict
+              : l.policyDraftSaveFailed,
+        );
+      }
+    } catch (_) {
+      if (mounted) _notify(l.policyDraftSaveFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _useOriginal() async {
+    if (_busy || _selected == null) return;
+    final expected = _selected;
+    if (!await _confirm(context.appLocalizations.policyOriginalConfirm) ||
+        !mounted) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final result = await ref
+          .read(policySelectionActionProvider.notifier)
+          .selectConfirmed(
+            widget.profile.id,
+            expected: expected,
+            draftRaw: null,
+            selectionRaw: null,
+          );
+      if (!mounted) return;
+      if (result == PolicyDraftWriteResult.saved) {
+        setState(() => _selected = null);
+        _notify(context.appLocalizations.policyApplyRequested);
+      } else {
+        _notify(context.appLocalizations.policyDraftConflict);
+      }
+    } catch (_) {
+      if (mounted) _notify(context.appLocalizations.policyDraftSaveFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  String _selectionStatus() {
+    final l = context.appLocalizations;
+    if (_selected == null) return l.policyOriginalStatus;
+    try {
+      SelectedPolicy.decode(_selected!.rawContent);
+      final envelope = jsonDecode(_selected!.rawContent!) as Map;
+      return jsonEncode(envelope['policy']) == jsonEncode(_draft?.policy)
+          ? l.policySelectedStatus
+          : l.policyUnappliedEdits;
+    } catch (_) {
+      return l.policySelectionUnavailable;
+    }
   }
 
   Future<void> _rebuild() async {
@@ -526,6 +667,9 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
         _problemLocation ??
         (_draft == null ? null : policyDraftInputProblem(_draft!));
     final canPreview = editable && problem == null;
+    final supportsManaged = ref
+        .read(policySelectionActionProvider.notifier)
+        .supportsManaged;
     return PopScope(
       canPop: !_busy && (!_dirty || _allowPop),
       onPopInvokedWithResult: (didPop, _) {
@@ -548,6 +692,24 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
           ),
         ],
         menuItems: [
+          CommonPopupMenuItem(
+            label: l.policyActualPreview,
+            glyph: AppGlyphs.eye,
+            onPressed: () => BaseNavigator.push<String>(
+              context,
+              PreviewProfileView(profile: widget.profile, actual: true),
+            ),
+          ),
+          CommonPopupMenuItem(
+            label: l.policyApply,
+            glyph: AppGlyphs.check,
+            onPressed: canPreview && supportsManaged ? _apply : null,
+          ),
+          CommonPopupMenuItem(
+            label: l.policyOriginal,
+            glyph: AppGlyphs.refresh,
+            onPressed: !_busy && _selected != null ? _useOriginal : null,
+          ),
           CommonPopupMenuItem(
             label: l.policyDraftCopyFull,
             glyph: AppGlyphs.copy,
@@ -586,6 +748,8 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
                 16 + BottomInsetScope.of(bodyContext),
               ),
               children: [
+                Text(_selectionStatus()),
+                if (!supportsManaged) Text(l.policyAndroidRequired),
                 Text(
                   _dirty || _storedRaw == null
                       ? l.policyDraftUnsaved

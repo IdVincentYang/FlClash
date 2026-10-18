@@ -37,6 +37,8 @@ object ServiceState {
 
     suspend fun failRunIntent(requestId: Long, token: Long) = machine.failRunIntent(requestId, token)
 
+    suspend fun failConfigBuild(input: com.google.gson.JsonObject) = machine.failConfigBuild(input)
+
     fun applyConfig(input: com.google.gson.JsonObject) = machine.applyConfig(input)
 
     fun observeConfigFact(fact: com.follow.clash.models.ConfigFact) = machine.observeConfigFact(fact)

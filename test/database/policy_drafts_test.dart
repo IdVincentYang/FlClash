@@ -196,7 +196,7 @@ void main() {
 
   for (final keepTable in [false, true]) {
     test(
-      'schema11 to12 preserves profile; existing new table: $keepTable',
+      'schema11 to13 preserves profile; existing new table: $keepTable',
       () async {
         final root = await Directory.systemTemp.createTemp('policy-schema11-');
         try {
@@ -220,7 +220,7 @@ void main() {
                   .data
                   .values
                   .single,
-              12,
+              13,
             );
           } finally {
             await upgraded.close();

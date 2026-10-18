@@ -108,6 +108,9 @@ class CoreController {
   Future<ConfigApplyResult> applyConfigInput(Map<String, Object?> input) =>
       _interface.applyConfigInput(input);
 
+  Future<ConfigApplyResult> failConfigBuild(Map<String, Object?> input) =>
+      _interface.failConfigBuild(input);
+
   Future<String> validateConfig(String path) async {
     final res = await _interface.validateConfig(path);
     return res;

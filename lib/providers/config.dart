@@ -1,11 +1,26 @@
-import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/models/models.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'dart:async';
 
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/database/database.dart';
+import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/app.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:flutter/foundation.dart' show protected;
+
+part 'application_input.dart';
 part 'generated/config.g.dart';
 
 @riverpod
-class AppSetting extends _$AppSetting with AutoDisposeNotifierMixin {
+class AppSetting extends _$AppSetting
+    with
+        AutoDisposeNotifierMixin<AppSettingProps>,
+        _ApplicationInputGuard<AppSettingProps> {
+  @override
+  bool inputChanged(AppSettingProps previous, AppSettingProps next) =>
+      previous.testUrl != next.testUrl;
+
   @override
   AppSettingProps build() {
     return const AppSettingProps();
@@ -21,7 +36,8 @@ class WindowSetting extends _$WindowSetting with AutoDisposeNotifierMixin {
 }
 
 @riverpod
-class VpnSetting extends _$VpnSetting with AutoDisposeNotifierMixin {
+class VpnSetting extends _$VpnSetting
+    with AutoDisposeNotifierMixin<VpnProps>, _ApplicationInputGuard<VpnProps> {
   @override
   VpnProps build() {
     return const VpnProps();
@@ -29,7 +45,10 @@ class VpnSetting extends _$VpnSetting with AutoDisposeNotifierMixin {
 }
 
 @riverpod
-class NetworkSetting extends _$NetworkSetting with AutoDisposeNotifierMixin {
+class NetworkSetting extends _$NetworkSetting
+    with
+        AutoDisposeNotifierMixin<NetworkProps>,
+        _ApplicationInputGuard<NetworkProps> {
   @override
   NetworkProps build() {
     return const NetworkProps();
@@ -62,7 +81,8 @@ class DavSetting extends _$DavSetting with AutoDisposeNotifierMixin {
 }
 
 @riverpod
-class OverrideDns extends _$OverrideDns with AutoDisposeNotifierMixin {
+class OverrideDns extends _$OverrideDns
+    with AutoDisposeNotifierMixin<bool>, _ApplicationInputGuard<bool> {
   @override
   bool build() {
     return false;
@@ -70,7 +90,8 @@ class OverrideDns extends _$OverrideDns with AutoDisposeNotifierMixin {
 }
 
 @riverpod
-class OverrideNtp extends _$OverrideNtp with AutoDisposeNotifierMixin {
+class OverrideNtp extends _$OverrideNtp
+    with AutoDisposeNotifierMixin<bool>, _ApplicationInputGuard<bool> {
   @override
   bool build() {
     return false;
@@ -96,7 +117,9 @@ class ProxiesStyleSetting extends _$ProxiesStyleSetting
 
 @Riverpod(name: 'patchClashConfigProvider')
 class _PatchClashConfig extends _$PatchClashConfig
-    with AutoDisposeNotifierMixin {
+    with
+        AutoDisposeNotifierMixin<PatchClashConfig>,
+        _ApplicationInputGuard<PatchClashConfig> {
   @override
   PatchClashConfig build() {
     return const PatchClashConfig();
@@ -143,21 +166,23 @@ Config _config(Ref ref) {
   );
 }
 
-void writeConfig(Ref ref, Config config) {
-  ref.read(appSettingProvider.notifier).value = config.appSettingProps;
-  ref.read(windowSettingProvider.notifier).value = config.windowProps;
-  ref.read(vpnSettingProvider.notifier).value = config.vpnProps;
-  ref.read(networkSettingProvider.notifier).value = config.networkProps;
-  ref.read(themeSettingProvider.notifier).value = config.themeProps;
-  ref.read(currentProfileIdProvider.notifier).value = config.currentProfileId;
-  ref.read(davSettingProvider.notifier).value = config.davProps;
-  ref.read(overrideDnsProvider.notifier).value = config.overrideDns;
-  ref.read(overrideNtpProvider.notifier).value = config.overrideNtp;
-  ref.read(hotKeyActionsProvider.notifier).value = config.hotKeyActions;
-  ref.read(proxiesStyleSettingProvider.notifier).value =
-      config.proxiesStyleProps;
-  ref.read(patchClashConfigProvider.notifier).value = config.patchClashConfig;
-  ref.read(excludeSSIDsProvider.notifier).value = config.excludeSSIDs;
+void writeConfig(Ref ref, Config config, {Request? mutationClient}) {
+  _publishApplicationInputs(mutationClient ?? request, () {
+    ref.read(appSettingProvider.notifier).value = config.appSettingProps;
+    ref.read(windowSettingProvider.notifier).value = config.windowProps;
+    ref.read(vpnSettingProvider.notifier).value = config.vpnProps;
+    ref.read(networkSettingProvider.notifier).value = config.networkProps;
+    ref.read(themeSettingProvider.notifier).value = config.themeProps;
+    ref.read(currentProfileIdProvider.notifier).value = config.currentProfileId;
+    ref.read(davSettingProvider.notifier).value = config.davProps;
+    ref.read(overrideDnsProvider.notifier).value = config.overrideDns;
+    ref.read(overrideNtpProvider.notifier).value = config.overrideNtp;
+    ref.read(hotKeyActionsProvider.notifier).value = config.hotKeyActions;
+    ref.read(proxiesStyleSettingProvider.notifier).value =
+        config.proxiesStyleProps;
+    ref.read(patchClashConfigProvider.notifier).value = config.patchClashConfig;
+    ref.read(excludeSSIDsProvider.notifier).value = config.excludeSSIDs;
+  });
 }
 
 List<Override> buildConfigOverrides(Config config) {

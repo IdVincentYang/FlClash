@@ -1,3 +1,7 @@
+import '../helpers/commit_tap.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fl_clash/providers/config_state.dart';
+import '../helpers/test_config_state.dart';
 import 'dart:ui' show Tristate;
 
 import 'package:fl_clash/common/common.dart';
@@ -18,6 +22,12 @@ import '../helpers/test_profiles.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
+  TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
 
@@ -28,9 +38,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
     addTearDown(container.dispose);
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container
         .read(viewSizeProvider.notifier)
@@ -47,32 +61,34 @@ void main() {
 
   PatchClashConfig config() => container.read(patchClashConfigProvider);
 
-  void setKeys(Set<DnsOverrideKey> keys) {
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(dnsOverrideKeys: keys));
+  Future<void> setKeys(WidgetTester tester, Set<DnsOverrideKey> keys) async {
+    await tester.runAsync(
+      () => container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith(dnsOverrideKeys: keys)),
+    );
   }
 
   String emptyLabel() =>
       currentAppLocalizations.nullTip(currentAppLocalizations.overrideEntries);
 
   Future<void> openMenu(WidgetTester tester) async {
-    await tester.tap(find.byTooltip(currentAppLocalizations.more));
+    await tapAndCommit(tester, find.byTooltip(currentAppLocalizations.more));
     await tester.pumpAndSettle();
   }
 
   testWidgets('lists a key picked from the sheet', (tester) async {
     await pumpView(tester);
-    setKeys({});
+    await setKeys(tester, {});
     await tester.pump();
     expect(find.text(emptyLabel()), findsOneWidget);
 
     await openMenu(tester);
-    await tester.tap(find.text(currentAppLocalizations.add));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.add));
     await tester.pumpAndSettle();
     expect(find.text(currentAppLocalizations.addOverrideEntry), findsOneWidget);
 
-    await tester.tap(find.text(currentAppLocalizations.listen));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.listen));
     await tester.pumpAndSettle();
 
     expect(config().dnsOverrideKeys, {DnsOverrideKey.listen});
@@ -85,15 +101,15 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({DnsOverrideKey.ipv6});
+    await setKeys(tester, {DnsOverrideKey.ipv6});
     await tester.pump();
 
     expect(find.text('IPv6'), findsOneWidget);
-    await tester.tap(find.byType(Switch).last);
+    await tapAndCommit(tester, find.byType(Switch).last);
     await tester.pump();
     expect(config().dns.ipv6, isTrue);
 
-    await tester.tap(find.byTooltip(currentAppLocalizations.remove));
+    await tapAndCommit(tester, find.byTooltip(currentAppLocalizations.remove));
     await tester.pumpAndSettle();
     expect(config().dnsOverrideKeys, isEmpty);
     expect(find.text('IPv6'), findsNothing);
@@ -104,7 +120,10 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({DnsOverrideKey.fallbackFilterDomain, DnsOverrideKey.enable});
+    await setKeys(tester, {
+      DnsOverrideKey.fallbackFilterDomain,
+      DnsOverrideKey.enable,
+    });
     await tester.pump();
 
     final l = currentAppLocalizations;
@@ -120,18 +139,20 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({
+    await setKeys(tester, {
       DnsOverrideKey.fallbackFilterDomain,
       DnsOverrideKey.fallbackFilterGeosite,
     });
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update(
-          (state) => state.copyWith.dns.fallbackFilter(
-            domain: ['+.a.com', '+.b.com'],
-            geosite: [],
+    await tester.runAsync(
+      () => container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch(
+            (state) => state.copyWith.dns.fallbackFilter(
+              domain: ['+.a.com', '+.b.com'],
+              geosite: [],
+            ),
           ),
-        );
+    );
     await tester.pump();
 
     expect(find.text('+.a.com, +.b.com'), findsOneWidget);
@@ -140,13 +161,13 @@ void main() {
 
   testWidgets('a number entry writes the integer it is given', (tester) async {
     await pumpView(tester);
-    setKeys({DnsOverrideKey.ipv6Timeout});
+    await setKeys(tester, {DnsOverrideKey.ipv6Timeout});
     await tester.pump();
 
-    await tester.tap(find.text(currentAppLocalizations.ipv6Timeout));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.ipv6Timeout));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '300');
-    await tester.tap(find.text(currentAppLocalizations.submit));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.submit));
     await tester.pumpAndSettle();
 
     expect(config().dns.ipv6Timeout, 300);
@@ -155,10 +176,10 @@ void main() {
 
   testWidgets('the DNS mode options leave out hosts', (tester) async {
     await pumpView(tester);
-    setKeys({DnsOverrideKey.enhancedMode});
+    await setKeys(tester, {DnsOverrideKey.enhancedMode});
     await tester.pump();
 
-    await tester.tap(find.text(currentAppLocalizations.dnsMode));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.dnsMode));
     await tester.pumpAndSettle();
 
     expect(find.text(DnsMode.redirHost.name), findsOneWidget);
@@ -169,7 +190,7 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys(DnsOverrideKey.values.toSet());
+    await setKeys(tester, DnsOverrideKey.values.toSet());
     await tester.pump();
 
     await openMenu(tester);
@@ -185,14 +206,14 @@ void main() {
     await pumpView(tester);
 
     expect(container.read(overrideDnsProvider), isFalse);
-    await tester.tap(find.text(currentAppLocalizations.overrideDns));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.overrideDns));
     await tester.pump();
     expect(container.read(overrideDnsProvider), isTrue);
   });
 
   Future<EditorPage> openQuickEdit(WidgetTester tester) async {
     await openMenu(tester);
-    await tester.tap(find.text(currentAppLocalizations.quickEdit));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.quickEdit));
     await tester.pumpAndSettle();
     return tester.widget<EditorPage>(find.byType(EditorPage));
   }
@@ -201,7 +222,7 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({DnsOverrideKey.ipv6});
+    await setKeys(tester, {DnsOverrideKey.ipv6});
     await tester.pump();
 
     final editor = await openQuickEdit(tester);
@@ -210,7 +231,9 @@ void main() {
     expect(editor.onSave, isNull);
 
     final context = tester.element(find.byType(EditorPage));
-    final popped = await editor.onPop!(context, 'DNS', 'listen: :53');
+    final popped = await tester.runAsync(
+      () => editor.onPop!(context, 'DNS', 'listen: :53'),
+    );
     expect(popped, isTrue);
     expect(config().dnsOverrideKeys, {DnsOverrideKey.listen});
     expect(config().dns.listen, ':53');
@@ -220,7 +243,7 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({});
+    await setKeys(tester, {});
     await tester.pump();
     final editor = await openQuickEdit(tester);
     final context = tester.element(find.byType(EditorPage));
@@ -231,7 +254,7 @@ void main() {
       find.textContaining(currentAppLocalizations.discardChanges),
       findsOneWidget,
     );
-    await tester.tap(find.text(currentAppLocalizations.cancel));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.cancel));
     await tester.pump();
     expect(await popped, isFalse);
     expect(config().dnsOverrideKeys, isEmpty);

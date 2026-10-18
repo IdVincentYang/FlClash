@@ -19,6 +19,7 @@ part 'icons.dart';
 part 'links.dart';
 part 'profiles.dart';
 part 'policy_drafts.dart';
+part 'policy_selections.dart';
 part 'rules.dart';
 part 'scripts.dart';
 
@@ -33,6 +34,7 @@ part 'scripts.dart';
     ClashProviders,
     CustomProxies,
     ProfilePolicyDrafts,
+    ProfilePolicySelections,
   ],
   daos: [
     ProfilesDao,
@@ -43,13 +45,14 @@ part 'scripts.dart';
     ClashProvidersDao,
     CustomProxiesDao,
     ProfilePolicyDraftsDao,
+    ProfilePolicySelectionsDao,
   ],
 )
 class Database extends _$Database {
   Database([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -95,6 +98,9 @@ class Database extends _$Database {
         }
         if (from < 12) {
           await _createTableIfMissing(m, profilePolicyDrafts);
+        }
+        if (from < 13) {
+          await _createTableIfMissing(m, profilePolicySelections);
         }
         if (from < 9) {
           await _purgeOrphans();
@@ -200,10 +206,17 @@ class Database extends _$Database {
     List<ClashProvider> clashProviders = const [],
     List<CustomProxy> customProxies = const [],
     List<ProfilePolicyDraft> policyDrafts = const [],
+    List<ProfilePolicySelection> policySelections = const [],
     bool isOverride = false,
     Future<void> Function()? beforeCommit,
   }) async {
     if (!validPolicyDraftRelations(policyDrafts, profiles.map((p) => p.id))) {
+      throw const PolicyDraftRestoreException();
+    }
+    if (!validPolicySelectionRelations(
+      policySelections,
+      profiles.map((p) => p.id),
+    )) {
       throw const PolicyDraftRestoreException();
     }
     if (profiles.isEmpty &&
@@ -213,7 +226,8 @@ class Database extends _$Database {
         proxyGroups.isEmpty &&
         clashProviders.isEmpty &&
         customProxies.isEmpty &&
-        policyDrafts.isEmpty) {
+        policyDrafts.isEmpty &&
+        policySelections.isEmpty) {
       await beforeCommit?.call();
       return;
     }
@@ -233,6 +247,11 @@ class Database extends _$Database {
             policyDrafts,
             isOverride: true,
           );
+          profilePolicySelectionsDao.restoreWithBatch(
+            b,
+            policySelections,
+            isOverride: true,
+          );
           return;
         }
         profilesDao.putAllWithBatch(
@@ -247,6 +266,11 @@ class Database extends _$Database {
         profilePolicyDraftsDao.restoreWithBatch(
           b,
           policyDrafts,
+          isOverride: false,
+        );
+        profilePolicySelectionsDao.restoreWithBatch(
+          b,
+          policySelections,
           isOverride: false,
         );
       });
@@ -277,6 +301,9 @@ class Database extends _$Database {
       (t) => t.profileId.isNotNull() & t.profileId.isNotInQuery(profileIds),
     );
     await profilePolicyDrafts.remove(
+      (t) => t.profileId.isNotInQuery(profileIds),
+    );
+    await profilePolicySelections.remove(
       (t) => t.profileId.isNotInQuery(profileIds),
     );
     await rulesDao.delUnlinkedRules();

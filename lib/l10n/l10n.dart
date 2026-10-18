@@ -7017,6 +7017,176 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Save and request application`
+  String get policyApply {
+    return Intl.message(
+      'Save and request application',
+      name: 'policyApply',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use this policy for routing and DNS, including any explicit DIRECT choices. Original rules, DNS, providers and special overrides will not participate. Existing managed node selections will reset. This does not start a stopped proxy.`
+  String get policyApplyConfirm {
+    return Intl.message(
+      'Use this policy for routing and DNS, including any explicit DIRECT choices. Original rules, DNS, providers and special overrides will not participate. Existing managed node selections will reset. This does not start a stopped proxy.',
+      name: 'policyApplyConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use original profile`
+  String get policyOriginal {
+    return Intl.message(
+      'Use original profile',
+      name: 'policyOriginal',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Leave managed routing and use the original profile with its rules, DNS and overrides? This can change the traffic path.`
+  String get policyOriginalConfirm {
+    return Intl.message(
+      'Leave managed routing and use the original profile with its rules, DNS and overrides? This can change the traffic path.',
+      name: 'policyOriginalConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Original profile selected`
+  String get policyOriginalStatus {
+    return Intl.message(
+      'Original profile selected',
+      name: 'policyOriginalStatus',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Policy selected; actual acceptance is shown separately`
+  String get policySelectedStatus {
+    return Intl.message(
+      'Policy selected; actual acceptance is shown separately',
+      name: 'policySelectedStatus',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Managed policy is required but unavailable. Choose a valid policy.`
+  String get policySelectionUnavailable {
+    return Intl.message(
+      'Managed policy is required but unavailable. Choose a valid policy.',
+      name: 'policySelectionUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Draft differs from the selected policy; edits are not applied`
+  String get policyUnappliedEdits {
+    return Intl.message(
+      'Draft differs from the selected policy; edits are not applied',
+      name: 'policyUnappliedEdits',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Maintenance proxy target`
+  String get policyMaintenanceTarget {
+    return Intl.message(
+      'Maintenance proxy target',
+      name: 'policyMaintenanceTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No default maintenance proxy`
+  String get policyMaintenanceNone {
+    return Intl.message(
+      'No default maintenance proxy',
+      name: 'policyMaintenanceNone',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose and apply a maintenance proxy group or node, or explicitly select Auto or Direct for this request. A previous target may no longer exist.`
+  String get policyMaintenanceRequired {
+    return Intl.message(
+      'Choose and apply a maintenance proxy group or node, or explicitly select Auto or Direct for this request. A previous target may no longer exist.',
+      name: 'policyMaintenanceRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This profile uses a managed policy. Edit routing and DNS in the policy draft, then explicitly request application.`
+  String get policyManagedEditRequired {
+    return Intl.message(
+      'This profile uses a managed policy. Edit routing and DNS in the policy draft, then explicitly request application.',
+      name: 'policyManagedEditRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Selection saved and application requested. Check the actual configuration status.`
+  String get policyApplyRequested {
+    return Intl.message(
+      'Selection saved and application requested. Check the actual configuration status.',
+      name: 'policyApplyRequested',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Generated final configuration`
+  String get policyFinalPreview {
+    return Intl.message(
+      'Generated final configuration',
+      name: 'policyFinalPreview',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Actual accepted configuration`
+  String get policyActualPreview {
+    return Intl.message(
+      'Actual accepted configuration',
+      name: 'policyActualPreview',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The selected policy differs from the actual accepted configuration.`
+  String get policySelectionPending {
+    return Intl.message(
+      'The selected policy differs from the actual accepted configuration.',
+      name: 'policySelectionPending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Managed policies can currently be applied only on Android. Draft editing and previews remain available.`
+  String get policyAndroidRequired {
+    return Intl.message(
+      'Managed policies can currently be applied only on Android. Draft editing and previews remain available.',
+      name: 'policyAndroidRequired',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

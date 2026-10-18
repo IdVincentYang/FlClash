@@ -21,16 +21,20 @@ class RequestRouteFields extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = context.appLocalizations;
     final groups = ref.watch(groupsProvider);
-    final selected =
-        ref.watch(selectedMapProvider)['GLOBAL'] ??
-        groups.getGroup('GLOBAL')?.now ??
-        '';
+    final fact = ref.watch(configStateProvider).fact;
+    final managed = fact.isManaged;
+    final selected = managed
+        ? fact.maintenanceProxy
+        : ref.watch(selectedMapProvider)['GLOBAL'] ??
+              groups.getGroup('GLOBAL')?.now ??
+              '';
     final names = <String>{
       'GLOBAL',
       if (proxy != null && proxy!.isNotEmpty) proxy!,
       for (final group in groups) ...[
-        group.name,
-        for (final node in group.all) node.name,
+        if (!managed || group.name.startsWith('fc-managed-group-')) group.name,
+        for (final node in group.all)
+          if (!managed || node.name.startsWith('fc-managed-proxy-')) node.name,
       ],
     }.toList();
     String label(RequestMode value) => switch (value) {
@@ -73,6 +77,15 @@ class RequestRouteFields extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           child: Text(strings.requestModeHelp),
         ),
+        if (managed &&
+            (selected.isEmpty ||
+                proxy != null &&
+                    proxy != 'GLOBAL' &&
+                    !proxy!.startsWith('fc-managed-')))
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(strings.policyMaintenanceRequired),
+          ),
       ],
     );
   }

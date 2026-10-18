@@ -20,6 +20,7 @@ UpdateParams updateParams(Ref ref) {
 
 @riverpod
 TrayState trayState(Ref ref) {
+  final fact = ref.watch(configStateProvider).fact;
   final isStart = ref.watch(runTimeProvider.select((state) => state != null));
   final systemProxy = ref.watch(
     networkSettingProvider.select((state) => state.systemProxy),
@@ -45,8 +46,8 @@ TrayState trayState(Ref ref) {
   final hotKeys = _trayHotKeys(ref);
 
   return TrayState(
-    mode: clashConfig.mode,
-    port: clashConfig.mixedPort,
+    mode: fact.isManaged ? Mode.rule : clashConfig.mode,
+    port: fact.isManaged ? fact.mixedPort : clashConfig.mixedPort,
     autoLaunch: appSetting.autoLaunch,
     systemProxy: systemProxy,
     tunEnable: clashConfig.tunEnable,
@@ -211,7 +212,8 @@ SharedState sharedState(Ref ref) {
   final onlyStatisticsProxy = appSetting.onlyStatisticsProxy;
   final testUrl = appSetting.testUrl;
   final stack = clashConfig.stack;
-  final port = clashConfig.mixedPort;
+  final fact = ref.watch(configStateProvider).fact;
+  final port = fact.isManaged ? fact.mixedPort : clashConfig.mixedPort;
   return SharedState(
     currentProfileName: currentProfileName,
     systemProxyRequested: vpnSetting.systemProxy && !safeMode,

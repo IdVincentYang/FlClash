@@ -62,6 +62,11 @@ class _ConfirmBackup extends BackupAction {
   }
 }
 
+class _AndroidSelection extends PolicySelectionAction {
+  @override
+  bool get supportsManaged => true;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory root;
@@ -88,6 +93,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+        policySelectionActionProvider.overrideWith(_AndroidSelection.new),
         setupActionProvider.overrideWith(() => setup),
         currentProfileIdProvider.overrideWithBuild((_, _) => null),
       ],
@@ -661,6 +667,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          policySelectionActionProvider.overrideWith(_AndroidSelection.new),
           setupActionProvider.overrideWith(() => setup),
           currentProfileIdProvider.overrideWithBuild((_, _) => null),
           policyDraftActionProvider.overrideWith(() => _LateLoad(pending)),
@@ -861,6 +868,44 @@ void main() {
       );
       expect(find.text('Proxy group: DIRECT'), findsWidgets);
       noRuntimeChange();
+    },
+  );
+
+  testWidgets(
+    'real policy selection confirms target, stays stopped, and explicit original mode preserves draft',
+    (tester) async {
+      await seed(completePolicyDraft());
+      await pump(tester);
+      await click(tester, find.byTooltip('More'));
+      await click(tester, find.text('Save and request application'));
+      await click(tester, find.text('Proxy group: a'));
+      await click(tester, find.text('Confirm').last);
+      await settle(tester, 12);
+      final selected = await db.profilePolicySelectionsDao.query(1).getSingle();
+      expect(selected.rawContent, contains('maintenanceProxyTarget'));
+      expect(container.read(currentProfileIdProvider), 1);
+      expect(container.read(initProvider), isFalse);
+      expect(setup.autoApplyCalls, 0);
+      verifyZeroInteractions(core);
+      final before = await stored();
+      await click(tester, find.byTooltip('More'));
+      await click(tester, find.text('Use original profile'));
+      await click(tester, find.text('Cancel').last);
+      expect(
+        await db.profilePolicySelectionsDao.query(1).getSingleOrNull(),
+        isNotNull,
+      );
+      await click(tester, find.byTooltip('More'));
+      await click(tester, find.text('Use original profile'));
+      await click(tester, find.text('Confirm').last);
+      await settle(tester, 12);
+      expect(
+        await db.profilePolicySelectionsDao.query(1).getSingleOrNull(),
+        isNull,
+      );
+      expect(await stored(), before);
+      expect(container.read(currentProfileIdProvider), 1);
+      verifyZeroInteractions(core);
     },
   );
 }

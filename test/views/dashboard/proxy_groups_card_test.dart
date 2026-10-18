@@ -1,3 +1,6 @@
+import 'package:fl_clash/common/common.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../helpers/test_config_state.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -22,12 +25,22 @@ Group _group(String name, List<String> proxies) => Group(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
   late ProviderContainer container;
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container.listen(groupsProvider, (_, _) {});
   });

@@ -24,7 +24,7 @@ class _QuickSwitchCard extends StatelessWidget {
   final String label;
   final Glyph glyph;
   final ProviderListenable<bool> selector;
-  final void Function(WidgetRef ref, bool value) onChanged;
+  final Future<void> Function(WidgetRef ref, bool value) onChanged;
   final WidgetBuilder sheetBuilder;
 
   /// A shrink-wrapped Switch still lays out 4 above and below its track, so
@@ -84,7 +84,9 @@ class _QuickSwitchCard extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       value: value,
-                      onChanged: (value) => onChanged(ref, value),
+                      onChanged: (value) async {
+                        await globalState.safeRun(() => onChanged(ref, value));
+                      },
                     ),
                   ],
                 );
@@ -133,10 +135,10 @@ class TUNButton extends StatelessWidget {
         sections: const [NetworkOptionsSection()],
       ),
       selector: patchClashConfigProvider.select((state) => state.tun.enable),
-      onChanged: (ref, value) {
-        ref
-            .read(patchClashConfigProvider.notifier)
-            .update((state) => state.copyWith.tun(enable: value));
+      onChanged: (ref, value) async {
+        await ref
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch((state) => state.copyWith.tun(enable: value));
       },
     );
   }
@@ -154,10 +156,10 @@ class SystemProxyButton extends StatelessWidget {
       sheetBuilder: (_) =>
           _NetworkSheet(title: label, sections: const [SystemProxySection()]),
       selector: networkSettingProvider.select((state) => state.systemProxy),
-      onChanged: (ref, value) {
-        ref
-            .read(networkSettingProvider.notifier)
-            .update((state) => state.copyWith(systemProxy: value));
+      onChanged: (ref, value) async {
+        await ref
+            .read(applicationInputActionProvider.notifier)
+            .updateNetwork((state) => state.copyWith(systemProxy: value));
       },
     );
   }
@@ -176,10 +178,10 @@ class VpnButton extends StatelessWidget {
         sections: [VpnSections(), NetworkOptionsSection()],
       ),
       selector: vpnSettingProvider.select((state) => state.enable),
-      onChanged: (ref, value) {
-        ref
-            .read(vpnSettingProvider.notifier)
-            .update((state) => state.copyWith(enable: value));
+      onChanged: (ref, value) async {
+        await ref
+            .read(applicationInputActionProvider.notifier)
+            .updateVpn((state) => state.copyWith(enable: value));
       },
     );
   }
@@ -195,8 +197,10 @@ class OverrideDnsButton extends StatelessWidget {
       glyph: AppGlyphs.dns,
       sheetBuilder: (_) => const DnsView(),
       selector: overrideDnsProvider,
-      onChanged: (ref, value) {
-        ref.read(overrideDnsProvider.notifier).value = value;
+      onChanged: (ref, value) async {
+        await ref
+            .read(applicationInputActionProvider.notifier)
+            .setOverrideDns(value);
       },
     );
   }
@@ -212,8 +216,10 @@ class OverrideNtpButton extends StatelessWidget {
       glyph: AppGlyphs.clock,
       sheetBuilder: (_) => const NtpView(),
       selector: overrideNtpProvider,
-      onChanged: (ref, value) {
-        ref.read(overrideNtpProvider.notifier).value = value;
+      onChanged: (ref, value) async {
+        await ref
+            .read(applicationInputActionProvider.notifier)
+            .setOverrideNtp(value);
       },
     );
   }

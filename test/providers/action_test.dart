@@ -6,7 +6,9 @@ import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -14,6 +16,8 @@ import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -21,7 +25,19 @@ import '../helpers/test_profiles.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 
+CoreController _idleCore() {
+  final core = _MockCoreHandlerInterface();
+  when(
+    core.getConfigState,
+  ).thenAnswer((_) async => const ConfigFact(runtimeEpoch: 'fixture'));
+  return CoreController.scoped(core);
+}
+
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await AppLocalizations.load(const Locale('en'));
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late db.Database testDatabase;
   setUp(() {
@@ -90,7 +106,7 @@ void main() {
 
         container.read(currentProfileIdProvider.notifier).value = null;
         await action.putProfile(second);
-        expect(container.read(currentProfileIdProvider), second.id);
+        expect(container.read(currentProfileIdProvider), isNull);
         expect(
           container.read(profilesProvider),
           unorderedEquals([updatedFirst, second]),
@@ -780,6 +796,7 @@ void main() {
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
           overrides: [
+            coreHandlerProvider.overrideWithValue(_idleCore()),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
               return setupAction;
@@ -792,9 +809,9 @@ void main() {
         );
         container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
-        container
-            .read(patchClashConfigProvider.notifier)
-            .update((state) => state.copyWith.tun(enable: true));
+        await container
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch((state) => state.copyWith.tun(enable: true));
         container.read(setupActionProvider);
         container.read(coreActionProvider);
 
@@ -816,6 +833,7 @@ void main() {
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
           overrides: [
+            coreHandlerProvider.overrideWithValue(_idleCore()),
             currentProfileProvider.overrideWithValue(null),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
@@ -829,9 +847,9 @@ void main() {
         );
         container.listen(configProvider, (_, _) {});
         addTearDown(container.dispose);
-        container
-            .read(patchClashConfigProvider.notifier)
-            .update((state) => state.copyWith.tun(enable: true));
+        await container
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch((state) => state.copyWith.tun(enable: true));
         container.read(setupActionProvider);
         container.read(coreActionProvider);
 
@@ -846,6 +864,7 @@ void main() {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
+          coreHandlerProvider.overrideWithValue(_idleCore()),
           currentProfileProvider.overrideWithValue(null),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
@@ -856,9 +875,9 @@ void main() {
       );
       container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
-      container
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith.tun(enable: true));
+      await container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith.tun(enable: true));
       container.read(setupActionProvider);
       container.read(coreActionProvider);
 
@@ -877,6 +896,7 @@ void main() {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
+          coreHandlerProvider.overrideWithValue(_idleCore()),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([
               AuthorizeCode.error,
@@ -908,6 +928,7 @@ void main() {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
+          coreHandlerProvider.overrideWithValue(_idleCore()),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([AuthorizeCode.error]);
             return setupAction;
@@ -916,9 +937,9 @@ void main() {
       );
       container.listen(configProvider, (_, _) {});
       addTearDown(container.dispose);
-      container
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith.tun(enable: true));
+      await container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith.tun(enable: true));
       container.read(setupActionProvider);
 
       await setupAction.requestAdmin(true);

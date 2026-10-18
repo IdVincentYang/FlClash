@@ -40,6 +40,7 @@ enum CoreMethod {
   crash,
   setupConfig,
   registerConfigInput,
+  failConfigBuild,
   prepareConfig,
   installConfig,
   activateConfig,

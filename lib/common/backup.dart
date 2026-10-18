@@ -109,7 +109,8 @@ Database _openBackupDatabase(File file) {
 Future<bool> backupSnapshotHasPolicyDrafts(String path) async {
   final snapshot = _openBackupDatabase(File(path));
   try {
-    return await snapshot.profilePolicyDraftsDao.hasAny();
+    return await snapshot.profilePolicyDraftsDao.hasAny() ||
+        await snapshot.profilePolicySelectionsDao.hasSensitiveContent();
   } finally {
     await snapshot.close();
   }
@@ -198,10 +199,18 @@ Future<MigrationData> readBackupArchive({
           .map((item) => item.toCustomProxy())
           .get(),
       database.profilePolicyDraftsDao.query().get(),
+      database.profilePolicySelectionsDao.query().get(),
     ]);
     final drafts = results[7].cast<ProfilePolicyDraft>();
+    final selections = results[8].cast<ProfilePolicySelection>();
     if (!validPolicyDraftRelations(
       drafts,
+      results[0].cast<Profile>().map((p) => p.id),
+    )) {
+      throw const BackupException(BackupFailure.invalid);
+    }
+    if (!validPolicySelectionRelations(
+      selections,
       results[0].cast<Profile>().map((p) => p.id),
     )) {
       throw const BackupException(BackupFailure.invalid);
@@ -216,6 +225,7 @@ Future<MigrationData> readBackupArchive({
       clashProviders: results[5].cast<ClashProvider>(),
       customProxies: results[6].cast<CustomProxy>(),
       policyDrafts: drafts,
+      policySelections: selections,
     );
   } finally {
     await database.close();

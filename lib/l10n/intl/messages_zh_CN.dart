@@ -765,6 +765,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "请上传有效的二维码",
     ),
+    "policyActualPreview": MessageLookupByLibrary.simpleMessage("实际接受配置"),
+    "policyAndroidRequired": MessageLookupByLibrary.simpleMessage(
+      "目前仅 Android 支持应用受管策略；仍可编辑草稿和预览。",
+    ),
+    "policyApply": MessageLookupByLibrary.simpleMessage("保存并请求应用"),
+    "policyApplyConfirm": MessageLookupByLibrary.simpleMessage(
+      "使用本策略处理分流和 DNS，包括明确选择的 DIRECT。原规则、DNS、provider 和特殊覆写不参与；已有受管节点选择将重置。此操作不会启动已停止的代理。",
+    ),
+    "policyApplyRequested": MessageLookupByLibrary.simpleMessage(
+      "已保存选择并请求应用，请查看实际配置状态。",
+    ),
     "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
       "使用用户名和密码",
     ),
@@ -879,6 +890,36 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyDraftUnsaved": MessageLookupByLibrary.simpleMessage("未保存草稿，尚未应用"),
     "policyDraftUnset": MessageLookupByLibrary.simpleMessage("未配置"),
     "policyDraftUsername": MessageLookupByLibrary.simpleMessage("用户名"),
+    "policyFinalPreview": MessageLookupByLibrary.simpleMessage("最终生成配置"),
+    "policyMaintenanceNone": MessageLookupByLibrary.simpleMessage(
+      "不设置维护代理默认目标",
+    ),
+    "policyMaintenanceRequired": MessageLookupByLibrary.simpleMessage(
+      "请选择并应用维护代理组或节点，或为本次请求明确选择 Auto／Direct。旧目标可能已不存在。",
+    ),
+    "policyMaintenanceTarget": MessageLookupByLibrary.simpleMessage("维护请求代理目标"),
+    "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
+      "此 Profile 使用受管策略。请在策略草稿中修改分流和 DNS，再明确请求应用。",
+    ),
+    "policyOriginal": MessageLookupByLibrary.simpleMessage("改用原 Profile"),
+    "policyOriginalConfirm": MessageLookupByLibrary.simpleMessage(
+      "退出受管分流，改用原 Profile 的规则、DNS 和覆写？这可能改变流量出口。",
+    ),
+    "policyOriginalStatus": MessageLookupByLibrary.simpleMessage(
+      "已选择原 Profile",
+    ),
+    "policySelectedStatus": MessageLookupByLibrary.simpleMessage(
+      "已选择策略；实际接受结果单独显示",
+    ),
+    "policySelectionPending": MessageLookupByLibrary.simpleMessage(
+      "已选策略与实际接受的配置不同。",
+    ),
+    "policySelectionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "需要受管策略，但当前选择不可用，请选择有效策略。",
+    ),
+    "policyUnappliedEdits": MessageLookupByLibrary.simpleMessage(
+      "草稿与已选策略不同，编辑尚未应用",
+    ),
     "port": MessageLookupByLibrary.simpleMessage("端口"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage("请输入不同的端口"),
     "portTip": m44,

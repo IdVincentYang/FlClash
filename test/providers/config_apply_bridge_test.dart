@@ -77,6 +77,10 @@ class _BridgeSetup extends SetupAction {
   Future<({String yaml, String md5})> getProfile({
     required SetupState setupState,
     required PatchClashConfig patchConfig,
+    NetworkProps? network,
+    bool? dnsOverride,
+    bool? ntpOverride,
+    bool? safeMode,
   }) async {
     final gate = buildGate;
     buildGate = null;

@@ -860,6 +860,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "有効なQRコードをアップロードしてください",
     ),
+    "policyActualPreview": MessageLookupByLibrary.simpleMessage("実際に受理された構成"),
+    "policyAndroidRequired": MessageLookupByLibrary.simpleMessage(
+      "管理ポリシーの適用は現在 Android のみ対応しています。下書きの編集とプレビューは引き続き利用できます。",
+    ),
+    "policyApply": MessageLookupByLibrary.simpleMessage("保存して適用を要求"),
+    "policyApplyConfirm": MessageLookupByLibrary.simpleMessage(
+      "明示的な DIRECT を含め、このポリシーでルーティングと DNS を処理します。元のルール、DNS、プロバイダー、特殊な上書きは使用しません。管理対象のノード選択はリセットされます。停止中のプロキシは起動しません。",
+    ),
+    "policyApplyRequested": MessageLookupByLibrary.simpleMessage(
+      "選択を保存して適用を要求しました。実際の構成状態を確認してください。",
+    ),
     "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
       "ユーザー名とパスワードを使用",
     ),
@@ -982,6 +993,38 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyDraftUnsaved": MessageLookupByLibrary.simpleMessage("未保存の下書き。未適用です"),
     "policyDraftUnset": MessageLookupByLibrary.simpleMessage("未設定"),
     "policyDraftUsername": MessageLookupByLibrary.simpleMessage("ユーザー名"),
+    "policyFinalPreview": MessageLookupByLibrary.simpleMessage("生成された最終構成"),
+    "policyMaintenanceNone": MessageLookupByLibrary.simpleMessage(
+      "既定のプロキシを設定しない",
+    ),
+    "policyMaintenanceRequired": MessageLookupByLibrary.simpleMessage(
+      "メンテナンス用のグループかノードを選択して適用するか、この要求に Auto または Direct を明示的に選択してください。以前の対象は存在しない可能性があります。",
+    ),
+    "policyMaintenanceTarget": MessageLookupByLibrary.simpleMessage(
+      "メンテナンス通信のプロキシ",
+    ),
+    "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
+      "このプロファイルは管理対象ポリシーを使用します。下書きでルーティングと DNS を編集し、適用を要求してください。",
+    ),
+    "policyOriginal": MessageLookupByLibrary.simpleMessage("元のプロファイルを使用"),
+    "policyOriginalConfirm": MessageLookupByLibrary.simpleMessage(
+      "管理対象のルーティングを終了し、元のルール、DNS、上書きを使用しますか？通信経路が変わる可能性があります。",
+    ),
+    "policyOriginalStatus": MessageLookupByLibrary.simpleMessage(
+      "元のプロファイルを選択済み",
+    ),
+    "policySelectedStatus": MessageLookupByLibrary.simpleMessage(
+      "ポリシーを選択済み。実際の受理状態は別に表示します",
+    ),
+    "policySelectionPending": MessageLookupByLibrary.simpleMessage(
+      "選択済みポリシーは実際に受理された構成と異なります。",
+    ),
+    "policySelectionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "管理対象ポリシーが必要ですが利用できません。有効なポリシーを選択してください。",
+    ),
+    "policyUnappliedEdits": MessageLookupByLibrary.simpleMessage(
+      "下書きは選択済みポリシーと異なり、変更は未適用です",
+    ),
     "port": MessageLookupByLibrary.simpleMessage("ポート"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage("別のポートを入力してください"),
     "portTip": m44,

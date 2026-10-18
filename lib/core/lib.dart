@@ -130,6 +130,13 @@ class CoreLib extends CoreHandlerInterface {
   }
 
   @override
+  Future<ConfigApplyResult> failConfigBuild(Map<String, Object?> input) async {
+    final native = _service;
+    if (native == null) throw StateError('Android service unavailable');
+    return ConfigApplyResult.fromJson(await native.failConfigBuild(input));
+  }
+
+  @override
   Future<bool> stopListener() async {
     final requestId = RunRequestScope.current;
     final serviceStopped = requestId == null

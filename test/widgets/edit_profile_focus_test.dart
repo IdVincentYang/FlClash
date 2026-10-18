@@ -1,3 +1,4 @@
+import '../helpers/test_config_state.dart';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
@@ -89,6 +90,7 @@ Future<FocusNode> pumpEditProfile(
 
   final container = ProviderContainer(
     overrides: [
+      configStateProvider.overrideWith(TestConfigState.new),
       setupActionProvider.overrideWith(() => _NoopSetupAction()),
       ...overrides,
     ],

@@ -61,14 +61,9 @@ class ProfilesAction extends _$ProfilesAction {
     });
     final currentProfileId = ref.read(currentProfileIdProvider);
     if (currentProfileId == id) {
-      final profiles = ref.read(profilesProvider);
-      if (profiles.isNotEmpty) {
-        final updateId = profiles.first.id;
-        ref.read(currentProfileIdProvider.notifier).value = updateId;
-      } else {
-        ref.read(currentProfileIdProvider.notifier).value = null;
-        unawaited(ref.read(setupActionProvider.notifier).setRunning(false));
-      }
+      ref.read(currentProfileIdProvider.notifier).value = null;
+      await ref.read(setupActionProvider.notifier).setRunning(false);
+      return;
     }
     ref.read(setupActionProvider.notifier).applyProfileDebounce(force: true);
   }
@@ -122,9 +117,6 @@ class ProfilesAction extends _$ProfilesAction {
         );
       }
     });
-    if (ref.read(currentProfileIdProvider) == null) {
-      ref.read(currentProfileIdProvider.notifier).value = profile.id;
-    }
   }
 
   Future<List<Profile>> providerUsers(Profile profile) async {
@@ -269,9 +261,6 @@ class ProfilesAction extends _$ProfilesAction {
         );
         await requestClient.invalidate('profile:${profile.id}');
       });
-      if (ref.read(currentProfileIdProvider) == null) {
-        ref.read(currentProfileIdProvider.notifier).value = profile.id;
-      }
       final completed = session;
       Future<bool> current() async =>
           profile.id == ref.read(currentProfileIdProvider) &&
@@ -331,9 +320,6 @@ class ProfilesAction extends _$ProfilesAction {
               ),
         );
       });
-      if (ref.read(currentProfileIdProvider) == null) {
-        ref.read(currentProfileIdProvider.notifier).value = profile.id;
-      }
     } finally {
       await staged.close();
     }

@@ -20,9 +20,16 @@ class RequestUnavailable implements Exception {
   const RequestUnavailable(this.code);
   final String code;
   @override
-  String toString() => code == 'request_partial_commit'
-      ? currentAppLocalizations.requestPartialCommit
-      : currentAppLocalizations.requestRouteUnavailable;
+  String toString() => switch (code) {
+    'request_partial_commit' => currentAppLocalizations.requestPartialCommit,
+    'managed_maintenance_target_required' =>
+      currentAppLocalizations.policyMaintenanceRequired,
+    'managed_policy_edit_required' =>
+      currentAppLocalizations.policyManagedEditRequired,
+    'managed_policy_android_required' =>
+      currentAppLocalizations.policyAndroidRequired,
+    _ => currentAppLocalizations.requestRouteUnavailable,
+  };
 }
 
 class _SessionHttpOverrides extends HttpOverrides {}
@@ -166,6 +173,14 @@ class RequestSession {
   }
 }
 
+class _LocalReceipt {
+  _LocalReceipt(this.owner, this.id);
+  final Request owner;
+  final String? id;
+  bool active = true;
+  bool applicationInputsInvalidated = false;
+}
+
 class Request with ServiceListener {
   Request() : _native = null, _android = null;
   Request.scoped({required Service native, required bool isAndroid})
@@ -190,6 +205,26 @@ class Request with ServiceListener {
   bool partialCommit = false;
   static final Object _receiptKey = Object();
 
+  _LocalReceipt? get _receipt {
+    final receipt = Zone.current[_receiptKey];
+    return receipt is _LocalReceipt &&
+            identical(receipt.owner, this) &&
+            receipt.active
+        ? receipt
+        : null;
+  }
+
+  bool get applicationInputsInvalidated =>
+      _receipt?.applicationInputsInvalidated == true;
+
+  bool get hasNativeClient => _isAndroid && _client != null;
+
+  Future<Map<String, Object?>?> captureNativeRunState() async {
+    await _attachment;
+    if (!hasNativeClient) return null;
+    return Map.unmodifiable(await _service!.getRequestState());
+  }
+
   Future<T> _runReceipt<T>(String? id, Future<T> Function() action) async {
     final marker = _isAndroid && id != null
         ? File('${await appPath.homeDirPath}/request-recovery-required')
@@ -203,9 +238,11 @@ class Request with ServiceListener {
         await staged.safeDelete();
       }
     }
+    final receipt = _LocalReceipt(this, id);
     try {
-      return await runZoned(action, zoneValues: {_receiptKey: id});
+      return await runZoned(action, zoneValues: {_receiptKey: receipt});
     } finally {
+      receipt.active = false;
       if (!partialCommit) await marker?.safeDelete();
     }
   }
@@ -326,7 +363,7 @@ class Request with ServiceListener {
 
   Future<T> localCommit<T>(Future<T> Function() action) async {
     await _attachment;
-    if (!_isAndroid || _client == null) return action();
+    if (!_isAndroid || _client == null) return _runReceipt(null, action);
     final result = await _commitControl({'action': 'lock', 'client': _client});
     try {
       return await _runReceipt(result['id'] as String, action);
@@ -355,8 +392,7 @@ class Request with ServiceListener {
       }
     }
     await _attachment;
-    if (!_isAndroid || _client == null) return;
-    if (key == 'dav') {
+    if (_isAndroid && _client != null && key == 'dav') {
       for (final target in ['dav:ping', 'dav:backup', 'dav:restore']) {
         await _control({
           'action': 'invalidate',
@@ -364,30 +400,37 @@ class Request with ServiceListener {
           'key': target,
         });
       }
-    } else {
+    } else if (_isAndroid && _client != null) {
       await _control({'action': 'invalidate', 'client': _client, 'key': key});
+    }
+    if (key == 'application-config') {
+      _receipt?.applicationInputsInvalidated = true;
     }
   }
 
   Future<void> invalidateDataset({String? committingId}) async {
     _datasetRevision++;
-    committingId ??= Zone.current[_receiptKey] as String?;
+    committingId ??= _receipt?.id;
     for (final session in List.of(_sessions)) {
       session.close();
     }
     await _attachment;
-    if (!_isAndroid || _client == null) return;
-    await _control({'action': 'invalidateDataset', 'client': _client});
-    for (var attempt = 0; ; attempt++) {
-      final result = await _control({
-        'action': 'inspect',
-        'client': _client,
-        'id': committingId,
-      });
-      if (result['commits'] == 0) return;
-      if (attempt >= 200) throw const RequestUnavailable('request_commit_busy');
-      await Future<void>.delayed(const Duration(milliseconds: 25));
+    if (_isAndroid && _client != null) {
+      await _control({'action': 'invalidateDataset', 'client': _client});
+      for (var attempt = 0; ; attempt++) {
+        final result = await _control({
+          'action': 'inspect',
+          'client': _client,
+          'id': committingId,
+        });
+        if (result['commits'] == 0) break;
+        if (attempt >= 200) {
+          throw const RequestUnavailable('request_commit_busy');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
     }
+    _receipt?.applicationInputsInvalidated = true;
   }
 
   Future<void> detach() async {
@@ -518,12 +561,21 @@ class Request with ServiceListener {
         state['phase'] == 'started' &&
         state['paused'] != true &&
         snapshot['phase'] == 'ready';
+    final managed = (snapshot['policyVersion'] as num? ?? 0) != 0;
+    final defaultProxy = snapshot['maintenanceProxy'] as String? ?? '';
+    if (mode == RequestMode.proxy &&
+        managed &&
+        (proxy == null || proxy.isEmpty || proxy == 'GLOBAL') &&
+        defaultProxy.isEmpty) {
+      throw const RequestUnavailable('managed_maintenance_target_required');
+    }
     String target;
     String kind = 'maintenance';
     String? permit;
     if (explicitTarget != null) {
       target = explicitTarget;
-    } else if ((allowBootstrap ||
+    } else if (!(managed && mode == RequestMode.proxy) &&
+        (allowBootstrap ||
             bootstrapIfUnconfigured && snapshot['hasProxy'] == false) &&
         !running &&
         !automatic) {
@@ -555,7 +607,9 @@ class Request with ServiceListener {
     } else if (mode == RequestMode.direct) {
       target = 'DIRECT';
     } else if (mode == RequestMode.proxy) {
-      target = proxy == null || proxy.isEmpty ? 'GLOBAL' : proxy;
+      target = proxy == null || proxy.isEmpty || proxy == 'GLOBAL'
+          ? (managed ? defaultProxy : 'GLOBAL')
+          : proxy;
     } else if (running) {
       target = '';
     } else if (maintenance && !automatic) {

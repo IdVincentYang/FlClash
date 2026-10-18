@@ -1,3 +1,7 @@
+import '../helpers/commit_tap.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fl_clash/providers/config_state.dart';
+import '../helpers/test_config_state.dart';
 import 'dart:ui' show Tristate;
 
 import 'package:fl_clash/common/common.dart';
@@ -18,6 +22,12 @@ import '../helpers/test_profiles.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
+  TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
 
@@ -28,9 +38,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
     addTearDown(container.dispose);
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container
         .read(viewSizeProvider.notifier)
@@ -47,17 +61,19 @@ void main() {
 
   PatchClashConfig config() => container.read(patchClashConfigProvider);
 
-  void setKeys(Set<NtpOverrideKey> keys) {
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(ntpOverrideKeys: keys));
+  Future<void> setKeys(WidgetTester tester, Set<NtpOverrideKey> keys) async {
+    await tester.runAsync(
+      () => container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith(ntpOverrideKeys: keys)),
+    );
   }
 
   String emptyLabel() =>
       currentAppLocalizations.nullTip(currentAppLocalizations.overrideEntries);
 
   Future<void> openMenu(WidgetTester tester) async {
-    await tester.tap(find.byTooltip(currentAppLocalizations.more));
+    await tapAndCommit(tester, find.byTooltip(currentAppLocalizations.more));
     await tester.pumpAndSettle();
   }
 
@@ -72,11 +88,11 @@ void main() {
     await pumpView(tester);
 
     await openMenu(tester);
-    await tester.tap(find.text(currentAppLocalizations.add));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.add));
     await tester.pumpAndSettle();
     expect(find.text(currentAppLocalizations.addOverrideEntry), findsOneWidget);
 
-    await tester.tap(find.text(currentAppLocalizations.server));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.server));
     await tester.pumpAndSettle();
 
     expect(config().ntpOverrideKeys, {NtpOverrideKey.server});
@@ -88,15 +104,15 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({NtpOverrideKey.enable});
+    await setKeys(tester, {NtpOverrideKey.enable});
     await tester.pump();
 
     expect(find.text(currentAppLocalizations.status), findsOneWidget);
-    await tester.tap(find.byType(Switch).last);
+    await tapAndCommit(tester, find.byType(Switch).last);
     await tester.pump();
     expect(config().ntp.enable, isTrue);
 
-    await tester.tap(find.byTooltip(currentAppLocalizations.remove));
+    await tapAndCommit(tester, find.byTooltip(currentAppLocalizations.remove));
     await tester.pumpAndSettle();
     expect(config().ntpOverrideKeys, isEmpty);
     expect(find.text(emptyLabel()), findsOneWidget);
@@ -104,13 +120,13 @@ void main() {
 
   testWidgets('a number entry writes the integer it is given', (tester) async {
     await pumpView(tester);
-    setKeys({NtpOverrideKey.interval});
+    await setKeys(tester, {NtpOverrideKey.interval});
     await tester.pump();
 
-    await tester.tap(find.text(currentAppLocalizations.ntpInterval));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.ntpInterval));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '120');
-    await tester.tap(find.text(currentAppLocalizations.submit));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.submit));
     await tester.pumpAndSettle();
 
     expect(config().ntp.interval, 120);
@@ -121,7 +137,7 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys(NtpOverrideKey.values.toSet());
+    await setKeys(tester, NtpOverrideKey.values.toSet());
     await tester.pump();
 
     await openMenu(tester);
@@ -137,14 +153,14 @@ void main() {
     await pumpView(tester);
 
     expect(container.read(overrideNtpProvider), isFalse);
-    await tester.tap(find.text(currentAppLocalizations.overrideNtp));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.overrideNtp));
     await tester.pump();
     expect(container.read(overrideNtpProvider), isTrue);
   });
 
   Future<EditorPage> openQuickEdit(WidgetTester tester) async {
     await openMenu(tester);
-    await tester.tap(find.text(currentAppLocalizations.quickEdit));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.quickEdit));
     await tester.pumpAndSettle();
     return tester.widget<EditorPage>(find.byType(EditorPage));
   }
@@ -153,7 +169,7 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys({NtpOverrideKey.enable});
+    await setKeys(tester, {NtpOverrideKey.enable});
     await tester.pump();
 
     final editor = await openQuickEdit(tester);
@@ -161,7 +177,9 @@ void main() {
     expect(editor.readOnly, isFalse);
 
     final context = tester.element(find.byType(EditorPage));
-    final popped = await editor.onPop!(context, 'NTP', 'port: 1230');
+    final popped = await tester.runAsync(
+      () => editor.onPop!(context, 'NTP', 'port: 1230'),
+    );
     expect(popped, isTrue);
     expect(config().ntpOverrideKeys, {NtpOverrideKey.port});
     expect(config().ntp.port, 1230);
@@ -180,7 +198,7 @@ void main() {
       find.textContaining(currentAppLocalizations.discardChanges),
       findsOneWidget,
     );
-    await tester.tap(find.text(currentAppLocalizations.cancel));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.cancel));
     await tester.pump();
     expect(await popped, isFalse);
     expect(config().ntpOverrideKeys, isEmpty);

@@ -12,6 +12,7 @@ import 'package:fl_clash/views/access.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/glyph_finders.dart';
 import '../helpers/test_app.dart';
@@ -84,23 +85,37 @@ void main() {
   late ProviderContainer container;
   late _TestSystemAction systemAction;
 
-  setUp(() {
-    systemAction = _TestSystemAction();
+  setUpAll(() => SharedPreferences.setMockInitialValues({}));
+
+  void createContainer([AccessControlProps? accessControl]) {
     container = ProviderContainer(
       overrides: [
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(() => systemAction),
+        vpnSettingProvider.overrideWithBuild(
+          (_, _) => VpnProps(
+            accessControlProps: accessControl ?? defaultAccessControlProps,
+          ),
+        ),
       ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container.read(packagesProvider.notifier).value = _packages;
+  }
+
+  setUp(() {
+    systemAction = _TestSystemAction();
+    createContainer();
   });
 
   tearDown(() => container.dispose());
 
   void seedAccessControl(AccessControlProps props) {
-    container.read(vpnSettingProvider.notifier).value = const VpnProps()
-        .copyWith(accessControlProps: props);
+    final packages = container.read(packagesProvider);
+    container.dispose();
+    createContainer(props);
+    container.read(packagesProvider.notifier).value = packages;
   }
 
   Future<void> pumpAccessView(WidgetTester tester) async {

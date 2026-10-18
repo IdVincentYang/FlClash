@@ -38,11 +38,7 @@ Profile _selectedProfile(String proxyName) => Profile(
 final _delayKey = delayTestKey(_testUrl, 'HK-01');
 
 ProviderContainer _delayContainer(ProviderContainer Function() build) {
-  final container = build();
-  container.read(appSettingProvider.notifier).value = const AppSettingProps(
-    testUrl: _testUrl,
-  );
-  return container;
+  return build();
 }
 
 ExternalProvider _provider(String name, {int count = 1}) => ExternalProvider(
@@ -71,6 +67,9 @@ void main() {
   ProviderContainer buildContainer({Profile? profile}) {
     final container = ProviderContainer(
       overrides: [
+        appSettingProvider.overrideWithBuild(
+          (_, _) => const AppSettingProps(testUrl: _testUrl),
+        ),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesProvider.overrideWith(() => TestProfiles([?profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile?.id),
@@ -202,9 +201,9 @@ void main() {
 
     test('closes connections when enabled', () async {
       final container = runningContainer();
-      container.read(appSettingProvider.notifier).value = const AppSettingProps(
-        closeConnections: true,
-      );
+      container
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(closeConnections: true));
 
       await actionOf(
         container,
@@ -221,9 +220,9 @@ void main() {
 
     test('resets connections instead when the setting is off', () async {
       final container = buildContainer();
-      container.read(appSettingProvider.notifier).value = const AppSettingProps(
-        closeConnections: false,
-      );
+      container
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(closeConnections: false));
 
       await actionOf(
         container,
@@ -241,9 +240,9 @@ void main() {
         ),
       );
       final container = buildContainer(profile: _selectedProfile('HK-00'));
-      container.read(appSettingProvider.notifier).value = const AppSettingProps(
-        closeConnections: true,
-      );
+      container
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(closeConnections: true));
 
       await actionOf(
         container,
@@ -484,6 +483,7 @@ void main() {
         expect(phaseOf(maxConcurrentDelayTests - 1), DelayTestPhase.running);
         expect(phaseOf(maxConcurrentDelayTests), DelayTestPhase.queued);
 
+        await Future<void>.delayed(Duration.zero);
         answers['HK-0']!.complete(null);
         await Future<void>.delayed(renderThrottleDuration * 2);
 

@@ -7,6 +7,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/managed_policy.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,8 +24,8 @@ ProviderListenable<T> _ntpSelector<T>(T Function(Ntp ntp) select) {
 
 ConfigWriter<T> _ntpWriter<T>(_NtpUpdate<T> update) {
   return (ref, value) => ref
-      .read(patchClashConfigProvider.notifier)
-      .update((state) => update(state, value));
+      .read(applicationInputActionProvider.notifier)
+      .updatePatch((state) => update(state, value));
 }
 
 extension on NtpOverrideKey {
@@ -75,9 +76,9 @@ class NtpView extends ConsumerWidget {
     if (key == null || !context.mounted) {
       return;
     }
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update(
+    await ref
+        .read(applicationInputActionProvider.notifier)
+        .updatePatch(
           (state) =>
               state.copyWith(ntpOverrideKeys: {...state.ntpOverrideKeys, key}),
         );
@@ -111,9 +112,9 @@ class NtpView extends ConsumerWidget {
           .read(patchClashConfigProvider)
           .ntp
           .applyOverrideYaml(content);
-      ref
-          .read(patchClashConfigProvider.notifier)
-          .update(
+      await ref
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch(
             (state) =>
                 state.copyWith(ntp: result.ntp, ntpOverrideKeys: result.keys),
           );
@@ -132,6 +133,8 @@ class NtpView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gate = managedPolicySettingsGate(context, ref);
+    if (gate != null) return gate;
     final appLocalizations = context.appLocalizations;
     final canAdd = ref.watch(
       _ntpOverrideKeysSelector.select(
@@ -179,8 +182,9 @@ class _OverrideList extends ConsumerWidget {
                   ConfigToggleItem(
                     title: (l) => l.overrideNtp,
                     selector: overrideNtpProvider,
-                    onChanged: (ref, value) =>
-                        ref.read(overrideNtpProvider.notifier).value = value,
+                    onChanged: (ref, value) => ref
+                        .read(applicationInputActionProvider.notifier)
+                        .setOverrideNtp(value),
                   ),
                 ],
               ),
@@ -314,8 +318,8 @@ class _RemoveButton extends ConsumerWidget {
         child: IconButton.filledTonal(
           tooltip: context.appLocalizations.remove,
           onPressed: () => ref
-              .read(patchClashConfigProvider.notifier)
-              .update(
+              .read(applicationInputActionProvider.notifier)
+              .updatePatch(
                 (state) => state.copyWith(
                   ntpOverrideKeys: {...state.ntpOverrideKeys}
                     ..remove(overrideKey),

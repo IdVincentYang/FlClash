@@ -1,3 +1,5 @@
+import 'package:fl_clash/providers/config_state.dart';
+import '../helpers/test_config_state.dart';
 import 'package:fl_clash/features/overwrite/overwrite.dart';
 import 'package:fl_clash/common/feature.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -76,6 +78,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          configStateProvider.overrideWith(TestConfigState.new),
           profilesProvider.overrideWith(TestProfiles.new),
           scriptsProvider.overrideWith(TestScripts.new),
           globalRulesProvider.overrideWith(TestGlobalRules.new),
@@ -124,7 +127,10 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       final container = ProviderContainer(
-        overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+        overrides: [
+          configStateProvider.overrideWith(TestConfigState.new),
+          profilesProvider.overrideWith(TestProfiles.new),
+        ],
       );
       addTearDown(container.dispose);
       globalState.container = container;
@@ -163,7 +169,10 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
     addTearDown(container.dispose);
     globalState.container = container;
@@ -205,7 +214,10 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
     addTearDown(container.dispose);
     globalState.container = container;
@@ -268,6 +280,7 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
         currentGroupsStateProvider.overrideWithValue(
@@ -357,6 +370,7 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
         profileCustomRulesProvider.overrideWith2(

@@ -12,6 +12,83 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConfigApplyStateMachineTest {
+    @Test
+    fun `conditional build failure retires only its own service and keeps retained input`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine()
+        assertTrue(machine.requestStart().await())
+        val failure = JsonParser.parseString("""{"expected":${com.google.gson.Gson().toJson(host.lastConfigFact)}}""").asJsonObject
+        assertEquals("retained",machine.failConfigBuild(failure).status)
+        assertEquals(0,host.stopCalls)
+        host.buildFailureStatus = "blocked"
+        assertEquals("blocked",machine.failConfigBuild(failure).status)
+        assertEquals(1,host.stopCalls)
+        assertEquals("failed",machine.getRequestState().phase)
+    }
+
+    @Test
+    fun `late conditional failure cannot stop a newly applied service`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine()
+        assertTrue(machine.requestStart().await())
+        val failure = JsonParser.parseString("""{"expected":${com.google.gson.Gson().toJson(host.lastConfigFact)}}""").asJsonObject
+        host.buildFailureGate = CompletableDeferred()
+        host.buildFailureStatus = "blocked"
+        val pending = async { machine.failConfigBuild(failure) }
+        host.buildFailureEntered.await()
+        val next = machine.prepareRunIntent(true)
+        assertEquals("activated",machine.applyConfig(input(next)).await().status)
+        val stops = host.stopCalls
+        host.buildFailureGate!!.complete(Unit)
+        assertEquals("superseded",pending.await().status)
+        assertEquals(stops,host.stopCalls)
+        assertEquals("started",machine.getRequestState().phase)
+    }
+    @Test
+    fun `observed failure cannot adopt an intent that arrived before its call`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine()
+        assertTrue(machine.requestStart().await())
+        val failure = com.google.gson.JsonObject().apply {
+            add("expected", com.google.gson.Gson().toJsonTree(host.lastConfigFact))
+            add("expectedRun", com.google.gson.Gson().toJsonTree(machine.getRequestState()))
+            addProperty("registeredToken", machine.configOperationToken())
+        }
+        host.buildFailureStatus = "blocked"
+        val next = machine.prepareRunIntent(true)
+        val stops = host.stopCalls
+        assertEquals("superseded", machine.failConfigBuild(failure).status)
+        assertFalse(host.buildFailureEntered.isCompleted)
+        assertEquals(stops, host.stopCalls)
+        assertEquals(next, machine.getRequestState().intentRevision)
+        assertEquals("activated", machine.applyConfig(input(next)).await().status)
+    }
+
+    @Test
+    fun `observed failure cannot adopt a newer registered token before its call`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine()
+        assertTrue(machine.requestStart().await())
+        val failure = com.google.gson.JsonObject().apply {
+            add("expected", com.google.gson.Gson().toJsonTree(host.lastConfigFact))
+            add("expectedRun", com.google.gson.Gson().toJsonTree(machine.getRequestState()))
+            addProperty("registeredToken", machine.configOperationToken())
+        }
+        host.buildFailureStatus = "blocked"
+        host.heldPhase = "prepareConfig"
+        host.phaseGate = CompletableDeferred()
+        host.phaseEntered = CompletableDeferred()
+        val pending = machine.applyConfig(input(machine.getRequestState().intentRevision))
+        host.phaseEntered!!.await()
+        val stops = host.stopCalls
+        assertEquals("superseded", machine.failConfigBuild(failure).status)
+        assertFalse(host.buildFailureEntered.isCompleted)
+        assertEquals(stops, host.stopCalls)
+        host.heldPhase = null
+        host.phaseGate!!.complete(Unit)
+        assertEquals("activated", pending.await().status)
+    }
+
     private fun input(requestId: Long) = JsonParser.parseString(
         """{"inputId":"${"a".repeat(64)}","requestId":$requestId}""",
     ).asJsonObject

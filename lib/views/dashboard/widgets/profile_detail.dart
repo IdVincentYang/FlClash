@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
@@ -146,6 +147,20 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
     final appLocalizations = context.appLocalizations;
     final observation = ref.watch(configStateProvider);
     final applied = observation.fact;
+    final selection = ref.watch(policySelectionProvider(profile.id)).value;
+    String selectedPolicyStatus() {
+      if (selection == null) return appLocalizations.policyOriginalStatus;
+      try {
+        final selected = SelectedPolicy.decode(selection.rawContent);
+        return selected.digest == applied.policySha256 &&
+                applied.profileId == profile.id
+            ? appLocalizations.policySelectedStatus
+            : appLocalizations.policySelectionPending;
+      } catch (_) {
+        return appLocalizations.policySelectionUnavailable;
+      }
+    }
+
     final active =
         applied.businessActive &&
         (!system.isAndroid ||
@@ -164,6 +179,14 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
     return CommonScaffold(
       title: profile.realLabel,
       iconActions: [
+        IconButtonData(
+          glyph: AppGlyphs.eye,
+          tooltip: appLocalizations.policyActualPreview,
+          onPressed: () => BaseNavigator.push<String>(
+            context,
+            PreviewProfileView(profile: profile, actual: true),
+          ),
+        ),
         if (profile.type == ProfileType.url)
           IconButtonData(
             glyph: AppGlyphs.sync,
@@ -207,9 +230,13 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
                 label: appLocalizations.selected,
                 value: Text(profile.realLabel),
               ),
-              _InfoRow(
-                label: appLocalizations.appliedProfile,
-                value: Text(active ? applied.profileName : status),
+              ListItem(
+                title: Text(appLocalizations.policyDraftTitle),
+                subtitle: Text(selectedPolicyStatus()),
+              ),
+              ListItem(
+                title: Text(appLocalizations.appliedProfile),
+                subtitle: Text(active ? applied.profileName : status),
               ),
               if (observation.buildFailed ||
                   applied.profileId != profile.id ||

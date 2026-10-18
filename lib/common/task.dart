@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
@@ -307,7 +308,11 @@ Future<({String yaml, String md5})> _makeRealProfileTask(
         .toList();
   }
   rawConfig['rules'] = rules;
-  final yaml = await _encodeYaml(Map<String, dynamic>.from(rawConfig));
+  final yaml = await _encodeYaml(
+    data.policySelection == null
+        ? Map<String, dynamic>.from(rawConfig)
+        : managedFinalProfile(data),
+  );
   return (yaml: yaml, md5: yaml.toMd5());
 }
 

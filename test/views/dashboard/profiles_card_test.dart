@@ -1,8 +1,13 @@
+import '../../helpers/commit_tap.dart';
+import 'package:drift/native.dart';
+import 'package:fl_clash/database/database.dart' as db;
+import '../../helpers/test_config_state.dart';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
+import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -56,6 +61,12 @@ Profile _profile(int id, {SubscriptionInfo? info}) => Profile(
 
 void main() {
   late ProviderContainer container;
+  late db.Database testDatabase;
+  setUp(() {
+    testDatabase = db.Database(NativeDatabase.memory());
+    db.database = testDatabase;
+  });
+  tearDown(() => testDatabase.close());
 
   // appPath resolves its directories once per process; resolved inside a
   // test's fake async zone, later tests never see the future complete.
@@ -64,12 +75,19 @@ void main() {
     await appPath.homeDirPath;
   });
 
-  void setUpProfiles(
+  Future<void> setUpProfiles(
+    WidgetTester tester,
     List<Profile> profiles, {
     List<Override> overrides = const [],
-  }) {
+  }) async {
+    await tester.runAsync(
+      () => testDatabase.profilesDao.putAll([
+        for (final profile in profiles) profile.toCompanion(),
+      ]),
+    );
     container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(() => TestProfiles(profiles)),
         viewSizeProvider.overrideWithBuild((_, _) => const Size(1200, 1000)),
         ...overrides,
@@ -116,12 +134,12 @@ void main() {
   Finder label(String text) => find.text(text, findRichText: true);
 
   Future<void> openPicker(WidgetTester tester) async {
-    await tester.tap(find.byTooltip('Switch profile'));
+    await tapAndCommit(tester, find.byTooltip('Switch profile'));
     await tester.pumpAndSettle();
   }
 
   testWidgets('offers to add a profile without profiles', (tester) async {
-    setUpProfiles([]);
+    await setUpProfiles(tester, []);
     await pumpCard(tester);
 
     expect(find.text('Add profile'), findsOneWidget);
@@ -131,7 +149,7 @@ void main() {
   testWidgets('shows the current profile and its usage in one row', (
     tester,
   ) async {
-    setUpProfiles([
+    await setUpProfiles(tester, [
       _profile(
         1,
         info: const SubscriptionInfo(
@@ -159,7 +177,7 @@ void main() {
   });
 
   testWidgets('hides the switch button with a single profile', (tester) async {
-    setUpProfiles([_profile(1)]);
+    await setUpProfiles(tester, [_profile(1)]);
     await pumpCard(tester);
 
     expect(label('P1'), findsOneWidget);
@@ -167,12 +185,12 @@ void main() {
   });
 
   testWidgets('switching picks a profile from a sheet', (tester) async {
-    setUpProfiles([for (var id = 1; id <= 3; id++) _profile(id)]);
+    await setUpProfiles(tester, [for (var id = 1; id <= 3; id++) _profile(id)]);
     await pumpCard(tester);
 
     await openPicker(tester);
     expect(find.byType(RadioGroup<int>), findsOneWidget);
-    await tester.tap(label('P3'));
+    await tapAndCommit(tester, label('P3'));
     await tester.pumpAndSettle();
 
     expect(container.read(currentProfileIdProvider), 3);
@@ -182,18 +200,22 @@ void main() {
 
   _MockCore appliedConfigCore() {
     final core = _MockCore();
-    when(() => core.getConfig(any())).thenAnswer(
+    when(
+      () => core.invokeMethod<Map<String, dynamic>>(
+        method: CoreMethod.getAppliedInput,
+      ),
+    ).thenAnswer(
       (_) async => {
         'proxies': [{}, {}],
         'proxy-groups': [{}],
-        'rule': ['MATCH,DIRECT', 'DOMAIN,a.com,DIRECT', 'GEOIP,CN,DIRECT'],
+        'rules': ['MATCH,DIRECT', 'DOMAIN,a.com,DIRECT', 'GEOIP,CN,DIRECT'],
       },
     );
     return core;
   }
 
   Future<void> openDetail(WidgetTester tester) async {
-    await tester.tap(label('P1'));
+    await tapAndCommit(tester, label('P1'));
     await tester.pumpAndSettle();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 50)),
@@ -205,7 +227,8 @@ void main() {
     final core = appliedConfigCore();
     globalState.lastConfigMd5 = 'applied';
     addTearDown(() => globalState.lastConfigMd5 = null);
-    setUpProfiles(
+    await setUpProfiles(
+      tester,
       [_profile(1)],
       overrides: [
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -224,14 +247,19 @@ void main() {
     await openDetail(tester);
 
     expect(find.text('3'), findsOneWidget);
-    verify(() => core.getConfig(any())).called(1);
+    verify(
+      () => core.invokeMethod<Map<String, dynamic>>(
+        method: CoreMethod.getAppliedInput,
+      ),
+    ).called(1);
   });
 
   testWidgets('tapping the card shows what the Core was handed', (
     tester,
   ) async {
     final core = appliedConfigCore();
-    setUpProfiles(
+    await setUpProfiles(
+      tester,
       [_profile(1), _profile(2)],
       overrides: [
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),

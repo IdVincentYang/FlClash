@@ -12,10 +12,15 @@ class ConfigInput {
   final String id, markerName, home;
   final List<RequestSource> sources;
 
-  Map<String, Object?> toRequest({int? requestId, bool active = false}) => {
+  Map<String, Object?> toRequest({
+    int? requestId,
+    bool active = false,
+    Map<String, Object?>? expectedConfig,
+  }) => {
     'inputId': id,
     'requestId': ?requestId,
     'active': active,
+    'expectedConfig': ?expectedConfig,
     'source': {
       'client': sources.firstOrNull?.client ?? '',
       'dataset': sources.firstOrNull?.snapshot['dataset'] ?? 0,
@@ -40,6 +45,7 @@ class ConfigInput {
     required Map<String, String> selectedMap,
     required String testUrl,
     required List<RequestSource> sources,
+    Map<String, Object?>? managedPolicy,
   }) async {
     if (yaml.trim().isEmpty) throw StateError('Configuration is empty');
     final directory = Directory(path.join(home, 'config-inputs'));
@@ -56,6 +62,7 @@ class ConfigInput {
         'selectedMap': Map<String, String>.of(selectedMap),
         'testUrl': testUrl,
         'acceptedOverrides': <String, Object?>{},
+        'managedPolicy': ?managedPolicy,
       }),
     );
     final id = sha256.convert(manifest).toString();

@@ -10,6 +10,7 @@ import 'app.dart';
 import 'config.dart';
 import 'core.dart';
 import 'database.dart';
+import 'config_state.dart';
 
 part 'generated/state.g.dart';
 part 'state/proxies.dart';

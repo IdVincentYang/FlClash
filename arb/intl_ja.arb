@@ -835,5 +835,22 @@
   "policyDraftReady": "下書きのプレビューを検証済み。未適用です",
   "policyDraftNeedsPreview": "入力は生成プレビューでの検証が必要です",
   "policyDraftMigrationChoices": "抽出行は候補です。両方の既定値、DNS、起動用DNSを明示的に選んでください。元のプロファイル・上書き・グローバルDNSは従来の設定経路を使用し、このプレビューは動作中の設定ではありません。",
-  "policyDraftRestoreFailed": "復元を完了できませんでした。再読み込みして保存済みデータを確認してください。復旧の案内がある場合は対応してください。"
+  "policyDraftRestoreFailed": "復元を完了できませんでした。再読み込みして保存済みデータを確認してください。復旧の案内がある場合は対応してください。",
+  "policyApply": "保存して適用を要求",
+  "policyApplyConfirm": "明示的な DIRECT を含め、このポリシーでルーティングと DNS を処理します。元のルール、DNS、プロバイダー、特殊な上書きは使用しません。管理対象のノード選択はリセットされます。停止中のプロキシは起動しません。",
+  "policyOriginal": "元のプロファイルを使用",
+  "policyOriginalConfirm": "管理対象のルーティングを終了し、元のルール、DNS、上書きを使用しますか？通信経路が変わる可能性があります。",
+  "policyOriginalStatus": "元のプロファイルを選択済み",
+  "policySelectedStatus": "ポリシーを選択済み。実際の受理状態は別に表示します",
+  "policySelectionUnavailable": "管理対象ポリシーが必要ですが利用できません。有効なポリシーを選択してください。",
+  "policyUnappliedEdits": "下書きは選択済みポリシーと異なり、変更は未適用です",
+  "policyMaintenanceTarget": "メンテナンス通信のプロキシ",
+  "policyMaintenanceNone": "既定のプロキシを設定しない",
+  "policyMaintenanceRequired": "メンテナンス用のグループかノードを選択して適用するか、この要求に Auto または Direct を明示的に選択してください。以前の対象は存在しない可能性があります。",
+  "policyManagedEditRequired": "このプロファイルは管理対象ポリシーを使用します。下書きでルーティングと DNS を編集し、適用を要求してください。",
+  "policyApplyRequested": "選択を保存して適用を要求しました。実際の構成状態を確認してください。",
+  "policyFinalPreview": "生成された最終構成",
+  "policyActualPreview": "実際に受理された構成",
+  "policySelectionPending": "選択済みポリシーは実際に受理された構成と異なります。",
+  "policyAndroidRequired": "管理ポリシーの適用は現在 Android のみ対応しています。下書きの編集とプレビューは引き続き利用できます。"
 }

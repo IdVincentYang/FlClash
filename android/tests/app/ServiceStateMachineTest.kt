@@ -115,6 +115,9 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
     @Volatile var phaseGate: CompletableDeferred<Unit>? = null
     @Volatile var phaseEntered: CompletableDeferred<Unit>? = null
     var phaseFailureStatus = "blocked"
+    var buildFailureStatus = "retained"
+    var buildFailureGate: CompletableDeferred<Unit>? = null
+    val buildFailureEntered = CompletableDeferred<Unit>()
     val phaseCalls = mutableListOf<Pair<String,Long>>()
     var coreParameters: ServiceCoreParams? = null
     @Volatile var lastConfigFact = ConfigFact(runtimeEpoch="test")
@@ -150,6 +153,14 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
         val fact = ConfigFact(runtimeEpoch="test",version=++factVersion,token=receipt.token,owner=prepared.owner,inputId=receipt.inputId,profileName="Applied",phase=if(status in setOf("activated","installedInactive")) "ready" else if(status=="blocked") "failed" else "parsing",businessActive=status=="activated")
         lastConfigFact = fact
         return ConfigApplyResult(status,receipt=prepared,coreParams=coreParameters ?: ServiceCoreParams(mixedPort=7890,bindingId=receipt.token,localReachable=true),fact=fact)
+    }
+    override suspend fun failConfigBuild(input: JsonObject): ConfigApplyResult {
+        buildFailureEntered.complete(Unit)
+        buildFailureGate?.await()
+        val expected = input.getAsJsonObject("expected")
+        if (expected.get("owner").asLong != lastConfigFact.owner || expected.get("token").asLong != lastConfigFact.token) return ConfigApplyResult("superseded",fact=lastConfigFact)
+        if (buildFailureStatus == "blocked") lastConfigFact = lastConfigFact.copy(version=++factVersion,phase="failed",businessActive=false,replayEligible=false)
+        return ConfigApplyResult(buildFailureStatus,fact=lastConfigFact)
     }
     override suspend fun startService(options: VpnOptions, requestId: Long): Long {
         var identity = RequestServiceIdentity("fake-service-${startCalls+1}",requestId)

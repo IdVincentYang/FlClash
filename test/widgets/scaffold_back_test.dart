@@ -1,3 +1,4 @@
+import '../helpers/test_config_state.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/theme.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -174,7 +175,9 @@ void main() {
   testWidgets('system back exits search without reaching the root fallback', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [configStateProvider.overrideWith(TestConfigState.new)],
+    );
     addTearDown(container.dispose);
     globalState.container = container;
     var rootBackCount = 0;
@@ -217,7 +220,9 @@ void main() {
   testWidgets('inactive page scope exits the kept search layer', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [configStateProvider.overrideWith(TestConfigState.new)],
+    );
     addTearDown(container.dispose);
     globalState.container = container;
     final isActive = ValueNotifier(true);
@@ -253,6 +258,7 @@ void main() {
   testWidgets('inactive page scope exits dashboard edit layer', (tester) async {
     final container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         dashboardStateProvider.overrideWithValue(
           const DashboardState(dashboardWidgets: []),
         ),
@@ -288,7 +294,9 @@ void main() {
   });
 
   testWidgets('inactive page scope exits access search layer', (tester) async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [configStateProvider.overrideWith(TestConfigState.new)],
+    );
     addTearDown(container.dispose);
     globalState.container = container;
     final isActive = ValueNotifier(true);
@@ -322,6 +330,7 @@ void main() {
   ) async {
     final container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         dashboardStateProvider.overrideWithValue(
           const DashboardState(dashboardWidgets: []),
         ),
@@ -354,6 +363,7 @@ void main() {
   ) async {
     final container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         dashboardStateProvider.overrideWithValue(
           const DashboardState(
             dashboardWidgets: [

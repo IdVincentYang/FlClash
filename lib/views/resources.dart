@@ -52,9 +52,9 @@ class ResourcesView extends ConsumerWidget {
     if (interval == null || interval <= 0) {
       return;
     }
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(geoUpdateInterval: interval));
+    await ref
+        .read(applicationInputActionProvider.notifier)
+        .updatePatch((state) => state.copyWith(geoUpdateInterval: interval));
   }
 
   @override
@@ -72,8 +72,8 @@ class ResourcesView extends ConsumerWidget {
 
     void updateAutoUpdate(bool value) {
       ref
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith(geoAutoUpdate: value));
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith(geoAutoUpdate: value));
     }
 
     return CommonScaffold(

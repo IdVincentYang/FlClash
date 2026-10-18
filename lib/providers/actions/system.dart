@@ -128,22 +128,25 @@ class SystemAction extends _$SystemAction {
     await windowPort?.toggle();
   }
 
-  void updateTun() {
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith.tun(enable: !state.tun.enable));
+  Future<void> updateTun() async {
+    await ref
+        .read(applicationInputActionProvider.notifier)
+        .updatePatch((state) => state.copyWith.tun(enable: !state.tun.enable));
   }
 
-  void updateSystemProxy() {
-    ref
-        .read(networkSettingProvider.notifier)
-        .update((state) => state.copyWith(systemProxy: !state.systemProxy));
+  Future<void> updateSystemProxy() async {
+    await ref
+        .read(applicationInputActionProvider.notifier)
+        .updateNetwork(
+          (state) => state.copyWith(systemProxy: !state.systemProxy),
+        );
   }
 
   Future<void> copyProxyEnv() async {
-    final port = ref.read(
-      patchClashConfigProvider.select((state) => state.mixedPort),
-    );
+    final fact = ref.read(configStateProvider).fact;
+    final port = fact.isManaged
+        ? fact.mixedPort
+        : ref.read(patchClashConfigProvider.select((state) => state.mixedPort));
     await Clipboard.setData(
       ClipboardData(text: proxyEnvCommand(port, isWindows: system.isWindows)),
     );

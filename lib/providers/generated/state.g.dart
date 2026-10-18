@@ -89,7 +89,7 @@ final class TrayStateProvider
   }
 }
 
-String _$trayStateHash() => r'e3e841e2d6ae95e4eafe27996c7da33f82edcc80';
+String _$trayStateHash() => r'e0aff9b23d769d58f6eca153b9df97233af44f30';
 
 /// Measured delays of the proxies the tray lists, by group and then proxy
 /// name. Resolved like a proxy card, so a nested group shows its selection.
@@ -436,7 +436,7 @@ final class SharedStateProvider
   }
 }
 
-String _$sharedStateHash() => r'81d631dab3290482704f5dbbe6001ed952f052fc';
+String _$sharedStateHash() => r'2e29681b8b1f2f2bd797b016f89f9c7ae9b8e4ae';
 
 @ProviderFor(AccessControlState)
 final accessControlStateProvider = AccessControlStateProvider._();
@@ -1811,7 +1811,7 @@ final class CurrentGroupsStateProvider
 }
 
 String _$currentGroupsStateHash() =>
-    r'c93e02f94abd4284bff58c42a931df0b35883bd4';
+    r'73c7b3045fc79090de80eda04a591f5dc39ac079';
 
 @ProviderFor(proxyState)
 final proxyStateProvider = ProxyStateProvider._();
@@ -1852,7 +1852,7 @@ final class ProxyStateProvider
   }
 }
 
-String _$proxyStateHash() => r'76a71ab5da07dca9aeb351282c5c03ab222d0760';
+String _$proxyStateHash() => r'ee033d28687f18603f6dbf73181c8968805d6972';
 
 @ProviderFor(proxiesActionsState)
 final proxiesActionsStateProvider = ProxiesActionsStateProvider._();
@@ -3405,6 +3405,83 @@ final class OverlayTopOffsetProvider
 
 String _$overlayTopOffsetHash() => r'44c3b3c9f8f3af5e10ba91e0f2514f52f3c6ddac';
 
+@ProviderFor(policySelection)
+final policySelectionProvider = PolicySelectionFamily._();
+
+final class PolicySelectionProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<ProfilePolicySelection?>,
+          ProfilePolicySelection?,
+          Stream<ProfilePolicySelection?>
+        >
+    with
+        $FutureModifier<ProfilePolicySelection?>,
+        $StreamProvider<ProfilePolicySelection?> {
+  PolicySelectionProvider._({
+    required PolicySelectionFamily super.from,
+    required int super.argument,
+  }) : super(
+         retry: null,
+         name: r'policySelectionProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$policySelectionHash();
+
+  @override
+  String toString() {
+    return r'policySelectionProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<ProfilePolicySelection?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<ProfilePolicySelection?> create(Ref ref) {
+    final argument = this.argument as int;
+    return policySelection(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PolicySelectionProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$policySelectionHash() => r'213f14ff8de71783cfc0a05c93ff9059702efbe1';
+
+final class PolicySelectionFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<ProfilePolicySelection?>, int> {
+  PolicySelectionFamily._()
+    : super(
+        retry: null,
+        name: r'policySelectionProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  PolicySelectionProvider call(int profileId) =>
+      PolicySelectionProvider._(argument: profileId, from: this);
+
+  @override
+  String toString() => r'policySelectionProvider';
+}
+
 @ProviderFor(profilesState)
 final profilesStateProvider = ProfilesStateProvider._();
 
@@ -3770,7 +3847,7 @@ final class SetupStateProvider
   }
 }
 
-String _$setupStateHash() => r'cb775b64e77646c06f0130175b818df74740977e';
+String _$setupStateHash() => r'3a47e725b2ac525251aafd67defa55daa8fc8437';
 
 final class SetupStateFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<SetupState>, int?> {

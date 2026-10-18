@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -31,10 +32,11 @@ class _UserAgentsViewState extends ConsumerState<UserAgentsView> {
         .update((state) => state.copyWith(userAgents: userAgents));
   }
 
-  void _select(String? userAgent) {
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(globalUa: userAgent));
+  Future<void> _select(String? userAgent) async {
+    final inputs = ref.read(applicationInputActionProvider.notifier);
+    await globalState.safeRun(
+      () => inputs.updatePatch((state) => state.copyWith(globalUa: userAgent)),
+    );
   }
 
   Future<String?> _showInputDialog([String? userAgent]) async {
@@ -79,7 +81,7 @@ class _UserAgentsViewState extends ConsumerState<UserAgentsView> {
     }
     _save([for (final item in _entries) item == userAgent ? next : item]);
     if (_selected == userAgent) {
-      _select(next);
+      await _select(next);
     }
   }
 
@@ -96,18 +98,18 @@ class _UserAgentsViewState extends ConsumerState<UserAgentsView> {
     }
     _save([..._entries]..remove(userAgent));
     if (_selected == userAgent) {
-      _select(null);
+      await _select(null);
     }
   }
 
   Widget _buildRadioGroup(String? selected, Widget child) {
     return RadioGroup<String>(
       groupValue: selected ?? _defaultValue,
-      onChanged: (value) {
+      onChanged: (value) async {
         if (value == null) {
           return;
         }
-        _select(value == _defaultValue ? null : value);
+        await _select(value == _defaultValue ? null : value);
       },
       child: child,
     );
@@ -167,8 +169,8 @@ class _UserAgentsViewState extends ConsumerState<UserAgentsView> {
               value: _defaultValue,
               label: appLocalizations.defaultText,
               isSelected: selected == null,
-              onSelected: () {
-                _select(null);
+              onSelected: () async {
+                await _select(null);
               },
             ),
           ),

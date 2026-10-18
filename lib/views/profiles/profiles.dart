@@ -8,6 +8,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/profiles/overwrite/overwrite.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/managed_policy.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -174,7 +175,7 @@ class _ProfilesGrid extends ConsumerWidget {
               profile: profile,
               groupValue: currentProfileId,
               onChanged: (profileId) {
-                ref.read(currentProfileIdProvider.notifier).value = profileId;
+                unawaited(chooseProfileFromUi(context, ref, profileId));
               },
             );
           },

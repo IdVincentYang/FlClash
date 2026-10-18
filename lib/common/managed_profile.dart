@@ -2,15 +2,17 @@ import 'package:fl_clash/models/managed_policy.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
+String managedProxyName(String id) => 'fc-managed-proxy-$id';
+
+String managedGroupName(String id) => 'fc-managed-group-$id';
+
 String compileManagedProfile(ManagedPolicy policy) {
-  String nodeName(String id) => 'fc-managed-proxy-$id';
-  String groupName(String id) => 'fc-managed-group-$id';
   String targetName(ManagedTarget target, String location) {
     if (target.kind != 'proxy') return target.kind.toUpperCase();
     if (!policy.groups.containsKey(target.group)) {
       throw FormatException('$location: unknown proxy group');
     }
-    return groupName(target.group!);
+    return managedGroupName(target.group!);
   }
 
   for (final group in policy.groups.entries) {
@@ -104,7 +106,7 @@ String compileManagedProfile(ManagedPolicy policy) {
     'proxies': [
       for (final entry in policy.proxies.entries)
         {
-          'name': nodeName(entry.key),
+          'name': managedProxyName(entry.key),
           'type': 'socks5',
           'server': entry.value.address,
           'port': entry.value.port,
@@ -116,9 +118,9 @@ String compileManagedProfile(ManagedPolicy policy) {
     'proxy-groups': [
       for (final entry in policy.groups.entries)
         {
-          'name': groupName(entry.key),
+          'name': managedGroupName(entry.key),
           'type': 'select',
-          'proxies': entry.value.map(nodeName).toList(),
+          'proxies': entry.value.map(managedProxyName).toList(),
         },
     ],
     'rule-providers': providers,

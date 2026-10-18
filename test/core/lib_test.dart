@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/test_config_state.dart';
 
 class _FakeService implements Service {
   _FakeService();
@@ -83,7 +84,10 @@ void main() {
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        profilesProvider.overrideWith(TestProfiles.new),
+        configStateProvider.overrideWith(TestConfigState.new),
+      ],
     );
     globalState.container = container;
     service = _FakeService();

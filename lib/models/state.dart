@@ -10,6 +10,7 @@ import 'config.dart';
 import 'core.dart';
 import 'profile.dart';
 import 'policy_draft.dart';
+import 'policy_selection.dart';
 
 part 'generated/state.freezed.dart';
 part 'generated/state.g.dart';
@@ -357,6 +358,7 @@ abstract class MakeRealProfileState with _$MakeRealProfileState {
     @Default({}) Map<String, dynamic> injectedRuleProviders,
     String? matchTarget,
     @Default(false) bool safeMode,
+    ProfilePolicySelection? policySelection,
   }) = _MakeRealProfileState;
 }
 
@@ -372,6 +374,7 @@ abstract class MigrationData with _$MigrationData {
     @Default([]) List<ClashProvider> clashProviders,
     @Default([]) List<CustomProxy> customProxies,
     @Default([]) List<ProfilePolicyDraft> policyDrafts,
+    @Default([]) List<ProfilePolicySelection> policySelections,
   }) = _MigrationData;
 }
 
@@ -391,6 +394,7 @@ abstract class SetupState with _$SetupState {
     required Set<DnsOverrideKey> dnsOverrideKeys,
     @Default([]) List<ClashProvider> clashProviders,
     @Default({}) Map<String, int> profileProviders,
+    ProfilePolicySelection? policySelection,
     String? matchTarget,
   }) = _SetupState;
 }

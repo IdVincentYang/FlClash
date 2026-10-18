@@ -766,6 +766,41 @@ func handleRequestControl(data string) string {
 	return string(bytes)
 }
 
+func (r *appRequestRegistry) inspect(params appRequestControl) any {
+	result := func() any {
+		selectMu.Lock()
+		defer selectMu.Unlock()
+		checkpointMu.Lock()
+		defer checkpointMu.Unlock()
+		r.mu.Lock()
+		if params.Client == "" || params.Client != r.client {
+			r.mu.Unlock()
+			return map[string]string{"error": "request_cancelled"}
+		}
+		commits := len(r.commits)
+		if r.commits[params.ID] != nil {
+			commits--
+		}
+		snapshot := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sources[params.Key], "operation": r.operations[params.Key], "commits": commits, "bootstrap": r.bootstrap, "policyVersion": configFact.PolicyVersion, "maintenanceProxy": configFact.MaintenanceProxy}
+		r.mu.Unlock()
+		proxyConfigured := false
+		for _, proxy := range tunnel.AllProxies() {
+			switch proxy.Type() {
+			case C.Direct, C.Reject, C.Compatible, C.Pass, C.Selector, C.URLTest, C.Fallback, C.LoadBalance:
+			default:
+				proxyConfigured = true
+			}
+			if proxyConfigured {
+				break
+			}
+		}
+		snapshot["hasProxy"] = proxyConfigured
+		return snapshot
+	}()
+	r.flushCleanup()
+	return result
+}
+
 func (r *appRequestRegistry) control(params appRequestControl) any {
 	if params.Action == "registerConfigInput" {
 		if params.ConfigInput == nil || !validInputID(params.ConfigInput.InputID) {
@@ -779,16 +814,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 	}
 
 	failure := func(code string) any { return map[string]string{"error": code} }
-	proxyConfigured := false
-	if params.Action == "inspect" {
-		for _, proxy := range tunnel.AllProxies() {
-			switch proxy.Type() {
-			case C.Direct, C.Reject, C.Compatible, C.Pass, C.Selector, C.URLTest, C.Fallback, C.LoadBalance:
-			default:
-				proxyConfigured = true
-			}
-		}
-	}
+
 	switch params.Action {
 	case "publish":
 		return map[string]any{"applied": r.publishPrepared(params.State)}
@@ -836,7 +862,9 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			lease.Close()
 		}
 		return map[string]any{"client": client}
-	case "inspect", "ready", "invalidate", "invalidateDataset", "detach", "permit":
+	case "inspect":
+		return r.inspect(params)
+	case "ready", "invalidate", "invalidateDataset", "detach", "permit":
 		r.mu.Lock()
 		if params.Client == "" || params.Client != r.client {
 			r.mu.Unlock()
@@ -898,7 +926,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		if r.commits[params.ID] != nil {
 			commits--
 		}
-		result := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sources[params.Key], "operation": r.operations[params.Key], "commits": commits, "bootstrap": r.bootstrap, "hasProxy": proxyConfigured}
+		result := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sources[params.Key], "operation": r.operations[params.Key], "commits": commits, "bootstrap": r.bootstrap, "hasProxy": false, "policyVersion": 0, "maintenanceProxy": ""}
 		r.mu.Unlock()
 		for _, lease := range old {
 			lease.Close()
@@ -906,6 +934,25 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		r.flushCleanup()
 		return result
 	case "begin":
+		if params.Mode == "proxy" {
+			selectMu.Lock()
+			checkpointMu.Lock()
+			if configFact.PolicyVersion != 0 {
+				p := appliedConfig
+				if params.Proxy == "" || params.Proxy == "GLOBAL" {
+					params.Proxy = configFact.MaintenanceProxy
+				}
+				valid := params.Owner == configFact.Owner && p != nil && p.raw != nil && configFact.Phase == "ready" && (isManagedProxy(p.raw, params.Proxy) || len(managedGroup(p.raw, params.Proxy)) != 0)
+				checkpointMu.Unlock()
+				selectMu.Unlock()
+				if !valid {
+					return failure("managed_maintenance_target_required")
+				}
+			} else {
+				checkpointMu.Unlock()
+				selectMu.Unlock()
+			}
+		}
 		if params.Mode != "direct" && params.Proxy != "DIRECT" {
 			if auth := authStore.Default.Authenticator(); auth != nil && !auth.Verify(params.User, params.Password) {
 				return failure("proxy_authentication_required")

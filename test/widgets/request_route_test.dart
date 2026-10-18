@@ -1,3 +1,4 @@
+import '../helpers/test_config_state.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -13,7 +14,10 @@ void main() {
     'saved unavailable proxy remains visible and mode changes explicitly',
     (tester) async {
       final container = ProviderContainer(
-        overrides: [selectedMapProvider.overrideWithValue(const {})],
+        overrides: [
+          configStateProvider.overrideWith(TestConfigState.new),
+          selectedMapProvider.overrideWithValue(const {}),
+        ],
       );
       container.read(viewSizeProvider.notifier).value = const Size(800, 600);
       addTearDown(container.dispose);
@@ -65,7 +69,10 @@ void main() {
     ) async {
       await tester.pumpWidget(
         TestApp(
-          overrides: [selectedMapProvider.overrideWithValue(const {})],
+          overrides: [
+            configStateProvider.overrideWith(TestConfigState.new),
+            selectedMapProvider.overrideWithValue(const {}),
+          ],
           locale: locale,
           child: Scaffold(
             body: SingleChildScrollView(

@@ -309,24 +309,26 @@ void main() {
     late ProviderContainer container;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       container = ProviderContainer();
+      container.listen(configProvider, (_, _) {});
       globalState.container = container;
     });
 
     tearDown(() => container.dispose());
 
-    test('updateTun flips the patched Core tun flag', () {
+    test('updateTun flips the patched Core tun flag', () async {
       final before = container.read(patchClashConfigProvider).tun.enable;
 
-      container.read(systemActionProvider.notifier).updateTun();
+      await container.read(systemActionProvider.notifier).updateTun();
 
       expect(container.read(patchClashConfigProvider).tun.enable, !before);
     });
 
-    test('updateSystemProxy flips the system proxy flag', () {
+    test('updateSystemProxy flips the system proxy flag', () async {
       final before = container.read(networkSettingProvider).systemProxy;
 
-      container.read(systemActionProvider.notifier).updateSystemProxy();
+      await container.read(systemActionProvider.notifier).updateSystemProxy();
 
       expect(container.read(networkSettingProvider).systemProxy, !before);
     });

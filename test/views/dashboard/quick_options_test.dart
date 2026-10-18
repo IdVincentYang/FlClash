@@ -1,3 +1,6 @@
+import '../../helpers/commit_tap.dart';
+import 'package:fl_clash/providers/config_state.dart';
+import '../../helpers/test_config_state.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -8,6 +11,7 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/test_app.dart';
 import '../../helpers/test_profiles.dart';
@@ -54,12 +58,21 @@ final _cardCases = <_CardCase>[
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
   late ProviderContainer container;
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container.read(viewSizeProvider.notifier).value = const Size(1200, 1000);
   });
@@ -90,11 +103,11 @@ void main() {
 
         expect(testCase.read(container), testCase.initial);
 
-        await tester.tap(find.byType(Switch));
+        await tapAndCommit(tester, find.byType(Switch));
         await tester.pumpAndSettle();
         expect(testCase.read(container), !testCase.initial);
 
-        await tester.tap(find.byType(Switch));
+        await tapAndCommit(tester, find.byType(Switch));
         await tester.pumpAndSettle();
         expect(testCase.read(container), testCase.initial);
       });
@@ -107,7 +120,7 @@ void main() {
           testCase.initial,
         );
 
-        await tester.tap(find.byType(Switch));
+        await tapAndCommit(tester, find.byType(Switch));
         await tester.pumpAndSettle();
 
         expect(
@@ -151,7 +164,7 @@ void main() {
         reason: '${testCase.name} must label the state it reads',
       );
 
-      await tester.tap(find.byType(CommonCard));
+      await tapAndCommit(tester, find.byType(CommonCard));
       await tester.pumpAndSettle();
 
       final sheet = find.byType(CommonScaffold);

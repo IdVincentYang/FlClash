@@ -142,12 +142,16 @@ _ChangeProxyParams _$ChangeProxyParamsFromJson(Map<String, dynamic> json) =>
     _ChangeProxyParams(
       groupName: json['group-name'] as String,
       proxyName: json['proxy-name'] as String,
+      owner: (json['owner'] as num?)?.toInt() ?? 0,
+      token: (json['token'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$ChangeProxyParamsToJson(_ChangeProxyParams instance) =>
     <String, dynamic>{
       'group-name': instance.groupName,
       'proxy-name': instance.proxyName,
+      'owner': instance.owner,
+      'token': instance.token,
     };
 
 _ChangeProxyResult _$ChangeProxyResultFromJson(Map<String, dynamic> json) =>

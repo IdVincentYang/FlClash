@@ -28,6 +28,12 @@ data class ConfigFact(
     val phase: String = "unknown",
     val businessActive: Boolean = false,
     val replayEligible: Boolean = false,
+    val policyVersion: Int = 0,
+    val policySha256: String = "",
+    val maintenanceProxy: String = "",
+    val mixedPort: Int = 0,
+    val routeEpoch: Long = 0,
+    val picksVersion: Long = 0,
 )
 
 data class ConfigApplyResult(

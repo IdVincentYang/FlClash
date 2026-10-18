@@ -140,6 +140,17 @@ class Service {
     return Map<String, Object?>.from(json.decode(result) as Map);
   }
 
+  Future<Map<String, Object?>> failConfigBuild(
+    Map<String, Object?> input,
+  ) async {
+    final result = await methodChannel.invokeMethod<String>(
+      'failConfigBuild',
+      json.encode(input),
+    );
+    if (result == null) throw StateError('Configuration cleanup unavailable');
+    return Map<String, Object?>.from(json.decode(result) as Map);
+  }
+
   Future<Map<String, Object?>> getRequestState() async {
     final result = await methodChannel.invokeMethod<String>('getRequestState');
     if (result == null) throw StateError('Request state unavailable');

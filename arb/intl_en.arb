@@ -835,5 +835,22 @@
   "policyDraftReady": "Draft preview validated; not applied",
   "policyDraftNeedsPreview": "Inputs still need generated preview validation",
   "policyDraftMigrationChoices": "Extracted rows are candidates. Choose both defaults, DNS and bootstrap services explicitly. The original Profile, overwrite settings and global DNS keep using the traditional configuration path. This preview is not the current running configuration.",
-  "policyDraftRestoreFailed": "Could not complete restore. Reload to check the stored data. Any recovery notice still applies."
+  "policyDraftRestoreFailed": "Could not complete restore. Reload to check the stored data. Any recovery notice still applies.",
+  "policyApply": "Save and request application",
+  "policyApplyConfirm": "Use this policy for routing and DNS, including any explicit DIRECT choices. Original rules, DNS, providers and special overrides will not participate. Existing managed node selections will reset. This does not start a stopped proxy.",
+  "policyOriginal": "Use original profile",
+  "policyOriginalConfirm": "Leave managed routing and use the original profile with its rules, DNS and overrides? This can change the traffic path.",
+  "policyOriginalStatus": "Original profile selected",
+  "policySelectedStatus": "Policy selected; actual acceptance is shown separately",
+  "policySelectionUnavailable": "Managed policy is required but unavailable. Choose a valid policy.",
+  "policyUnappliedEdits": "Draft differs from the selected policy; edits are not applied",
+  "policyMaintenanceTarget": "Maintenance proxy target",
+  "policyMaintenanceNone": "No default maintenance proxy",
+  "policyMaintenanceRequired": "Choose and apply a maintenance proxy group or node, or explicitly select Auto or Direct for this request. A previous target may no longer exist.",
+  "policyManagedEditRequired": "This profile uses a managed policy. Edit routing and DNS in the policy draft, then explicitly request application.",
+  "policyApplyRequested": "Selection saved and application requested. Check the actual configuration status.",
+  "policyFinalPreview": "Generated final configuration",
+  "policyActualPreview": "Actual accepted configuration",
+  "policySelectionPending": "The selected policy differs from the actual accepted configuration.",
+  "policyAndroidRequired": "Managed policies can currently be applied only on Android. Draft editing and previews remain available."
 }

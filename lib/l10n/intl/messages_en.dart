@@ -1017,6 +1017,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "pleaseUploadValidQrcode": MessageLookupByLibrary.simpleMessage(
       "Please upload a valid QR code",
     ),
+    "policyActualPreview": MessageLookupByLibrary.simpleMessage(
+      "Actual accepted configuration",
+    ),
+    "policyAndroidRequired": MessageLookupByLibrary.simpleMessage(
+      "Managed policies can currently be applied only on Android. Draft editing and previews remain available.",
+    ),
+    "policyApply": MessageLookupByLibrary.simpleMessage(
+      "Save and request application",
+    ),
+    "policyApplyConfirm": MessageLookupByLibrary.simpleMessage(
+      "Use this policy for routing and DNS, including any explicit DIRECT choices. Original rules, DNS, providers and special overrides will not participate. Existing managed node selections will reset. This does not start a stopped proxy.",
+    ),
+    "policyApplyRequested": MessageLookupByLibrary.simpleMessage(
+      "Selection saved and application requested. Check the actual configuration status.",
+    ),
     "policyDraftAuthentication": MessageLookupByLibrary.simpleMessage(
       "Use username and password",
     ),
@@ -1165,6 +1180,42 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "policyDraftUnset": MessageLookupByLibrary.simpleMessage("Not configured"),
     "policyDraftUsername": MessageLookupByLibrary.simpleMessage("Username"),
+    "policyFinalPreview": MessageLookupByLibrary.simpleMessage(
+      "Generated final configuration",
+    ),
+    "policyMaintenanceNone": MessageLookupByLibrary.simpleMessage(
+      "No default maintenance proxy",
+    ),
+    "policyMaintenanceRequired": MessageLookupByLibrary.simpleMessage(
+      "Choose and apply a maintenance proxy group or node, or explicitly select Auto or Direct for this request. A previous target may no longer exist.",
+    ),
+    "policyMaintenanceTarget": MessageLookupByLibrary.simpleMessage(
+      "Maintenance proxy target",
+    ),
+    "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
+      "This profile uses a managed policy. Edit routing and DNS in the policy draft, then explicitly request application.",
+    ),
+    "policyOriginal": MessageLookupByLibrary.simpleMessage(
+      "Use original profile",
+    ),
+    "policyOriginalConfirm": MessageLookupByLibrary.simpleMessage(
+      "Leave managed routing and use the original profile with its rules, DNS and overrides? This can change the traffic path.",
+    ),
+    "policyOriginalStatus": MessageLookupByLibrary.simpleMessage(
+      "Original profile selected",
+    ),
+    "policySelectedStatus": MessageLookupByLibrary.simpleMessage(
+      "Policy selected; actual acceptance is shown separately",
+    ),
+    "policySelectionPending": MessageLookupByLibrary.simpleMessage(
+      "The selected policy differs from the actual accepted configuration.",
+    ),
+    "policySelectionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Managed policy is required but unavailable. Choose a valid policy.",
+    ),
+    "policyUnappliedEdits": MessageLookupByLibrary.simpleMessage(
+      "Draft differs from the selected policy; edits are not applied",
+    ),
     "port": MessageLookupByLibrary.simpleMessage("Port"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage(
       "Please enter a different port",

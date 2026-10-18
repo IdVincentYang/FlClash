@@ -835,5 +835,22 @@
   "policyDraftReady": "草稿预览已校验，尚未应用",
   "policyDraftNeedsPreview": "输入尚需生成预览校验",
   "policyDraftMigrationChoices": "提取行只是候选，两个默认、DNS 和启动解析服务仍需明确选择。原 Profile、覆写和全局 DNS 继续沿传统配置路径生效；此预览不是当前运行配置。",
-  "policyDraftRestoreFailed": "未能完成恢复，请重新载入核对已保存的数据；如有恢复提示，仍需处理。"
+  "policyDraftRestoreFailed": "未能完成恢复，请重新载入核对已保存的数据；如有恢复提示，仍需处理。",
+  "policyApply": "保存并请求应用",
+  "policyApplyConfirm": "使用本策略处理分流和 DNS，包括明确选择的 DIRECT。原规则、DNS、provider 和特殊覆写不参与；已有受管节点选择将重置。此操作不会启动已停止的代理。",
+  "policyOriginal": "改用原 Profile",
+  "policyOriginalConfirm": "退出受管分流，改用原 Profile 的规则、DNS 和覆写？这可能改变流量出口。",
+  "policyOriginalStatus": "已选择原 Profile",
+  "policySelectedStatus": "已选择策略；实际接受结果单独显示",
+  "policySelectionUnavailable": "需要受管策略，但当前选择不可用，请选择有效策略。",
+  "policyUnappliedEdits": "草稿与已选策略不同，编辑尚未应用",
+  "policyMaintenanceTarget": "维护请求代理目标",
+  "policyMaintenanceNone": "不设置维护代理默认目标",
+  "policyMaintenanceRequired": "请选择并应用维护代理组或节点，或为本次请求明确选择 Auto／Direct。旧目标可能已不存在。",
+  "policyManagedEditRequired": "此 Profile 使用受管策略。请在策略草稿中修改分流和 DNS，再明确请求应用。",
+  "policyApplyRequested": "已保存选择并请求应用，请查看实际配置状态。",
+  "policyFinalPreview": "最终生成配置",
+  "policyActualPreview": "实际接受配置",
+  "policySelectionPending": "已选策略与实际接受的配置不同。",
+  "policyAndroidRequired": "目前仅 Android 支持应用受管策略；仍可编辑草稿和预览。"
 }

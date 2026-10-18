@@ -206,6 +206,9 @@ func prepareCheckpointCandidate(params *UpdateParams, picks map[string]string) (
 	}
 	selectMu.Lock()
 	actualPicks, err := checkpointSelectionsLocked()
+	if err == nil {
+		actualPicks, err = managedCheckpointPicks(p, actualPicks)
+	}
 	if err != nil {
 		selectMu.Unlock()
 		return nil, err
@@ -264,6 +267,9 @@ func mergeAcceptedOverrides(manifest *ConfigManifest, params *UpdateParams) erro
 		var values map[string]json.RawMessage
 		_ = json.Unmarshal(data, &values)
 		for key, value := range values {
+			if manifest.ManagedPolicy != nil && !managedHotKey(key) {
+				continue
+			}
 			if string(value) == "null" {
 				continue
 			}

@@ -7,6 +7,7 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/dashboard/widget_metrics.dart';
 import 'package:fl_clash/views/profiles/add.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/managed_policy.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -164,11 +165,12 @@ class _ProfilePickerSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(profilesProvider);
     final currentId = ref.watch(currentProfileIdProvider);
-    void select(int? profileId) {
-      if (profileId != null) {
-        ref.read(currentProfileIdProvider.notifier).value = profileId;
+    Future<void> select(int? profileId) async {
+      if (profileId == null) return;
+      if (await chooseProfileFromUi(context, ref, profileId) &&
+          context.mounted) {
+        Navigator.of(context).pop();
       }
-      Navigator.of(context).pop();
     }
 
     return ConstrainedBox(

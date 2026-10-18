@@ -91,7 +91,9 @@ class BackupAction extends _$BackupAction {
     await Directory(join(homeDirPath, 'restore')).safeDelete(recursive: true);
   }
 
-  Future<bool> hasPolicyDrafts() => database.profilePolicyDraftsDao.hasAny();
+  Future<bool> hasPolicyDrafts() async =>
+      await database.profilePolicyDraftsDao.hasAny() ||
+      await database.profilePolicySelectionsDao.hasSensitiveContent();
 
   Future<String> _createArchive(
     String workDir,
@@ -130,21 +132,29 @@ class BackupAction extends _$BackupAction {
     MigrationData data,
     RestoreOption option, {
     String? stagingDirPath,
-  }) {
+  }) async {
     if (!validPolicyDraftRelations(
-      data.policyDrafts,
-      data.profiles.map((p) => p.id),
-    )) {
-      return Future<void>.error(
-        MessageException(currentAppLocalizations.invalidBackupFile),
-      );
+          data.policyDrafts,
+          data.profiles.map((p) => p.id),
+        ) ||
+        !validPolicySelectionRelations(
+          data.policySelections,
+          data.profiles.map((p) => p.id),
+        )) {
+      throw MessageException(currentAppLocalizations.invalidBackupFile);
     }
     final session = RequestSession.current;
+    final previousId = ref.read(currentProfileIdProvider);
     Future<void> apply() =>
         _applyRestore(data, option, stagingDirPath: stagingDirPath);
-    return session == null
+    await (session == null
         ? requestClient.mutate(apply)
-        : session.commit(apply);
+        : session.commit(apply));
+    if (ref.mounted &&
+        ref.read(initProvider) &&
+        ref.read(currentProfileIdProvider) == previousId) {
+      await ref.read(setupActionProvider.notifier).applyProfile(force: true);
+    }
   }
 
   Future<void> _applyRestore(
@@ -154,7 +164,8 @@ class BackupAction extends _$BackupAction {
   }) async {
     final hasPolicyDrafts =
         data.policyDrafts.isNotEmpty ||
-        await database.profilePolicyDraftsDao.hasAny();
+        data.policySelections.isNotEmpty ||
+        await this.hasPolicyDrafts();
     final configMap = data.configMap;
     final config = option == RestoreOption.onlyProfiles || configMap == null
         ? null
@@ -162,6 +173,13 @@ class BackupAction extends _$BackupAction {
     final isOverride =
         ref.read(appSettingProvider).restoreStrategy ==
         RestoreStrategy.override;
+    final previousSelectionIds =
+        (await database.profilePolicySelectionsDao.query().get())
+            .map((s) => s.profileId)
+            .toSet();
+    final wasManaged =
+        previousSelectionIds.contains(ref.read(currentProfileIdProvider)) ||
+        ref.read(configStateProvider).fact.isManaged;
     await requestClient.invalidateDataset();
     final previousConfig = ref.read(configProvider);
     final previousProviders = await database.clashProvidersDao.queryAll().get();
@@ -170,28 +188,41 @@ class BackupAction extends _$BackupAction {
     final nextConfig = config?.copyWith(
       davProps: config.davProps ?? ref.read(davSettingProvider),
     );
+    final targetId = nextConfig == null
+        ? previousConfig.currentProfileId
+        : nextConfig.currentProfileId;
+    final requiredSelections = {
+      ...previousSelectionIds,
+      if (wasManaged && targetId != null) targetId,
+    };
     try {
-      await database.restore(
-        data.profiles,
-        data.scripts,
-        data.rules,
-        data.links,
-        data.proxyGroups,
-        clashProviders: data.clashProviders,
-        customProxies: data.customProxies,
-        policyDrafts: data.policyDrafts,
-        isOverride: isOverride,
-        beforeCommit: () async {
-          if (stagingDirPath != null) {
-            putBack = await _copyStagedFiles(data, stagingDirPath);
-          }
-          if (nextConfig != null) {
-            preferencesChanged = true;
-            if (!await preferences.saveConfig(nextConfig)) {
-              throw const RequestUnavailable('preferences_save_failed');
+      await database.transaction(
+        () => database.restore(
+          data.profiles,
+          data.scripts,
+          data.rules,
+          data.links,
+          data.proxyGroups,
+          clashProviders: data.clashProviders,
+          customProxies: data.customProxies,
+          policyDrafts: data.policyDrafts,
+          policySelections: data.policySelections,
+          isOverride: isOverride,
+          beforeCommit: () async {
+            await database.profilePolicySelectionsDao.requireSelections(
+              requiredSelections,
+            );
+            if (stagingDirPath != null) {
+              putBack = await _copyStagedFiles(data, stagingDirPath);
             }
-          }
-        },
+            if (nextConfig != null) {
+              preferencesChanged = true;
+              if (!await preferences.saveConfig(nextConfig)) {
+                throw const RequestUnavailable('preferences_save_failed');
+              }
+            }
+          },
+        ),
       );
     } catch (error, stack) {
       try {
@@ -211,7 +242,9 @@ class BackupAction extends _$BackupAction {
       }
       Error.throwWithStackTrace(error, stack);
     }
-    if (nextConfig != null) writeConfig(ref, nextConfig);
+    if (nextConfig != null) {
+      writeConfig(ref, nextConfig, mutationClient: requestClient);
+    }
     await _clearReplacedProviderCaches(previousProviders);
     await requestClient.clearPartialCommit();
   }

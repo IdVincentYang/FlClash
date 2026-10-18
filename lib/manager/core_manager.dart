@@ -9,7 +9,6 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/route_state.dart';
-import 'package:fl_clash/providers/state.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -43,11 +42,6 @@ class _CoreContainerState extends ConsumerState<CoreManager>
       runAfterFrame(() {
         unawaited(ref.read(setupActionProvider.notifier).fullSetup());
       });
-    });
-    ref.listenManual(updateParamsProvider, (prev, next) {
-      if (prev != next) {
-        ref.read(setupActionProvider.notifier).updateConfigDebounce();
-      }
     });
     ref.listenManual(appSettingProvider.select((state) => state.openLogs), (
       prev,

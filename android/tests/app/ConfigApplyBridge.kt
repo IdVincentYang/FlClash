@@ -62,6 +62,9 @@ object ConfigApplyBridge {
                         val cleanup = machine.failRunIntent(arguments.asJsonObject.get("requestId").asLong, arguments.asJsonObject.get("token").asLong)
                         reply(id,gson.toJson(cleanup))
                     }
+                    "failConfigBuild" -> scope.launch {
+                        reply(id,gson.toJson(machine.failConfigBuild(JsonParser.parseString(arguments.asString).asJsonObject)))
+                    }
                     "invokeMethod" -> {
                         val core = JsonParser.parseString(arguments.asString).asJsonObject
                         val result = when(core.get("method").asString) {

@@ -41,15 +41,20 @@ void main() {
     List<String> excludeSSIDs = const [],
     int mixedPort = 7890,
     bool checkCertificate = true,
+    NetworkProps network = const NetworkProps(),
   }) {
     final container = ProviderContainer(
-      overrides: [excludeSSIDsProvider.overrideWithValue(excludeSSIDs)],
+      overrides: [
+        excludeSSIDsProvider.overrideWithValue(excludeSSIDs),
+        patchClashConfigProvider.overrideWithBuild(
+          (_, _) => PatchClashConfig(mixedPort: mixedPort),
+        ),
+        networkSettingProvider.overrideWithBuild((_, _) => network),
+      ],
     );
     addTearDown(container.dispose);
     container.read(runTimeProvider.notifier).value = running ? 1 : null;
     container.read(currentSSIDProvider.notifier).value = currentSsid;
-    container.read(patchClashConfigProvider.notifier).value =
-        const PatchClashConfig().copyWith(mixedPort: mixedPort);
     container.read(appSettingProvider.notifier).value = const AppSettingProps()
         .copyWith(checkCertificate: checkCertificate);
     return container;
@@ -79,30 +84,31 @@ void main() {
   });
 
   test('carries credentials when local authentication is enabled', () {
-    final container = buildContainer();
-    container.read(networkSettingProvider.notifier).value = const NetworkProps()
-        .copyWith(
-          authentication: const AuthenticationProps(
-            enable: true,
-            username: 'user',
-            password: 'pass',
-          ),
-        );
+    final container = buildContainer(
+      network: const NetworkProps().copyWith(
+        authentication: const AuthenticationProps(
+          enable: true,
+          username: 'user',
+          password: 'pass',
+        ),
+      ),
+    );
 
     expect(
       FlClashHttpOverrides.findProxyFor(container, remote),
       'PROXY user:pass@localhost:7890',
     );
 
-    container.read(networkSettingProvider.notifier).value = const NetworkProps()
-        .copyWith(
-          authentication: const AuthenticationProps(
-            enable: false,
-            username: 'user',
-          ),
-        );
+    final disabled = buildContainer(
+      network: const NetworkProps().copyWith(
+        authentication: const AuthenticationProps(
+          enable: false,
+          username: 'user',
+        ),
+      ),
+    );
     expect(
-      FlClashHttpOverrides.findProxyFor(container, remote),
+      FlClashHttpOverrides.findProxyFor(disabled, remote),
       'PROXY localhost:7890',
     );
   });

@@ -40,7 +40,7 @@ final class CommonActionProvider extends $NotifierProvider<CommonAction, void> {
   }
 }
 
-String _$commonActionHash() => r'dda2cd3ca81086ebc56f3ad1b4299659b0f73ab5';
+String _$commonActionHash() => r'2a8460dac3b20ec1f9c45f497c26eadd955a22ae';
 
 abstract class _$CommonAction extends $Notifier<void> {
   void build();
@@ -91,7 +91,7 @@ final class SetupActionProvider extends $NotifierProvider<SetupAction, void> {
   }
 }
 
-String _$setupActionHash() => r'996660181af63e783ec359f16daf73dbdcc3466a';
+String _$setupActionHash() => r'361031bc9ab238df95312b0d089c8e4477b6df25';
 
 abstract class _$SetupAction extends $Notifier<void> {
   void build();
@@ -142,7 +142,7 @@ final class BackupActionProvider extends $NotifierProvider<BackupAction, void> {
   }
 }
 
-String _$backupActionHash() => r'7151ac59c8a0fb2b2f937a1dea5121c1c9b5ca9e';
+String _$backupActionHash() => r'5f95f26c28af67af3143e3556145388d52a70641';
 
 abstract class _$BackupAction extends $Notifier<void> {
   void build();
@@ -197,6 +197,59 @@ final class PolicyDraftActionProvider
 String _$policyDraftActionHash() => r'0090a251ea1a8147d8b61b133524709906a564cc';
 
 abstract class _$PolicyDraftAction extends $Notifier<void> {
+  void build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<void, void>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<void, void>,
+              void,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(PolicySelectionAction)
+final policySelectionActionProvider = PolicySelectionActionProvider._();
+
+final class PolicySelectionActionProvider
+    extends $NotifierProvider<PolicySelectionAction, void> {
+  PolicySelectionActionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'policySelectionActionProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$policySelectionActionHash();
+
+  @$internal
+  @override
+  PolicySelectionAction create() => PolicySelectionAction();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(void value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<void>(value),
+    );
+  }
+}
+
+String _$policySelectionActionHash() =>
+    r'9a5406068a2ee2a7d4589e86743f086b67bbcee5';
+
+abstract class _$PolicySelectionAction extends $Notifier<void> {
   void build();
   @$mustCallSuper
   @override
@@ -296,7 +349,7 @@ final class SystemActionProvider extends $NotifierProvider<SystemAction, void> {
   }
 }
 
-String _$systemActionHash() => r'8b0a292bd614bc48b2ae5a7190c05529eb77bcc2';
+String _$systemActionHash() => r'dd2a4ab34706923dc46572dd95a368327ce70d80';
 
 abstract class _$SystemAction extends $Notifier<void> {
   void build();
@@ -450,7 +503,7 @@ final class ProxiesActionProvider
   }
 }
 
-String _$proxiesActionHash() => r'de08f1b94ba74c40699ac719600a19974fcd72da';
+String _$proxiesActionHash() => r'2706b3cedf0b06a52973006e375fe70b861f5bf3';
 
 abstract class _$ProxiesAction extends $Notifier<void> {
   void build();
@@ -502,7 +555,7 @@ final class ProfilesActionProvider
   }
 }
 
-String _$profilesActionHash() => r'38f1bb7aea426eb804ed323342ff0543c920a2ad';
+String _$profilesActionHash() => r'507737550d80d31addea448038c85eec0308ca87';
 
 abstract class _$ProfilesAction extends $Notifier<void> {
   void build();
@@ -659,7 +712,7 @@ final class GeoResourceActionProvider
   }
 }
 
-String _$geoResourceActionHash() => r'8d4d383d4bbb21d8df723207eb7654a762e028f5';
+String _$geoResourceActionHash() => r'd149b81fdc17e01e27f27a1659d71b6d5d5cf646';
 
 abstract class _$GeoResourceAction extends $Notifier<void> {
   void build();

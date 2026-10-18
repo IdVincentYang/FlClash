@@ -18,20 +18,20 @@ typedef _TunUpdate<T> =
 
 ConfigWriter<T> _vpnWriter<T>(_VpnUpdate<T> update) {
   return (ref, value) => ref
-      .read(vpnSettingProvider.notifier)
-      .update((state) => update(state, value));
+      .read(applicationInputActionProvider.notifier)
+      .updateVpn((state) => update(state, value));
 }
 
 ConfigWriter<T> _networkWriter<T>(_NetworkUpdate<T> update) {
   return (ref, value) => ref
-      .read(networkSettingProvider.notifier)
-      .update((state) => update(state, value));
+      .read(applicationInputActionProvider.notifier)
+      .updateNetwork((state) => update(state, value));
 }
 
 ConfigWriter<T> _tunWriter<T>(_TunUpdate<T> update) {
   return (ref, value) => ref
-      .read(patchClashConfigProvider.notifier)
-      .update((state) => update(state, value));
+      .read(applicationInputActionProvider.notifier)
+      .updatePatch((state) => update(state, value));
 }
 
 ConfigToggleItem _vpnToggle({

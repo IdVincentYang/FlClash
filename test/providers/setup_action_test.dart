@@ -3,6 +3,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/policy_selection.dart';
+import 'package:drift/native.dart';
+import 'package:fl_clash/database/database.dart' as db;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -16,6 +20,7 @@ import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/plugins/service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -25,8 +30,11 @@ import 'package:riverpod/riverpod.dart';
 import 'package:yaml/yaml.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/test_policy_drafts.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
+
+class _Native extends Mock implements Service {}
 
 // checkAndUpdateAndCopy checks the file system before it refreshes, so its
 // failure tests need appPath to resolve to a real, writable directory.
@@ -184,8 +192,19 @@ Future<String> _submittedYaml(Object? arguments) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
     await AppLocalizations.load(const Locale('en'));
     registerFallbackValue(const SetupParams(selectedMap: {}, testUrl: ''));
+    registerFallbackValue(
+      const SharedState(
+        stopTip: '',
+        startTip: '',
+        localNetworkTip: '',
+        currentProfileName: '',
+        stopText: '',
+        onlyStatisticsProxy: false,
+      ),
+    );
     registerFallbackValue(
       const UpdateParams(
         tun: Tun(),
@@ -202,10 +221,13 @@ void main() {
     );
   });
 
+  late db.Database testDatabase;
   late TestSetupAction action;
   late ProviderContainer container;
 
   setUp(() {
+    testDatabase = db.Database(NativeDatabase.memory());
+    db.database = testDatabase;
     action = TestSetupAction();
     container = ProviderContainer(
       overrides: [
@@ -214,6 +236,7 @@ void main() {
         commonActionProvider.overrideWith(TestCommonAction.new),
       ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     globalState.needInitStatus = true;
     container.read(setupActionProvider.notifier);
@@ -229,6 +252,7 @@ void main() {
     }
     await container.read(setupActionProvider.notifier).setRunning(false);
     container.dispose();
+    await testDatabase.close();
     globalState.needInitStatus = true;
   });
 
@@ -264,6 +288,7 @@ void main() {
           safeModeProvider.overrideWithValue(true),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
       globalState.container = scoped;
       scoped.read(setupActionProvider.notifier);
@@ -359,6 +384,7 @@ void main() {
           commonActionProvider.overrideWith(TestCommonAction.new),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
       globalState.container = scoped;
       scoped
@@ -569,6 +595,7 @@ void main() {
           safeModeProvider.overrideWithValue(true),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
       scoped.read(setupActionProvider.notifier);
 
@@ -636,11 +663,12 @@ void main() {
           safeModeProvider.overrideWithValue(true),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
       scoped.read(setupActionProvider.notifier);
-      scoped
-          .read(patchClashConfigProvider.notifier)
-          .update(
+      await scoped
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch(
             (state) => state.copyWith(tun: state.tun.copyWith(enable: true)),
           );
       scoped.read(authorizedTunEnableProvider.notifier).value =
@@ -667,11 +695,12 @@ void main() {
           safeModeProvider.overrideWithValue(true),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
       scoped.read(setupActionProvider.notifier);
-      scoped
-          .read(patchClashConfigProvider.notifier)
-          .update(
+      await scoped
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch(
             (state) => state.copyWith(
               externalController: ExternalControllerStatus.open,
             ),
@@ -699,21 +728,25 @@ void main() {
           setupActionProvider.overrideWith(TestSetupAction.new),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
       return scoped;
     }
 
-    test('a dangling profile id falls back to the first profile', () {
-      final profile = Profile.normal(label: 'p').copyWith(id: 1);
-      final scoped = buildScoped([profile], 404);
+    test(
+      'a dangling profile id stays unavailable without an implicit fallback',
+      () {
+        final profile = Profile.normal(label: 'p').copyWith(id: 1);
+        final scoped = buildScoped([profile], 404);
 
-      final recovered = scoped
-          .read(setupActionProvider.notifier)
-          .recoverMissingProfile();
+        final recovered = scoped
+            .read(setupActionProvider.notifier)
+            .recoverMissingProfile();
 
-      expect(recovered?.id, profile.id);
-      expect(scoped.read(currentProfileIdProvider), profile.id);
-    });
+        expect(recovered, isNull);
+        expect(scoped.read(currentProfileIdProvider), 404);
+      },
+    );
 
     test('no profiles keeps the stored id untouched', () {
       final scoped = buildScoped(const [], 404);
@@ -738,13 +771,15 @@ void main() {
   });
 
   group('changeMode', () {
-    test('records the requested mode', () {
-      container.read(setupActionProvider.notifier).changeMode(Mode.direct);
+    test('records the requested mode', () async {
+      await container
+          .read(setupActionProvider.notifier)
+          .changeMode(Mode.direct);
 
       expect(container.read(patchClashConfigProvider).mode, Mode.direct);
     });
 
-    test('leaving global alone keeps the selected group', () {
+    test('leaving global alone keeps the selected group', () async {
       final profile = Profile.normal(
         label: 'p',
       ).copyWith(id: 1, currentGroupName: 'Manual');
@@ -755,14 +790,15 @@ void main() {
           setupActionProvider.overrideWith(TestSetupAction.new),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
 
-      scoped.read(setupActionProvider.notifier).changeMode(Mode.rule);
+      await scoped.read(setupActionProvider.notifier).changeMode(Mode.rule);
 
       expect(scoped.read(currentProfileProvider)?.currentGroupName, 'Manual');
     });
 
-    test('global mode also selects the global group', () {
+    test('global mode also selects the global group', () async {
       final profile = Profile.normal(
         label: 'p',
       ).copyWith(id: 1, currentGroupName: 'Manual');
@@ -773,9 +809,10 @@ void main() {
           setupActionProvider.overrideWith(TestSetupAction.new),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
 
-      scoped.read(setupActionProvider.notifier).changeMode(Mode.global);
+      await scoped.read(setupActionProvider.notifier).changeMode(Mode.global);
 
       expect(scoped.read(patchClashConfigProvider).mode, Mode.global);
       expect(
@@ -852,10 +889,99 @@ void main() {
       dnsOverrideKeys: {},
     );
 
+    for (final supersede in [false, true]) {
+      test(
+        'managed stale input recaptures once; newer setup: $supersede',
+        () async {
+          final profile = draftTestProfile(71);
+          await testDatabase.profilesDao.putAll([profile.toCompanion()]);
+          final selection = ProfilePolicySelection(
+            profileId: profile.id,
+            rawContent: selectPolicyDraft(completePolicyDraft()),
+          );
+          final native = _Native();
+          when(native.getRequestState).thenAnswer(
+            (_) async => {
+              'phase': 'stopped',
+              'intentRevision': 1,
+              'intentRunning': false,
+              'processEpoch': 'fixture',
+              'configToken': 0,
+              'paused': false,
+            },
+          );
+          when(() => native.syncState(any())).thenAnswer((_) async => '');
+          final core = _newCore();
+          when(() => core.getConfig(any())).thenAnswer((_) async => {});
+          when(
+            core.getProxies,
+          ).thenAnswer((_) async => const ProxiesData(all: [], proxies: {}));
+          when(core.getExternalProviders).thenAnswer((_) async => []);
+          final entered = Completer<void>();
+          final release = Completer<void>();
+          var calls = 0;
+          when(() => core.applyConfigInput(any())).thenAnswer((_) async {
+            calls++;
+            if (supersede && calls == 1) {
+              entered.complete();
+              await release.future;
+            }
+            return _appliedResult(
+              supersede && calls > 1 ? 'installedInactive' : 'staleInput',
+            );
+          });
+          when(
+            () => core.failConfigBuild(any()),
+          ).thenAnswer((_) async => _appliedResult('blocked'));
+          final scoped = ProviderContainer(
+            overrides: [
+              profilesProvider.overrideWith(() => TestProfiles([profile])),
+              currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+              setupStateProvider.overrideWith(
+                (_, id) => nullProfileSetupState.copyWith(
+                  profileId: id,
+                  policySelection: selection,
+                ),
+              ),
+              coreHandlerProvider.overrideWithValue(
+                CoreController.scoped(core),
+              ),
+              setupActionProvider.overrideWith(
+                () => SetupAction.scoped(
+                  isAndroid: true,
+                  native: native,
+                  requests: Request(),
+                ),
+              ),
+            ],
+          );
+          scoped.listen(configProvider, (_, _) {});
+          addTearDown(scoped.dispose);
+          final action = scoped.read(setupActionProvider.notifier);
+          final first = action.applyProfile(force: true);
+          Future<bool>? newer;
+          if (supersede) {
+            await entered.future;
+            newer = action.applyProfile(force: true);
+            release.complete();
+          }
+          expect(await first, isFalse);
+          if (newer != null) expect(await newer, isTrue);
+          expect(calls, 2);
+          if (supersede) {
+            verifyNever(() => core.failConfigBuild(any()));
+          } else {
+            verify(() => core.failConfigBuild(any())).called(1);
+          }
+        },
+      );
+    }
+
     test(
       'a refresh failure can still apply the verified cached profile',
       () async {
         final profile = Profile.normal(label: 'p', url: 'http://127.0.0.1:9/');
+        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
         final core = _newCore();
         when(
           () => core.applyConfigInput(any()),
@@ -877,6 +1003,7 @@ void main() {
             setupActionProvider.overrideWith(SetupAction.new),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
 
         final succeeded = await scoped
@@ -891,6 +1018,7 @@ void main() {
       'a build failure retains the existing input and never sends empty YAML',
       () async {
         final profile = Profile.normal(label: 'p');
+        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
         final core = _newCore();
         when(() => core.getConfig(any())).thenThrow(Exception('broken yaml'));
         String? pushedConfig;
@@ -910,6 +1038,7 @@ void main() {
             setupActionProvider.overrideWith(SetupAction.new),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
 
         final succeeded = await scoped
@@ -934,6 +1063,7 @@ void main() {
         }
         await blockedInputs.writeAsString('blocked');
         final profile = Profile.normal(label: 'write failure');
+        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
         final core = _newCore();
         when(() => core.getConfig(any())).thenAnswer((_) async => {});
         when(
@@ -949,6 +1079,7 @@ void main() {
             setupActionProvider.overrideWith(SetupAction.new),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
 
         try {
@@ -968,6 +1099,7 @@ void main() {
       'safe mode writes a closed external controller into the profile',
       () async {
         final profile = Profile.normal(label: 'p');
+        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
         final core = _newCore();
         when(() => core.getConfig(any())).thenAnswer((_) async => {});
         String? pushedConfig;
@@ -988,10 +1120,11 @@ void main() {
             safeModeProvider.overrideWithValue(true),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
-        scoped
-            .read(patchClashConfigProvider.notifier)
-            .update(
+        await scoped
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch(
               (state) => state.copyWith(
                 externalController: ExternalControllerStatus.open,
               ),
@@ -1009,6 +1142,7 @@ void main() {
 
     test('a custom overwrite injects only the providers it names', () async {
       final profile = Profile.normal(label: 'p');
+      await testDatabase.profilesDao.putAll([profile.toCompanion()]);
       final core = _newCore();
       when(() => core.getConfig(any())).thenAnswer(
         (_) async => {
@@ -1068,6 +1202,7 @@ void main() {
           setupActionProvider.overrideWith(SetupAction.new),
         ],
       );
+      scoped.listen(configProvider, (_, _) {});
       addTearDown(scoped.dispose);
 
       final res = await scoped
@@ -1133,6 +1268,7 @@ void main() {
             setupActionProvider.overrideWith(SetupAction.new),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
 
         final succeeded = await scoped
@@ -1148,6 +1284,7 @@ void main() {
       'a blocked activation during initialize never publishes running',
       () async {
         final profile = Profile.normal(label: 'p');
+        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
         final core = _newCore();
         when(() => core.getConfig(any())).thenAnswer(
           (_) async => {
@@ -1170,6 +1307,7 @@ void main() {
             ),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
         final handoffAction =
             scoped.read(setupActionProvider.notifier)
@@ -1187,6 +1325,7 @@ void main() {
       'a rejected activation during initialize leaves runtime stopped',
       () async {
         final profile = Profile.normal(label: 'p');
+        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
         final core = _newCore();
         when(() => core.getConfig(any())).thenAnswer(
           (_) async => {
@@ -1207,6 +1346,7 @@ void main() {
             setupActionProvider.overrideWith(_MessageFailureSetupAction.new),
           ],
         );
+        scoped.listen(configProvider, (_, _) {});
         addTearDown(scoped.dispose);
         final messageAction =
             scoped.read(setupActionProvider.notifier)

@@ -1,3 +1,5 @@
+import 'package:fl_clash/providers/config_state.dart';
+import '../helpers/test_config_state.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/icons/icons.dart';
@@ -35,7 +37,10 @@ void main() {
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
     globalState.container = container;
     container.listen(configProvider, (_, _) {});

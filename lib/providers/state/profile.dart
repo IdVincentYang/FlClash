@@ -1,6 +1,10 @@
 part of '../state.dart';
 
 @riverpod
+Stream<ProfilePolicySelection?> policySelection(Ref ref, int profileId) =>
+    database.profilePolicySelectionsDao.query(profileId).watchSingleOrNull();
+
+@riverpod
 ProfilesState profilesState(Ref ref) {
   final currentProfileId = ref.watch(currentProfileIdProvider);
   final profiles = ref.watch(profilesProvider);
@@ -80,6 +84,11 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
     }
   }
   return SetupState(
+    policySelection: profileId == null
+        ? null
+        : await database.profilePolicySelectionsDao
+              .query(profileId)
+              .getSingleOrNull(),
     clashProviders: clashProviders,
     profileProviders: profileProviders,
     rules: rules,

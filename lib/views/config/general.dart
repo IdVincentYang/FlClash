@@ -3,8 +3,10 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/config/on_demand.dart';
 import 'package:fl_clash/views/config/user_agents.dart';
+import 'package:fl_clash/views/profiles/policy_draft.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,8 +24,8 @@ class LogLevelItem extends ConsumerWidget {
       textBuilder: (logLevel) => logLevel.name,
       selector: patchClashConfigProvider.select((state) => state.logLevel),
       onChanged: (ref, value) => ref
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith(logLevel: value)),
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith(logLevel: value)),
     );
   }
 }
@@ -78,8 +80,10 @@ class KeepAliveIntervalItem extends ConsumerWidget {
         }
         final intValue = int.parse(value);
         ref
-            .read(patchClashConfigProvider.notifier)
-            .update((state) => state.copyWith(keepAliveInterval: intValue));
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch(
+              (state) => state.copyWith(keepAliveInterval: intValue),
+            );
       },
     );
   }
@@ -115,8 +119,8 @@ class TestUrlItem extends ConsumerWidget {
           return;
         }
         ref
-            .read(appSettingProvider.notifier)
-            .update((state) => state.copyWith(testUrl: value));
+            .read(applicationInputActionProvider.notifier)
+            .updateAppSetting((state) => state.copyWith(testUrl: value));
       },
     );
   }
@@ -132,6 +136,22 @@ class PortItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, ref) {
     final appLocalizations = context.appLocalizations;
+    final profile = ref.watch(currentProfileProvider);
+    final selected = profile == null
+        ? null
+        : ref.watch(policySelectionProvider(profile.id));
+    final fact = ref.watch(configStateProvider).fact;
+    if (profile != null && (selected?.value != null || fact.isManaged)) {
+      return ListItem.open(
+        title: Text(appLocalizations.port),
+        subtitle: Text(
+          fact.isManaged
+              ? '${fact.mixedPort}'
+              : appLocalizations.policyManagedEditRequired,
+        ),
+        widget: PolicyDraftView(profile: profile),
+      );
+    }
     final mixedPort = ref.watch(
       patchClashConfigProvider.select((state) => state.mixedPort),
     );
@@ -165,8 +185,8 @@ class HostsItem extends ConsumerWidget {
       ),
       onChanged: (value) {
         ref
-            .read(patchClashConfigProvider.notifier)
-            .update((state) => state.copyWith(hosts: value));
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch((state) => state.copyWith(hosts: value));
       },
     );
   }
@@ -183,8 +203,9 @@ class AuthenticationItem extends ConsumerWidget {
       selector: networkSettingProvider.select(
         (state) => state.authentication.enable,
       ),
-      onChanged: (ref, value) =>
-          ref.read(networkSettingProvider.notifier).update((state) {
+      onChanged: (ref, value) => ref
+          .read(applicationInputActionProvider.notifier)
+          .updateNetwork((state) {
             var authentication = state.authentication.copyWith(enable: value);
             if (value && authentication.username.isEmpty) {
               authentication = authentication.copyWith(
@@ -213,8 +234,10 @@ class AuthenticationAccountItem extends ConsumerWidget {
       // colon, so a colon in the username breaks authentication.
       normalize: (value) => value.trim().replaceAll(':', ''),
       onChanged: (ref, value) => ref
-          .read(networkSettingProvider.notifier)
-          .update((state) => state.copyWith.authentication(username: value)),
+          .read(applicationInputActionProvider.notifier)
+          .updateNetwork(
+            (state) => state.copyWith.authentication(username: value),
+          ),
     );
   }
 }
@@ -232,8 +255,10 @@ class AuthenticationPasswordItem extends ConsumerWidget {
       ),
       normalize: (value) => value.trim(),
       onChanged: (ref, value) => ref
-          .read(networkSettingProvider.notifier)
-          .update((state) => state.copyWith.authentication(password: value)),
+          .read(applicationInputActionProvider.notifier)
+          .updateNetwork(
+            (state) => state.copyWith.authentication(password: value),
+          ),
     );
   }
 }
@@ -249,8 +274,8 @@ ConfigToggleItem _clashToggle({
     subtitle: subtitle,
     selector: patchClashConfigProvider.select(select),
     onChanged: (ref, value) => ref
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => update(state, value)),
+        .read(applicationInputActionProvider.notifier)
+        .updatePatch((state) => update(state, value)),
   );
 }
 
@@ -411,8 +436,8 @@ class GeneralView extends ConsumerWidget {
           (state) => state.appendSystemDns,
         ),
         onChanged: (ref, value) => ref
-            .read(networkSettingProvider.notifier)
-            .update((state) => state.copyWith(appendSystemDns: value)),
+            .read(applicationInputActionProvider.notifier)
+            .updateNetwork((state) => state.copyWith(appendSystemDns: value)),
       ),
       _clashToggle(
         title: (l) => l.geodataLoader,

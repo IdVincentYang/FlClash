@@ -16,6 +16,7 @@ import (
 	"github.com/metacubex/mihomo/common/yaml"
 	"github.com/metacubex/mihomo/component/age"
 	"github.com/metacubex/mihomo/component/requestscope"
+	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
@@ -33,6 +34,7 @@ type ConfigManifest struct {
 	SelectedMap       map[string]string          `json:"selectedMap"`
 	TestURL           string                     `json:"testUrl"`
 	AcceptedOverrides map[string]json.RawMessage `json:"acceptedOverrides"`
+	ManagedPolicy     *ManagedPolicyDescriptor   `json:"managedPolicy,omitempty"`
 }
 
 type ConfigSourceTicket struct {
@@ -42,12 +44,13 @@ type ConfigSourceTicket struct {
 }
 
 type ConfigInputRequest struct {
-	InputID     string             `json:"inputId"`
-	ExpectedRun AppRequestState    `json:"expectedRun"`
-	Active      bool               `json:"active"`
-	Init        *InitParams        `json:"init,omitempty"`
-	Source      ConfigSourceTicket `json:"source"`
-	Replay      bool               `json:"replay"`
+	InputID        string             `json:"inputId"`
+	ExpectedRun    AppRequestState    `json:"expectedRun"`
+	Active         bool               `json:"active"`
+	Init           *InitParams        `json:"init,omitempty"`
+	Source         ConfigSourceTicket `json:"source"`
+	Replay         bool               `json:"replay"`
+	ExpectedConfig *ConfigFence       `json:"expectedConfig,omitempty"`
 }
 
 type ConfigReceipt struct {
@@ -67,18 +70,24 @@ type ServiceCoreParams struct {
 }
 
 type ConfigFact struct {
-	RuntimeEpoch   string `json:"runtimeEpoch"`
-	Version        uint64 `json:"version"`
-	Token          uint64 `json:"token"`
-	Owner          uint64 `json:"owner"`
-	InputID        string `json:"inputId"`
-	YAMLSHA256     string `json:"yamlSha256"`
-	ParsedSHA256   string `json:"parsedSha256"`
-	ProfileID      *int64 `json:"profileId"`
-	ProfileName    string `json:"profileName"`
-	Phase          string `json:"phase"`
-	BusinessActive bool   `json:"businessActive"`
-	ReplayEligible bool   `json:"replayEligible"`
+	RuntimeEpoch     string `json:"runtimeEpoch"`
+	Version          uint64 `json:"version"`
+	Token            uint64 `json:"token"`
+	Owner            uint64 `json:"owner"`
+	InputID          string `json:"inputId"`
+	YAMLSHA256       string `json:"yamlSha256"`
+	ParsedSHA256     string `json:"parsedSha256"`
+	ProfileID        *int64 `json:"profileId"`
+	ProfileName      string `json:"profileName"`
+	Phase            string `json:"phase"`
+	BusinessActive   bool   `json:"businessActive"`
+	ReplayEligible   bool   `json:"replayEligible"`
+	PolicyVersion    int    `json:"policyVersion"`
+	PolicySHA256     string `json:"policySha256"`
+	MaintenanceProxy string `json:"maintenanceProxy"`
+	MixedPort        int    `json:"mixedPort"`
+	RouteEpoch       uint64 `json:"routeEpoch"`
+	PicksVersion     uint64 `json:"picksVersion"`
 }
 
 type ConfigApplyResult struct {
@@ -103,6 +112,7 @@ type preparedConfig struct {
 	receipt    ConfigReceipt
 	coreParams ServiceCoreParams
 	mixed      *listener.MixedBinding
+	dns        *configDNSBinding
 	scope      *requestscope.BusinessScope
 	sources    map[string]uint64
 	dataset    uint64
@@ -233,6 +243,9 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 	if err = patchConfigInput(raw, manifest.AcceptedOverrides); err != nil {
 		return manifest, nil, nil, "", err
 	}
+	if err = validateManagedInput(manifest, raw); err != nil {
+		return manifest, nil, nil, "", err
+	}
 	return manifest, slices.Clone(data), raw, parsedSHA, nil
 }
 
@@ -309,8 +322,16 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	if err != nil {
 		return configResult("rejected", receipt, err)
 	}
+	if manifest.ManagedPolicy != nil && !op.request.Replay && op.request.ExpectedConfig == nil {
+		return configResult("rejected", receipt, errManagedPolicy)
+	}
 	selectMu.Lock()
 	checkpointMu.Lock()
+	if !configFenceMatchesLocked(op.request.ExpectedConfig) {
+		checkpointMu.Unlock()
+		selectMu.Unlock()
+		return configResult("staleInput", receipt, errConfigSuperseded)
+	}
 	replayValid := true
 	if op.request.Replay {
 		ref, err := readCheckpointLocked(home)
@@ -348,6 +369,12 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	pendingConfig = p
 	appliedConfig = nil
 	configFact = ConfigFact{RuntimeEpoch: configRuntimeEpoch, Version: configFactSequence.Add(1), Token: receipt.Token, Owner: owner.ID, InputID: receipt.InputID, YAMLSHA256: manifest.YAMLSHA256, ParsedSHA256: parsedSHA, ProfileID: manifest.ProfileID, ProfileName: manifest.ProfileName, Phase: "parsing", ReplayEligible: true}
+	configFact.MixedPort = raw.MixedPort
+	if manifest.ManagedPolicy != nil {
+		configFact.PolicyVersion = manifest.ManagedPolicy.Version
+		configFact.PolicySHA256 = manifest.ManagedPolicy.PolicySHA256
+		configFact.MaintenanceProxy = manifest.ManagedPolicy.MaintenanceProxy
+	}
 	checkpointMu.Unlock()
 	selectMu.Unlock()
 	finishRequestCleanup(cleanups)
@@ -441,7 +468,20 @@ func installConfig(receipt ConfigReceipt) ConfigApplyResult {
 		return blockConfigLocked(p, err)
 	}
 	setTestURL(p.manifest.TestURL)
+	if p.op.request.Active && cfg.DNS.Enable {
+		p.dns, err = prepareConfigDNS(cfg.DNS.Listen, cfg.DNS.ListenRoutingMark, p.scope)
+		if err != nil {
+			return blockConfigLocked(p, err)
+		}
+		ordinaryDNS.Store(p.dns)
+	}
+	dnsListen := cfg.DNS.Listen
+	cfg.DNS.Listen = ""
 	hub.ApplyConfigStaged(cfg)
+	cfg.DNS.Listen = dnsListen
+	if err = p.dns.start(p.scope, resolver.DefaultService); err != nil {
+		return blockConfigLocked(p, err)
+	}
 	patchSelectGroup(p.manifest.SelectedMap)
 	bumpRouteEpoch()
 	if _, err = pendingForReceipt(receipt); err != nil {
@@ -472,6 +512,9 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 		return blockConfigLocked(p, errors.New("configuration is not installed"))
 	}
 	if err = p.mixed.Validate(); err != nil {
+		return blockConfigLocked(p, err)
+	}
+	if err = p.dns.validate(); err != nil {
 		return blockConfigLocked(p, err)
 	}
 	checkpointMu.Lock()
@@ -614,6 +657,7 @@ func configStateSnapshot() ConfigFact {
 	checkpointMu.Lock()
 	defer checkpointMu.Unlock()
 	fact := configFact
+	fact.RouteEpoch, fact.PicksVersion = routeStamp()
 	if appliedConfig != nil && fact.Owner == appliedConfig.receipt.Owner {
 		fact.ReplayEligible = appliedConfig.eligible
 	}
@@ -712,6 +756,9 @@ func initializeCore(params *InitParams) {
 }
 
 func init() {
+	registerMethod(failConfigBuildMethod, withArguments(func(request *ConfigBuildFailure, response MethodResponse) {
+		response.success(failConfigBuild(request))
+	}))
 	registerMethod(getAppliedInputMethod, withoutArguments(func(response MethodResponse) {
 		configMu.Lock()
 		defer configMu.Unlock()

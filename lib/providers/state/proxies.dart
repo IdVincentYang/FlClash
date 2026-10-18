@@ -2,10 +2,13 @@ part of '../state.dart';
 
 @riverpod
 GroupsState currentGroupsState(Ref ref) {
-  final mode = ref.watch(
-    patchClashConfigProvider.select((state) => state.mode),
-  );
-  final groups = ref.watch(groupsProvider);
+  final managed = ref.watch(configStateProvider).fact.isManaged;
+  final mode = managed
+      ? Mode.rule
+      : ref.watch(patchClashConfigProvider.select((state) => state.mode));
+  final groups = ref
+      .watch(groupsProvider)
+      .where((group) => !managed || group.name.startsWith('fc-managed-group-'));
   final shown = switch (mode) {
     Mode.direct => const <Group>[],
     Mode.global => groups,
@@ -40,11 +43,12 @@ ProxyState proxyState(Ref ref) {
       ),
     ),
   );
-  final mixedPort = ref.watch(
-    patchClashConfigProvider.select((state) => state.mixedPort),
-  );
+  final fact = ref.watch(configStateProvider).fact;
+  final mixedPort = fact.isManaged
+      ? fact.mixedPort
+      : ref.watch(patchClashConfigProvider.select((state) => state.mixedPort));
   return ProxyState(
-    isStart: suspend ? false : isStart,
+    isStart: !suspend && isStart && (!fact.isManaged || fact.businessActive),
     systemProxy: systemProxySelector.systemProxy,
     bassDomain: systemProxySelector.bypassDomain,
     port: mixedPort,

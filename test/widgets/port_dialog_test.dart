@@ -1,3 +1,5 @@
+import 'package:fl_clash/common/preferences.dart';
+import '../helpers/commit_tap.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
@@ -6,6 +8,9 @@ import 'package:fl_clash/views/config/general.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fl_clash/providers/config_state.dart';
+import '../helpers/test_config_state.dart';
 
 import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
@@ -17,8 +22,12 @@ Future<ProviderContainer> _openPortDialog(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 
   final container = ProviderContainer(
-    overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+    overrides: [
+      profilesProvider.overrideWith(TestProfiles.new),
+      configStateProvider.overrideWith(TestConfigState.new),
+    ],
   );
+  container.listen(configProvider, (_, _) {});
   addTearDown(container.dispose);
   globalState.container = container;
   container
@@ -35,17 +44,22 @@ Future<ProviderContainer> _openPortDialog(WidgetTester tester) async {
   );
   await tester.pump();
 
-  await tester.tap(find.byType(PortItem));
+  await tapAndCommit(tester, find.byType(PortItem));
   await tester.pumpAndSettle();
   return container;
 }
 
 Future<void> _expandMore(WidgetTester tester) async {
-  await tester.tap(find.byType(IconButton).first);
+  await tapAndCommit(tester, find.byType(IconButton).first);
   await tester.pumpAndSettle();
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
   testWidgets('opens with the mixed port and hides the rest until expanded', (
     tester,
   ) async {
@@ -123,7 +137,7 @@ void main() {
     await tester.enterText(fields.at(4), '0');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Submit'));
+    await tapAndCommit(tester, find.text('Submit'));
     await tester.pumpAndSettle();
 
     final config = container.read(patchClashConfigProvider);

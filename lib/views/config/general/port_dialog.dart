@@ -86,23 +86,26 @@ class _PortDialogState extends ConsumerState<_PortDialog> {
     if (res != true) {
       return;
     }
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update(
-          (state) => state.copyWith(
-            mixedPort: 7890,
-            port: 0,
-            socksPort: 0,
-            redirPort: 0,
-            tproxyPort: 0,
-          ),
-        );
-    if (mounted) {
+    if (!mounted) return;
+    final action = ref.read(applicationInputActionProvider.notifier);
+    final saved = await globalState.safeRun(() async {
+      await action.updatePatch(
+        (state) => state.copyWith(
+          mixedPort: 7890,
+          port: 0,
+          socksPort: 0,
+          redirPort: 0,
+          tproxyPort: 0,
+        ),
+      );
+      return true;
+    });
+    if (saved == true && mounted) {
       Navigator.of(context).pop();
     }
   }
 
-  void _handleUpdate() {
+  Future<void> _handleUpdate() async {
     final appLocalizations = context.appLocalizations;
     final hasInvalid = _fields.any(
       (field) =>
@@ -124,18 +127,25 @@ class _PortDialogState extends ConsumerState<_PortDialog> {
       });
       return;
     }
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update(
-          (state) => state.copyWith(
-            mixedPort: int.parse(_mixedPortController.text),
-            port: int.parse(_portController.text),
-            socksPort: int.parse(_socksPortController.text),
-            redirPort: int.parse(_redirPortController.text),
-            tproxyPort: int.parse(_tProxyPortController.text),
-          ),
-        );
-    Navigator.of(context).pop();
+    final mixed = int.parse(_mixedPortController.text);
+    final http = int.parse(_portController.text);
+    final socks = int.parse(_socksPortController.text);
+    final redir = int.parse(_redirPortController.text);
+    final tproxy = int.parse(_tProxyPortController.text);
+    final action = ref.read(applicationInputActionProvider.notifier);
+    final saved = await globalState.safeRun(() async {
+      await action.updatePatch(
+        (state) => state.copyWith(
+          mixedPort: mixed,
+          port: http,
+          socksPort: socks,
+          redirPort: redir,
+          tproxyPort: tproxy,
+        ),
+      );
+      return true;
+    });
+    if (saved == true && mounted) Navigator.of(context).pop();
   }
 
   void _handleMore() {

@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod/riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 
@@ -24,6 +25,7 @@ void main() {
   late MockCoreHandlerInterface core;
 
   setUpAll(() {
+    SharedPreferences.setMockInitialValues({});
     core = MockCoreHandlerInterface();
     globalState.packageInfo = PackageInfo(
       appName: 'FlClash',
@@ -41,12 +43,13 @@ void main() {
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
       ],
     );
+    container.listen(configProvider, (_, _) {});
     addTearDown(container.dispose);
     return container;
   }
 
   group('CommonAction.updateMode', () {
-    test('advances through every mode and wraps back to the first', () {
+    test('advances through every mode and wraps back to the first', () async {
       final container = buildContainer();
       final action = container.read(commonActionProvider.notifier);
       container
@@ -55,7 +58,7 @@ void main() {
 
       final seen = <Mode>[container.read(patchClashConfigProvider).mode];
       for (var i = 0; i < Mode.values.length; i++) {
-        action.updateMode();
+        await action.updateMode();
         seen.add(container.read(patchClashConfigProvider).mode);
       }
 

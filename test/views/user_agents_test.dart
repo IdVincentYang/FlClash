@@ -1,3 +1,5 @@
+import '../helpers/commit_tap.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -11,6 +13,11 @@ import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
   late ProviderContainer container;
 
   String? selected() => container.read(patchClashConfigProvider).globalUa;
@@ -32,16 +39,19 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        profilesProvider.overrideWith(TestProfiles.new),
+        patchClashConfigProvider.overrideWithBuild(
+          (_, _) => PatchClashConfig(globalUa: globalUa),
+        ),
+      ],
     );
     addTearDown(container.dispose);
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
     container
         .read(viewSizeProvider.notifier)
         .update((_) => const Size(1000, 1600));
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(globalUa: globalUa));
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -54,7 +64,7 @@ void main() {
 
   Future<void> submitInput(WidgetTester tester, String text) async {
     await tester.enterText(find.byType(TextFormField), text);
-    await tester.tap(find.text(currentAppLocalizations.submit));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.submit));
     await tester.pumpAndSettle();
   }
 
@@ -78,11 +88,11 @@ void main() {
   ) async {
     await pumpView(tester);
 
-    await tester.tap(find.text(defaultUserAgents.last));
+    await tapAndCommit(tester, find.text(defaultUserAgents.last));
     await tester.pumpAndSettle();
     expect(selected(), defaultUserAgents.last);
 
-    await tester.tap(find.text(currentAppLocalizations.defaultText));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.defaultText));
     await tester.pumpAndSettle();
     expect(selected(), isNull);
   });
@@ -90,7 +100,7 @@ void main() {
   testWidgets('adding appends without changing the selection', (tester) async {
     await pumpView(tester);
 
-    await tester.tap(find.text(currentAppLocalizations.add));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.add));
     await tester.pumpAndSettle();
     await submitInput(tester, '  CustomUA/1.0  ');
 
@@ -102,7 +112,7 @@ void main() {
   testWidgets('adding rejects an empty or duplicate value', (tester) async {
     await pumpView(tester);
 
-    await tester.tap(find.text(currentAppLocalizations.add));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.add));
     await tester.pumpAndSettle();
     await submitInput(tester, '   ');
     expect(
@@ -125,9 +135,9 @@ void main() {
   testWidgets('editing the selected value keeps it selected', (tester) async {
     await pumpView(tester, globalUa: defaultUserAgents.first);
 
-    await tester.tap(menuOf(defaultUserAgents.first));
+    await tapAndCommit(tester, menuOf(defaultUserAgents.first));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(currentAppLocalizations.edit));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.edit));
     await tester.pumpAndSettle();
     await submitInput(tester, 'clash-verge/v3.0.0');
 
@@ -140,11 +150,11 @@ void main() {
   ) async {
     await pumpView(tester, globalUa: defaultUserAgents.last);
 
-    await tester.tap(menuOf(defaultUserAgents.last));
+    await tapAndCommit(tester, menuOf(defaultUserAgents.last));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(currentAppLocalizations.delete));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.delete));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(currentAppLocalizations.confirm));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.confirm));
     await tester.pumpAndSettle();
 
     expect(saved(), [defaultUserAgents.first]);
@@ -160,11 +170,11 @@ void main() {
     expect(find.text('Legacy/1.0'), findsOneWidget);
     expect(saved(), defaultUserAgents);
 
-    await tester.tap(menuOf(defaultUserAgents.first));
+    await tapAndCommit(tester, menuOf(defaultUserAgents.first));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(currentAppLocalizations.delete));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.delete));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(currentAppLocalizations.confirm));
+    await tapAndCommit(tester, find.text(currentAppLocalizations.confirm));
     await tester.pumpAndSettle();
 
     expect(saved(), [defaultUserAgents.last, 'Legacy/1.0']);

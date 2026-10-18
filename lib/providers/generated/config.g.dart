@@ -41,7 +41,7 @@ final class AppSettingProvider
   }
 }
 
-String _$appSettingHash() => r'520a3125e1d0baca1fb65abb2110ad4419f8b2d9';
+String _$appSettingHash() => r'630e4c340fdaa546b0442acf84069eadf5386e42';
 
 abstract class _$AppSetting extends $Notifier<AppSettingProps> {
   AppSettingProps build();
@@ -144,7 +144,7 @@ final class VpnSettingProvider extends $NotifierProvider<VpnSetting, VpnProps> {
   }
 }
 
-String _$vpnSettingHash() => r'dd0ff8720c2c4f22fc973305de8c87bcbee4536e';
+String _$vpnSettingHash() => r'4623a2b1aafeb525fbd4b8cd5839810536f26cea';
 
 abstract class _$VpnSetting extends $Notifier<VpnProps> {
   VpnProps build();
@@ -196,7 +196,7 @@ final class NetworkSettingProvider
   }
 }
 
-String _$networkSettingHash() => r'fa204b5ad21bc3e73c07aa6989f68c288ca20aaf';
+String _$networkSettingHash() => r'8f2416d9d339792be157e2921c3ede24120e6fd2';
 
 abstract class _$NetworkSetting extends $Notifier<NetworkProps> {
   NetworkProps build();
@@ -403,7 +403,7 @@ final class OverrideDnsProvider extends $NotifierProvider<OverrideDns, bool> {
   }
 }
 
-String _$overrideDnsHash() => r'3d49994fa23389530643e8c80e588a58f14eec92';
+String _$overrideDnsHash() => r'98176dcc6f6de0a5f6ec16cd772f3377ffbc51be';
 
 abstract class _$OverrideDns extends $Notifier<bool> {
   bool build();
@@ -454,7 +454,7 @@ final class OverrideNtpProvider extends $NotifierProvider<OverrideNtp, bool> {
   }
 }
 
-String _$overrideNtpHash() => r'9ff34d39ed6adf60ce1a059edad8784f15fe5591';
+String _$overrideNtpHash() => r'5e3728ae0c7c68375930058f79d7681c48d6607d';
 
 abstract class _$OverrideNtp extends $Notifier<bool> {
   bool build();
@@ -611,7 +611,7 @@ final class _PatchClashConfigProvider
   }
 }
 
-String _$_patchClashConfigHash() => r'2a02c8f1ff5746c6c0b2248343bd729d4f2a5886';
+String _$_patchClashConfigHash() => r'8f8335bc58f2f37d5898d3ba13dc48f5776ac856';
 
 abstract class _$PatchClashConfig extends $Notifier<PatchClashConfig> {
   PatchClashConfig build();
@@ -722,3 +722,56 @@ final class _ConfigProvider extends $FunctionalProvider<Config, Config, Config>
 }
 
 String _$_configHash() => r'654d23a6e5572e1368724378204e2b14087dad71';
+
+@ProviderFor(ApplicationInputAction)
+final applicationInputActionProvider = ApplicationInputActionProvider._();
+
+final class ApplicationInputActionProvider
+    extends $NotifierProvider<ApplicationInputAction, void> {
+  ApplicationInputActionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'applicationInputActionProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$applicationInputActionHash();
+
+  @$internal
+  @override
+  ApplicationInputAction create() => ApplicationInputAction();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(void value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<void>(value),
+    );
+  }
+}
+
+String _$applicationInputActionHash() =>
+    r'877dfba5a861e573d453034ec3ddc99f711c1a45';
+
+abstract class _$ApplicationInputAction extends $Notifier<void> {
+  void build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<void, void>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<void, void>,
+              void,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}

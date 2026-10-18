@@ -6,6 +6,7 @@ import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/profiles/preview.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/managed_policy.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,6 +45,12 @@ class _OverwriteViewState extends ConsumerState<OverwriteView> {
 
   @override
   Widget build(BuildContext context) {
+    final gate = managedPolicySettingsGate(
+      context,
+      ref,
+      profileId: widget.profileId,
+    );
+    if (gate != null) return gate;
     final appLocalizations = context.appLocalizations;
     return ProfileIdProvider(
       profileId: widget.profileId,

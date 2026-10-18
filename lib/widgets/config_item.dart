@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +14,7 @@ export 'package:riverpod/misc.dart' show ProviderListenable;
 
 typedef ConfigLabel = String Function(AppLocalizations appLocalizations);
 
-typedef ConfigWriter<T> = void Function(WidgetRef ref, T value);
+typedef ConfigWriter<T> = FutureOr<void> Function(WidgetRef ref, T value);
 
 abstract class _ConfigItem<T> extends ConsumerWidget {
   const _ConfigItem({
@@ -28,6 +31,10 @@ abstract class _ConfigItem<T> extends ConsumerWidget {
   final ConfigLabel? subtitle;
   final ConfigWriter<T> onChanged;
   final Widget? leading;
+
+  void writeValue(WidgetRef ref, T value) {
+    unawaited(globalState.safeRun(() => onChanged(ref, value)));
+  }
 
   Widget buildItem(
     BuildContext context,
@@ -70,7 +77,7 @@ class ConfigToggleItem extends _ConfigItem<bool> {
       title: Text(title(appLocalizations)),
       subtitle: buildSubtitle(appLocalizations),
       value: value,
-      onChanged: (value) => onChanged(ref, value),
+      onChanged: (value) => writeValue(ref, value),
     );
   }
 }
@@ -109,7 +116,7 @@ class ConfigOptionsItem<T> extends _ConfigItem<T> {
         if (value == null) {
           return;
         }
-        onChanged(ref, value);
+        writeValue(ref, value);
       },
     );
   }
@@ -175,7 +182,7 @@ class ConfigTextItem extends _ConfigItem<String> {
         if (normalized == null) {
           return;
         }
-        onChanged(ref, normalized);
+        writeValue(ref, normalized);
       },
     );
   }
@@ -218,7 +225,7 @@ class ConfigListEditItem extends _ConfigItem<List<String>> {
         itemMaxLength: itemMaxLength,
         titleBuilder: (item) => Text(item),
       ),
-      onChanged: (items) => onChanged(ref, List<String>.from(items as List)),
+      onChanged: (items) => writeValue(ref, List<String>.from(items as List)),
     );
   }
 }

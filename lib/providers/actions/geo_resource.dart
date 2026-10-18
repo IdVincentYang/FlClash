@@ -108,11 +108,8 @@ class GeoResourceAction extends _$GeoResourceAction {
     if (!newUrl.isUrl) {
       throw ArgumentError.value(newUrl, 'newUrl', 'Not a valid URL');
     }
-    await request.mutate(() async {
-      await request.invalidate('geo:${geoResource.name}');
-      ref.read(patchClashConfigProvider.notifier).update((state) {
-        return state.copyWith(geoXUrl: {...state.geoXUrl, geoResource: newUrl});
-      });
-    });
+    await ref
+        .read(applicationInputActionProvider.notifier)
+        .updateGeoUrl(geoResource, newUrl);
   }
 }

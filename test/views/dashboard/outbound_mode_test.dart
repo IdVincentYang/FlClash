@@ -1,3 +1,6 @@
+import '../../helpers/commit_tap.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../helpers/test_config_state.dart';
 import 'dart:math';
 
 import 'package:fl_clash/common/common.dart';
@@ -18,12 +21,22 @@ import '../../helpers/test_app.dart';
 import '../../helpers/test_profiles.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
+  });
+
   late ProviderContainer container;
 
   setUp(() {
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
+    container.listen(configProvider, (_, _) {});
     globalState.container = container;
   });
 
@@ -167,7 +180,7 @@ void main() {
         unitHeight: unitHeight,
         textScale: textScale,
       );
-      await tester.tap(rowOf(Mode.direct));
+      await tapAndCommit(tester, rowOf(Mode.direct));
       await tester.pumpAndSettle();
 
       final card = tester.getRect(find.byType(OutboundMode));
@@ -194,7 +207,7 @@ void main() {
       for (final mode in Mode.values) mode: tester.getRect(rowOf(mode)),
     };
 
-    await tester.tap(rowOf(Mode.direct));
+    await tapAndCommit(tester, rowOf(Mode.direct));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
 
@@ -222,7 +235,7 @@ void main() {
       ).colorScheme;
       final colors = <Mode, Color>{};
       for (final mode in Mode.values) {
-        await tester.tap(rowOf(mode));
+        await tapAndCommit(tester, rowOf(mode));
         await tester.pumpAndSettle();
         colors[mode] = highlightColor();
       }

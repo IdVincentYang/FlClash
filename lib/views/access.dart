@@ -195,7 +195,7 @@ class _AccessViewState extends ConsumerState<AccessView> {
       return;
     }
     if (res) {
-      _handleSave();
+      if (!await _handleSave()) return;
     }
     if (mounted) {
       Navigator.of(context).pop();
@@ -224,15 +224,18 @@ class _AccessViewState extends ConsumerState<AccessView> {
     );
   }
 
-  void _handleSave() {
+  Future<bool> _handleSave() async {
     final accessControl = ref.read(accessControlStateProvider);
-    ref
-        .read(vpnSettingProvider.notifier)
-        .update(
-          (state) => state.copyWith(
-            accessControlProps: _getRealAccessControlProps(accessControl),
-          ),
-        );
+    final selected = _getRealAccessControlProps(accessControl);
+    return await globalState.safeRun(() async {
+          await ref
+              .read(applicationInputActionProvider.notifier)
+              .updateVpn(
+                (state) => state.copyWith(accessControlProps: selected),
+              );
+          return true;
+        }) ==
+        true;
   }
 
   Future<void> _exportToClipboard() async {

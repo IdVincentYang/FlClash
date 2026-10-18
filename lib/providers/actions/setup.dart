@@ -1,6 +1,19 @@
 part of '../action.dart';
 
-enum _SetupTaskResult { completed, handoffToCoreRestart, failed, superseded }
+typedef ConfigFailureObservation = ({
+  CoreController core,
+  ConfigFact fact,
+  Map<String, Object?>? nativeRun,
+  int registeredToken,
+});
+
+enum _SetupTaskResult {
+  completed,
+  handoffToCoreRestart,
+  failed,
+  superseded,
+  staleInput,
+}
 
 class _RunRequest {
   final bool running;
@@ -16,6 +29,36 @@ class _RunRequest {
     required this.previousStartTime,
     required this.nativeRequest,
   });
+}
+
+class _SetupInputs {
+  const _SetupInputs({
+    required this.state,
+    required this.profile,
+    required this.patch,
+    required this.network,
+    required this.overrideDns,
+    required this.overrideNtp,
+    required this.safeMode,
+    required this.testUrl,
+    required this.picks,
+    required this.shared,
+    required this.vpn,
+    required this.fact,
+    required this.policy,
+  });
+
+  final SetupState state;
+  final Profile profile;
+  final PatchClashConfig patch;
+  final NetworkProps network;
+  final bool overrideDns, overrideNtp, safeMode;
+  final String testUrl;
+  final Map<String, String> picks;
+  final SharedState shared;
+  final VpnState vpn;
+  final ConfigFact fact;
+  final SelectedPolicy? policy;
 }
 
 @Riverpod(keepAlive: true)
@@ -39,6 +82,39 @@ class SetupAction extends _$SetupAction {
   Request get _requests => _requestClient ?? request;
 
   CoreController get _core => ref.read(coreHandlerProvider);
+
+  Future<ConfigFailureObservation?> captureConfigFailure(Request client) async {
+    if (!client.hasNativeClient && !ref.read(initProvider)) return null;
+    final core = _core;
+    final nativeRun = await client.captureNativeRunState();
+    final fact = await core.getConfigState();
+    return (
+      core: core,
+      fact: fact,
+      nativeRun: nativeRun,
+      registeredToken:
+          (nativeRun?['configToken'] as num?)?.toInt() ?? fact.token,
+    );
+  }
+
+  Future<void> finishConfigFailure(ConfigFailureObservation observation) async {
+    final result = await observation.core.failConfigBuild({
+      'expected': observation.fact.fence,
+      'expectedRun': ?observation.nativeRun,
+      'registeredToken': observation.registeredToken,
+    });
+    if (result.status == 'cleanupFailed') {
+      throw StateError('Owned service cleanup failed');
+    }
+    if (!ref.mounted || result.status == 'superseded') return;
+    ref
+        .read(configStateProvider.notifier)
+        .accept(result.fact, authoritative: true);
+    if (ref.read(configStateProvider).fact.token == result.fact.token) {
+      if (!result.fact.businessActive) _setLocalRunning(false);
+      ref.read(configStateProvider.notifier).markBuildFailure();
+    }
+  }
 
   Timer? _runtimeTimer;
   final _setupScheduler = SerialTaskScheduler();
@@ -350,6 +426,15 @@ class SetupAction extends _$SetupAction {
   @visibleForTesting
   Future<void> updateConfig() async {
     await globalState.safeRun(() async {
+      final profileId = ref.read(currentProfileIdProvider);
+      if (profileId != null &&
+          await database.profilePolicySelectionsDao
+                  .query(profileId)
+                  .getSingleOrNull() !=
+              null) {
+        await applyProfile(force: true);
+        return;
+      }
       final patchConfig = ref.read(patchClashConfigProvider);
       final shouldContinueSetup = await requestAdmin(patchConfig.tun.enable);
       if (!shouldContinueSetup) {
@@ -388,10 +473,10 @@ class SetupAction extends _$SetupAction {
     });
   }
 
-  void changeMode(Mode mode) {
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(mode: mode));
+  Future<void> changeMode(Mode mode) async {
+    await ref
+        .read(applicationInputActionProvider.notifier)
+        .updatePatch((state) => state.copyWith(mode: mode));
     if (mode == Mode.global) {
       ref
           .read(proxiesActionProvider.notifier)
@@ -423,17 +508,26 @@ class SetupAction extends _$SetupAction {
       if (!await current()) {
         return _SetupTaskResult.superseded;
       }
-      return _setupConfig(
+      Future<_SetupTaskResult> run({bool retryAllowed = true}) => _setupConfig(
         force: force,
         silence: silence,
         isCurrent: current,
         isLatestSetup: () => generation == _setupGeneration,
         onCleanupDeferred: (cleanup) => deferredCleanup = cleanup,
+        retryAllowed: retryAllowed,
         onUpdated: () async {
           await ref.read(proxiesActionProvider.notifier).updateGroups();
           await ref.read(providersProvider.notifier).syncProviders();
         },
       );
+      final first = await run();
+      if (first != _SetupTaskResult.staleInput || !await current()) {
+        return first;
+      }
+      final second = await run(retryAllowed: false);
+      return second == _SetupTaskResult.staleInput
+          ? _SetupTaskResult.superseded
+          : second;
     });
     await deferredCleanup;
     if (result != _SetupTaskResult.handoffToCoreRestart) {
@@ -471,21 +565,18 @@ class SetupAction extends _$SetupAction {
   Future<({String yaml, String md5})> getProfile({
     required SetupState setupState,
     required PatchClashConfig patchConfig,
+    NetworkProps? network,
+    bool? dnsOverride,
+    bool? ntpOverride,
+    bool? safeMode,
   }) async {
     final profileId = setupState.profileId;
     if (profileId == null) return (yaml: '', md5: '');
     final defaultUA = globalState.packageInfo.ua;
-    final networkSetting = ref.read(
-      networkSettingProvider.select(
-        (state) => (
-          appendSystemDns: state.appendSystemDns,
-          routeMode: state.routeMode,
-          authentication: state.authentication,
-        ),
-      ),
-    );
-    final overrideDns = ref.read(overrideDnsProvider);
-    final overrideNtp = ref.read(overrideNtpProvider);
+    final NetworkProps networkSetting =
+        network ?? ref.read<NetworkProps>(networkSettingProvider);
+    final bool overrideDns = dnsOverride ?? ref.read<bool>(overrideDnsProvider);
+    final bool overrideNtp = ntpOverride ?? ref.read<bool>(overrideNtpProvider);
     final appendSystemDns = networkSetting.appendSystemDns;
     final routeMode = networkSetting.routeMode;
     final configMap = await _core.getConfig(profileId);
@@ -534,7 +625,8 @@ class SetupAction extends _$SetupAction {
         defaultUA: defaultUA,
         authentication: networkSetting.authentication.credentials,
         matchTarget: setupState.matchTarget,
-        safeMode: ref.read(safeModeProvider),
+        safeMode: safeMode ?? ref.read(safeModeProvider),
+        policySelection: setupState.policySelection,
       ),
     );
     return res;
@@ -602,6 +694,7 @@ class SetupAction extends _$SetupAction {
 
   Future<String> getProfileWithId(int profileId) async {
     try {
+      ref.invalidate(setupStateProvider(profileId));
       final setupState = await ref.read(setupStateProvider(profileId).future);
       final patchClashConfig = ref.read(patchClashConfigProvider);
       final res = await getProfile(
@@ -666,21 +759,9 @@ class SetupAction extends _$SetupAction {
     }
   }
 
-  /// An empty profile list is left alone: it is the first-run state, and it is
-  /// what the profile stream holds before its first emission.
   @visibleForTesting
   Profile? recoverMissingProfile() {
-    final profileId = ref.read(currentProfileIdProvider);
-    if (profileId == null) return null;
-    final profiles = ref.read(profilesProvider);
-    if (profiles.isEmpty) return null;
-    final fallback = profiles.first;
-    commonPrint.log(
-      'profile $profileId is missing, falling back to ${fallback.id}',
-      logLevel: LogLevel.warning,
-    );
-    ref.read(currentProfileIdProvider.notifier).value = fallback.id;
-    return fallback;
+    return null;
   }
 
   Future<_SetupTaskResult> _setupConfig({
@@ -690,8 +771,26 @@ class SetupAction extends _$SetupAction {
     Future<bool> Function()? isCurrent,
     required bool Function() isLatestSetup,
     required void Function(Future<void>) onCleanupDeferred,
+    bool retryAllowed = true,
   }) async {
     final nativeContext = _isAndroid ? await _service!.getRequestState() : null;
+    final failureCore = _core;
+    final observedFact = await failureCore.getConfigState();
+    var registeredToken =
+        (nativeContext?['configToken'] as num?)?.toInt() ?? observedFact.token;
+    var managedRequested = false;
+    Future<void> finishBuildFailure() async {
+      if (!isLatestSetup() || !managedRequested && !observedFact.isManaged) {
+        return;
+      }
+      await finishConfigFailure((
+        core: failureCore,
+        fact: observedFact,
+        nativeRun: nativeContext,
+        registeredToken: registeredToken,
+      ));
+    }
+
     Future<void> finishOrDefer(Future<void> Function() cleanup) async {
       if (isLatestSetup()) {
         await cleanup();
@@ -732,10 +831,8 @@ class SetupAction extends _$SetupAction {
     if (!shouldContinueSetup) {
       return _SetupTaskResult.handoffToCoreRestart;
     }
-    final realPatchConfig = _effectivePatchConfig(patchConfig);
-    final selectedMap = Map<String, String>.of(ref.read(selectedMapProvider));
-    final testUrl = ref.read(appSettingProvider).testUrl;
     final sources = <RequestSource>[];
+    _SetupInputs? captured;
     final realProfile = await globalState.safeRun(() async {
       if (_requests.partialCommit) return null;
       final selectedProfile = profile;
@@ -748,7 +845,60 @@ class SetupAction extends _$SetupAction {
             final setupState = await ref.read(
               setupStateProvider(selectedProfile.id).future,
             );
+            final actualProfile = (await database.profilesDao.query().get())
+                .getProfile(selectedProfile.id);
+            if (actualProfile == null) {
+              throw const RequestUnavailable('request_cancelled');
+            }
+            final selection = setupState.policySelection;
+            managedRequested = selection != null;
+            if (managedRequested && !_isAndroid) {
+              throw const RequestUnavailable('managed_policy_android_required');
+            }
+            final policy = selection == null
+                ? null
+                : SelectedPolicy.decode(selection.rawContent);
+            final picks = Map<String, String>.unmodifiable(
+              policy?.picks(actualProfile.selectedMap) ??
+                  actualProfile.selectedMap,
+            );
+            final effective = _effectivePatchConfig(
+              ref.read(patchClashConfigProvider),
+            );
+            final testUrl = ref.read(appSettingProvider).testUrl;
+            var shared = ref
+                .read(sharedStateProvider)
+                .copyWith(
+                  currentProfileName: actualProfile.realLabel,
+                  setupParams: SetupParams(
+                    selectedMap: picks,
+                    testUrl: testUrl,
+                  ),
+                );
+            if (policy != null) {
+              shared = shared.copyWith(
+                vpnOptions: shared.vpnOptions?.copyWith(
+                  port: policy.policy.mixedPort,
+                ),
+              );
+            }
+            captured = _SetupInputs(
+              state: setupState,
+              profile: actualProfile,
+              patch: effective,
+              network: ref.read(networkSettingProvider),
+              overrideDns: ref.read(overrideDnsProvider),
+              overrideNtp: ref.read(overrideNtpProvider),
+              safeMode: ref.read(safeModeProvider),
+              testUrl: testUrl,
+              picks: picks,
+              shared: shared,
+              vpn: ref.read(vpnStateProvider),
+              fact: await _core.getConfigState(),
+              policy: policy,
+            );
             final keys = <String>{'profile:${selectedProfile.id}'};
+            if (selection != null) keys.add('application-config');
             if (setupState.overwriteType == OverwriteType.standard) {
               keys.add('global-rules');
             }
@@ -784,7 +934,11 @@ class SetupAction extends _$SetupAction {
           .then(
             (setupState) => getProfile(
               setupState: setupState,
-              patchConfig: realPatchConfig,
+              patchConfig: captured!.patch,
+              network: captured!.network,
+              dnsOverride: captured!.overrideDns,
+              ntpOverride: captured!.overrideNtp,
+              safeMode: captured!.safeMode,
             ),
           );
     }, title: 'build profile');
@@ -800,6 +954,7 @@ class SetupAction extends _$SetupAction {
     }
 
     if (realProfile == null || realProfile.yaml.trim().isEmpty) {
+      await finishBuildFailure();
       if (!await current()) {
         await finishUnregisteredStart();
         return _SetupTaskResult.superseded;
@@ -810,6 +965,12 @@ class SetupAction extends _$SetupAction {
       return _SetupTaskResult.failed;
     }
     if (!await current()) {
+      if (captured?.policy != null &&
+          isLatestSetup() &&
+          profile?.id == ref.read(currentProfileIdProvider)) {
+        if (!retryAllowed) await finishBuildFailure();
+        return _SetupTaskResult.staleInput;
+      }
       await finishUnregisteredStart();
       return _SetupTaskResult.superseded;
     }
@@ -817,6 +978,7 @@ class SetupAction extends _$SetupAction {
     final yamlMd5 = realProfile.md5;
     var setupFailed = false;
     var superseded = false;
+    var staleInput = false;
     await globalState.loadingRun(
       () async {
         ConfigInput? input;
@@ -824,14 +986,15 @@ class SetupAction extends _$SetupAction {
         int? recoveryRequestId;
         var submittedToCore = false;
         try {
-          final runtimeEpoch = (await _core.getConfigState()).runtimeEpoch;
+          final snapshot = captured!;
+          final runtimeEpoch = snapshot.fact.runtimeEpoch;
           await _requests.mutate(() async {
             if (!await current()) {
               throw const RequestUnavailable('request_cancelled');
             }
             if (_isAndroid) {
-              globalState.lastVpnState = ref.read(vpnStateProvider);
-              final desired = ref.read(sharedStateProvider);
+              globalState.lastVpnState = snapshot.vpn;
+              final desired = snapshot.shared;
               if (!await preferences.saveShareState(desired)) {
                 throw const RequestUnavailable('preferences_save_failed');
               }
@@ -843,11 +1006,12 @@ class SetupAction extends _$SetupAction {
               home: await appPath.homeDirPath,
               yaml: yamlString,
               runtimeEpoch: runtimeEpoch,
-              profileId: profile!.id,
-              profileName: profile.realLabel,
-              selectedMap: selectedMap,
-              testUrl: testUrl,
+              profileId: snapshot.profile.id,
+              profileName: snapshot.profile.realLabel,
+              selectedMap: snapshot.picks,
+              testUrl: snapshot.testUrl,
               sources: sources,
+              managedPolicy: snapshot.policy?.descriptor,
             );
           });
           final profileId = profile?.id;
@@ -868,12 +1032,17 @@ class SetupAction extends _$SetupAction {
             final result = await _core.applyConfigInput(
               input!.toRequest(
                 requestId: RunRequestScope.current,
+                expectedConfig: snapshot.policy == null
+                    ? null
+                    : snapshot.fact.fence,
                 active:
-                    !ref.read(safeModeProvider) &&
+                    !snapshot.safeMode &&
                     (_latestRunRequest?.running ?? _isRunning) &&
                     !ref.read(suspendProvider),
               ),
             );
+            registeredToken =
+                (result.receipt['token'] as num?)?.toInt() ?? registeredToken;
             ref
                 .read(configStateProvider.notifier)
                 .accept(result.fact, authoritative: true);
@@ -894,6 +1063,10 @@ class SetupAction extends _$SetupAction {
               }
               break;
             }
+            if (result.status == 'staleInput') {
+              staleInput = true;
+              throw const RequestUnavailable('request_cancelled');
+            }
             if (result.status == 'superseded') {
               superseded = true;
               throw const RequestUnavailable('request_cancelled');
@@ -906,6 +1079,13 @@ class SetupAction extends _$SetupAction {
             }
           }
         } catch (_) {
+          if (!await current() &&
+              captured?.policy != null &&
+              isLatestSetup() &&
+              profile?.id == ref.read(currentProfileIdProvider)) {
+            staleInput = true;
+          }
+          if (staleInput) return;
           superseded = superseded || !await current();
           setupFailed = !superseded;
           final pending = recoveryPending;
@@ -953,6 +1133,10 @@ class SetupAction extends _$SetupAction {
       silence: true,
       tag: !silence ? LoadingTag.proxies : null,
     );
+    if (staleInput) {
+      if (!retryAllowed) await finishBuildFailure();
+      return _SetupTaskResult.staleInput;
+    }
     if (superseded) return _SetupTaskResult.superseded;
     if (setupFailed) {
       return _SetupTaskResult.failed;

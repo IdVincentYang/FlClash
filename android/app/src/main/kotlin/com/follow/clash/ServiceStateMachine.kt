@@ -166,6 +166,30 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         applySharedState()
     }
 
+    suspend fun failConfigBuild(input: JsonObject): ConfigApplyResult {
+        val request = arbiter.current()
+        val token = configToken.get()
+        val state = getRequestState()
+        val expectedRun = input.getAsJsonObject("expectedRun")
+        val expectedToken = input.get("registeredToken")?.takeUnless { it.isJsonNull }?.asLong
+        if (expectedToken != null && expectedToken != token || expectedRun != null && (
+            expectedRun.get("processEpoch")?.asString != state.processEpoch ||
+            expectedRun.get("intentRevision")?.asLong != state.intentRevision ||
+            expectedRun.get("intentRunning")?.asBoolean != state.intentRunning ||
+            expectedRun.get("paused")?.asBoolean != state.paused
+        )) return ConfigApplyResult("superseded", fact = configFact)
+        val payload = input.deepCopy().apply {
+            if (!has("expectedRun")) add("expectedRun", Gson().toJsonTree(state))
+            if (!has("registeredToken")) addProperty("registeredToken", token)
+        }
+        val result = host.failConfigBuild(payload)
+        if (!isCurrent(request) || configToken.get() != token) return ConfigApplyResult("superseded", fact = configFact)
+        observeConfigFact(result.fact, authoritative = true)
+        if (result.status != "blocked") return result
+        val cleanup = failRunIntent(request.id, token, abort = false)
+        return if (cleanup.status == "cleaned") result else result.copy(status = cleanup.status, message = cleanup.message)
+    }
+
     fun applyConfig(input: JsonObject): Deferred<ConfigApplyResult> {
         val state = getRequestState()
         val expectedRequest = input.get("requestId")?.takeUnless { it.isJsonNull }?.asLong
@@ -174,7 +198,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         val desired = sharedState
         val payload = input.deepCopy().apply {
             add("expectedRun", Gson().toJsonTree(state))
-            addProperty("active", state.intentRunning && !state.paused)
+            addProperty("active", input.get("active")?.asBoolean != false && state.intentRunning && !state.paused)
             add("init", JsonParser.parseString(initParams(host.homeDirPath, host.sdkInt)))
         }
         val receipt = host.registerConfigInput(payload)
@@ -186,7 +210,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         val result = CompletableDeferred<ConfigApplyResult>()
         host.scope.launch {
             val applied = startPreparationLock.withLock {
-                runCatching { runConfigApply(request, state.intentRunning && !state.paused, desired, receipt) }
+                runCatching { runConfigApply(request, payload.get("active").asBoolean, desired, receipt, state) }
                     .getOrElse { error ->
                         host.log("Unable to apply configuration: $error")
                         val owned = pendingConfigReceipt.takeIf { it.token == receipt.token } ?: receipt
@@ -210,12 +234,21 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         return ConfigApplyResult(if (cleanup.status == "cleaned") "blocked" else cleanup.status, message.ifEmpty { cleanup.message }, receipt, fact = aborted?.fact ?: configFact)
     }
 
-    private suspend fun runConfigApply(request: RunRequest, active: Boolean, desired: SharedState, registered: ConfigReceipt): ConfigApplyResult {
+    private suspend fun runConfigApply(request: RunRequest, active: Boolean, desired: SharedState, registered: ConfigReceipt, expectedRun: ApplicationRequestState): ConfigApplyResult {
         if (!currentConfigRequest(request, registered)) return ConfigApplyResult("superseded", receipt = registered)
         val prepared = host.configPhase("prepareConfig", registered)
         if (currentConfigRequest(request, registered)) pendingConfigReceipt = prepared.receipt
         if (prepared.status != "prepared") {
             observeConfigFact(prepared.fact, authoritative = true)
+            if (prepared.status == "staleInput") return prepared
+            if (prepared.status == "rejected" && currentConfigRequest(request, registered)) {
+                val failed = failConfigBuild(JsonObject().apply {
+                    add("expected", Gson().toJsonTree(prepared.fact))
+                    add("expectedRun", Gson().toJsonTree(expectedRun))
+                    addProperty("registeredToken", registered.token)
+                })
+                if (failed.status != "retained") return failed
+            }
             if (active && getRequestState().phase == "preparing" && currentConfigRequest(request, registered)) failRunIntent(request.id, registered.token)
             return prepared
         }

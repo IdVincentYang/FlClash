@@ -41,6 +41,10 @@ class _SnapshotSetup extends SetupAction {
   Future<({String yaml, String md5})> getProfile({
     required SetupState setupState,
     required PatchClashConfig patchConfig,
+    NetworkProps? network,
+    bool? dnsOverride,
+    bool? ntpOverride,
+    bool? safeMode,
   }) async {
     captured = setupState;
     return (yaml: 'mode: rule\nrules: ["MATCH,REJECT"]\n', md5: 'snapshot');

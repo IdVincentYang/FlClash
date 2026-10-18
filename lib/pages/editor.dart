@@ -63,6 +63,7 @@ class EditorPage extends ConsumerStatefulWidget {
   onPop;
   final bool? readOnly;
   final EditorSchema schema;
+  final Future<void> Function()? onCopyFull;
 
   const EditorPage({
     super.key,
@@ -75,6 +76,7 @@ class EditorPage extends ConsumerStatefulWidget {
     this.readOnly,
     this.language = Language.yaml,
     this.schema = EditorSchema.config,
+    this.onCopyFull,
   }) : assert(content == null || load == null);
 
   @override
@@ -287,6 +289,12 @@ class _EditorPageState extends ConsumerState<EditorPage> {
                 ),
             ],
             menuItems: [
+              if (widget.onCopyFull != null)
+                CommonPopupMenuItem(
+                  glyph: AppGlyphs.copy,
+                  label: appLocalizations.policyDraftCopyFull,
+                  onPressed: isReady ? widget.onCopyFull : null,
+                ),
               CommonPopupMenuItem(
                 glyph: AppGlyphs.undo,
                 label: appLocalizations.undo,

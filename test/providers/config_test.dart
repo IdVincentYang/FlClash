@@ -58,11 +58,14 @@ void main() {
       expect(value.systemProxy, true);
     });
 
-    test('can update state', () {
-      container
-          .read(vpnSettingProvider.notifier)
-          .update((_) => const VpnProps(enable: false));
-      expect(container.read(vpnSettingProvider).enable, false);
+    test('effective writes require an application input commit', () {
+      expect(
+        () => container
+            .read(vpnSettingProvider.notifier)
+            .update((_) => const VpnProps(enable: false)),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(container.read(vpnSettingProvider).enable, true);
     });
   });
 
@@ -73,11 +76,14 @@ void main() {
       expect(value.bypassDomain, defaultBypassDomain);
     });
 
-    test('can update state', () {
-      container
-          .read(networkSettingProvider.notifier)
-          .update((_) => const NetworkProps(systemProxy: false));
-      expect(container.read(networkSettingProvider).systemProxy, false);
+    test('effective writes require an application input commit', () {
+      expect(
+        () => container
+            .read(networkSettingProvider.notifier)
+            .update((_) => const NetworkProps(systemProxy: false)),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(container.read(networkSettingProvider).systemProxy, true);
     });
   });
 
@@ -130,9 +136,12 @@ void main() {
       expect(container.read(overrideDnsProvider), false);
     });
 
-    test('can toggle on', () {
-      container.read(overrideDnsProvider.notifier).update((_) => true);
-      expect(container.read(overrideDnsProvider), true);
+    test('effective writes require an application input commit', () {
+      expect(
+        () => container.read(overrideDnsProvider.notifier).update((_) => true),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(container.read(overrideDnsProvider), false);
     });
   });
 
@@ -209,11 +218,17 @@ void main() {
     });
 
     test('reflects updated sub-provider values', () {
+      container.dispose();
+      container = ProviderContainer(
+        overrides: buildConfigOverrides(
+          const Config(
+            themeProps: defaultThemeProps,
+            overrideDns: true,
+            patchClashConfig: PatchClashConfig(mixedPort: 7890),
+          ),
+        ),
+      );
       container.read(currentProfileIdProvider.notifier).update((_) => 99);
-      container.read(overrideDnsProvider.notifier).update((_) => true);
-      container
-          .read(patchClashConfigProvider.notifier)
-          .update((_) => const PatchClashConfig(mixedPort: 7890));
       container
           .read(excludeSSIDsProvider.notifier)
           .update((_) => ['Office Wi-Fi']);
