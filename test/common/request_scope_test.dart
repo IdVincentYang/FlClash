@@ -9,6 +9,7 @@ import 'package:fl_clash/database/database.dart' as db;
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:material_ui/material_ui.dart';
 import '../helpers/test_app.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -57,6 +58,9 @@ class _Native implements Service {
 
   @override
   void removeListener(ServiceListener listener) => listeners.remove(listener);
+
+  @override
+  Future<Map<String, Object?>> getRequestState() async => snapshot;
 
   void stopPending(String change) {
     if (change == 'epoch') {
@@ -179,6 +183,9 @@ class _SocketProbe extends Notifier<RoutedProbeState<String, String>>
 }
 
 class _ValidationCore implements CoreHandlerInterface {
+  @override
+  Future<ConfigFact> getConfigState() async =>
+      const ConfigFact(runtimeEpoch: 'fixture');
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   @override
@@ -648,7 +655,7 @@ void main() {
       final original = Profile.normal(
         label: 'synthetic edit',
         url: 'http://127.0.0.1/original',
-      );
+      ).copyWith(autoUpdate: false);
       await tester.runAsync(
         () => database.profiles.put(original.toCompanion()),
       );
@@ -753,6 +760,19 @@ void main() {
       expect(profile.unfoldSet, {'new group'});
       expect(native.calls.where((call) => call['action'] == 'begin'), isEmpty);
       expect(proxyHeaders, isEmpty);
+      var refreshDrained = false;
+      await tester.runAsync(() async {
+        unawaited(
+          dataMutations.run(() async {}).then((_) => refreshDrained = true),
+        );
+      });
+      for (var i = 0; !refreshDrained && i < 100; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(refreshDrained, isTrue);
     },
   );
 
@@ -772,7 +792,7 @@ void main() {
         final original = Profile.normal(
           label: 'pending $change',
           url: 'http://127.0.0.1/original',
-        );
+        ).copyWith(autoUpdate: false);
         await tester.runAsync(
           () => database.profiles.put(original.toCompanion()),
         );
@@ -1043,21 +1063,7 @@ void main() {
         expectedSource: source,
       );
       final rejected = expectLater(attempt, throwsA(isA<RequestUnavailable>()));
-      for (
-        var i = 0;
-        i < 100 &&
-            native.calls
-                    .where(
-                      (call) =>
-                          call['action'] == 'inspect' &&
-                          call['key'] == 'profile:queued',
-                    )
-                    .length <
-                2;
-        i++
-      ) {
-        await pumpEventQueue();
-      }
+      await pumpEventQueue();
       expect(
         native.calls
             .where(
@@ -1066,7 +1072,7 @@ void main() {
                   call['key'] == 'profile:queued',
             )
             .length,
-        2,
+        1,
       );
       native.stopPending('stop');
       release.complete();

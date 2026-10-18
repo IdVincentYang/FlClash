@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/metacubex/mihomo/component/requestscope"
 	C "github.com/metacubex/mihomo/constant"
 )
 
@@ -16,6 +17,8 @@ func TestApplicationInputBridge(t *testing.T) {
 		t.Skip("local Flutter consumer bridge")
 	}
 	configTestEnvironment(t)
+	previousProxyHook := requestscope.ProxyHook
+	defer func() { requestscope.ProxyHook = previousProxyHook }()
 	C.SetHomeDir(home)
 	isInit.Store(true)
 	var fixture *managedFixture
@@ -31,8 +34,49 @@ func TestApplicationInputBridge(t *testing.T) {
 		}
 		var result any
 		switch call.Method {
-		case "fixture":
+		case "refreshState":
+			requestscope.ProxyHook = appRequests.bindProxy
+			appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback"})
+			result = map[string]any{"ok": true}
+		case "refreshRunning":
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 2, IntentRevision: 2, IntentRunning: true, Phase: "started", Reason: "none", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback"})
+			result = map[string]any{"ok": true}
+		case "refreshRead":
+			var name string
+			if err := json.Unmarshal(call.Arguments, &name); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := handleGetConfig(name)
+			if err != nil {
+				result = map[string]any{"error": "read_failed"}
+			} else {
+				result = map[string]any{"value": raw}
+			}
+		case "refreshValidate":
+			var name string
+			if err := json.Unmarshal(call.Arguments, &name); err != nil {
+				t.Fatal(err)
+			}
+			result = map[string]any{"value": handleValidateConfig(name)}
+		case "refreshRelease":
+			var name string
+			if err := json.Unmarshal(call.Arguments, &name); err != nil {
+				t.Fatal(err)
+			}
+			result = map[string]any{"value": collectConfigInputs(name) == nil}
+		case "refreshGroups":
+			result = map[string]any{"value": handleGetProxies()}
+		case "refreshProviders":
+			result = map[string]any{"value": handleGetExternalProviders()}
+		case "fixture", "refreshFixture":
+			registry := appRequests
 			fixture = newManagedFixture(t)
+			if call.Method == "refreshFixture" {
+				appRequests = registry
+				requestscope.OwnerHook = registry.currentOwner
+				requestscope.PhaseHook = registry.setPhase
+			}
 			C.SetHomeDir(home)
 			result = fixture.policy
 		case "probe":

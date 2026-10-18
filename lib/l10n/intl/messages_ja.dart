@@ -1035,14 +1035,37 @@ class MessageLookup extends MessageLookupByLibrary {
     "process": MessageLookupByLibrary.simpleMessage("プロセス"),
     "profile": MessageLookupByLibrary.simpleMessage("プロファイル"),
     "profileAutoUpdateIntervalInvalidValidationDesc":
-        MessageLookupByLibrary.simpleMessage("有効な間隔を入力してください"),
+        MessageLookupByLibrary.simpleMessage(
+          "分単位の正の整数を入力してください。以前の無効な値は1日として扱われます。",
+        ),
     "profileAutoUpdateIntervalNullValidationDesc":
         MessageLookupByLibrary.simpleMessage("自動更新間隔を入力してください"),
+    "profileDownloadFailed": MessageLookupByLibrary.simpleMessage(
+      "ダウンロードに失敗しました。以前のファイルを保持しました。",
+    ),
+    "profileDownloadTimeout": MessageLookupByLibrary.simpleMessage(
+      "サブスクリプションのダウンロードが90秒を超えました。",
+    ),
+    "profileDownloadTooLarge": MessageLookupByLibrary.simpleMessage(
+      "サブスクリプションが16 MiBの上限を超えています。",
+    ),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "プロファイルが変更されています。自動更新を無効にしますか？",
     ),
+    "profileInvalidBody": MessageLookupByLibrary.simpleMessage(
+      "ダウンロードした設定が無効です。以前のファイルを保持しました。",
+    ),
     "profileNameNullValidationDesc": MessageLookupByLibrary.simpleMessage(
       "プロファイル名を入力してください",
+    ),
+    "profileRefreshFailed": MessageLookupByLibrary.simpleMessage(
+      "サブスクリプションの更新に失敗しました。現在の設定状態を確認してください。",
+    ),
+    "profileSavedNotApplied": MessageLookupByLibrary.simpleMessage(
+      "保存しました。現在の設定状態を確認してください。更新はまだ適用されていない可能性があります。",
+    ),
+    "profileSavedRecoveryRequired": MessageLookupByLibrary.simpleMessage(
+      "サブスクリプションは保存されましたが、クリーンアップを確認できません。以降のリクエストには復旧が必要です。",
     ),
     "profileUrlInvalidValidationDesc": MessageLookupByLibrary.simpleMessage(
       "有効なプロファイルURLを入力してください",

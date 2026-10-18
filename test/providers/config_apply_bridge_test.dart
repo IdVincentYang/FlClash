@@ -113,12 +113,15 @@ class _BridgeProfiles extends ProfilesAction {
   @override
   Request get requestClient => requests;
   @override
-  Future<Profile?> ensureFile(Profile profile) async => profile;
+  Future<Profile?> ensureFile(
+    Profile profile, {
+    Future<bool> Function()? isCurrent,
+  }) async => profile;
 }
 
 class _BridgeProxies extends ProxiesAction {
   @override
-  Future<void> updateGroups() async {}
+  Future<void> updateGroups({Future<bool> Function()? isCurrent}) async {}
 }
 
 class _BridgeCommon extends CommonAction {
@@ -128,7 +131,7 @@ class _BridgeCommon extends CommonAction {
 
 class _BridgeProviders extends Providers {
   @override
-  Future<void> syncProviders() async {}
+  Future<void> syncProviders({Future<bool> Function()? isCurrent}) async {}
 }
 
 void main() {

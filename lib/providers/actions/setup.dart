@@ -97,14 +97,29 @@ class SetupAction extends _$SetupAction {
     );
   }
 
-  Future<void> finishConfigFailure(ConfigFailureObservation observation) async {
-    final result = await observation.core.failConfigBuild({
-      'expected': observation.fact.fence,
-      'expectedRun': ?observation.nativeRun,
-      'registeredToken': observation.registeredToken,
-    });
-    if (result.status == 'cleanupFailed') {
-      throw StateError('Owned service cleanup failed');
+  Future<void> finishConfigFailure(
+    ConfigFailureObservation observation, {
+    Request? requests,
+  }) async {
+    late ConfigApplyResult result;
+    try {
+      result = await observation.core.failConfigBuild({
+        'expected': observation.fact.fence,
+        'expectedRun': ?observation.nativeRun,
+        'registeredToken': observation.registeredToken,
+      });
+      if (!const {
+        'retained',
+        'blocked',
+        'superseded',
+      }.contains(result.status)) {
+        throw const RequestUnavailable('request_partial_commit');
+      }
+    } catch (_) {
+      try {
+        await (requests ?? _requests).markRecoveryRequired();
+      } catch (_) {}
+      throw const RequestUnavailable('request_partial_commit');
     }
     if (!ref.mounted || result.status == 'superseded') return;
     ref
@@ -306,7 +321,13 @@ class SetupAction extends _$SetupAction {
                 Future.value(null),
     );
     _latestRunRequest = request;
-    if (!running) _setLocalRunning(false);
+    if (!running) {
+      _setupGeneration++;
+      unawaited(
+        ref.read(profilesActionProvider.notifier)._cancelExpiredDemands(),
+      );
+      _setLocalRunning(false);
+    }
     if (request.initialize) {
       globalState.needInitStatus = false;
     }
@@ -493,41 +514,90 @@ class SetupAction extends _$SetupAction {
     return result == _SetupTaskResult.completed;
   }
 
+  Future<ProfileApplicationOutcome> applyRefreshedProfile({
+    required Future<bool> Function() isCurrent,
+    required ConfigFact previous,
+  }) async {
+    if (!await isCurrent()) return ProfileApplicationOutcome.superseded;
+    ConfigApplyResult? accepted;
+    final result = await _runSetup(
+      silence: true,
+      force: true,
+      isCurrent: isCurrent,
+      onApplied: (value) => accepted = value,
+    );
+    if (result == _SetupTaskResult.superseded ||
+        result == _SetupTaskResult.staleInput) {
+      return ProfileApplicationOutcome.superseded;
+    }
+    if (result == _SetupTaskResult.completed && accepted != null) {
+      return accepted!.status == 'activated'
+          ? ProfileApplicationOutcome.activated
+          : ProfileApplicationOutcome.installedInactive;
+    }
+    final fact = await _core.getConfigState();
+    return ConfigInput.sameAcceptedInput(previous, fact)
+        ? ProfileApplicationOutcome.retained
+        : fact.businessActive ||
+              const {'ready', 'installed'}.contains(fact.phase)
+        ? ProfileApplicationOutcome.failed
+        : ProfileApplicationOutcome.blocked;
+  }
+
   Future<_SetupTaskResult> _runSetup({
     bool silence = false,
     bool force = false,
     Future<bool> Function()? isCurrent,
+    void Function(ConfigApplyResult)? onApplied,
   }) async {
     final generation = ++_setupGeneration;
+    unawaited(
+      ref.read(profilesActionProvider.notifier)._cancelExpiredDemands(),
+    );
     Future<void>? deferredCleanup;
     Future<bool> current() async =>
         generation == _setupGeneration &&
         (isCurrent == null || await isCurrent());
     final result = await _setupScheduler.run(() async {
-      await dataMutations.run(() async {});
-      if (!await current()) {
-        return _SetupTaskResult.superseded;
+      ref.read(profilesActionProvider.notifier).setupExecutionChanged(true);
+      try {
+        await dataMutations.run(() async {});
+        if (!await current()) {
+          return _SetupTaskResult.superseded;
+        }
+        Future<_SetupTaskResult> run({bool retryAllowed = true}) =>
+            _setupConfig(
+              force: force,
+              silence: silence,
+              isCurrent: current,
+              isLatestSetup: () => generation == _setupGeneration,
+              onCleanupDeferred: (cleanup) => deferredCleanup = cleanup,
+              onApplied: onApplied,
+              retryAllowed: retryAllowed,
+              onUpdated: (current) async {
+                await ref
+                    .read(proxiesActionProvider.notifier)
+                    .updateGroups(isCurrent: current);
+                await ref
+                    .read(providersProvider.notifier)
+                    .syncProviders(isCurrent: current);
+              },
+            );
+        final first = await run();
+        if (first != _SetupTaskResult.staleInput || !await current()) {
+          return first;
+        }
+        final second = await run(retryAllowed: false);
+        return second == _SetupTaskResult.staleInput
+            ? _SetupTaskResult.superseded
+            : second;
+      } finally {
+        if (ref.mounted) {
+          ref
+              .read(profilesActionProvider.notifier)
+              .setupExecutionChanged(false);
+        }
       }
-      Future<_SetupTaskResult> run({bool retryAllowed = true}) => _setupConfig(
-        force: force,
-        silence: silence,
-        isCurrent: current,
-        isLatestSetup: () => generation == _setupGeneration,
-        onCleanupDeferred: (cleanup) => deferredCleanup = cleanup,
-        retryAllowed: retryAllowed,
-        onUpdated: () async {
-          await ref.read(proxiesActionProvider.notifier).updateGroups();
-          await ref.read(providersProvider.notifier).syncProviders();
-        },
-      );
-      final first = await run();
-      if (first != _SetupTaskResult.staleInput || !await current()) {
-        return first;
-      }
-      final second = await run(retryAllowed: false);
-      return second == _SetupTaskResult.staleInput
-          ? _SetupTaskResult.superseded
-          : second;
     });
     await deferredCleanup;
     if (result != _SetupTaskResult.handoffToCoreRestart) {
@@ -767,8 +837,9 @@ class SetupAction extends _$SetupAction {
   Future<_SetupTaskResult> _setupConfig({
     bool force = false,
     bool silence = false,
-    FutureOr Function()? onUpdated,
+    FutureOr<void> Function(Future<bool> Function())? onUpdated,
     Future<bool> Function()? isCurrent,
+    void Function(ConfigApplyResult)? onApplied,
     required bool Function() isLatestSetup,
     required void Function(Future<void>) onCleanupDeferred,
     bool retryAllowed = true,
@@ -816,11 +887,26 @@ class SetupAction extends _$SetupAction {
     }
 
     var profile = ref.read(currentProfileProvider) ?? recoverMissingProfile();
+    Future<bool> materialCurrent() async {
+      if (isCurrent != null && !await isCurrent() ||
+          profile?.id != ref.read(currentProfileIdProvider)) {
+        return false;
+      }
+      if (nativeContext == null) return true;
+      final native = await _service!.getRequestState();
+      return native['processEpoch'] == nativeContext['processEpoch'] &&
+          native['intentRevision'] == nativeContext['intentRevision'] &&
+          native['intentRunning'] == nativeContext['intentRunning'] &&
+          native['paused'] == nativeContext['paused'];
+    }
+
     // A refresh failure is surfaced by safeRun; setup keeps the old profile.
     final nextProfile = await globalState.safeRun(
       () => profile == null
           ? Future<Profile?>.value(null)
-          : ref.read(profilesActionProvider.notifier).ensureFile(profile),
+          : ref
+                .read(profilesActionProvider.notifier)
+                .ensureFile(profile, isCurrent: materialCurrent),
     );
     if (nextProfile != null) {
       profile = nextProfile;
@@ -979,6 +1065,7 @@ class SetupAction extends _$SetupAction {
     var setupFailed = false;
     var superseded = false;
     var staleInput = false;
+    ConfigApplyResult? accepted;
     await globalState.loadingRun(
       () async {
         ConfigInput? input;
@@ -1051,9 +1138,20 @@ class SetupAction extends _$SetupAction {
             }
             if (result.succeeded) {
               recoveryPending = null;
-              if (!await current()) {
+              if (!await current() ||
+                  onApplied != null &&
+                      (result.fact.inputId != input!.id ||
+                          result.receipt['inputId'] != result.fact.inputId ||
+                          result.receipt['owner'] != result.fact.owner ||
+                          result.receipt['token'] != result.fact.token ||
+                          result.fact.runtimeEpoch != runtimeEpoch ||
+                          !ConfigInput.sameAcceptedInput(
+                            result.fact,
+                            await _core.getConfigState(),
+                          ))) {
                 throw const RequestUnavailable('request_cancelled');
               }
+              accepted = result;
               if (_isAndroid && result.fact.businessActive) {
                 final native = await _service!.getRequestState();
                 ref
@@ -1127,8 +1225,29 @@ class SetupAction extends _$SetupAction {
             }
           }
         }
+        final completed = accepted;
+        if (completed == null) {
+          superseded = true;
+          return;
+        }
+        Future<bool> completionCurrent() async =>
+            await current() &&
+            (onApplied == null ||
+                ConfigInput.sameAcceptedInput(
+                  completed.fact,
+                  await _core.getConfigState(),
+                ));
+        if (!await completionCurrent()) {
+          superseded = true;
+          return;
+        }
         globalState.lastConfigMd5 = yamlMd5;
-        await onUpdated?.call();
+        await onUpdated?.call(completionCurrent);
+        if (!await completionCurrent()) {
+          superseded = true;
+          return;
+        }
+        onApplied?.call(completed);
       },
       silence: true,
       tag: !silence ? LoadingTag.proxies : null,

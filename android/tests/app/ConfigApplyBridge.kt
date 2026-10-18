@@ -88,6 +88,17 @@ object ConfigApplyBridge {
                         }
                         reply(id,gson.toJson(result))
                     }
+                    "startCleanupFixture" -> scope.launch {
+                        host.cleanupFailure = null
+                        reply(id, machine.requestStart().await())
+                    }
+                    "revokeCleanupFixture" -> {
+                        host.buildFailureStatus = "blocked"
+                        host.cleanupFailure = arguments.asString
+                        host.lastConfigFact = host.lastConfigFact.copy(version=host.lastConfigFact.version+1,profileId=1,replayEligible=false)
+                        machine.observeConfigFact(host.lastConfigFact,authoritative=true)
+                        reply(id,true)
+                    }
                     "holdCleanupAndFailInstall" -> {
                         host.cleanupGate=CompletableDeferred()
                         host.failingPhase="installConfig"

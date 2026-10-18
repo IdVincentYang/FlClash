@@ -84,7 +84,7 @@
   "autoUpdate": "Auto update",
   "autoUpdateInterval": "Auto-update interval (minutes)",
   "profileAutoUpdateIntervalNullValidationDesc": "Please enter the auto-update interval",
-  "profileAutoUpdateIntervalInvalidValidationDesc": "Please enter a valid interval",
+  "profileAutoUpdateIntervalInvalidValidationDesc": "Enter a positive whole number of minutes. An old invalid value is scheduled as one day.",
   "themeMode": "Theme mode",
   "themeColor": "Theme color",
   "preview": "Preview",
@@ -852,5 +852,12 @@
   "policyFinalPreview": "Generated final configuration",
   "policyActualPreview": "Actual accepted configuration",
   "policySelectionPending": "The selected policy differs from the actual accepted configuration.",
-  "policyAndroidRequired": "Managed policies can currently be applied only on Android. Draft editing and previews remain available."
+  "policyAndroidRequired": "Managed policies can currently be applied only on Android. Draft editing and previews remain available.",
+  "profileDownloadTimeout": "The subscription download exceeded 90 seconds.",
+  "profileDownloadTooLarge": "The subscription exceeds the 16 MiB download limit.",
+  "profileDownloadFailed": "The subscription download failed. The previous file was kept.",
+  "profileInvalidBody": "The downloaded subscription is invalid. The previous file was kept.",
+  "profileSavedNotApplied": "The subscription was saved. Check the current configuration status; it may not have been applied.",
+  "profileRefreshFailed": "Subscription refresh failed. Check the current configuration status.",
+  "profileSavedRecoveryRequired": "Subscription saved. Cleanup could not be confirmed. Recovery is required before further requests."
 }

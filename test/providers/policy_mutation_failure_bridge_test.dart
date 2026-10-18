@@ -64,7 +64,7 @@ class _Fixture {
   late final ProviderContainer container;
   final failures = <ConfigApplyResult>[];
   final failurePayloads = <Map<String, Object?>>[];
-  Future<void> Function()? afterComplete;
+  Future<void> Function()? beforeFailure;
   final inputs = <ConfigInput>[];
 
   static Future<_Fixture> open(
@@ -122,11 +122,6 @@ class _Fixture {
         call.positionalArguments.first as Map,
       );
       final response = await bridge.call('control', value);
-      if (value['action'] == 'complete' && fixture.afterComplete != null) {
-        final action = fixture.afterComplete!;
-        fixture.afterComplete = null;
-        await action();
-      }
       return response;
     });
     when(native.getRequestState).thenAnswer((_) => bridge.call('nativeState'));
@@ -139,6 +134,9 @@ class _Fixture {
         call.positionalArguments.first as Map,
       );
       fixture.failurePayloads.add(payload);
+      final action = fixture.beforeFailure;
+      fixture.beforeFailure = null;
+      await action?.call();
       final result = ConfigApplyResult.fromJson(
         await bridge.call('fail', payload),
       );
@@ -426,7 +424,7 @@ void main() {
         ConfigApplyResult? newer;
         if (mode == 'newer owner') {
           final second = await fixture.input(2);
-          fixture.afterComplete = () async {
+          fixture.beforeFailure = () async {
             for (final source in second.sources) {
               expect(await fixture.client.configSourceCurrent(source), isTrue);
             }

@@ -581,9 +581,11 @@ void main() {
 
     test('a page group holds its testing mark until the run settles', () async {
       final release = Completer<Delay?>();
-      when(
-        () => core.asyncTestDelay(_testUrl, 'HK-01'),
-      ).thenAnswer((_) => release.future);
+      final started = Completer<void>();
+      when(() => core.asyncTestDelay(_testUrl, 'HK-01')).thenAnswer((_) {
+        started.complete();
+        return release.future;
+      });
       final container = _delayContainer(buildContainer);
       container
           .read(groupsProvider.notifier)
@@ -595,6 +597,7 @@ void main() {
 
       final run = actionOf(container).delayTestPageGroup('Proxy');
       await actionOf(container).delayTestPageGroup('Proxy');
+      await started.future;
 
       expect(container.read(delayTestingGroupsProvider), {'Proxy'});
       release.completeError(

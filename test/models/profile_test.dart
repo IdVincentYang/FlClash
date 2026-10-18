@@ -5,6 +5,23 @@ import 'package:test/test.dart';
 
 void main() {
   group('SubscriptionInfo', () {
+    test(
+      'repeated HTTP fields use the first valid value and share the statistics budget',
+      () {
+        expect(
+          SubscriptionInfo.fromHeaderValues([
+            'upload=bad; broken;',
+            'upload=10; download=20',
+            'upload=30',
+          ]),
+          const SubscriptionInfo(upload: 10, download: 20),
+        );
+        expect(
+          SubscriptionInfo.fromHeaderValues(['upload=1', 'x' * 8192]),
+          const SubscriptionInfo(),
+        );
+      },
+    );
     test('parses subscription-userinfo header values', () {
       final info = SubscriptionInfo.formHString(
         'upload=10; download=20; total=100; expire=200',
@@ -15,6 +32,24 @@ void main() {
       expect(info.total, 100);
       expect(info.expire, 200);
     });
+
+    test(
+      'tolerates malformed, duplicate, negative and out-of-range optional statistics',
+      () {
+        final parsed = SubscriptionInfo.formHString(
+          'broken; upload=-1; upload=10; upload=20; download=x=y; download=30; total=99999999999999999999999; expire=253402300800;',
+        );
+        expect(parsed, const SubscriptionInfo(upload: 10, download: 30));
+        expect(
+          SubscriptionInfo.formHString('upload=1;${'x' * 8192}'),
+          const SubscriptionInfo(),
+        );
+        expect(
+          SubscriptionInfo.formHString('upload=1;${'x;' * 32}'),
+          const SubscriptionInfo(),
+        );
+      },
+    );
 
     test('falls back to zero for null and invalid values', () {
       expect(SubscriptionInfo.formHString(null), const SubscriptionInfo());

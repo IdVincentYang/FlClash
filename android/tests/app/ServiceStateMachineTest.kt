@@ -109,6 +109,7 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
     private var ownedIdentity: RequestServiceIdentity? = null
     private val activeInputs = mutableMapOf<Long,Boolean>()
     var cleanupGate: CompletableDeferred<Unit>? = null
+    var cleanupFailure: String? = null
     val cleanupEntered = CompletableDeferred<Unit>()
     var failingPhase: String? = null
     @Volatile var heldPhase: String? = null
@@ -188,6 +189,8 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
     override suspend fun stopOwnedService(identity: RequestServiceIdentity): Boolean {
         cleanupEntered.complete(Unit)
         cleanupGate?.await()
+        if (cleanupFailure == "throw") error("synthetic cleanup failure")
+        if (cleanupFailure == "false") return false
         if (ownedIdentity != null && ownedIdentity != identity) return false
         stopService()
         ownedIdentity = null

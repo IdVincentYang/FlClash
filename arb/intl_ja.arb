@@ -84,7 +84,7 @@
   "autoUpdate": "自動更新",
   "autoUpdateInterval": "自動更新間隔（分）",
   "profileAutoUpdateIntervalNullValidationDesc": "自動更新間隔を入力してください",
-  "profileAutoUpdateIntervalInvalidValidationDesc": "有効な間隔を入力してください",
+  "profileAutoUpdateIntervalInvalidValidationDesc": "分単位の正の整数を入力してください。以前の無効な値は1日として扱われます。",
   "themeMode": "テーマモード",
   "themeColor": "テーマカラー",
   "preview": "プレビュー",
@@ -852,5 +852,12 @@
   "policyFinalPreview": "生成された最終構成",
   "policyActualPreview": "実際に受理された構成",
   "policySelectionPending": "選択済みポリシーは実際に受理された構成と異なります。",
-  "policyAndroidRequired": "管理ポリシーの適用は現在 Android のみ対応しています。下書きの編集とプレビューは引き続き利用できます。"
+  "policyAndroidRequired": "管理ポリシーの適用は現在 Android のみ対応しています。下書きの編集とプレビューは引き続き利用できます。",
+  "profileDownloadTimeout": "サブスクリプションのダウンロードが90秒を超えました。",
+  "profileDownloadTooLarge": "サブスクリプションが16 MiBの上限を超えています。",
+  "profileDownloadFailed": "ダウンロードに失敗しました。以前のファイルを保持しました。",
+  "profileInvalidBody": "ダウンロードした設定が無効です。以前のファイルを保持しました。",
+  "profileSavedNotApplied": "保存しました。現在の設定状態を確認してください。更新はまだ適用されていない可能性があります。",
+  "profileRefreshFailed": "サブスクリプションの更新に失敗しました。現在の設定状態を確認してください。",
+  "profileSavedRecoveryRequired": "サブスクリプションは保存されましたが、クリーンアップを確認できません。以降のリクエストには復旧が必要です。"
 }

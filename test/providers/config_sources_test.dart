@@ -22,17 +22,20 @@ class _Core extends Mock implements CoreHandlerInterface {}
 
 class _LocalProfiles extends ProfilesAction {
   @override
-  Future<Profile?> ensureFile(Profile profile) async => profile;
+  Future<Profile?> ensureFile(
+    Profile profile, {
+    Future<bool> Function()? isCurrent,
+  }) async => profile;
 }
 
 class _LocalProxies extends ProxiesAction {
   @override
-  Future<void> updateGroups() async {}
+  Future<void> updateGroups({Future<bool> Function()? isCurrent}) async {}
 }
 
 class _LocalProviders extends Providers {
   @override
-  Future<void> syncProviders() async {}
+  Future<void> syncProviders({Future<bool> Function()? isCurrent}) async {}
 }
 
 class _SnapshotSetup extends SetupAction {

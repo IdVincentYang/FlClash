@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as path;
 
+import '../models/config_state.dart';
 import 'request.dart';
 
 class ConfigInput {
@@ -34,6 +36,61 @@ class ConfigInput {
   Future<void> releaseMarker() async {
     final marker = File(path.join(home, 'config-inputs', markerName));
     if (await marker.exists()) await marker.delete();
+  }
+
+  static bool sameAcceptedInput(ConfigFact a, ConfigFact b) =>
+      const {'ready', 'installed'}.contains(a.phase) &&
+      const {'ready', 'installed'}.contains(b.phase) &&
+      a.runtimeEpoch == b.runtimeEpoch &&
+      a.owner == b.owner &&
+      a.token == b.token &&
+      a.inputId == b.inputId &&
+      a.profileId == b.profileId;
+
+  static Future<Set<String>?> acceptedDependencies({
+    required String home,
+    required ConfigFact accepted,
+    required Future<ConfigFact> Function() readFact,
+  }) async {
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(accepted.inputId) ||
+        !sameAcceptedInput(accepted, await readFact())) {
+      return null;
+    }
+    try {
+      final buffered = BytesBuilder(copy: false);
+      await for (final chunk in File(
+        path.join(home, 'config-inputs', '${accepted.inputId}.json'),
+      ).openRead()) {
+        if (buffered.length + chunk.length > 4 * 1024 * 1024) return null;
+        buffered.add(chunk);
+      }
+      final bytes = buffered.takeBytes();
+      if (sha256.convert(bytes).toString() != accepted.inputId) return null;
+      final manifest = json.decode(utf8.decode(bytes));
+      if (manifest is! Map ||
+          manifest['version'] != 1 ||
+          manifest['profileId'] != accepted.profileId ||
+          manifest['dependencies'] is! List) {
+        return null;
+      }
+      final dependencies = <String>{};
+      for (final item in manifest['dependencies'] as List) {
+        if (item is! String ||
+            item.isEmpty ||
+            item.length > 256 ||
+            RegExp(r'[\x00-\x20\x7f]').hasMatch(item)) {
+          return null;
+        }
+        dependencies.add(item);
+      }
+      return sameAcceptedInput(accepted, await readFact())
+          ? Set.unmodifiable(dependencies)
+          : null;
+    } on FileSystemException {
+      return null;
+    } on FormatException {
+      return null;
+    }
   }
 
   static Future<ConfigInput> write({

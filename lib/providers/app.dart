@@ -111,8 +111,13 @@ class Providers extends _$Providers with AutoDisposeNotifierMixin {
     value = newState;
   }
 
-  Future<void> syncProviders() async {
-    value = await ref.read(coreHandlerProvider).getExternalProviders();
+  Future<void> syncProviders({Future<bool> Function()? isCurrent}) async {
+    final providers = await ref
+        .read(coreHandlerProvider)
+        .getExternalProviders();
+    if (ref.mounted && (isCurrent == null || await isCurrent())) {
+      value = providers;
+    }
   }
 }
 

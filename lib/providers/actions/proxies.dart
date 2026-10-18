@@ -120,10 +120,10 @@ class ProxiesAction extends _$ProxiesAction {
     return ref.read(currentProfileProvider)?.selectedMap[groupName] ?? '';
   }
 
-  Future<void> updateGroups() async {
+  Future<void> updateGroups({Future<bool> Function()? isCurrent}) async {
     try {
       commonPrint.log('updateGroups');
-      ref.read(groupsProvider.notifier).value = await retry(
+      final groups = await retry<List<Group>>(
         task: () async {
           final sortType = ref.read(
             proxiesStyleSettingProvider.select((state) => state.sortType),
@@ -152,6 +152,9 @@ class ProxiesAction extends _$ProxiesAction {
         },
         retryIf: (res) => res.isEmpty,
       );
+      if (ref.mounted && (isCurrent == null || await isCurrent())) {
+        ref.read(groupsProvider.notifier).value = groups;
+      }
     } catch (e) {
       // The Core failure path already runs inside the retry task above; a
       // throw here only means ref.read hit a disposed container or the

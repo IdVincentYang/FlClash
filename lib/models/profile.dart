@@ -24,13 +24,40 @@ abstract class SubscriptionInfo with _$SubscriptionInfo {
   factory SubscriptionInfo.fromJson(Map<String, Object?> json) =>
       _$SubscriptionInfoFromJson(json);
 
+  factory SubscriptionInfo.fromHeaderValues(List<String>? values) {
+    if (values == null ||
+        values.length > 32 ||
+        values.fold<int>(0, (size, value) => size + value.length) +
+                values.length -
+                1 >
+            8192) {
+      return const SubscriptionInfo();
+    }
+    return SubscriptionInfo.formHString(values.join(';'));
+  }
+
   factory SubscriptionInfo.formHString(String? info) {
     if (info == null) return const SubscriptionInfo();
+    if (info.length > 8192) return const SubscriptionInfo();
     final list = info.split(';');
-    final Map<String, int?> map = {};
-    for (final i in list) {
-      final keyValue = i.trim().split('=');
-      map[keyValue[0]] = int.tryParse(keyValue[1]);
+    if (list.length > 32) return const SubscriptionInfo();
+    final map = <String, int>{};
+    for (final item in list) {
+      final at = item.indexOf('=');
+      if (at <= 0 || at != item.lastIndexOf('=')) continue;
+      final key = item.substring(0, at).trim().toLowerCase();
+      if (!{'upload', 'download', 'total', 'expire'}.contains(key) ||
+          map.containsKey(key)) {
+        continue;
+      }
+      final value = int.tryParse(item.substring(at + 1).trim());
+      if (value == null ||
+          value < 0 ||
+          value > (1 << 62) - 1 ||
+          key == 'expire' && value > 253402300799) {
+        continue;
+      }
+      map[key] = value;
     }
     return SubscriptionInfo(
       upload: map['upload'] ?? 0,
@@ -176,14 +203,15 @@ extension ProfileExtension on Profile {
 
   Future<Profile> update({required ValidateConfig validate}) async {
     final response = await request.getFileResponseForUrl(url);
-    final disposition = response.headers.value('content-disposition');
-    final userinfo = response.headers.value('subscription-userinfo');
+    final disposition = response.headers['content-disposition']?.firstOrNull;
     return copyWith(
       label: label.takeFirstValid([
         getFileNameForDisposition(disposition),
         id.toString(),
       ]),
-      subscriptionInfo: SubscriptionInfo.formHString(userinfo),
+      subscriptionInfo: SubscriptionInfo.fromHeaderValues(
+        response.headers['subscription-userinfo'],
+      ),
     ).saveFile(response.data ?? Uint8List.fromList([]), validate: validate);
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
@@ -13,8 +14,41 @@ class RequestFile {
       await appPath.tempPath,
     ).createTemp('request-');
     final staged = File('${directory.path}/incoming');
-    await staged.writeAsBytes(bytes, flush: true);
-    return RequestFile._(directory, staged);
+    try {
+      await staged.writeAsBytes(bytes, flush: true);
+      return RequestFile._(directory, staged);
+    } catch (_) {
+      await directory.delete(recursive: true);
+      rethrow;
+    }
+  }
+
+  Future<void> receive(
+    Stream<List<int>> body, {
+    required int maxBytes,
+    required Duration Function() remaining,
+  }) async {
+    final iterator = StreamIterator(body);
+    RandomAccessFile? output;
+    var received = 0;
+    try {
+      output = await staged.open(mode: FileMode.write);
+      while (await iterator.moveNext().timeout(remaining())) {
+        final chunk = iterator.current;
+        received += chunk.length;
+        if (received > maxBytes) {
+          throw const RequestUnavailable('profile_download_too_large');
+        }
+        await output.writeFrom(chunk);
+      }
+      await output.flush();
+    } finally {
+      try {
+        await iterator.cancel();
+      } finally {
+        await output?.close();
+      }
+    }
   }
 
   Future<T> replace<T>(String path, Future<T> Function() persist) async {

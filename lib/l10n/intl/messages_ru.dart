@@ -1291,14 +1291,37 @@ class MessageLookup extends MessageLookupByLibrary {
     "process": MessageLookupByLibrary.simpleMessage("Процесс"),
     "profile": MessageLookupByLibrary.simpleMessage("Профиль"),
     "profileAutoUpdateIntervalInvalidValidationDesc":
-        MessageLookupByLibrary.simpleMessage("Введите корректный интервал"),
+        MessageLookupByLibrary.simpleMessage(
+          "Введите положительное целое число минут. Старое некорректное значение считается одним днём.",
+        ),
     "profileAutoUpdateIntervalNullValidationDesc":
         MessageLookupByLibrary.simpleMessage("Введите интервал автообновления"),
+    "profileDownloadFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось загрузить подписку. Предыдущий файл сохранён.",
+    ),
+    "profileDownloadTimeout": MessageLookupByLibrary.simpleMessage(
+      "Загрузка подписки превысила 90 секунд.",
+    ),
+    "profileDownloadTooLarge": MessageLookupByLibrary.simpleMessage(
+      "Подписка превышает лимит загрузки 16 МиБ.",
+    ),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "Профиль изменён. Отключить автообновление?",
     ),
+    "profileInvalidBody": MessageLookupByLibrary.simpleMessage(
+      "Загруженная подписка некорректна. Предыдущий файл сохранён.",
+    ),
     "profileNameNullValidationDesc": MessageLookupByLibrary.simpleMessage(
       "Введите название профиля",
+    ),
+    "profileRefreshFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось обновить подписку. Проверьте состояние текущей конфигурации.",
+    ),
+    "profileSavedNotApplied": MessageLookupByLibrary.simpleMessage(
+      "Подписка сохранена. Проверьте состояние текущей конфигурации: обновление могло ещё не примениться.",
+    ),
+    "profileSavedRecoveryRequired": MessageLookupByLibrary.simpleMessage(
+      "Подписка сохранена, но завершение очистки не подтверждено. Перед дальнейшими запросами требуется восстановление.",
     ),
     "profileUrlInvalidValidationDesc": MessageLookupByLibrary.simpleMessage(
       "Введите корректный URL профиля",

@@ -84,7 +84,7 @@
   "autoUpdate": "自动更新",
   "autoUpdateInterval": "自动更新间隔（分钟）",
   "profileAutoUpdateIntervalNullValidationDesc": "请输入自动更新间隔时间",
-  "profileAutoUpdateIntervalInvalidValidationDesc": "请输入有效间隔时间格式",
+  "profileAutoUpdateIntervalInvalidValidationDesc": "请输入正整数分钟；历史无效值暂按一天调度。",
   "themeMode": "主题模式",
   "themeColor": "主题色彩",
   "preview": "预览",
@@ -852,5 +852,12 @@
   "policyFinalPreview": "最终生成配置",
   "policyActualPreview": "实际接受配置",
   "policySelectionPending": "已选策略与实际接受的配置不同。",
-  "policyAndroidRequired": "目前仅 Android 支持应用受管策略；仍可编辑草稿和预览。"
+  "policyAndroidRequired": "目前仅 Android 支持应用受管策略；仍可编辑草稿和预览。",
+  "profileDownloadTimeout": "订阅下载超过 90 秒。",
+  "profileDownloadTooLarge": "订阅超过 16 MiB 下载上限。",
+  "profileDownloadFailed": "订阅下载失败，已保留原文件。",
+  "profileInvalidBody": "下载的订阅无效，已保留原文件。",
+  "profileSavedNotApplied": "订阅已保存，请查看当前配置状态，更新可能尚未应用。",
+  "profileRefreshFailed": "订阅刷新失败，请检查当前配置状态。",
+  "profileSavedRecoveryRequired": "订阅已保存，但无法确认清理结果。恢复完成前已暂停后续请求。"
 }

@@ -405,14 +405,14 @@ class _AutoUpdateIntervalField extends StatelessWidget {
         inputFormatters: TextInputLimits.digitsOnly(TextInputLimits.interval),
         decoration: InputDecoration(
           labelText: appLocalizations.autoUpdateInterval,
+          errorMaxLines: 3,
         ),
         validator: (String? value) {
           if (value == null || value.isEmpty) {
             return appLocalizations.profileAutoUpdateIntervalNullValidationDesc;
           }
-          try {
-            int.parse(value);
-          } catch (_) {
+          final minutes = int.tryParse(value);
+          if (minutes == null || minutes <= 0 || minutes > 153722867280) {
             return appLocalizations
                 .profileAutoUpdateIntervalInvalidValidationDesc;
           }

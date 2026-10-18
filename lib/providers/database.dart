@@ -116,6 +116,36 @@ class Profiles extends _$Profiles {
   Profile labeled(Profile profile) =>
       state.optimizeLabel(profile, reserved: _reservedLabels);
 
+  Future<Profile> persistRefresh(Profile profile, {required bool importing}) {
+    return database.transaction(() async {
+      final rows = await database.profilesDao.query().get();
+      final previous = rows.getProfile(profile.id);
+      if (importing ? previous != null : previous == null) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      final next = importing
+          ? rows.optimizeLabel(profile, reserved: _reservedLabels)
+          : previous!.copyWith(
+              subscriptionInfo: profile.subscriptionInfo,
+              lastUpdateDate: profile.lastUpdateDate,
+            );
+      if (importing) {
+        await database.into(database.profiles).insert(next.toCompanion());
+      } else {
+        final count = await (database.update(
+          database.profiles,
+        )..where((row) => row.id.equals(profile.id))).write(next.toCompanion());
+        if (count != 1) throw const RequestUnavailable('request_cancelled');
+      }
+      return next;
+    });
+  }
+
+  Future<void> publishRefresh() async {
+    final rows = await database.profilesDao.query().get();
+    if (ref.mounted) state = rows;
+  }
+
   Future<Profile> persist(
     Profile profile, {
     Iterable<int> renameIn = const [],

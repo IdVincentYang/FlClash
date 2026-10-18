@@ -1,14 +1,69 @@
 part of '../action.dart';
 
 @Riverpod(keepAlive: true)
-class ProfilesAction extends _$ProfilesAction {
+class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
+  @override
   CoreController get _core => ref.read(coreHandlerProvider);
 
+  @override
   @protected
   Request get requestClient => request;
 
   @override
-  void build() {}
+  @protected
+  DateTime get refreshNow => DateTime.now();
+
+  @override
+  @protected
+  Duration get refreshElapsed => _refreshClock.elapsed;
+
+  @override
+  void build() {
+    _watchRefreshProfiles();
+    ref.listen(appVisibleProvider, (previous, visible) {
+      if (visible && previous != true) unawaited(autoUpdateProfiles());
+    });
+    ref.listen(appSettingProvider.select((value) => value.disclaimerAccepted), (
+      _,
+      accepted,
+    ) {
+      if (accepted) unawaited(autoUpdateProfiles());
+    });
+    ref.listen(nativeRequestStateProvider, (_, next) {
+      unawaited(_cancelExpiredDemands());
+      if (next['phase'] == 'started' &&
+          next['intentRunning'] == true &&
+          next['paused'] != true) {
+        unawaited(autoUpdateProfiles());
+      }
+    });
+    ref.onDispose(() {
+      _refreshDisposed = true;
+      _refreshTimer?.cancel();
+      _refreshClock.stop();
+      for (final job in [
+        ..._refreshJobs.values,
+        ..._refreshSuccessors.values,
+      ]) {
+        job.cancel();
+        if (!job.committing) {
+          job.complete(
+            const ProfileRefreshResult(
+              application: ProfileApplicationOutcome.superseded,
+            ),
+          );
+        }
+      }
+      _refreshJobs.clear();
+      _refreshSuccessors.clear();
+      _refreshRetries.clear();
+    });
+  }
+
+  void setupExecutionChanged(bool busy) {
+    _refreshSetupBusy = busy;
+    if (!busy) _pumpRefresh();
+  }
 
   Future<void> useDefaultCustomConfig(int profileId) async {
     final source = await requestClient.captureSource('profile:$profileId');
@@ -72,21 +127,19 @@ class ProfilesAction extends _$ProfilesAction {
     return _core.validateConfigWithData(data);
   }
 
-  Future<void> autoUpdateProfiles() async {
-    for (final profile in ref.read(profilesProvider)) {
-      if (!profile.autoUpdate) continue;
-      final isNotNeedUpdate = profile.lastUpdateDate
-          ?.add(profile.autoUpdateDuration)
-          .isBeforeNow;
-      if (isNotNeedUpdate == false || profile.type == ProfileType.file) {
-        continue;
-      }
-      try {
-        await updateProfile(profile, automatic: true);
-      } catch (e) {
-        commonPrint.log(compactError(e), logLevel: LogLevel.warning);
-      }
+  void _watchRefreshProfiles() {
+    if (_refreshDisposed ||
+        _refreshProfilesSubscribed ||
+        !requestClient.isAttached) {
+      return;
     }
+    _refreshProfilesSubscribed = true;
+    ref.listen(profilesProvider, (_, _) => unawaited(autoUpdateProfiles()));
+  }
+
+  Future<void> autoUpdateProfiles() {
+    _watchRefreshProfiles();
+    return _wakeRefresh();
   }
 
   Profile _editedProfile(Profile? current, Profile proposed) =>
@@ -108,13 +161,15 @@ class ProfilesAction extends _$ProfilesAction {
       final current = (await database.profilesDao.query().get()).getProfile(
         profile.id,
       );
-      await ref
+      final saved = await ref
           .read(profilesProvider.notifier)
           .persist(_editedProfile(current, profile), renameIn: renameIn);
       if (onSourceSaved != null) {
-        onSourceSaved(
-          await requestClient.captureSource('profile:${profile.id}'),
+        final source = await requestClient.captureSource(
+          'profile:${profile.id}',
         );
+        _reserveEditedRefresh(saved, source);
+        onSourceSaved(source);
       }
     });
   }
@@ -151,129 +206,67 @@ class ProfilesAction extends _$ProfilesAction {
   Future<void> updateProfiles() async {
     for (final profile in ref.read(profilesProvider)) {
       if (profile.type == ProfileType.file) continue;
-      await updateProfile(profile, showLoading: true);
+      try {
+        await updateProfile(profile, showLoading: true);
+      } on RequestUnavailable catch (error) {
+        dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+      }
     }
   }
 
-  Future<void> updateProfile(
+  Future<ProfileRefreshResult> updateProfile(
     Profile profile, {
     bool showLoading = false,
     bool automatic = false,
     bool allowBootstrap = false,
     bool sourceEdit = false,
     bool sourceMustMatch = false,
+    bool importing = false,
     RequestSource? expectedSource,
     Iterable<int> renameIn = const [],
   }) async {
+    if (_refreshDisposed) {
+      return const ProfileRefreshResult(
+        application: ProfileApplicationOutcome.superseded,
+      );
+    }
     final operation = showLoading
         ? ref.read(updatingKeysProvider.notifier).start(profile.updatingKey)
         : null;
-    RequestSession? session;
-    RequestFile? staged;
     try {
       if (sourceEdit) await putProfile(profile, renameIn: renameIn);
-      if (expectedSource != null &&
-          !await requestClient.sourceCurrent(expectedSource)) {
-        return;
-      }
-      final previous = (await database.profilesDao.query().get()).getProfile(
-        profile.id,
-      );
-      if (sourceMustMatch &&
-          (previous == null ||
-              (
-                    previous.url,
-                    previous.requestMode,
-                    previous.requestProxy,
-                    previous.autoUpdate,
-                    previous.autoUpdateDuration,
-                  ) !=
-                  (
-                    profile.url,
-                    profile.requestMode,
-                    profile.requestProxy,
-                    profile.autoUpdate,
-                    profile.autoUpdateDuration,
-                  ))) {
-        return;
-      }
-      profile = previous ?? profile;
-      session = await requestClient.begin(
-        key: 'profile:${profile.id}',
-        url: profile.url,
-        mode: profile.requestMode,
-        proxy: profile.requestProxy,
+      final job = await _enqueueRefresh(
+        profile,
         automatic: automatic,
+        importing: importing,
         allowBootstrap: allowBootstrap,
-        bootstrapIfUnconfigured:
-            previous == null && profile.requestMode == RequestMode.proxy,
-        label: profile.realLabel,
+        sourceMustMatch: sourceMustMatch,
         expectedSource: expectedSource,
-        sourceIsCurrent: () async {
-          final current = (await database.profilesDao.query().get()).getProfile(
-            profile.id,
-          );
-          return current == null
-              ? previous == null
-              : (
-                      current.url,
-                      current.requestMode,
-                      current.requestProxy,
-                      current.autoUpdate,
-                    ) ==
-                    (
-                      profile.url,
-                      profile.requestMode,
-                      profile.requestProxy,
-                      profile.autoUpdate,
-                    );
-        },
       );
-      final response = await session.run(
-        () => requestClient.getFileResponseForUrl(profile.url),
-      );
-      staged = await RequestFile.stage(response.data ?? []);
-      final message = await _core.validateConfig(staged.staged.path);
-      if (message.isNotEmpty) throw MessageException(message);
-      final incoming = staged;
-      final path = await appPath.getProfilePath(profile.id.toString());
-      await session.commit(() async {
-        final current =
-            (await database.profilesDao.query().get()).getProfile(profile.id) ??
-            profile;
-        final next = current.copyWith(
-          label: current.label.takeFirstValid([
-            getFileNameForDisposition(
-              response.headers.value('content-disposition'),
-            ),
-            profile.id.toString(),
-          ]),
-          subscriptionInfo: SubscriptionInfo.formHString(
-            response.headers.value('subscription-userinfo'),
-          ),
-          lastUpdateDate: DateTime.now(),
-        );
-        await incoming.replace(
-          path,
-          () => ref
-              .read(profilesProvider.notifier)
-              .persist(next, networkResult: true),
-        );
-        await requestClient.invalidate('profile:${profile.id}');
-      });
-      final completed = session;
-      Future<bool> current() async =>
-          profile.id == ref.read(currentProfileIdProvider) &&
-          await completed.lifecycleCurrent(sourceInvalidated: true);
-      if (await current()) {
-        ref
-            .read(setupActionProvider.notifier)
-            .applyProfileDebounce(silence: true, isCurrent: current);
+      final result = await job.completion.future;
+      if (result.failure != null &&
+          (!result.materialSaved ||
+              result.failure == 'request_partial_commit')) {
+        throw RequestUnavailable(result.failure!);
       }
+      if (ref.mounted &&
+          !automatic &&
+          result.materialSaved &&
+          !const {
+            ProfileApplicationOutcome.notRequired,
+            ProfileApplicationOutcome.activated,
+            ProfileApplicationOutcome.installedInactive,
+          }.contains(result.application)) {
+        dialogs.showNotifier(
+          result.failure == 'profile_saved_recovery_required'
+              ? currentAppLocalizations.profileSavedRecoveryRequired
+              : currentAppLocalizations.profileSavedNotApplied,
+          level: MessageLevel.warning,
+        );
+      }
+      return result;
     } finally {
-      session?.close();
-      await staged?.close();
-      if (operation != null) {
+      if (operation != null && ref.mounted) {
         ref
             .read(updatingKeysProvider.notifier)
             .stop(profile.updatingKey, operation);
@@ -281,14 +274,25 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
-  Future<Profile?> ensureFile(Profile profile) async {
+  Future<Profile?> ensureFile(
+    Profile profile, {
+    Future<bool> Function()? isCurrent,
+  }) async {
     if (profile.url.isEmpty ||
         await File(
           await appPath.getProfilePath(profile.id.toString()),
         ).exists()) {
       return null;
     }
-    await updateProfile(profile, allowBootstrap: true);
+    final job = await _enqueueRefresh(
+      profile,
+      allowBootstrap: true,
+      demandCurrent: isCurrent ?? () async => ref.mounted,
+    );
+    final result = await job.material.future;
+    if (!result.materialSaved) {
+      throw RequestUnavailable(result.failure ?? 'request_cancelled');
+    }
     return (await database.profilesDao.query().get()).getProfile(profile.id);
   }
 
@@ -367,7 +371,7 @@ class ProfilesAction extends _$ProfilesAction {
     ).copyWith(requestMode: mode, requestProxy: proxy);
     ref.read(currentPageLabelProvider.notifier).value = PageLabel.profiles;
     await globalState.loadingRun(
-      () => updateProfile(profile),
+      () => updateProfile(profile, importing: true),
       tag: LoadingTag.profiles,
       title: currentAppLocalizations.addProfile,
     );

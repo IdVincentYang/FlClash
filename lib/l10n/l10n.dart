@@ -685,10 +685,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Please enter a valid interval`
+  /// `Enter a positive whole number of minutes. An old invalid value is scheduled as one day.`
   String get profileAutoUpdateIntervalInvalidValidationDesc {
     return Intl.message(
-      'Please enter a valid interval',
+      'Enter a positive whole number of minutes. An old invalid value is scheduled as one day.',
       name: 'profileAutoUpdateIntervalInvalidValidationDesc',
       desc: '',
       args: [],
@@ -7183,6 +7183,76 @@ class AppLocalizations {
     return Intl.message(
       'Managed policies can currently be applied only on Android. Draft editing and previews remain available.',
       name: 'policyAndroidRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The subscription download exceeded 90 seconds.`
+  String get profileDownloadTimeout {
+    return Intl.message(
+      'The subscription download exceeded 90 seconds.',
+      name: 'profileDownloadTimeout',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The subscription exceeds the 16 MiB download limit.`
+  String get profileDownloadTooLarge {
+    return Intl.message(
+      'The subscription exceeds the 16 MiB download limit.',
+      name: 'profileDownloadTooLarge',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The subscription download failed. The previous file was kept.`
+  String get profileDownloadFailed {
+    return Intl.message(
+      'The subscription download failed. The previous file was kept.',
+      name: 'profileDownloadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The downloaded subscription is invalid. The previous file was kept.`
+  String get profileInvalidBody {
+    return Intl.message(
+      'The downloaded subscription is invalid. The previous file was kept.',
+      name: 'profileInvalidBody',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The subscription was saved. Check the current configuration status; it may not have been applied.`
+  String get profileSavedNotApplied {
+    return Intl.message(
+      'The subscription was saved. Check the current configuration status; it may not have been applied.',
+      name: 'profileSavedNotApplied',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Subscription refresh failed. Check the current configuration status.`
+  String get profileRefreshFailed {
+    return Intl.message(
+      'Subscription refresh failed. Check the current configuration status.',
+      name: 'profileRefreshFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Subscription saved. Cleanup could not be confirmed. Recovery is required before further requests.`
+  String get profileSavedRecoveryRequired {
+    return Intl.message(
+      'Subscription saved. Cleanup could not be confirmed. Recovery is required before further requests.',
+      name: 'profileSavedRecoveryRequired',
       desc: '',
       args: [],
     );

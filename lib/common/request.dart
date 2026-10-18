@@ -21,7 +21,18 @@ class RequestUnavailable implements Exception {
   final String code;
   @override
   String toString() => switch (code) {
+    'profile_download_timeout' =>
+      currentAppLocalizations.profileDownloadTimeout,
+    'profile_download_too_large' =>
+      currentAppLocalizations.profileDownloadTooLarge,
+    'profile_download_failed' => currentAppLocalizations.profileDownloadFailed,
+    'profile_invalid' => currentAppLocalizations.profileInvalidBody,
+    'profile_refresh_failed' ||
+    'profile_publish_failed' ||
+    'profile_cleanup_failed' => currentAppLocalizations.profileRefreshFailed,
     'request_partial_commit' => currentAppLocalizations.requestPartialCommit,
+    'profile_saved_recovery_required' =>
+      currentAppLocalizations.profileSavedRecoveryRequired,
     'managed_maintenance_target_required' =>
       currentAppLocalizations.policyMaintenanceRequired,
     'managed_policy_edit_required' =>
@@ -67,6 +78,7 @@ class RequestSession {
     this.closeClient,
     this.generation = const {},
     this.ownsDio = true,
+    required this.cancellationGeneration,
   });
 
   final Request owner;
@@ -77,11 +89,13 @@ class RequestSession {
   final Map<String, Object?> generation;
   final Dio dio;
   final bool ownsDio;
+  final int cancellationGeneration;
   final void Function()? closeClient;
   final cancelToken = CancelToken();
   bool _closed = false;
   bool _granted = false;
   bool get committed => _granted;
+  bool get isActive => !_closed && !cancelToken.isCancelled;
   static final Object _zoneKey = Object();
   static RequestSession? get current =>
       Zone.current[_zoneKey] as RequestSession?;
@@ -143,17 +157,7 @@ class RequestSession {
           }
         }
         _granted = true;
-        try {
-          return await owner._runReceipt(id, () => run(action));
-        } finally {
-          if (id != null) {
-            await owner._control({
-              'action': 'complete',
-              'id': id,
-              'client': client,
-            });
-          }
-        }
+        return owner._runReceipt(id, () => run(action));
       });
 
   void close() {
@@ -218,6 +222,7 @@ class Request with ServiceListener {
       _receipt?.applicationInputsInvalidated == true;
 
   bool get hasNativeClient => _isAndroid && _client != null;
+  bool get isAttached => _container != null;
 
   Future<Map<String, Object?>?> captureNativeRunState() async {
     await _attachment;
@@ -226,21 +231,41 @@ class Request with ServiceListener {
   }
 
   Future<T> _runReceipt<T>(String? id, Future<T> Function() action) async {
-    final marker = _isAndroid && id != null
-        ? File('${await appPath.homeDirPath}/request-recovery-required')
-        : null;
-    if (marker != null && !partialCommit) {
-      final staged = File('${marker.path}.pending');
-      try {
-        await staged.writeAsString('pending local commit', flush: true);
-        await staged.rename(marker.path);
-      } finally {
-        await staged.safeDelete();
-      }
-    }
+    File? marker;
     final receipt = _LocalReceipt(this, id);
     try {
-      return await runZoned(action, zoneValues: {_receiptKey: receipt});
+      return await runZoned(() async {
+        try {
+          marker = _isAndroid && id != null
+              ? File('${await appPath.homeDirPath}/request-recovery-required')
+              : null;
+          if (marker != null && !partialCommit) {
+            final staged = File('${marker!.path}.pending');
+            try {
+              await staged.writeAsString('pending local commit', flush: true);
+              await staged.rename(marker!.path);
+            } finally {
+              await staged.safeDelete();
+            }
+          }
+          return await action();
+        } finally {
+          if (id != null) {
+            try {
+              await _control({
+                'action': 'complete',
+                'id': id,
+                'client': _client,
+              });
+            } catch (_) {
+              try {
+                await markPartialCommit();
+              } catch (_) {}
+              throw const RequestUnavailable('request_partial_commit');
+            }
+          }
+        }
+      }, zoneValues: {_receiptKey: receipt});
     } finally {
       receipt.active = false;
       if (!partialCommit) await marker?.safeDelete();
@@ -248,11 +273,15 @@ class Request with ServiceListener {
   }
 
   Future<void> markPartialCommit() async {
+    await markRecoveryRequired();
+    await invalidateDataset();
+  }
+
+  Future<void> markRecoveryRequired() async {
     partialCommit = true;
     await File(
       '${await appPath.homeDirPath}/request-recovery-required',
-    ).writeAsString('incomplete local commit', flush: true);
-    await invalidateDataset();
+    ).writeAsString('recovery required', flush: true);
   }
 
   Future<void> clearPartialCommit() async {
@@ -365,15 +394,7 @@ class Request with ServiceListener {
     await _attachment;
     if (!_isAndroid || _client == null) return _runReceipt(null, action);
     final result = await _commitControl({'action': 'lock', 'client': _client});
-    try {
-      return await _runReceipt(result['id'] as String, action);
-    } finally {
-      await _control({
-        'action': 'complete',
-        'id': result['id'],
-        'client': _client,
-      });
-    }
+    return _runReceipt(result['id'] as String, action);
   }
 
   void cancelKey(String key) {
@@ -505,6 +526,35 @@ class Request with ServiceListener {
         _nativeSourceCurrent(source, snapshot);
   }
 
+  bool _queuedLocalCurrent(RequestSource source, int generation) =>
+      identical(source.owner, this) &&
+      source.client == _client &&
+      source.dataset == _datasetRevision &&
+      (_cancellations[source.key] ?? 0) == generation;
+
+  Future<bool> materialSessionCurrent(
+    RequestSession session,
+    RequestSource source,
+  ) async {
+    if (!_localSourceCurrent(source) ||
+        session.cancellationGeneration != source.revision ||
+        session.key != source.key) {
+      return false;
+    }
+    if (_isAndroid &&
+        (session.generation['dataset'] != source.snapshot['dataset'] ||
+            session.generation['sourceRevision'] !=
+                source.snapshot['sourceRevision'])) {
+      return false;
+    }
+    try {
+      await session.check();
+      return _localSourceCurrent(source);
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<RequestSession> begin({
     required String key,
     required String url,
@@ -517,17 +567,44 @@ class Request with ServiceListener {
     Future<bool> Function()? sourceIsCurrent,
     String? explicitTarget,
     RequestSource? expectedSource,
+    RequestSource? queuedMaterialSource,
   }) async {
+    if (expectedSource != null && queuedMaterialSource != null) {
+      throw ArgumentError('Conflicting request source constraints');
+    }
+    if (queuedMaterialSource != null &&
+        (queuedMaterialSource.key != key ||
+            !_localSourceCurrent(queuedMaterialSource))) {
+      throw const RequestUnavailable('request_cancelled');
+    }
     if (expectedSource != null &&
         (expectedSource.key != key || !_localSourceCurrent(expectedSource))) {
       throw const RequestUnavailable('request_cancelled');
     }
-    cancelKey(key);
-    final generation = _cancellations[key] ?? 0;
+    final generation = await dataMutations.run(() async {
+      if (queuedMaterialSource != null &&
+              !_localSourceCurrent(queuedMaterialSource) ||
+          expectedSource != null && !_localSourceCurrent(expectedSource) ||
+          sourceIsCurrent != null && !await sourceIsCurrent()) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      cancelKey(key);
+      return _cancellations[key] ?? 0;
+    });
     await _attachment;
     if (partialCommit) throw const RequestUnavailable('request_partial_commit');
     final container = _container;
     if (!_isAndroid) {
+      await dataMutations.run(() async {
+        if ((_cancellations[key] ?? 0) != generation ||
+            queuedMaterialSource != null &&
+                !_queuedLocalCurrent(queuedMaterialSource, generation) ||
+            expectedSource != null &&
+                expectedSource.dataset != _datasetRevision ||
+            sourceIsCurrent != null && !await sourceIsCurrent()) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+      });
       final session = _makeSession(key, null, const {}, null);
       _sessions.add(session);
       return session;
@@ -629,6 +706,19 @@ class Request with ServiceListener {
               expectedSource.dataset != _datasetRevision) {
         throw const RequestUnavailable('request_cancelled');
       }
+      if (queuedMaterialSource != null) {
+        final current = await _control({
+          'action': 'inspect',
+          'client': _client,
+          'key': key,
+        });
+        if (!_queuedLocalCurrent(queuedMaterialSource, generation) ||
+            current['dataset'] != queuedMaterialSource.snapshot['dataset'] ||
+            current['sourceRevision'] !=
+                queuedMaterialSource.snapshot['sourceRevision']) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+      }
       if (sourceIsCurrent != null && !await sourceIsCurrent()) {
         throw const RequestUnavailable('request_cancelled');
       }
@@ -711,6 +801,7 @@ class Request with ServiceListener {
         state,
         _legacyDio,
         ownsDio: false,
+        cancellationGeneration: _cancellations[key] ?? 0,
       );
     }
     final client = HttpOverrides.runWithHttpOverrides(
@@ -747,6 +838,7 @@ class Request with ServiceListener {
       state,
       scopedDio,
       generation: grant ?? const {},
+      cancellationGeneration: _cancellations[key] ?? 0,
       closeClient: () => client.close(force: true),
     );
     scopedDio.interceptors.add(
@@ -808,12 +900,92 @@ class Request with ServiceListener {
     }
   }
 
-  Future<Response<Uint8List>> getFileResponseForUrl(String url) =>
-      dio.get<Uint8List>(
-        url,
-        options: Options(responseType: ResponseType.bytes),
-        cancelToken: RequestSession.current?.cancelToken,
+  Future<({RequestFile file, Headers headers})> downloadFileForUrl(
+    String url, {
+    int maxBytes = 16 * 1024 * 1024,
+    Duration deadline = const Duration(seconds: 90),
+  }) async {
+    final session = RequestSession.current;
+    session?.ensureActive();
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        !const {'http', 'https'}.contains(uri.scheme) ||
+        uri.host.isEmpty) {
+      throw const RequestUnavailable('profile_download_failed');
+    }
+    final file = await RequestFile.stage(const []);
+    final watch = Stopwatch()..start();
+    final token = session?.cancelToken ?? CancelToken();
+    var expired = false;
+    void cancelDownload() {
+      expired = true;
+      token.cancel('profile_download_timeout');
+      session?.close();
+    }
+
+    final timer = Timer(deadline, cancelDownload);
+    Duration remaining() {
+      final value = deadline - watch.elapsed;
+      if (value <= Duration.zero) {
+        cancelDownload();
+        throw const RequestUnavailable('profile_download_timeout');
+      }
+      return value;
+    }
+
+    try {
+      final response = await dio
+          .get<ResponseBody>(
+            url,
+            options: Options(responseType: ResponseType.stream),
+            cancelToken: token,
+          )
+          .timeout(remaining());
+      final body = response.data;
+      if (body == null) {
+        throw const RequestUnavailable('profile_download_failed');
+      }
+      final declared = int.tryParse(
+        response.headers.value('content-length') ?? '',
       );
+      if (declared != null && declared > maxBytes) {
+        await body.stream.listen((_) {}).cancel();
+        throw const RequestUnavailable('profile_download_too_large');
+      }
+      await file.receive(body.stream, maxBytes: maxBytes, remaining: remaining);
+      remaining();
+      return (file: file, headers: response.headers);
+    } catch (error) {
+      token.cancel('profile_download_cancelled');
+      session?.close();
+      await file.close();
+      if (expired || error is TimeoutException) {
+        throw const RequestUnavailable('profile_download_timeout');
+      }
+      if (error is RequestUnavailable) rethrow;
+      if (error is DioException && error.type == DioExceptionType.cancel) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      throw const RequestUnavailable('profile_download_failed');
+    } finally {
+      timer.cancel();
+      watch.stop();
+    }
+  }
+
+  Future<Response<Uint8List>> getFileResponseForUrl(String url) async {
+    final response = await downloadFileForUrl(url);
+    try {
+      return Response<Uint8List>(
+        data: await response.file.staged.readAsBytes(),
+        headers: response.headers,
+        requestOptions: RequestOptions(path: url),
+        statusCode: HttpStatus.ok,
+      );
+    } finally {
+      await response.file.close();
+    }
+  }
 
   Future<Response<String>> getTextResponseForUrl(String url) => dio.get<String>(
     url,

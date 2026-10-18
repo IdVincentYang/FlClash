@@ -1230,16 +1230,39 @@ class MessageLookup extends MessageLookupByLibrary {
     "process": MessageLookupByLibrary.simpleMessage("Process"),
     "profile": MessageLookupByLibrary.simpleMessage("Profile"),
     "profileAutoUpdateIntervalInvalidValidationDesc":
-        MessageLookupByLibrary.simpleMessage("Please enter a valid interval"),
+        MessageLookupByLibrary.simpleMessage(
+          "Enter a positive whole number of minutes. An old invalid value is scheduled as one day.",
+        ),
     "profileAutoUpdateIntervalNullValidationDesc":
         MessageLookupByLibrary.simpleMessage(
           "Please enter the auto-update interval",
         ),
+    "profileDownloadFailed": MessageLookupByLibrary.simpleMessage(
+      "The subscription download failed. The previous file was kept.",
+    ),
+    "profileDownloadTimeout": MessageLookupByLibrary.simpleMessage(
+      "The subscription download exceeded 90 seconds.",
+    ),
+    "profileDownloadTooLarge": MessageLookupByLibrary.simpleMessage(
+      "The subscription exceeds the 16 MiB download limit.",
+    ),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "The profile has been modified. Turn off auto update?",
     ),
+    "profileInvalidBody": MessageLookupByLibrary.simpleMessage(
+      "The downloaded subscription is invalid. The previous file was kept.",
+    ),
     "profileNameNullValidationDesc": MessageLookupByLibrary.simpleMessage(
       "Please enter the profile name",
+    ),
+    "profileRefreshFailed": MessageLookupByLibrary.simpleMessage(
+      "Subscription refresh failed. Check the current configuration status.",
+    ),
+    "profileSavedNotApplied": MessageLookupByLibrary.simpleMessage(
+      "The subscription was saved. Check the current configuration status; it may not have been applied.",
+    ),
+    "profileSavedRecoveryRequired": MessageLookupByLibrary.simpleMessage(
+      "Subscription saved. Cleanup could not be confirmed. Recovery is required before further requests.",
     ),
     "profileUrlInvalidValidationDesc": MessageLookupByLibrary.simpleMessage(
       "Please enter a valid profile URL",

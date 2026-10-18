@@ -930,14 +930,35 @@ class MessageLookup extends MessageLookupByLibrary {
     "process": MessageLookupByLibrary.simpleMessage("进程"),
     "profile": MessageLookupByLibrary.simpleMessage("配置"),
     "profileAutoUpdateIntervalInvalidValidationDesc":
-        MessageLookupByLibrary.simpleMessage("请输入有效间隔时间格式"),
+        MessageLookupByLibrary.simpleMessage("请输入正整数分钟；历史无效值暂按一天调度。"),
     "profileAutoUpdateIntervalNullValidationDesc":
         MessageLookupByLibrary.simpleMessage("请输入自动更新间隔时间"),
+    "profileDownloadFailed": MessageLookupByLibrary.simpleMessage(
+      "订阅下载失败，已保留原文件。",
+    ),
+    "profileDownloadTimeout": MessageLookupByLibrary.simpleMessage(
+      "订阅下载超过 90 秒。",
+    ),
+    "profileDownloadTooLarge": MessageLookupByLibrary.simpleMessage(
+      "订阅超过 16 MiB 下载上限。",
+    ),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "配置文件已经修改，是否关闭自动更新？",
     ),
+    "profileInvalidBody": MessageLookupByLibrary.simpleMessage(
+      "下载的订阅无效，已保留原文件。",
+    ),
     "profileNameNullValidationDesc": MessageLookupByLibrary.simpleMessage(
       "请输入配置名称",
+    ),
+    "profileRefreshFailed": MessageLookupByLibrary.simpleMessage(
+      "订阅刷新失败，请检查当前配置状态。",
+    ),
+    "profileSavedNotApplied": MessageLookupByLibrary.simpleMessage(
+      "订阅已保存，请查看当前配置状态，更新可能尚未应用。",
+    ),
+    "profileSavedRecoveryRequired": MessageLookupByLibrary.simpleMessage(
+      "订阅已保存，但无法确认清理结果。恢复完成前已暂停后续请求。",
     ),
     "profileUrlInvalidValidationDesc": MessageLookupByLibrary.simpleMessage(
       "请输入有效配置URL",
