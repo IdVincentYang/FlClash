@@ -180,20 +180,20 @@ class AppLocalizations {
     );
   }
 
-  /// `Unavailable`
+  /// `No valid response to this request`
   String get serviceUnavailable {
     return Intl.message(
-      'Unavailable',
+      'No valid response to this request',
       name: 'serviceUnavailable',
       desc: '',
       args: [],
     );
   }
 
-  /// `Check failed`
+  /// `Unable to determine`
   String get serviceFailed {
     return Intl.message(
-      'Check failed',
+      'Unable to determine',
       name: 'serviceFailed',
       desc: '',
       args: [],
@@ -7253,6 +7253,316 @@ class AppLocalizations {
     return Intl.message(
       'Subscription saved. Cleanup could not be confirmed. Recovery is required before further requests.',
       name: 'profileSavedRecoveryRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Responded`
+  String get serviceResponded {
+    return Intl.message(
+      'Responded',
+      name: 'serviceResponded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Redirect response`
+  String get serviceRedirected {
+    return Intl.message(
+      'Redirect response',
+      name: 'serviceRedirected',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `HTTP response`
+  String get serviceHttpResponse {
+    return Intl.message(
+      'HTTP response',
+      name: 'serviceHttpResponse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Service clues observed`
+  String get serviceObserved {
+    return Intl.message(
+      'Service clues observed',
+      name: 'serviceObserved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Waiting for check interval`
+  String get serviceQueued {
+    return Intl.message(
+      'Waiting for check interval',
+      name: 'serviceQueued',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Expired: {result}`
+  String serviceExpired(Object result) {
+    return Intl.message(
+      'Expired: $result',
+      name: 'serviceExpired',
+      desc: '',
+      args: [result],
+    );
+  }
+
+  /// `All services disabled · Manage services`
+  String get serviceAllDisabled {
+    return Intl.message(
+      'All services disabled · Manage services',
+      name: 'serviceAllDisabled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Route unknown`
+  String get serviceUnknownRoute {
+    return Intl.message(
+      'Route unknown',
+      name: 'serviceUnknownRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Multiple exits · see each request`
+  String get serviceMultipleRoutes {
+    return Intl.message(
+      'Multiple exits · see each request',
+      name: 'serviceMultipleRoutes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Basic HTTPS response`
+  String get serviceBasic {
+    return Intl.message(
+      'Basic HTTPS response',
+      name: 'serviceBasic',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Region / service check`
+  String get serviceAdvanced {
+    return Intl.message(
+      'Region / service check',
+      name: 'serviceAdvanced',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The displayed service is checked automatically in the foreground. Results expire after 5 minutes; route changes or returning to the app may trigger a new check. Checks start at least 30 seconds apart. Check all covers enabled services only. Only response headers are read; redirects and page resources are not loaded. A response does not prove site features, account access or device-wide protection.`
+  String get serviceBasicExplanation {
+    return Intl.message(
+      'The displayed service is checked automatically in the foreground. Results expire after 5 minutes; route changes or returning to the app may trigger a new check. Checks start at least 30 seconds apart. Check all covers enabled services only. Only response headers are read; redirects and page resources are not loaded. A response does not prove site features, account access or device-wide protection.',
+      name: 'serviceBasicExplanation',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This optional one-time check observes region and service-page clues using anonymous requests. It may contact extra endpoints listed below. No browser login cookies or subscription credentials are sent. Results do not prove account benefits, playback or device-wide protection. Basic connectivity is independent.`
+  String get serviceAdvancedExplanation {
+    return Intl.message(
+      'This optional one-time check observes region and service-page clues using anonymous requests. It may contact extra endpoints listed below. No browser login cookies or subscription credentials are sent. Results do not prove account benefits, playback or device-wide protection. Basic connectivity is independent.',
+      name: 'serviceAdvancedExplanation',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recipients: {hosts}`
+  String serviceRecipients(Object hosts) {
+    return Intl.message(
+      'Recipients: $hosts',
+      name: 'serviceRecipients',
+      desc: '',
+      args: [hosts],
+    );
+  }
+
+  /// `Starting this check registers an anonymous browser device, exchanges its assertion for a temporary token, and queries a session. Tokens are used only within this check and are not saved.`
+  String get serviceDisneyExplanation {
+    return Intl.message(
+      'Starting this check registers an anonymous browser device, exchanges its assertion for a temporary token, and queries a session. Tokens are used only within this check and are not saved.',
+      name: 'serviceDisneyExplanation',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Total elapsed (including queue and body): {milliseconds} ms`
+  String serviceElapsed(Object milliseconds) {
+    return Intl.message(
+      'Total elapsed (including queue and body): $milliseconds ms',
+      name: 'serviceElapsed',
+      desc: '',
+      args: [milliseconds],
+    );
+  }
+
+  /// `Reported region: {region}`
+  String serviceDetectedRegion(Object region) {
+    return Intl.message(
+      'Reported region: $region',
+      name: 'serviceDetectedRegion',
+      desc: '',
+      args: [region],
+    );
+  }
+
+  /// `Start one-time check`
+  String get serviceStartAdvanced {
+    return Intl.message(
+      'Start one-time check',
+      name: 'serviceStartAdvanced',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Expires after 5 minutes. Minimum interval: 30 seconds. No automatic reruns; leaving this page cancels unfinished work. Step times measure response headers, not ping or throughput.`
+  String get serviceAdvancedTiming {
+    return Intl.message(
+      'Expires after 5 minutes. Minimum interval: 30 seconds. No automatic reruns; leaving this page cancels unfinished work. Step times measure response headers, not ping or throughput.',
+      name: 'serviceAdvancedTiming',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Response headers received`
+  String get serviceHeaders {
+    return Intl.message(
+      'Response headers received',
+      name: 'serviceHeaders',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Response read completely`
+  String get serviceBodyComplete {
+    return Intl.message(
+      'Response read completely',
+      name: 'serviceBodyComplete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Required marker found`
+  String get serviceMarkerFound {
+    return Intl.message(
+      'Required marker found',
+      name: 'serviceMarkerFound',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Response size limit reached`
+  String get serviceBodyLimit {
+    return Intl.message(
+      'Response size limit reached',
+      name: 'serviceBodyLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Response interrupted or unreadable`
+  String get serviceReadError {
+    return Intl.message(
+      'Response interrupted or unreadable',
+      name: 'serviceReadError',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recipient or redirect outside this check`
+  String get serviceRecipientBlocked {
+    return Intl.message(
+      'Recipient or redirect outside this check',
+      name: 'serviceRecipientBlocked',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Request limit reached`
+  String get serviceRequestLimit {
+    return Intl.message(
+      'Request limit reached',
+      name: 'serviceRequestLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Route changed · check again manually`
+  String get serviceRouteChanged {
+    return Intl.message(
+      'Route changed · check again manually',
+      name: 'serviceRouteChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unable to determine; the check may be incomplete or the response format may have changed.`
+  String get serviceIndeterminate {
+    return Intl.message(
+      'Unable to determine; the check may be incomplete or the response format may have changed.',
+      name: 'serviceIndeterminate',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This request could not resolve the host`
+  String get serviceDnsFailed {
+    return Intl.message(
+      'This request could not resolve the host',
+      name: 'serviceDnsFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This request failed TLS identity validation`
+  String get serviceTlsFailed {
+    return Intl.message(
+      'This request failed TLS identity validation',
+      name: 'serviceTlsFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This request could not establish a response`
+  String get serviceConnectFailed {
+    return Intl.message(
+      'This request could not establish a response',
+      name: 'serviceConnectFailed',
       desc: '',
       args: [],
     );

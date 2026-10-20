@@ -159,11 +159,20 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m54(time) => "Checked at ${time}";
 
-  static String m55(label) => "${label} must be a single item";
+  static String m55(region) => "Reported region: ${region}";
 
-  static String m56(label) => "${label} must be a URL";
+  static String m56(milliseconds) =>
+      "Total elapsed (including queue and body): ${milliseconds} ms";
 
-  static String m57(count) =>
+  static String m57(result) => "Expired: ${result}";
+
+  static String m58(hosts) => "Recipients: ${hosts}";
+
+  static String m59(label) => "${label} must be a single item";
+
+  static String m60(label) => "${label} must be a URL";
+
+  static String m61(count) =>
       "${Intl.plural(count, one: '1 year ago', other: '${count} years ago')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1558,26 +1567,113 @@ class MessageLookup extends MessageLookupByLibrary {
     "selected": MessageLookupByLibrary.simpleMessage("Selected"),
     "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("Server"),
+    "serviceAdvanced": MessageLookupByLibrary.simpleMessage(
+      "Region / service check",
+    ),
+    "serviceAdvancedExplanation": MessageLookupByLibrary.simpleMessage(
+      "This optional one-time check observes region and service-page clues using anonymous requests. It may contact extra endpoints listed below. No browser login cookies or subscription credentials are sent. Results do not prove account benefits, playback or device-wide protection. Basic connectivity is independent.",
+    ),
+    "serviceAdvancedTiming": MessageLookupByLibrary.simpleMessage(
+      "Expires after 5 minutes. Minimum interval: 30 seconds. No automatic reruns; leaving this page cancels unfinished work. Step times measure response headers, not ping or throughput.",
+    ),
+    "serviceAllDisabled": MessageLookupByLibrary.simpleMessage(
+      "All services disabled · Manage services",
+    ),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("Available"),
+    "serviceBasic": MessageLookupByLibrary.simpleMessage(
+      "Basic HTTPS response",
+    ),
+    "serviceBasicExplanation": MessageLookupByLibrary.simpleMessage(
+      "The displayed service is checked automatically in the foreground. Results expire after 5 minutes; route changes or returning to the app may trigger a new check. Checks start at least 30 seconds apart. Check all covers enabled services only. Only response headers are read; redirects and page resources are not loaded. A response does not prove site features, account access or device-wide protection.",
+    ),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("Blocked"),
+    "serviceBodyComplete": MessageLookupByLibrary.simpleMessage(
+      "Response read completely",
+    ),
+    "serviceBodyLimit": MessageLookupByLibrary.simpleMessage(
+      "Response size limit reached",
+    ),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Check"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Check all"),
     "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Coming soon"),
+    "serviceConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "This request could not establish a response",
+    ),
+    "serviceDetectedRegion": m55,
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Disallowed ISP",
     ),
-    "serviceFailed": MessageLookupByLibrary.simpleMessage("Check failed"),
+    "serviceDisneyExplanation": MessageLookupByLibrary.simpleMessage(
+      "Starting this check registers an anonymous browser device, exchanges its assertion for a temporary token, and queries a session. Tokens are used only within this check and are not saved.",
+    ),
+    "serviceDnsFailed": MessageLookupByLibrary.simpleMessage(
+      "This request could not resolve the host",
+    ),
+    "serviceElapsed": m56,
+    "serviceExpired": m57,
+    "serviceFailed": MessageLookupByLibrary.simpleMessage(
+      "Unable to determine",
+    ),
+    "serviceHeaders": MessageLookupByLibrary.simpleMessage(
+      "Response headers received",
+    ),
+    "serviceHttpResponse": MessageLookupByLibrary.simpleMessage(
+      "HTTP response",
+    ),
+    "serviceIndeterminate": MessageLookupByLibrary.simpleMessage(
+      "Unable to determine; the check may be incomplete or the response format may have changed.",
+    ),
     "serviceManage": MessageLookupByLibrary.simpleMessage("Manage services"),
+    "serviceMarkerFound": MessageLookupByLibrary.simpleMessage(
+      "Required marker found",
+    ),
+    "serviceMultipleRoutes": MessageLookupByLibrary.simpleMessage(
+      "Multiple exits · see each request",
+    ),
+    "serviceObserved": MessageLookupByLibrary.simpleMessage(
+      "Service clues observed",
+    ),
     "serviceOriginalsOnly": MessageLookupByLibrary.simpleMessage(
       "Originals only",
     ),
     "servicePending": MessageLookupByLibrary.simpleMessage("Not checked"),
+    "serviceQueued": MessageLookupByLibrary.simpleMessage(
+      "Waiting for check interval",
+    ),
+    "serviceReadError": MessageLookupByLibrary.simpleMessage(
+      "Response interrupted or unreadable",
+    ),
+    "serviceRecipientBlocked": MessageLookupByLibrary.simpleMessage(
+      "Recipient or redirect outside this check",
+    ),
+    "serviceRecipients": m58,
+    "serviceRedirected": MessageLookupByLibrary.simpleMessage(
+      "Redirect response",
+    ),
+    "serviceRequestLimit": MessageLookupByLibrary.simpleMessage(
+      "Request limit reached",
+    ),
+    "serviceResponded": MessageLookupByLibrary.simpleMessage("Responded"),
     "serviceRestricted": MessageLookupByLibrary.simpleMessage(
       "Access restricted",
     ),
+    "serviceRouteChanged": MessageLookupByLibrary.simpleMessage(
+      "Route changed · check again manually",
+    ),
+    "serviceStartAdvanced": MessageLookupByLibrary.simpleMessage(
+      "Start one-time check",
+    ),
     "serviceStatus": MessageLookupByLibrary.simpleMessage("Service status"),
-    "serviceUnavailable": MessageLookupByLibrary.simpleMessage("Unavailable"),
+    "serviceTlsFailed": MessageLookupByLibrary.simpleMessage(
+      "This request failed TLS identity validation",
+    ),
+    "serviceUnavailable": MessageLookupByLibrary.simpleMessage(
+      "No valid response to this request",
+    ),
+    "serviceUnknownRoute": MessageLookupByLibrary.simpleMessage(
+      "Route unknown",
+    ),
     "serviceUnsupportedRegion": MessageLookupByLibrary.simpleMessage(
       "Region not supported",
     ),
@@ -1599,7 +1695,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Start without showing the window",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("Single add"),
-    "singleValueTip": m55,
+    "singleValueTip": m59,
     "size": MessageLookupByLibrary.simpleMessage("Size"),
     "slide": MessageLookupByLibrary.simpleMessage("Slide"),
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKS port"),
@@ -1701,7 +1797,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "urlDesc": MessageLookupByLibrary.simpleMessage(
       "Obtain a profile from a URL",
     ),
-    "urlTip": m56,
+    "urlTip": m60,
     "useHosts": MessageLookupByLibrary.simpleMessage("Use hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("Use system hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Used traffic"),
@@ -1726,7 +1822,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Also set the system clock; Android ignores it",
     ),
-    "yearsAgo": m57,
+    "yearsAgo": m61,
     "yes": MessageLookupByLibrary.simpleMessage("Yes"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Simplified Chinese"),
   };

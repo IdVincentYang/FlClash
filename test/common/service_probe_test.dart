@@ -112,6 +112,79 @@ void main() {
   });
 
   group('checkServices', () {
+    test('keeps requested purposes and targets separate', () async {
+      when(() => core.serviceCheck(any())).thenAnswer(
+        (_) async => const [
+          ServiceCheckItem(
+            name: 'youtube',
+            purpose: 'basic',
+            status: 'available',
+          ),
+          ServiceCheckItem(
+            name: 'spotify',
+            purpose: 'advanced',
+            status: 'observed',
+          ),
+          ServiceCheckItem(
+            name: 'youtube',
+            purpose: 'advanced',
+            status: 'observed',
+          ),
+        ],
+      );
+      final checks = await checkServices(
+        controller,
+        purpose: ServiceProbePurpose.advanced,
+        targets: const [ServiceTarget.youtube],
+      );
+      expect(checks.keys, [ServiceTarget.youtube]);
+      expect(checks.values.single.purpose, ServiceProbePurpose.advanced);
+      expect(checks.values.single.status, ServiceProbeStatus.observed);
+      final params =
+          verify(() => core.serviceCheck(captureAny())).captured.single
+              as ServiceCheckParams;
+      expect(params.toJson()['purpose'], 'advanced');
+    });
+
+    test('wire round trip retains safe step and route metadata only', () {
+      const item = ServiceCheckItem(
+        name: 'disney-plus',
+        purpose: 'advanced',
+        status: 'observed',
+        elapsed: 120,
+        region: 'JP',
+        coreEpoch: 3,
+        picksVersion: 7,
+        steps: [
+          ServiceCheckStep(
+            endpoint: 'session',
+            httpStatus: 200,
+            delay: 20,
+            chains: ['Node A'],
+            outcome: 'complete',
+            observation: 'observed',
+            region: 'JP',
+            coreEpoch: 3,
+            picksVersion: 7,
+          ),
+        ],
+      );
+      final wire = jsonDecode(jsonEncode(item)) as Map<String, dynamic>;
+      wire['body'] = 'synthetic-secret';
+      wire['authorization'] = 'synthetic-token';
+      final decoded = ServiceCheckItem.fromJson(wire);
+      expect(decoded, item);
+      final check = ServiceCheck.of(decoded);
+      expect(check.elapsed, 120);
+      expect(check.steps.single.chains, ['Node A']);
+      expect(check.steps.single.observation, 'observed');
+      expect(check.steps.single.region, 'JP');
+      expect(check.node, isNull);
+      expect(check.delay, isNull);
+      expect(jsonEncode(decoded), isNot(contains('synthetic-secret')));
+      expect(jsonEncode(decoded), isNot(contains('synthetic-token')));
+    });
+
     test(
       'asks the Core for the named targets and keys the answers back',
       () async {
@@ -144,17 +217,10 @@ void main() {
       },
     );
 
-    test('an empty target list asks for every service', () async {
-      late ServiceCheckParams sent;
-      when(() => core.serviceCheck(any())).thenAnswer((invocation) async {
-        sent = invocation.positionalArguments.single as ServiceCheckParams;
-        return const [];
-      });
-
-      await checkServices(controller);
-
-      expect(sent.names, isEmpty);
-      expect(sent.proxyName, isEmpty);
+    test('an empty target list makes no request', () async {
+      final checks = await checkServices(controller);
+      expect(checks, isEmpty);
+      verifyNever(() => core.serviceCheck(any()));
     });
 
     test('skips a name this build does not know', () async {
@@ -165,7 +231,10 @@ void main() {
         ],
       );
 
-      final checks = await checkServices(controller);
+      final checks = await checkServices(
+        controller,
+        targets: const [ServiceTarget.spotify],
+      );
 
       expect(checks.keys, [ServiceTarget.spotify]);
     });

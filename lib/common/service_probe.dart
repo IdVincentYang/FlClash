@@ -37,7 +37,41 @@ enum ServiceTarget {
   }
 }
 
+enum ServiceProbePurpose { basic, advanced }
+
+typedef ServiceProbeKey = ({ServiceTarget target, ServiceProbePurpose purpose});
+
+extension ServiceProbeTargets on ServiceTarget {
+  ServiceProbeKey get basic =>
+      (target: this, purpose: ServiceProbePurpose.basic);
+  ServiceProbeKey get advanced =>
+      (target: this, purpose: ServiceProbePurpose.advanced);
+  bool get hasAdvanced =>
+      this != ServiceTarget.google && this != ServiceTarget.github;
+
+  List<String> get advancedRecipients => switch (this) {
+    ServiceTarget.chatgpt => [
+      'ios.chat.openai.com',
+      'chat.openai.com',
+      'api.openai.com',
+    ],
+    ServiceTarget.netflix => ['api.fast.com', 'www.netflix.com'],
+    ServiceTarget.disneyPlus => ['disney.api.edge.bamgrid.com'],
+    ServiceTarget.bilibili => ['api.bilibili.com'],
+    ServiceTarget.youtube => ['www.youtube.com'],
+    ServiceTarget.claude => ['claude.ai'],
+    ServiceTarget.gemini => ['gemini.google.com'],
+    ServiceTarget.primeVideo => ['www.primevideo.com'],
+    ServiceTarget.spotify => ['www.spotify.com'],
+    ServiceTarget.tiktok => ['www.tiktok.com'],
+    _ => [],
+  };
+}
+
 enum ServiceProbeStatus {
+  redirected('redirected'),
+  httpResponse('http-response'),
+  observed('observed'),
   available('available'),
   unavailable('unavailable'),
   restricted('restricted'),
@@ -71,6 +105,11 @@ List<ServiceTarget> orderServiceTargets(List<String> order) {
 class ServiceCheck {
   const ServiceCheck(
     this.status, {
+    this.purpose = ServiceProbePurpose.basic,
+    this.reason = '',
+    this.httpStatus = 0,
+    this.elapsed = 0,
+    this.steps = const [],
     this.delay,
     this.chains = const [],
     this.region,
@@ -82,6 +121,13 @@ class ServiceCheck {
   factory ServiceCheck.of(ServiceCheckItem item) {
     return ServiceCheck(
       ServiceProbeStatus.byId(item.status),
+      purpose: item.purpose == 'advanced'
+          ? ServiceProbePurpose.advanced
+          : ServiceProbePurpose.basic,
+      reason: item.reason,
+      httpStatus: item.httpStatus,
+      elapsed: item.elapsed,
+      steps: item.steps,
       delay: item.delay > 0 ? item.delay : null,
       chains: item.chains,
       region: item.region.isEmpty ? null : item.region,
@@ -94,6 +140,11 @@ class ServiceCheck {
   }
 
   final ServiceProbeStatus status;
+  final ServiceProbePurpose purpose;
+  final String reason;
+  final int httpStatus;
+  final int elapsed;
+  final List<ServiceCheckStep> steps;
   final int? delay;
   final List<String> chains;
   final String? region;
@@ -107,6 +158,11 @@ class ServiceCheck {
   bool operator ==(Object other) =>
       other is ServiceCheck &&
       other.status == status &&
+      other.purpose == purpose &&
+      other.reason == reason &&
+      other.httpStatus == httpStatus &&
+      other.elapsed == elapsed &&
+      listEquals(other.steps, steps) &&
       other.delay == delay &&
       listEquals(other.chains, chains) &&
       other.region == region &&
@@ -117,6 +173,11 @@ class ServiceCheck {
   @override
   int get hashCode => Object.hash(
     status,
+    purpose,
+    reason,
+    httpStatus,
+    elapsed,
+    Object.hashAll(steps),
     delay,
     Object.hashAll(chains),
     region,
@@ -130,16 +191,18 @@ class ServiceCheck {
       'ServiceCheck(${status.id}, delay: $delay, node: $node, region: $region)';
 }
 
-/// An empty [proxyName] lets the Core route by its rules; an empty [targets]
-/// checks every service.
+/// An empty [proxyName] uses the accepted rules; no targets means no requests.
 Future<Map<ServiceTarget, ServiceCheck>> checkServices(
   CoreController core, {
   String proxyName = '',
+  ServiceProbePurpose purpose = ServiceProbePurpose.basic,
   List<ServiceTarget> targets = const [],
   Duration timeout = probeTimeoutDuration,
 }) async {
+  if (targets.isEmpty) return const {};
   final items = await core.serviceCheck(
     ServiceCheckParams(
+      purpose: purpose.name,
       proxyName: proxyName,
       names: targets.map((target) => target.id).toList(),
       timeout: timeout.inMilliseconds,
@@ -147,7 +210,9 @@ Future<Map<ServiceTarget, ServiceCheck>> checkServices(
   );
   return {
     for (final item in items)
-      ?ServiceTarget.byId(item.name): ServiceCheck.of(item),
+      if (item.purpose == purpose.name &&
+          targets.any((target) => target.id == item.name))
+        ?ServiceTarget.byId(item.name): ServiceCheck.of(item),
   };
 }
 

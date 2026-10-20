@@ -16,7 +16,7 @@ final class ServiceStatusProvider
     extends
         $NotifierProvider<
           ServiceStatus,
-          RoutedProbeState<ServiceTarget, ServiceCheck>
+          RoutedProbeState<ServiceProbeKey, ServiceCheck>
         > {
   ServiceStatusProvider._()
     : super(
@@ -38,40 +38,40 @@ final class ServiceStatusProvider
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(
-    RoutedProbeState<ServiceTarget, ServiceCheck> value,
+    RoutedProbeState<ServiceProbeKey, ServiceCheck> value,
   ) {
     return $ProviderOverride(
       origin: this,
       providerOverride:
-          $SyncValueProvider<RoutedProbeState<ServiceTarget, ServiceCheck>>(
+          $SyncValueProvider<RoutedProbeState<ServiceProbeKey, ServiceCheck>>(
             value,
           ),
     );
   }
 }
 
-String _$serviceStatusHash() => r'cb8e901a3ea8cf4e0b1a77a13c725ae4ba7a7f53';
+String _$serviceStatusHash() => r'f17881e1f13946223167944341aeaa77494bd7df';
 
 abstract class _$ServiceStatus
-    extends $Notifier<RoutedProbeState<ServiceTarget, ServiceCheck>> {
-  RoutedProbeState<ServiceTarget, ServiceCheck> build();
+    extends $Notifier<RoutedProbeState<ServiceProbeKey, ServiceCheck>> {
+  RoutedProbeState<ServiceProbeKey, ServiceCheck> build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
     final ref =
         this.ref
             as $Ref<
-              RoutedProbeState<ServiceTarget, ServiceCheck>,
-              RoutedProbeState<ServiceTarget, ServiceCheck>
+              RoutedProbeState<ServiceProbeKey, ServiceCheck>,
+              RoutedProbeState<ServiceProbeKey, ServiceCheck>
             >;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                RoutedProbeState<ServiceTarget, ServiceCheck>,
-                RoutedProbeState<ServiceTarget, ServiceCheck>
+                RoutedProbeState<ServiceProbeKey, ServiceCheck>,
+                RoutedProbeState<ServiceProbeKey, ServiceCheck>
               >,
-              RoutedProbeState<ServiceTarget, ServiceCheck>,
+              RoutedProbeState<ServiceProbeKey, ServiceCheck>,
               Object?,
               Object?
             >;
@@ -172,4 +172,4 @@ final class EnabledServiceTargetsProvider
 }
 
 String _$enabledServiceTargetsHash() =>
-    r'7c5f5b6879ea73bd726ec9271b792a7c7b4b6528';
+    r'ec0b9a985bc1f826b102f3bf01861152a4e2d692';

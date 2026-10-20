@@ -207,6 +207,7 @@ abstract class OutboundIpResult with _$OutboundIpResult {
 @freezed
 abstract class ServiceCheckParams with _$ServiceCheckParams {
   const factory ServiceCheckParams({
+    @Default('basic') String purpose,
     @JsonKey(name: 'proxy-name') @Default('') String proxyName,
     @Default([]) List<String> names,
     required int timeout,
@@ -219,6 +220,11 @@ abstract class ServiceCheckParams with _$ServiceCheckParams {
 @freezed
 abstract class ServiceCheckItem with _$ServiceCheckItem {
   const factory ServiceCheckItem({
+    @Default('basic') String purpose,
+    @Default('') String reason,
+    @JsonKey(name: 'http-status') @Default(0) int httpStatus,
+    @Default(0) int elapsed,
+    @Default([]) List<ServiceCheckStep> steps,
     @Default('') String name,
     @Default('') String status,
     @Default('') String region,
@@ -231,6 +237,24 @@ abstract class ServiceCheckItem with _$ServiceCheckItem {
 
   factory ServiceCheckItem.fromJson(Map<String, Object?> json) =>
       _$ServiceCheckItemFromJson(json);
+}
+
+@freezed
+abstract class ServiceCheckStep with _$ServiceCheckStep {
+  const factory ServiceCheckStep({
+    @Default('') String endpoint,
+    @JsonKey(name: 'http-status') @Default(0) int httpStatus,
+    @Default(0) int delay,
+    @Default([]) List<String> chains,
+    @Default('') String outcome,
+    @Default('') String observation,
+    @Default('') String region,
+    @JsonKey(name: 'core-epoch') @Default(0) int coreEpoch,
+    @JsonKey(name: 'picks-version') @Default(0) int picksVersion,
+  }) = _ServiceCheckStep;
+
+  factory ServiceCheckStep.fromJson(Map<String, Object?> json) =>
+      _$ServiceCheckStepFromJson(json);
 }
 
 @freezed

@@ -20,13 +20,36 @@ func stubChecker(name string, item ServiceCheckItem) serviceChecker {
 	return serviceChecker{name: name, check: func(serviceEnv) ServiceCheckItem { return item }}
 }
 
-func TestHandleServiceCheckRunsEveryCheckerByDefault(t *testing.T) {
+func checkRegisteredTestRules(params *ServiceCheckParams) []ServiceCheckItem {
+	params.Purpose = "advanced"
+	if params.Names == nil {
+		for _, checker := range serviceCheckers {
+			params.Names = append(params.Names, checker.name)
+		}
+	}
+	return handleServiceCheck(params)
+}
+
+func TestHandleServiceCheckEmptySelectionMakesNoRequests(t *testing.T) {
+	var calls atomic.Int32
+	withServiceCheckers(t, serviceChecker{name: "alpha", check: func(serviceEnv) ServiceCheckItem { calls.Add(1); return ServiceCheckItem{Status: serviceAvailable} }})
+	for _, purpose := range []string{"", "basic", "advanced", "unknown"} {
+		if got := handleServiceCheck(&ServiceCheckParams{Purpose: purpose, Timeout: 1000}); len(got) != 0 {
+			t.Fatalf("empty selection=%+v", got)
+		}
+	}
+	if calls.Load() != 0 {
+		t.Fatal("empty selection ran a rule")
+	}
+}
+
+func TestHandleServiceCheckRunsExplicitlySelectedRules(t *testing.T) {
 	withServiceCheckers(t,
 		stubChecker("alpha", ServiceCheckItem{Status: serviceAvailable, Region: "US"}),
 		stubChecker("beta", ServiceCheckItem{Status: serviceUnsupportedRegion}),
 	)
 
-	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
 
 	if len(items) != 2 {
 		t.Fatalf("items = %d, want 2", len(items))
@@ -49,7 +72,7 @@ func TestHandleServiceCheckStampsTheRegisteredName(t *testing.T) {
 		stubChecker("alpha", ServiceCheckItem{Name: "stale", Status: serviceAvailable}),
 	)
 
-	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
 
 	if items[0].Name != "alpha" {
 		t.Errorf("name = %q, want the registry's rather than the rule's", items[0].Name)
@@ -63,7 +86,7 @@ func TestHandleServiceCheckKeepsTheRequestedOrder(t *testing.T) {
 		stubChecker("gamma", ServiceCheckItem{Status: serviceAvailable}),
 	)
 
-	items := handleServiceCheck(&ServiceCheckParams{Names: []string{"gamma", "alpha"}, Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Names: []string{"gamma", "alpha"}, Timeout: 1000})
 
 	if len(items) != 2 {
 		t.Fatalf("items = %d, want 2", len(items))
@@ -76,7 +99,7 @@ func TestHandleServiceCheckKeepsTheRequestedOrder(t *testing.T) {
 func TestHandleServiceCheckIgnoresAnUnknownName(t *testing.T) {
 	withServiceCheckers(t, stubChecker("alpha", ServiceCheckItem{Status: serviceAvailable}))
 
-	items := handleServiceCheck(&ServiceCheckParams{Names: []string{"nope"}, Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Names: []string{"nope"}, Timeout: 1000})
 
 	if len(items) != 0 {
 		t.Fatalf("items = %d, want none", len(items))
@@ -89,7 +112,7 @@ func TestHandleServiceCheckSurvivesAPanickingRule(t *testing.T) {
 		stubChecker("alpha", ServiceCheckItem{Status: serviceAvailable}),
 	)
 
-	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
 
 	if len(items) != 2 {
 		t.Fatalf("items = %d, want 2", len(items))
@@ -139,11 +162,11 @@ func TestHandleServiceCheckBoundsConcurrency(t *testing.T) {
 	var tracker concurrencyTracker
 	checkers := make([]serviceChecker, 0, 12)
 	for index := 0; index < 12; index++ {
-		checkers = append(checkers, tracker.checker("x"))
+		checkers = append(checkers, tracker.checker(fmt.Sprintf("service-%d", index)))
 	}
 	withServiceCheckers(t, checkers...)
 
-	handleServiceCheck(&ServiceCheckParams{Timeout: 5000})
+	checkRegisteredTestRules(&ServiceCheckParams{Timeout: 5000})
 
 	tracker.verify(t, 12)
 }
@@ -161,7 +184,7 @@ func TestHandleServiceCheckBoundsConcurrencyAcrossRequests(t *testing.T) {
 		requests.Add(1)
 		go func(name string) {
 			defer requests.Done()
-			handleServiceCheck(&ServiceCheckParams{Names: []string{name}, Timeout: 5000})
+			checkRegisteredTestRules(&ServiceCheckParams{Names: []string{name}, Timeout: 5000})
 		}(checker.name)
 	}
 	requests.Wait()
@@ -174,7 +197,7 @@ func waitForClaim(t *testing.T, name string) {
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		serviceClaimsMu.Lock()
-		claimed := serviceClaims[name] != nil
+		claimed := serviceClaims[name+":advanced"] != nil
 		serviceClaimsMu.Unlock()
 		if claimed {
 			return
@@ -207,7 +230,7 @@ func TestHandleServiceCheckDropsAQueuedCheckAskedAgain(t *testing.T) {
 	ask := func() chan []ServiceCheckItem {
 		answer := make(chan []ServiceCheckItem, 1)
 		go func() {
-			answer <- handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000})
+			answer <- checkRegisteredTestRules(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000})
 		}()
 		return answer
 	}
@@ -259,7 +282,7 @@ func TestHandleServiceCheckHandsTheCancelledCheckSlotToItsReplacement(t *testing
 		older.Add(1)
 		go func(name string) {
 			defer older.Done()
-			handleServiceCheck(&ServiceCheckParams{Names: []string{name}, Timeout: 5000})
+			checkRegisteredTestRules(&ServiceCheckParams{Names: []string{name}, Timeout: 5000})
 		}(checker.name)
 	}
 	for range checkers {
@@ -268,7 +291,7 @@ func TestHandleServiceCheckHandsTheCancelledCheckSlotToItsReplacement(t *testing
 
 	done := make(chan []ServiceCheckItem, 1)
 	go func() {
-		done <- handleServiceCheck(&ServiceCheckParams{Names: []string{checkers[0].name}, Timeout: 5000})
+		done <- checkRegisteredTestRules(&ServiceCheckParams{Names: []string{checkers[0].name}, Timeout: 5000})
 	}()
 
 	select {
@@ -280,12 +303,12 @@ func TestHandleServiceCheckHandsTheCancelledCheckSlotToItsReplacement(t *testing
 		t.Fatal("the replacement waited behind the checks every slot was held by")
 	}
 	for _, checker := range checkers[1:] {
-		handleServiceCheck(&ServiceCheckParams{Names: []string{checker.name}, Timeout: 5000})
+		checkRegisteredTestRules(&ServiceCheckParams{Names: []string{checker.name}, Timeout: 5000})
 	}
 	older.Wait()
 }
 
-func TestHandleServiceCheckRetriesATimeoutOnce(t *testing.T) {
+func TestHandleServiceCheckDoesNotRetryATimeout(t *testing.T) {
 	var calls atomic.Int32
 	withServiceCheckers(t, serviceChecker{name: "flaky", check: func(serviceEnv) ServiceCheckItem {
 		if calls.Add(1) == 1 {
@@ -294,30 +317,31 @@ func TestHandleServiceCheckRetriesATimeoutOnce(t *testing.T) {
 		return ServiceCheckItem{Status: serviceAvailable}
 	}})
 
-	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
 
-	if items[0].Status != serviceAvailable {
-		t.Errorf("status = %q, want the retry's answer", items[0].Status)
+	if items[0].Status != serviceTimeout {
+		t.Errorf("status=%q, want timeout without implicit retry", items[0].Status)
 	}
-	if got := calls.Load(); got != 2 {
-		t.Errorf("ran %d times, want 2", got)
+	if got := calls.Load(); got != 1 {
+		t.Errorf("ran %d times, want one", got)
 	}
 }
 
-func TestHandleServiceCheckReportsARepeatedTimeout(t *testing.T) {
+func TestHandleServiceCheckReportsTimeoutForEachExplicitRun(t *testing.T) {
 	var calls atomic.Int32
 	withServiceCheckers(t, serviceChecker{name: "down", check: func(serviceEnv) ServiceCheckItem {
 		calls.Add(1)
 		return ServiceCheckItem{Status: serviceTimeout}
 	}})
 
-	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
 
 	if items[0].Status != serviceTimeout {
 		t.Errorf("status = %q, want %q", items[0].Status, serviceTimeout)
 	}
+	checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
 	if got := calls.Load(); got != 2 {
-		t.Errorf("ran %d times, want a single retry", got)
+		t.Errorf("ran %d times, want two explicit runs", got)
 	}
 }
 
@@ -345,11 +369,11 @@ func TestHandleServiceCheckCancelsTheOlderCheckOfTheSameService(t *testing.T) {
 	)
 
 	older := make(chan []ServiceCheckItem)
-	go func() { older <- handleServiceCheck(&ServiceCheckParams{Timeout: 5000}) }()
+	go func() { older <- checkRegisteredTestRules(&ServiceCheckParams{Timeout: 5000}) }()
 	<-started
 	<-started
 
-	newer := handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000})
+	newer := checkRegisteredTestRules(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000})
 
 	if newer[0].Status != serviceAvailable {
 		t.Errorf("newer alpha = %q, want %q", newer[0].Status, serviceAvailable)
@@ -375,8 +399,8 @@ func TestStatusFromCode(t *testing.T) {
 		http.StatusForbidden:                  serviceRestricted,
 		http.StatusTooManyRequests:            serviceRestricted,
 		http.StatusUnavailableForLegalReasons: serviceRestricted,
-		http.StatusNotFound:                   serviceUnavailable,
-		http.StatusInternalServerError:        serviceUnavailable,
+		http.StatusNotFound:                   "http-response",
+		http.StatusInternalServerError:        "http-response",
 	}
 	for code, want := range cases {
 		if got := statusFromCode(code); got != want {

@@ -103,7 +103,8 @@ type ProbeResult struct {
 
 	// Unexported, so it never reaches Dart: only the in-core checks read
 	// response headers, and ProbeResult is the shape the Dart side decodes.
-	header http.Header
+	header    http.Header
+	bodyState string
 }
 
 type Traffic struct {

@@ -140,11 +140,19 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m54(time) => "${time} に検査";
 
-  static String m55(label) => "${label}は1項目のみ指定できます";
+  static String m55(region) => "報告された地域：${region}";
 
-  static String m56(label) => "${label}はURLである必要があります";
+  static String m56(milliseconds) => "合計時間（待機・本文を含む）：${milliseconds} ms";
 
-  static String m57(count) => "${count} 年前";
+  static String m57(result) => "期限切れ：${result}";
+
+  static String m58(hosts) => "接続先：${hosts}";
+
+  static String m59(label) => "${label}は1項目のみ指定できます";
+
+  static String m60(label) => "${label}はURLである必要があります";
+
+  static String m61(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -1325,22 +1333,75 @@ class MessageLookup extends MessageLookupByLibrary {
     "selected": MessageLookupByLibrary.simpleMessage("選択済み"),
     "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("サーバー"),
+    "serviceAdvanced": MessageLookupByLibrary.simpleMessage("地域・サービス検査"),
+    "serviceAdvancedExplanation": MessageLookupByLibrary.simpleMessage(
+      "任意の一回限りの匿名リクエストで地域やサービスページの情報を調べます。下記の追加接続先にアクセスする場合があります。ブラウザーのログインCookieや購読認証情報は送信しません。アカウント権限・再生・端末全体の保護は保証せず、基本応答とは別に判断します。",
+    ),
+    "serviceAdvancedTiming": MessageLookupByLibrary.simpleMessage(
+      "結果は5分で期限切れ、開始間隔は最低30秒です。自動再実行はせず、ページを離れると未完了の検査を中止します。各時間は応答ヘッダーまでの時間で、pingや速度ではありません。",
+    ),
+    "serviceAllDisabled": MessageLookupByLibrary.simpleMessage(
+      "すべて無効 · サービス管理",
+    ),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("利用可能"),
+    "serviceBasic": MessageLookupByLibrary.simpleMessage("基本 HTTPS 応答"),
+    "serviceBasicExplanation": MessageLookupByLibrary.simpleMessage(
+      "表示中のサービスを前景で自動検査します。結果は5分で期限切れになり、経路変更やアプリ復帰時に必要に応じ再検査します。開始間隔は最低30秒です。一括検査は有効な項目のみです。応答ヘッダーのみ読み、転送やページ素材は読み込みません。応答は機能・アカウント権限・端末全体の保護を保証しません。",
+    ),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("ブロック済み"),
+    "serviceBodyComplete": MessageLookupByLibrary.simpleMessage("本文を完全に読み取り"),
+    "serviceBodyLimit": MessageLookupByLibrary.simpleMessage("応答サイズの上限に到達"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("検査"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("すべて検査"),
     "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("近日提供予定"),
+    "serviceConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "今回のリクエストは応答を確立できません",
+    ),
+    "serviceDetectedRegion": m55,
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "許可されていない ISP",
     ),
-    "serviceFailed": MessageLookupByLibrary.simpleMessage("検出に失敗しました"),
+    "serviceDisneyExplanation": MessageLookupByLibrary.simpleMessage(
+      "開始すると匿名ブラウザーデバイスを登録し、一時トークンに交換してセッションを照会します。トークンは今回のみ使用し保存しません。",
+    ),
+    "serviceDnsFailed": MessageLookupByLibrary.simpleMessage("今回のホストを解決できません"),
+    "serviceElapsed": m56,
+    "serviceExpired": m57,
+    "serviceFailed": MessageLookupByLibrary.simpleMessage("判定不能"),
+    "serviceHeaders": MessageLookupByLibrary.simpleMessage("応答ヘッダーを受信"),
+    "serviceHttpResponse": MessageLookupByLibrary.simpleMessage("HTTP 応答"),
+    "serviceIndeterminate": MessageLookupByLibrary.simpleMessage(
+      "判定できません。検査未完了または応答形式が変更された可能性があります。",
+    ),
     "serviceManage": MessageLookupByLibrary.simpleMessage("サービスを管理"),
+    "serviceMarkerFound": MessageLookupByLibrary.simpleMessage("必要な情報を検出"),
+    "serviceMultipleRoutes": MessageLookupByLibrary.simpleMessage(
+      "複数の出口 · 各リクエストを確認",
+    ),
+    "serviceObserved": MessageLookupByLibrary.simpleMessage("サービス情報を確認"),
     "serviceOriginalsOnly": MessageLookupByLibrary.simpleMessage("オリジナル作品のみ"),
     "servicePending": MessageLookupByLibrary.simpleMessage("未検査"),
+    "serviceQueued": MessageLookupByLibrary.simpleMessage("検査間隔を待機中"),
+    "serviceReadError": MessageLookupByLibrary.simpleMessage("応答が中断または読取不能"),
+    "serviceRecipientBlocked": MessageLookupByLibrary.simpleMessage(
+      "接続先または転送が検査範囲外",
+    ),
+    "serviceRecipients": m58,
+    "serviceRedirected": MessageLookupByLibrary.simpleMessage("リダイレクト応答（未追跡）"),
+    "serviceRequestLimit": MessageLookupByLibrary.simpleMessage("リクエスト上限に到達"),
+    "serviceResponded": MessageLookupByLibrary.simpleMessage("応答あり"),
     "serviceRestricted": MessageLookupByLibrary.simpleMessage("アクセス制限"),
+    "serviceRouteChanged": MessageLookupByLibrary.simpleMessage(
+      "経路変更 · 手動で再検査",
+    ),
+    "serviceStartAdvanced": MessageLookupByLibrary.simpleMessage("一回検査を開始"),
     "serviceStatus": MessageLookupByLibrary.simpleMessage("サービスの状態"),
-    "serviceUnavailable": MessageLookupByLibrary.simpleMessage("利用不可"),
+    "serviceTlsFailed": MessageLookupByLibrary.simpleMessage("今回のTLS証明書検証に失敗"),
+    "serviceUnavailable": MessageLookupByLibrary.simpleMessage(
+      "今回のリクエストに有効な応答なし",
+    ),
+    "serviceUnknownRoute": MessageLookupByLibrary.simpleMessage("経路不明"),
     "serviceUnsupportedRegion": MessageLookupByLibrary.simpleMessage("対象外の地域"),
     "settings": MessageLookupByLibrary.simpleMessage("設定"),
     "show": MessageLookupByLibrary.simpleMessage("表示"),
@@ -1360,7 +1421,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "起動時にウィンドウを表示しません",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("個別追加"),
-    "singleValueTip": m55,
+    "singleValueTip": m59,
     "size": MessageLookupByLibrary.simpleMessage("サイズ"),
     "slide": MessageLookupByLibrary.simpleMessage("スライド"),
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKSポート"),
@@ -1444,7 +1505,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("アップロード"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("URLからプロファイルを取得します"),
-    "urlTip": m56,
+    "urlTip": m60,
     "useHosts": MessageLookupByLibrary.simpleMessage("Hostsを使用"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("システムのHostsを使用"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("使用済みトラフィック"),
@@ -1465,7 +1526,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "システムクロックも設定します。Androidでは無視されます",
     ),
-    "yearsAgo": m57,
+    "yearsAgo": m61,
     "yes": MessageLookupByLibrary.simpleMessage("はい"),
     "zhCN": MessageLookupByLibrary.simpleMessage("簡体字中国語"),
   };

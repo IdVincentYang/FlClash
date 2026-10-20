@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -25,16 +26,18 @@ func TestNormalizeRegion(t *testing.T) {
 	}
 }
 
-func TestNormalizeRegionCoversTheBlockLists(t *testing.T) {
-	for _, code := range geminiBlockedRegions {
-		if normalizeRegion(code) == "" {
-			t.Errorf("gemini block list entry %q does not fold to an alpha-2 code", code)
-		}
-	}
-	for _, code := range claudeBlockedRegions {
-		if normalizeRegion(code) != code {
-			t.Errorf("claude block list entry %q is not already alpha-2", code)
-		}
+func TestDiagnosticRegionHintsDoNotApplyStaticAvailabilityBlacklists(t *testing.T) {
+	for _, scenario := range []struct{ name, body, want string }{
+		{"claude", "loc=CN\n", "CN"},
+		{"gemini", geminiRegionMarker + `HKG"`, "HK"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			diagnosticFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(scenario.body)) }, true)
+			item := diagnosticCheck(t, scenario.name, "advanced")
+			if item.Status != "observed" || item.Region != scenario.want {
+				t.Fatalf("region hint=%+v", item)
+			}
+		})
 	}
 }
 
@@ -61,10 +64,10 @@ func TestTikTokStatus(t *testing.T) {
 		body string
 		want string
 	}{
-		{http.StatusOK, `{"region":"JP"}`, serviceAvailable},
-		{http.StatusForbidden, "", serviceUnsupportedRegion},
-		{http.StatusUnavailableForLegalReasons, "", serviceUnsupportedRegion},
-		{http.StatusOK, "Access Denied", serviceUnsupportedRegion},
+		{http.StatusOK, `{"webapp.app-context":{"region":"JP"}}`, "observed"},
+		{http.StatusForbidden, "", serviceRestricted},
+		{http.StatusUnavailableForLegalReasons, "", serviceRestricted},
+		{http.StatusOK, "Access Denied", serviceFailed},
 		{http.StatusOK, "TikTok is not available in your region", serviceUnsupportedRegion},
 		{http.StatusInternalServerError, "", serviceFailed},
 	}
@@ -90,17 +93,11 @@ func TestTikTokRegionReadsTheAppContext(t *testing.T) {
 	}
 }
 
-func TestSpotifyRegionPrefersTheRedirectedPath(t *testing.T) {
-	redirected := &ProbeResult{Url: "https://www.spotify.com/de-de/", Body: `{"countryCode":"US"}`}
-	if got := spotifyRegion(redirected); got != "de" {
-		t.Errorf("region = %q, want the path's country", got)
-	}
-	unredirected := &ProbeResult{
-		Url:  "https://www.spotify.com/api/content/v1/country-selector",
-		Body: `{"countryCode":"SE"}`,
-	}
-	if got := spotifyRegion(unredirected); got != "SE" {
-		t.Errorf("region = %q, want the payload's country", got)
+func TestSpotifyRegionRequiresStructuredResponse(t *testing.T) {
+	diagnosticFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"countryCode":"SE"}`)) }, true)
+	item := diagnosticCheck(t, "spotify", "advanced")
+	if item.Status != "observed" || item.Region != "SE" {
+		t.Fatalf("country=%+v", item)
 	}
 }
 
@@ -125,17 +122,27 @@ func TestYouTubeRegionPatterns(t *testing.T) {
 	}
 }
 
-func TestDisneyAndPrimePatterns(t *testing.T) {
-	if got := firstSubmatch(disneyAssertionPattern, `{"assertion":"abc.def"}`); got != "abc.def" {
-		t.Errorf("assertion = %q", got)
+func TestServiceTokenBoundsAndPrimeMarker(t *testing.T) {
+	for _, value := range []string{"", "line\nbreak", "zero\x00value", strings.Repeat("x", 8193)} {
+		if serviceToken(value) {
+			t.Fatal("invalid token accepted")
+		}
 	}
-	if got := firstSubmatch(disneyRefreshPattern, `{"refresh_token":"tok123"}`); got != "tok123" {
-		t.Errorf("refresh token = %q", got)
-	}
-	if got := firstSubmatch(disneySupportedPattern, `{"inSupportedLocation":false}`); got != "false" {
-		t.Errorf("supported = %q", got)
+	if !serviceToken("synthetic+token") {
+		t.Fatal("valid token rejected")
 	}
 	if got := firstSubmatch(primeRegionPattern, `{"currentTerritory":"NL"}`); got != "NL" {
-		t.Errorf("territory = %q", got)
+		t.Fatalf("territory=%q", got)
+	}
+}
+
+func TestGeminiRequiresACompleteKnownRegionMarker(t *testing.T) {
+	for _, body := range []string{geminiRegionMarker + "CHN", geminiRegionMarker + `ZZZ"`, geminiRegionMarker + `cnx"`} {
+		if got := geminiRegion(body); got != "" {
+			t.Fatalf("invalid marker=%q", got)
+		}
+	}
+	if got := geminiRegion(geminiRegionMarker + `CHN"`); got != "CN" {
+		t.Fatalf("region=%q", got)
 	}
 }

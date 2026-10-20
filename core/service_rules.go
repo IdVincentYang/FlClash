@@ -4,10 +4,29 @@ import (
 	"encoding/json"
 	"net/url"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/metacubex/http"
+)
+
+const (
+	youtubePremiumURL  = "https://www.youtube.com/premium?hl=en"
+	chatGPTIOSURL      = "https://ios.chat.openai.com/"
+	chatGPTTraceURL    = "https://chat.openai.com/cdn-cgi/trace"
+	chatGPTWebURL      = "https://api.openai.com/compliance/cookie_requirements"
+	claudeTraceURL     = "https://claude.ai/cdn-cgi/trace"
+	geminiURL          = "https://gemini.google.com"
+	netflixCDNURL      = "https://api.fast.com/netflix/speedtest/v2?https=true&token=YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm&urlCount=5"
+	netflixTitleOneURL = "https://www.netflix.com/title/81280792"
+	netflixTitleTwoURL = "https://www.netflix.com/title/70143836"
+	netflixRegionURL   = "https://www.netflix.com/title/80018499"
+	disneyDeviceURL    = "https://disney.api.edge.bamgrid.com/devices"
+	disneyTokenURL     = "https://disney.api.edge.bamgrid.com/token"
+	disneySessionURL   = "https://disney.api.edge.bamgrid.com/graph/v1/device/graphql"
+	primeVideoURL      = "https://www.primevideo.com"
+	spotifyURL         = "https://www.spotify.com/api/content/v1/country-selector?platform=web&format=json"
+	tikTokURL          = "https://www.tiktok.com/"
+	bilibiliURL        = "https://api.bilibili.com/pgc/player/web/playurl?avid=18281381&cid=29892777&qn=0&type=&otype=json&ep_id=183799&fourk=1&fnver=0&fnval=16&module=bangumi"
 )
 
 // disneyAuthHeader is the public browser client token Disney+ hands to any web
@@ -21,16 +40,9 @@ var (
 		regexp.MustCompile(`"countryCode"\s*:\s*"([A-Za-z]{2})"`),
 		regexp.MustCompile(`"country_code"\s*:\s*"([A-Za-z]{2})"`),
 	}
-	tikTokRegionPattern    = regexp.MustCompile(`"webapp\.app-context"\s*:\s*\{[^{}]*?"region"\s*:\s*"([^"]*)"`)
-	primeRegionPattern     = regexp.MustCompile(`"currentTerritory":"([^"]+)"`)
-	disneyAssertionPattern = regexp.MustCompile(`"assertion"\s*:\s*"([^"]+)"`)
-	disneyRefreshPattern   = regexp.MustCompile(`"refresh_token"\s*:\s*"([^"]+)"`)
-	disneyCountryPattern   = regexp.MustCompile(`"countryCode"\s*:\s*"([^"]+)"`)
-	disneySupportedPattern = regexp.MustCompile(`"inSupportedLocation"\s*:\s*(false|true)`)
-	spotifyCountryPattern  = regexp.MustCompile(`"countryCode"\s*:\s*"([^"]+)"`)
-	geminiRegionMarker     = `,2,1,200,"`
-	claudeBlockedRegions   = []string{"AF", "BY", "CN", "CU", "HK", "IR", "KP", "MO", "RU", "SY"}
-	geminiBlockedRegions   = []string{"CHN", "RUS", "BLR", "CUB", "IRN", "PRK", "SYR", "HKG", "MAC"}
+	tikTokRegionPattern = regexp.MustCompile(`"webapp\.app-context"\s*:\s*\{[^{}]*?"region"\s*:\s*"([^"]*)"`)
+	primeRegionPattern  = regexp.MustCompile(`"currentTerritory":"([^"]+)"`)
+	geminiRegionMarker  = `,2,1,200,"`
 )
 
 func firstSubmatch(pattern *regexp.Regexp, body string) string {
@@ -42,9 +54,13 @@ func firstSubmatch(pattern *regexp.Regexp, body string) string {
 }
 
 func checkClaude(env serviceEnv) ServiceCheckItem {
-	result := env.get("https://claude.ai/cdn-cgi/trace", serviceSmallMaxBody)
+	result := env.get(claudeTraceURL, serviceSmallMaxBody)
 	item := itemFrom(result)
 	if !answered(item, result) {
+		return item
+	}
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
 		return item
 	}
 	region := normalizeRegion(traceValue(result.Body, "loc"))
@@ -53,61 +69,91 @@ func checkClaude(env serviceEnv) ServiceCheckItem {
 		return item
 	}
 	item.Region = region
-	item.Status = serviceAvailable
-	if slices.Contains(claudeBlockedRegions, region) {
-		item.Status = serviceUnsupportedRegion
-	}
+	item.Status = "observed"
 	return item
 }
 
 func checkGemini(env serviceEnv) ServiceCheckItem {
-	result := env.scan("https://gemini.google.com", func(tail string) bool {
-		index := strings.Index(tail, geminiRegionMarker)
-		return index >= 0 && index+len(geminiRegionMarker)+3 <= len(tail)
-	})
+	result := env.scan(geminiURL, func(tail string) bool { return geminiRegion(tail) != "" })
 	item := itemFrom(result)
 	if !answered(item, result) {
 		return item
 	}
-	index := strings.Index(result.Body, geminiRegionMarker)
-	if index < 0 || index+len(geminiRegionMarker)+3 > len(result.Body) {
-		item.Status = serviceFailed
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
 		return item
 	}
-	start := index + len(geminiRegionMarker)
-	code := result.Body[start : start+3]
-	if !isAsciiUpper(code) {
-		item.Status = serviceFailed
-		return item
-	}
-	item.Region = normalizeRegion(code)
-	item.Status = serviceAvailable
-	if slices.Contains(geminiBlockedRegions, code) {
-		item.Status = serviceUnsupportedRegion
+	item.Region = geminiRegion(result.Body)
+	item.Status = serviceFailed
+	if item.Region != "" {
+		item.Status = "observed"
 	}
 	return item
 }
 
-// checkChatGpt folds Verge's separate iOS and Web results into one entry: the
-// card shows a single row per service, and a split would put two identical
-// OpenAI icons next to each other.
+func geminiRegion(body string) string {
+	index := strings.Index(body, geminiRegionMarker)
+	if index < 0 {
+		return ""
+	}
+	start := index + len(geminiRegionMarker)
+	if start+3 >= len(body) || body[start+3] != '"' {
+		return ""
+	}
+	code := body[start : start+3]
+	if !isAsciiUpper(code) {
+		return ""
+	}
+	return normalizeRegion(code)
+}
+
 func checkChatGpt(env serviceEnv) ServiceCheckItem {
-	ios := env.get("https://ios.chat.openai.com/", serviceSmallMaxBody)
-	item := itemFrom(ios)
-	if answered(item, ios) {
-		item.Status = chatGptIosStatus(ios)
+	observe := func(status, region string) {
+		if env.run != nil && len(env.run.steps) > 0 {
+			step := &env.run.steps[len(env.run.steps)-1]
+			step.Observation, step.Region = status, region
+		}
 	}
-
-	trace := env.get("https://chat.openai.com/cdn-cgi/trace", serviceSmallMaxBody)
-	if traceItem := itemFrom(trace); answered(traceItem, trace) {
-		item.Region = normalizeRegion(traceValue(trace.Body, "loc"))
+	item := ServiceCheckItem{Status: serviceFailed, Reason: "unrecognized"}
+	ios := env.get(chatGPTIOSURL, serviceSmallMaxBody)
+	if answered(itemFrom(ios), ios) {
+		status := chatGptIosStatus(ios)
+		if status == serviceAvailable {
+			status = "observed"
+		}
+		observe(status, "")
 	}
-
-	web := env.get("https://api.openai.com/compliance/cookie_requirements", serviceSmallMaxBody)
-	if webItem := itemFrom(web); answered(webItem, web) &&
-		bodyContains(web, "unsupported_country") {
+	trace := env.get(chatGPTTraceURL, serviceSmallMaxBody)
+	if answered(itemFrom(trace), trace) {
+		status := serviceFailed
+		if trace.StatusCode == http.StatusOK {
+			item.Region = normalizeRegion(traceValue(trace.Body, "loc"))
+			if item.Region != "" {
+				status = "observed"
+			}
+		}
+		observe(status, item.Region)
+	}
+	web := env.get(chatGPTWebURL, serviceSmallMaxBody)
+	if !answered(itemFrom(web), web) {
+		return item
+	}
+	var payload struct {
+		Error *struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(web.Body), &payload) != nil {
+		observe(serviceFailed, "")
+		return item
+	}
+	if payload.Error != nil && payload.Error.Code == "unsupported_country" {
 		item.Status = serviceUnsupportedRegion
+		item.Reason = ""
+		observe(serviceUnsupportedRegion, "")
+		return item
 	}
+	observe(serviceFailed, "")
 	return item
 }
 
@@ -118,8 +164,6 @@ func chatGptIosStatus(result *ProbeResult) string {
 	case bodyContains(result, "sorry, you have been blocked"):
 		return serviceBlocked
 	case bodyContains(result, "request is not allowed. please try again later."):
-		// Being turned away as an API client is what a reachable region looks
-		// like here; anything else means the request never got that far.
 		return serviceAvailable
 	default:
 		return serviceFailed
@@ -127,9 +171,13 @@ func chatGptIosStatus(result *ProbeResult) string {
 }
 
 func checkYouTubePremium(env serviceEnv) ServiceCheckItem {
-	result := env.get("https://www.youtube.com/premium?hl=en", serviceHtmlMaxBody)
+	result := env.get(youtubePremiumURL, serviceHtmlMaxBody)
 	item := itemFrom(result)
 	if !answered(item, result) {
+		return item
+	}
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
 		return item
 	}
 	for _, pattern := range youTubeRegionPatterns {
@@ -144,56 +192,53 @@ func checkYouTubePremium(env serviceEnv) ServiceCheckItem {
 		"premium is not available in your country",
 		"premium is not available in your region"):
 		item.Status = serviceUnsupportedRegion
-	case result.StatusCode >= 200 && result.StatusCode < 300 &&
-		bodyContains(result, "youtube premium", "ad-free", `"browseid":"spunlimited"`):
-		item.Status = serviceAvailable
+	case result.StatusCode == http.StatusOK && (item.Region != "" || bodyContains(result, `"browseid":"spunlimited"`)):
+		item.Status = "observed"
 	default:
-		item.Status = statusFromCode(result.StatusCode)
+		item.Status = serviceFailed
 	}
 	return item
 }
 
 func checkSpotify(env serviceEnv) ServiceCheckItem {
 	result := env.get(
-		"https://www.spotify.com/api/content/v1/country-selector?platform=web&format=json",
+		spotifyURL,
 		serviceSmallMaxBody,
 	)
 	item := itemFrom(result)
 	if !answered(item, result) {
 		return item
 	}
-	item.Region = normalizeRegion(spotifyRegion(result))
-	switch {
-	case result.StatusCode == http.StatusForbidden ||
-		result.StatusCode == http.StatusUnavailableForLegalReasons:
-		item.Status = serviceUnsupportedRegion
-	case result.StatusCode < 200 || result.StatusCode >= 300:
-		item.Status = statusFromCode(result.StatusCode)
-	case bodyContains(result, "not available in your country"):
-		item.Status = serviceUnsupportedRegion
-	default:
-		item.Status = serviceAvailable
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
+		return item
 	}
-	return item
-}
+	var payload struct {
+		CountryCode string `json:"countryCode"`
+	}
+	if result.StatusCode != http.StatusOK || json.Unmarshal([]byte(result.Body), &payload) != nil {
+		item.Status = serviceFailed
+		return item
+	}
+	item.Region = normalizeRegion(payload.CountryCode)
+	if item.Region == "" {
+		item.Status = serviceFailed
+	} else {
+		item.Status = "observed"
+	}
 
-// spotifyRegion prefers the country Spotify redirected the request into, and
-// falls back to the one named in the payload.
-func spotifyRegion(result *ProbeResult) string {
-	if final, err := url.Parse(result.Url); err == nil {
-		segments := strings.Split(strings.Trim(final.Path, "/"), "/")
-		if first := segments[0]; first != "" && first != "api" {
-			return strings.Split(first, "-")[0]
-		}
-	}
-	return firstSubmatch(spotifyCountryPattern, result.Body)
+	return item
 }
 
 // TikTok is not behind Cloudflare: /cdn-cgi/trace redirects to a 404 page.
 func checkTikTok(env serviceEnv) ServiceCheckItem {
-	result := env.scan("https://www.tiktok.com/", tikTokRegionPattern.MatchString)
+	result := env.scan(tikTokURL, tikTokRegionPattern.MatchString)
 	item := itemFrom(result)
 	if !answered(item, result) {
+		return item
+	}
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
 		return item
 	}
 	item.Status = tikTokStatus(result)
@@ -205,13 +250,16 @@ func tikTokStatus(result *ProbeResult) string {
 	switch {
 	case result.StatusCode == http.StatusForbidden ||
 		result.StatusCode == http.StatusUnavailableForLegalReasons:
-		return serviceUnsupportedRegion
+		return serviceRestricted
 	case result.StatusCode < 200 || result.StatusCode >= 300:
 		return serviceFailed
-	case bodyContains(result, "access denied", "not available in your region", "tiktok is not available"):
+	case bodyContains(result, "not available in your region", "tiktok is not available"):
 		return serviceUnsupportedRegion
 	default:
-		return serviceAvailable
+		if tikTokRegion(result.Body) != "" {
+			return "observed"
+		}
+		return serviceFailed
 	}
 }
 
@@ -222,39 +270,73 @@ func tikTokRegion(body string) string {
 }
 
 func checkBilibili(env serviceEnv) ServiceCheckItem {
-	const url = "https://api.bilibili.com/pgc/player/web/playurl?avid=18281381&cid=29892777&qn=0&type=&otype=json&ep_id=183799&fourk=1&fnver=0&fnval=16&module=bangumi"
+	const url = bilibiliURL
 	result := env.get(url, serviceSmallMaxBody)
 	item := itemFrom(result)
 	if !answered(item, result) {
 		return item
 	}
-	var payload struct {
-		Code int `json:"code"`
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
+		return item
 	}
-	if err := json.Unmarshal([]byte(result.Body), &payload); err != nil {
+	var payload struct {
+		Code *int `json:"code"`
+		Data *struct {
+			Durl []struct {
+				URL string `json:"url"`
+			} `json:"durl"`
+			Dash *struct {
+				Video []struct {
+					BaseURL      string `json:"baseUrl"`
+					BaseURLSnake string `json:"base_url"`
+				} `json:"video"`
+			} `json:"dash"`
+		} `json:"data"`
+	}
+	if result.StatusCode != http.StatusOK || json.Unmarshal([]byte(result.Body), &payload) != nil || payload.Code == nil {
 		item.Status = serviceFailed
 		return item
 	}
-	switch payload.Code {
+	switch *payload.Code {
 	case 0:
-		item.Status = serviceAvailable
+		item.Status = serviceFailed
+		if payload.Data != nil {
+			for _, entry := range payload.Data.Durl {
+				if serviceMediaURL(entry.URL) {
+					item.Status = "observed"
+				}
+			}
+			if payload.Data.Dash != nil {
+				for _, entry := range payload.Data.Dash.Video {
+					if serviceMediaURL(entry.BaseURL) || serviceMediaURL(entry.BaseURLSnake) {
+						item.Status = "observed"
+					}
+				}
+			}
+		}
 	case -10403:
 		item.Status = serviceUnsupportedRegion
 	default:
 		item.Status = serviceFailed
 	}
+
 	return item
 }
 
 func checkPrimeVideo(env serviceEnv) ServiceCheckItem {
-	result := env.scan("https://www.primevideo.com", func(tail string) bool {
-		return strings.Contains(tail, "isServiceRestricted") || primeRegionPattern.MatchString(tail)
+	result := env.scan(primeVideoURL, func(tail string) bool {
+		return strings.Contains(tail, `"isServiceRestricted":true`) || primeRegionPattern.MatchString(tail)
 	})
 	item := itemFrom(result)
 	if !answered(item, result) {
 		return item
 	}
-	if strings.Contains(result.Body, "isServiceRestricted") {
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
+		return item
+	}
+	if strings.Contains(result.Body, `"isServiceRestricted":true`) {
 		item.Status = serviceUnsupportedRegion
 		return item
 	}
@@ -264,43 +346,38 @@ func checkPrimeVideo(env serviceEnv) ServiceCheckItem {
 		return item
 	}
 	item.Region = normalizeRegion(region)
-	item.Status = serviceAvailable
+	if item.Region == "" {
+		item.Status = serviceFailed
+		return item
+	}
+	item.Status = "observed"
 	return item
 }
 
 func checkNetflix(env serviceEnv) ServiceCheckItem {
-	if item := netflixFromCdn(env); item.Status == serviceAvailable || item.Status == serviceBlocked {
+	if item := netflixFromCdn(env); item.Status == "observed" {
 		return item
 	}
 
-	first := env.get("https://www.netflix.com/title/81280792", 0)
+	first := env.get(netflixTitleOneURL, 0)
 	firstItem := itemFrom(first)
 	if !answered(firstItem, first) {
 		return firstItem
 	}
-	second := env.get("https://www.netflix.com/title/70143836", 0)
+	second := env.get(netflixTitleTwoURL, 0)
 	secondItem := itemFrom(second)
 	if !answered(secondItem, second) {
 		return secondItem
 	}
 
 	item := firstItem
-	switch {
-	case first.StatusCode == http.StatusNotFound && second.StatusCode == http.StatusNotFound:
-		item.Status = serviceOriginalsOnly
-	case first.StatusCode == http.StatusForbidden || second.StatusCode == http.StatusForbidden:
-		item.Status = serviceUnsupportedRegion
-	case netflixServed(first.StatusCode) || netflixServed(second.StatusCode):
-		item.Status = serviceAvailable
+	item.Status = serviceFailed
+	if first.StatusCode == http.StatusOK || first.StatusCode == http.StatusNotFound || second.StatusCode == http.StatusOK || second.StatusCode == http.StatusNotFound {
+		item.Reason = "catalog-hint"
 		item.Region = netflixRegion(env)
-	default:
-		item.Status = statusFromCode(first.StatusCode)
 	}
-	return item
-}
 
-func netflixServed(code int) bool {
-	return code == http.StatusOK || code == http.StatusMovedPermanently
+	return item
 }
 
 // netflixRegion reads the country out of the redirect Netflix would send a
@@ -308,28 +385,34 @@ func netflixServed(code int) bool {
 func netflixRegion(env serviceEnv) string {
 	result := env.send(probeRequest{
 		method:     http.MethodGet,
-		url:        "https://www.netflix.com/title/80018499",
+		url:        netflixRegionURL,
 		noRedirect: true,
 	})
 	if result == nil || result.Error != "" || result.header == nil {
 		return ""
 	}
-	segments := strings.Split(result.header.Get("Location"), "/")
-	if len(segments) < 4 {
+	origin, _ := url.Parse(netflixRegionURL)
+	location, err := url.Parse(result.header.Get("Location"))
+	if err != nil {
 		return ""
 	}
-	return normalizeRegion(strings.Split(segments[3], "-")[0])
+	location = origin.ResolveReference(location)
+	if !serviceHTTPS(location) || !strings.EqualFold(location.Hostname(), origin.Hostname()) {
+		return ""
+	}
+	segments := strings.Split(strings.Trim(location.Path, "/"), "/")
+	return normalizeRegion(strings.Split(segments[0], "-")[0])
 }
 
 func netflixFromCdn(env serviceEnv) ServiceCheckItem {
-	const url = "https://api.fast.com/netflix/speedtest/v2?https=true&token=YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm&urlCount=5"
+	const url = netflixCDNURL
 	result := env.get(url, serviceSmallMaxBody)
 	item := itemFrom(result)
 	if !answered(item, result) {
 		return item
 	}
-	if result.StatusCode == http.StatusForbidden {
-		item.Status = serviceBlocked
+	if result.StatusCode < 200 || result.StatusCode >= 300 {
+		item.Status = serviceRestricted
 		return item
 	}
 	var payload struct {
@@ -339,102 +422,96 @@ func netflixFromCdn(env serviceEnv) ServiceCheckItem {
 			} `json:"location"`
 		} `json:"targets"`
 	}
-	if err := json.Unmarshal([]byte(result.Body), &payload); err != nil || len(payload.Targets) == 0 {
+	if err := json.Unmarshal([]byte(result.Body), &payload); result.StatusCode != http.StatusOK || err != nil || len(payload.Targets) == 0 {
 		item.Status = serviceFailed
 		return item
 	}
 	item.Region = normalizeRegion(payload.Targets[0].Location.Country)
-	item.Status = serviceAvailable
+	item.Status = serviceFailed
+	if item.Region != "" {
+		item.Status = "observed"
+	}
 	return item
 }
 
-// checkDisneyPlus walks the browser hand-shake: register a device, exchange the
-// assertion for a refresh token, then ask the session which region it landed
-// in. Any step can answer on its own that the address is not welcome.
 func checkDisneyPlus(env serviceEnv) ServiceCheckItem {
-	device := env.send(probeRequest{
-		method: http.MethodPost,
-		url:    "https://disney.api.edge.bamgrid.com/devices",
-		headers: map[string]string{
-			"authorization": disneyAuthHeader,
-			"content-type":  "application/json; charset=UTF-8",
-		},
-		body:    []byte(`{"deviceFamily":"browser","applicationRuntime":"chrome","deviceProfile":"windows","attributes":{}}`),
-		maxBody: serviceSmallMaxBody,
-	})
+	post := func(target string, payload []byte, contentType string) *ProbeResult {
+		return env.send(probeRequest{method: http.MethodPost, url: target, headers: map[string]string{"Authorization": disneyAuthHeader, "Content-Type": contentType}, body: payload, maxBody: serviceSmallMaxBody})
+	}
+	device := post(disneyDeviceURL, []byte(`{"deviceFamily":"browser","applicationRuntime":"chrome","deviceProfile":"windows","attributes":{}}`), "application/json")
 	item := itemFrom(device)
 	if !answered(item, device) {
 		return item
 	}
-	if device.StatusCode == http.StatusForbidden {
-		item.Status = serviceBlocked
-		return item
+	var registration struct {
+		Assertion string `json:"assertion"`
 	}
-	assertion := firstSubmatch(disneyAssertionPattern, device.Body)
-	if assertion == "" {
+	if device.StatusCode != http.StatusOK && device.StatusCode != http.StatusCreated || json.Unmarshal([]byte(device.Body), &registration) != nil || !serviceToken(registration.Assertion) {
 		item.Status = serviceFailed
 		return item
 	}
-
-	form := strings.NewReplacer("{assertion}", url.QueryEscape(assertion)).Replace(
-		"grant_type=urn:ietf:params:oauth:grant-type:token-exchange" +
-			"&latitude=0&longitude=0&platform=browser" +
-			"&subject_token={assertion}" +
-			"&subject_token_type=urn:bamtech:params:oauth:token-type:device",
-	)
-	token := env.send(probeRequest{
-		method: http.MethodPost,
-		url:    "https://disney.api.edge.bamgrid.com/token",
-		headers: map[string]string{
-			"authorization": disneyAuthHeader,
-			"content-type":  "application/x-www-form-urlencoded",
-		},
-		body:    []byte(form),
-		maxBody: serviceSmallMaxBody,
-	})
-	if tokenItem := itemFrom(token); !answered(tokenItem, token) {
-		return tokenItem
-	}
-	if strings.Contains(token.Body, "forbidden-location") || strings.Contains(token.Body, "403 ERROR") {
-		item.Status = serviceBlocked
+	form := url.Values{"grant_type": {"urn:ietf:params:oauth:grant-type:token-exchange"}, "latitude": {"0"}, "longitude": {"0"}, "platform": {"browser"}, "subject_token": {registration.Assertion}, "subject_token_type": {"urn:bamtech:params:oauth:token-type:device"}}
+	token := post(disneyTokenURL, []byte(form.Encode()), "application/x-www-form-urlencoded")
+	item = itemFrom(token)
+	if !answered(item, token) {
 		return item
 	}
-	refresh := firstSubmatch(disneyRefreshPattern, token.Body)
-	if refresh == "" {
+	var exchange struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if token.StatusCode != http.StatusOK || json.Unmarshal([]byte(token.Body), &exchange) != nil || !serviceToken(exchange.RefreshToken) {
 		item.Status = serviceFailed
 		return item
 	}
-
-	query := `{"query":"mutation refreshToken($input: RefreshTokenInput!) { refreshToken(refreshToken: $input) { activeSession { sessionId } } }","variables":{"input":{"refreshToken":"` +
-		refresh + `"}}}`
-	session := env.send(probeRequest{
-		method: http.MethodPost,
-		url:    "https://disney.api.edge.bamgrid.com/graph/v1/device/graphql",
-		headers: map[string]string{
-			"authorization": disneyAuthHeader,
-			"content-type":  "application/json",
-		},
-		body:    []byte(query),
-		maxBody: serviceSmallMaxBody,
-	})
-	sessionItem := itemFrom(session)
-	if !answered(sessionItem, session) || session.Body == "" || session.StatusCode >= 400 {
+	payload, err := json.Marshal(map[string]any{"query": "mutation refreshToken($input: RefreshTokenInput!) { refreshToken(refreshToken: $input) { activeSession { sessionId } } }", "variables": map[string]any{"input": map[string]string{"refreshToken": exchange.RefreshToken}}})
+	if err != nil {
 		item.Status = serviceFailed
 		return item
 	}
-	region := normalizeRegion(firstSubmatch(disneyCountryPattern, session.Body))
-	if region == "" {
-		item.Status = serviceUnavailable
+	session := post(disneySessionURL, payload, "application/json")
+	item = itemFrom(session)
+	if !answered(item, session) {
 		return item
 	}
-	item.Region = region
-	switch firstSubmatch(disneySupportedPattern, session.Body) {
-	case "true":
-		item.Status = serviceAvailable
-	case "false":
-		item.Status = serviceComingSoon
-	default:
+	var result struct {
+		Errors     []json.RawMessage `json:"errors"`
+		Extensions *struct {
+			SDK *struct {
+				Session *struct {
+					Location *struct {
+						CountryCode string `json:"countryCode"`
+					} `json:"location"`
+					InSupportedLocation *bool `json:"inSupportedLocation"`
+				} `json:"session"`
+			} `json:"sdk"`
+		} `json:"extensions"`
+	}
+	if session.StatusCode != http.StatusOK || json.Unmarshal([]byte(session.Body), &result) != nil || len(result.Errors) > 0 || result.Extensions == nil || result.Extensions.SDK == nil || result.Extensions.SDK.Session == nil {
 		item.Status = serviceFailed
+		return item
+	}
+	active := result.Extensions.SDK.Session
+	if active.Location == nil || active.InSupportedLocation == nil {
+		item.Status = serviceFailed
+		return item
+	}
+	item.Region = normalizeRegion(active.Location.CountryCode)
+	if item.Region == "" {
+		item.Status = serviceFailed
+		return item
+	}
+	item.Status = "observed"
+	if !*active.InSupportedLocation {
+		item.Status = serviceUnsupportedRegion
 	}
 	return item
+}
+
+func serviceToken(value string) bool {
+	return value != "" && len(value) <= 8192 && !strings.ContainsAny(value, "\r\n\x00")
+}
+
+func serviceMediaURL(value string) bool {
+	parsed, err := url.Parse(value)
+	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Hostname() != "" && parsed.User == nil
 }

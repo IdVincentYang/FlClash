@@ -13,13 +13,40 @@ part 'generated/service_status.g.dart';
 
 @Riverpod(keepAlive: true)
 class ServiceStatus extends _$ServiceStatus
-    with RoutedProbe<ServiceTarget, ServiceCheck> {
+    with RoutedProbe<ServiceProbeKey, ServiceCheck> {
   @override
-  RoutedProbeState<ServiceTarget, ServiceCheck> build() => buildProbe();
+  RoutedProbeState<ServiceProbeKey, ServiceCheck> build() {
+    ref.listen(
+      appSettingProvider.select(
+        (settings) => SelectValue(settings.disabledServices),
+      ),
+      (_, _) => reconcileEligibility(),
+    );
+    return buildProbe();
+  }
 
   @override
-  void cancelProbe(ServiceTarget target) =>
-      request.cancelKey('service:${target.id}');
+  ProbeSchedule get probeSchedule => const ProbeSchedule(
+    minimumInterval: Duration(seconds: 30),
+    maxAge: Duration(minutes: 5),
+  );
+
+  @override
+  bool isEligible(ServiceProbeKey target) =>
+      !ref
+          .read(appSettingProvider)
+          .disabledServices
+          .contains(target.target.id) &&
+      (target.purpose == ServiceProbePurpose.basic ||
+          target.target.hasAdvanced);
+
+  @override
+  bool allowsAutomatic(ServiceProbeKey target) =>
+      target.purpose == ServiceProbePurpose.basic;
+
+  @override
+  void cancelProbe(ServiceProbeKey target) =>
+      request.cancelKey('service:${target.target.id}:${target.purpose.name}');
 
   @override
   bool isFailure(ServiceCheck value) =>
@@ -27,27 +54,33 @@ class ServiceStatus extends _$ServiceStatus
       value.status == ServiceProbeStatus.failed;
 
   @override
-  Future<Map<ServiceTarget, ProbeAnswer<ServiceCheck>>> probe(
-    ServiceTarget target,
+  Future<Map<ServiceProbeKey, ProbeAnswer<ServiceCheck>>> probe(
+    ServiceProbeKey target,
     RouteState route,
   ) async {
+    final current = captureProbeGuard(target);
     final proxy = route.proxied ? '' : directOutbound;
     final checks = await request.withSession(
-      key: 'service:${target.id}',
+      key: 'service:${target.target.id}:${target.purpose.name}',
       url: 'https://diagnostic.invalid',
       explicitTarget: proxy,
       action: (session) async {
-        if (!ref.mounted) throw const RequestUnavailable('request_cancelled');
+        if (!current()) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        await session.check();
+        if (!current()) throw const RequestUnavailable('request_cancelled');
         final result = await checkServices(
           ref.read(coreHandlerProvider),
           proxyName: proxy,
-          targets: [target],
+          targets: [target.target],
+          purpose: target.purpose,
         );
         await session.check();
         return result;
       },
     );
-    final check = checks[target];
+    final check = checks[target.target];
     return {
       if (check != null)
         target: ProbeAnswer(
@@ -78,5 +111,5 @@ List<ServiceTarget> enabledServiceTargets(Ref ref) {
     for (final target in targets)
       if (!disabled.value.contains(target.id)) target,
   ];
-  return enabled.isEmpty ? targets : enabled;
+  return enabled;
 }

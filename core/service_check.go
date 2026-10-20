@@ -40,9 +40,10 @@ const (
 	serviceFailed            = "failed"
 )
 
-// An empty Names runs every check.
+// An empty Names selects no services.
 type ServiceCheckParams struct {
 	ScopeID   string   `json:"scopeId"`
+	Purpose   string   `json:"purpose"`
 	ProxyName string   `json:"proxy-name"`
 	Names     []string `json:"names"`
 	Timeout   int64    `json:"timeout"`
@@ -50,14 +51,19 @@ type ServiceCheckParams struct {
 
 // runServiceCheck stamps Name; a blank Status means a rule has yet to judge it.
 type ServiceCheckItem struct {
-	Name         string   `json:"name"`
-	Status       string   `json:"status"`
-	Region       string   `json:"region,omitempty"`
-	Delay        int64    `json:"delay,omitempty"`
-	Chains       []string `json:"chains,omitempty"`
-	CheckedAt    int64    `json:"checked-at"`
-	CoreEpoch    uint64   `json:"core-epoch"`
-	PicksVersion uint64   `json:"picks-version"`
+	Name         string             `json:"name"`
+	Purpose      string             `json:"purpose"`
+	Reason       string             `json:"reason,omitempty"`
+	HTTPStatus   int                `json:"http-status,omitempty"`
+	Elapsed      int64              `json:"elapsed,omitempty"`
+	Steps        []ServiceCheckStep `json:"steps,omitempty"`
+	Status       string             `json:"status"`
+	Region       string             `json:"region,omitempty"`
+	Delay        int64              `json:"delay,omitempty"`
+	Chains       []string           `json:"chains,omitempty"`
+	CheckedAt    int64              `json:"checked-at"`
+	CoreEpoch    uint64             `json:"core-epoch"`
+	PicksVersion uint64             `json:"picks-version"`
 }
 
 var (
@@ -71,6 +77,7 @@ type serviceEnv struct {
 	ctx       context.Context
 	proxyName string
 	timeout   time.Duration
+	run       *serviceRun
 }
 
 func (e serviceEnv) get(url string, maxBody int64) *ProbeResult {
@@ -82,6 +89,16 @@ func (e serviceEnv) scan(url string, until func(tail string) bool) *ProbeResult 
 }
 
 func (e serviceEnv) send(req probeRequest) *ProbeResult {
+	if e.run != nil {
+		policy, ok := e.run.policy(req)
+		if !ok {
+			return &ProbeResult{Error: probeErrorFailed, bodyState: "recipient-blocked"}
+		}
+		req.policy = policy
+		if policy.noRedirect {
+			req.noRedirect = true
+		}
+	}
 	req.proxyName = e.proxyName
 	req.timeout = e.timeout
 	headers := map[string]string{"User-Agent": browserUserAgent}
@@ -89,37 +106,58 @@ func (e serviceEnv) send(req probeRequest) *ProbeResult {
 		headers[name] = value
 	}
 	req.headers = headers
-	return runProbe(e.ctx, req)
+	first := 0
+	if e.run != nil {
+		first = len(e.run.steps)
+	}
+	result := runProbe(e.ctx, req)
+	if e.run != nil {
+		e.run.finishRead(result, first)
+	}
+	return result
 }
 
 type serviceChecker struct {
-	name  string
-	check func(serviceEnv) ServiceCheckItem
+	name      string
+	url       string
+	endpoints []string
+	purpose   string
+	check     func(serviceEnv) ServiceCheckItem
 }
 
 var serviceCheckers = []serviceChecker{
-	{name: "google", check: checkReachable("https://www.google.com/generate_204")},
-	{name: "github", check: checkReachable("https://github.com/")},
-	{name: "youtube", check: checkYouTubePremium},
-	{name: "chatgpt", check: checkChatGpt},
-	{name: "claude", check: checkClaude},
-	{name: "gemini", check: checkGemini},
-	{name: "netflix", check: checkNetflix},
-	{name: "disney-plus", check: checkDisneyPlus},
-	{name: "prime-video", check: checkPrimeVideo},
-	{name: "spotify", check: checkSpotify},
-	{name: "tiktok", check: checkTikTok},
-	{name: "bilibili", check: checkBilibili},
+	{name: "google", url: "https://www.google.com/generate_204"},
+	{name: "github", url: "https://github.com/"},
+	{name: "youtube", url: "https://www.youtube.com/generate_204", check: checkYouTubePremium, endpoints: []string{youtubePremiumURL}},
+	{name: "chatgpt", url: "https://chat.openai.com/", check: checkChatGpt, endpoints: []string{chatGPTIOSURL, chatGPTTraceURL, chatGPTWebURL}},
+	{name: "claude", url: "https://claude.ai/", check: checkClaude, endpoints: []string{claudeTraceURL}},
+	{name: "gemini", url: "https://gemini.google.com/", check: checkGemini, endpoints: []string{geminiURL}},
+	{name: "netflix", url: "https://www.netflix.com/", check: checkNetflix, endpoints: []string{netflixCDNURL, netflixTitleOneURL, netflixTitleTwoURL, netflixRegionURL}},
+	{name: "disney-plus", url: "https://www.disneyplus.com/", check: checkDisneyPlus, endpoints: []string{disneyDeviceURL, disneyTokenURL, disneySessionURL}},
+	{name: "prime-video", url: "https://www.primevideo.com/", check: checkPrimeVideo, endpoints: []string{primeVideoURL}},
+	{name: "spotify", url: "https://www.spotify.com/", check: checkSpotify, endpoints: []string{spotifyURL}},
+	{name: "tiktok", url: "https://www.tiktok.com/", check: checkTikTok, endpoints: []string{tikTokURL}},
+	{name: "bilibili", url: "https://www.bilibili.com/", check: checkBilibili, endpoints: []string{bilibiliURL}},
 }
 
 func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
+	started := time.Now()
+	if params.Purpose != "" && params.Purpose != "basic" && params.Purpose != "advanced" {
+		return nil
+	}
 	wanted := selectedCheckers(params.Names)
+	for index := range wanted {
+		wanted[index].purpose = params.Purpose
+		if wanted[index].purpose == "" {
+			wanted[index].purpose = "basic"
+		}
+	}
 	items := make([]ServiceCheckItem, len(wanted))
 	if len(wanted) == 0 {
 		return items
 	}
 
-	timeout := probeTimeout(params.Timeout)
+	timeout := min(probeTimeout(params.Timeout), defaultProbeTimeout)
 	parent, _, requestErr := requestOperationContext(params.ScopeID, params.ProxyName)
 	if requestErr != nil {
 		return nil
@@ -140,7 +178,7 @@ func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
 			if granted {
 				defer func() { <-serviceCheckSlots }()
 			}
-			items[index] = runServiceCheck(contexts[index], checker, params.ProxyName, timeout)
+			items[index] = runServiceCheck(contexts[index], checker, params.ProxyName, timeout, started)
 		}(index, checker)
 	}
 	running.Wait()
@@ -148,14 +186,39 @@ func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
 }
 
 // A misbehaving rule must not take the sweep down with it.
-func runServiceCheck(ctx context.Context, checker serviceChecker, proxyName string, timeout time.Duration) (item ServiceCheckItem) {
+func runServiceCheck(ctx context.Context, checker serviceChecker, proxyName string, timeout time.Duration, start time.Time) (item ServiceCheckItem) {
 	epoch, picksVersion := routeStamp()
+	run := &serviceRun{checker: checker}
 	item = ServiceCheckItem{Status: serviceFailed}
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			item = ServiceCheckItem{Status: serviceFailed}
 		}
 		item.Name = checker.name
+		item.Purpose = checker.purpose
+		if item.Purpose == "" {
+			item.Purpose = "basic"
+		}
+		item.Steps = run.steps
+		item.Elapsed = time.Since(start).Milliseconds()
+		if checker.purpose == "advanced" {
+			item.Chains = nil
+			item.Delay = 0
+			item.HTTPStatus = 0
+			endEpoch, endPicks := routeStamp()
+			if epoch != endEpoch || picksVersion != endPicks || run.changed(epoch, picksVersion) {
+				item.Status, item.Reason = serviceFailed, "route-changed"
+			}
+		}
+		if run.reason != "" {
+			item.Status, item.Reason = serviceFailed, run.reason
+			if run.reason == "timeout" {
+				item.Status = serviceTimeout
+			}
+		}
+		if item.Status == "" {
+			item.Status = serviceFailed
+		}
 		item.CheckedAt = time.Now().UnixMilli()
 		item.CoreEpoch = epoch
 		item.PicksVersion = picksVersion
@@ -163,10 +226,15 @@ func runServiceCheck(ctx context.Context, checker serviceChecker, proxyName stri
 	if ctx.Err() != nil {
 		return item
 	}
-	env := serviceEnv{ctx: ctx, proxyName: proxyName, timeout: timeout}
-	item = checker.check(env)
-	if item.Status == serviceTimeout && hasBudget(ctx, timeout) {
+	env := serviceEnv{ctx: ctx, proxyName: proxyName, timeout: timeout, run: run}
+	if checker.purpose == "advanced" {
+		if checker.check == nil {
+			item.Reason = "unsupported-purpose"
+			return item
+		}
 		item = checker.check(env)
+	} else {
+		item = checkReachable(checker.url)(env)
 	}
 	return item
 }
@@ -178,11 +246,12 @@ func claimServices(parent context.Context, checkers []serviceChecker) ([]context
 	claimed := make(map[string]context.Context, len(checkers))
 	var releases []func()
 	for index, checker := range checkers {
-		ctx, ok := claimed[checker.name]
+		key := checker.name + ":" + checker.purpose
+		ctx, ok := claimed[key]
 		if !ok {
 			var release func()
-			ctx, release = claimService(parent, checker.name)
-			claimed[checker.name] = ctx
+			ctx, release = claimService(parent, key)
+			claimed[key] = ctx
 			releases = append(releases, release)
 		}
 		contexts[index] = ctx
@@ -213,17 +282,17 @@ func claimService(parent context.Context, name string) (context.Context, func())
 	}
 }
 
-func hasBudget(ctx context.Context, timeout time.Duration) bool {
-	deadline, ok := ctx.Deadline()
-	return !ok || time.Until(deadline) >= timeout
-}
-
 func selectedCheckers(names []string) []serviceChecker {
 	if len(names) == 0 {
-		return serviceCheckers
+		return nil
 	}
 	wanted := make([]serviceChecker, 0, len(names))
+	seen := map[string]bool{}
 	for _, name := range names {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
 		for _, checker := range serviceCheckers {
 			if checker.name == name {
 				wanted = append(wanted, checker)
@@ -234,7 +303,6 @@ func selectedCheckers(names []string) []serviceChecker {
 	return wanted
 }
 
-// checkReachable is the rule for a target with no unlock semantics of its own.
 func checkReachable(url string) func(serviceEnv) ServiceCheckItem {
 	return func(env serviceEnv) ServiceCheckItem {
 		result := env.get(url, 0)
@@ -243,6 +311,10 @@ func checkReachable(url string) func(serviceEnv) ServiceCheckItem {
 			return item
 		}
 		item.Status = statusFromCode(result.StatusCode)
+		switch result.StatusCode {
+		case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+			item.Status = "redirected"
+		}
 		return item
 	}
 }
@@ -251,7 +323,11 @@ func itemFrom(result *ProbeResult) ServiceCheckItem {
 	if result == nil {
 		return ServiceCheckItem{Status: serviceFailed}
 	}
-	item := ServiceCheckItem{Delay: result.Delay, Chains: result.Chains}
+	item := ServiceCheckItem{Delay: result.Delay, Chains: result.Chains, HTTPStatus: result.StatusCode}
+	if result.bodyState == "read-error" || result.bodyState == "body-limit" || result.bodyState == "recipient-blocked" {
+		item.Status = serviceFailed
+		return item
+	}
 	switch result.Error {
 	case "":
 	case probeErrorTimeout:
@@ -274,12 +350,15 @@ func statusFromCode(code int) string {
 		code == http.StatusUnavailableForLegalReasons:
 		return serviceRestricted
 	default:
-		return serviceUnavailable
+		return "http-response"
 	}
 }
 
 func answered(item ServiceCheckItem, result *ProbeResult) bool {
-	return item.Status == "" && result != nil
+	if item.Status != "" || result == nil {
+		return false
+	}
+	return result.bodyState == "" || result.bodyState == "complete" || result.bodyState == "marker"
 }
 
 func bodyContains(result *ProbeResult, needles ...string) bool {

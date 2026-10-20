@@ -238,7 +238,7 @@ func TestProbeAnswersCarryTheRouteStamp(t *testing.T) {
 	}
 
 	withServiceCheckers(t, stubChecker("alpha", ServiceCheckItem{Status: serviceAvailable}))
-	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+	items := handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Purpose: "advanced", Timeout: 1000})
 	if items[0].CoreEpoch != 7 || items[0].PicksVersion != 42 {
 		t.Errorf("service check stamp = %d/%d, want 7/42", items[0].CoreEpoch, items[0].PicksVersion)
 	}

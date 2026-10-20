@@ -135,11 +135,19 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m54(time) => "检测于 ${time}";
 
-  static String m55(label) => "${label}只能是一项";
+  static String m55(region) => "检测报告地区：${region}";
 
-  static String m56(label) => "${label}必须为URL";
+  static String m56(milliseconds) => "总耗时（含排队及正文）：${milliseconds} ms";
 
-  static String m57(count) => "${count} 年前";
+  static String m57(result) => "已过期：${result}";
+
+  static String m58(hosts) => "接收方：${hosts}";
+
+  static String m59(label) => "${label}只能是一项";
+
+  static String m60(label) => "${label}必须为URL";
+
+  static String m61(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -1184,20 +1192,73 @@ class MessageLookup extends MessageLookupByLibrary {
     "selected": MessageLookupByLibrary.simpleMessage("已选择"),
     "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("服务器"),
+    "serviceAdvanced": MessageLookupByLibrary.simpleMessage("地区 / 服务检测"),
+    "serviceAdvancedExplanation": MessageLookupByLibrary.simpleMessage(
+      "此项为可选的单次主动检测，通过匿名请求取得地区及服务页面线索，可能访问下列额外端点。不携带浏览器登录 Cookie 或订阅凭据；结果不证明账号权益、实际播放或全设备保护。基础响应单独判断。",
+    ),
+    "serviceAdvancedTiming": MessageLookupByLibrary.simpleMessage(
+      "结果 5 分钟后过期，每次至少间隔 30 秒；不自动重跑，离开本页取消未完成检测。各步时间为响应头耗时，并非 ping 或吞吐量。",
+    ),
+    "serviceAllDisabled": MessageLookupByLibrary.simpleMessage(
+      "全部服务已关闭 · 管理服务",
+    ),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("可用"),
+    "serviceBasic": MessageLookupByLibrary.simpleMessage("基础 HTTPS 响应"),
+    "serviceBasicExplanation": MessageLookupByLibrary.simpleMessage(
+      "显示中的服务会在前台自动检查；结果 5 分钟后过期，出口变化或返回应用时按需重检。每项至少间隔 30 秒；全部检查仅包含启用项。仅读取响应头，不跟随跳转或加载网页资源。响应不证明网站功能、账号权益或全设备保护。",
+    ),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("已被封禁"),
+    "serviceBodyComplete": MessageLookupByLibrary.simpleMessage("响应读取完整"),
+    "serviceBodyLimit": MessageLookupByLibrary.simpleMessage("响应超过读取上限"),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("检测"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("全部检测"),
     "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("即将上线"),
+    "serviceConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "本次请求未能建立有效响应",
+    ),
+    "serviceDetectedRegion": m55,
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage("不允许的 ISP"),
-    "serviceFailed": MessageLookupByLibrary.simpleMessage("检测失败"),
+    "serviceDisneyExplanation": MessageLookupByLibrary.simpleMessage(
+      "开始后将注册匿名浏览器设备、交换临时令牌并查询会话；令牌仅供本次检测使用，不保存。",
+    ),
+    "serviceDnsFailed": MessageLookupByLibrary.simpleMessage("本次请求无法解析主机"),
+    "serviceElapsed": m56,
+    "serviceExpired": m57,
+    "serviceFailed": MessageLookupByLibrary.simpleMessage("无法判定"),
+    "serviceHeaders": MessageLookupByLibrary.simpleMessage("已收到响应头"),
+    "serviceHttpResponse": MessageLookupByLibrary.simpleMessage("HTTP 异常响应"),
+    "serviceIndeterminate": MessageLookupByLibrary.simpleMessage(
+      "无法判定；检测可能未完成，或响应规则已变化。",
+    ),
     "serviceManage": MessageLookupByLibrary.simpleMessage("管理服务"),
+    "serviceMarkerFound": MessageLookupByLibrary.simpleMessage("已取得所需标记"),
+    "serviceMultipleRoutes": MessageLookupByLibrary.simpleMessage(
+      "多个出口 · 见各请求",
+    ),
+    "serviceObserved": MessageLookupByLibrary.simpleMessage("已取得服务线索"),
     "serviceOriginalsOnly": MessageLookupByLibrary.simpleMessage("仅限自制内容"),
     "servicePending": MessageLookupByLibrary.simpleMessage("待检测"),
+    "serviceQueued": MessageLookupByLibrary.simpleMessage("等待检测间隔"),
+    "serviceReadError": MessageLookupByLibrary.simpleMessage("响应中断或无法读取"),
+    "serviceRecipientBlocked": MessageLookupByLibrary.simpleMessage(
+      "接收方或跳转超出检测范围",
+    ),
+    "serviceRecipients": m58,
+    "serviceRedirected": MessageLookupByLibrary.simpleMessage("要求跳转（未跟随）"),
+    "serviceRequestLimit": MessageLookupByLibrary.simpleMessage("已达本轮请求上限"),
+    "serviceResponded": MessageLookupByLibrary.simpleMessage("已响应"),
     "serviceRestricted": MessageLookupByLibrary.simpleMessage("访问受限"),
+    "serviceRouteChanged": MessageLookupByLibrary.simpleMessage(
+      "出口已变化 · 请手动重检",
+    ),
+    "serviceStartAdvanced": MessageLookupByLibrary.simpleMessage("开始单次检测"),
     "serviceStatus": MessageLookupByLibrary.simpleMessage("服务状态"),
-    "serviceUnavailable": MessageLookupByLibrary.simpleMessage("不可用"),
+    "serviceTlsFailed": MessageLookupByLibrary.simpleMessage(
+      "本次请求未通过 TLS 身份校验",
+    ),
+    "serviceUnavailable": MessageLookupByLibrary.simpleMessage("本次请求无有效响应"),
+    "serviceUnknownRoute": MessageLookupByLibrary.simpleMessage("出口未知"),
     "serviceUnsupportedRegion": MessageLookupByLibrary.simpleMessage("地区不支持"),
     "settings": MessageLookupByLibrary.simpleMessage("设置"),
     "show": MessageLookupByLibrary.simpleMessage("显示"),
@@ -1213,7 +1274,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunch": MessageLookupByLibrary.simpleMessage("静默启动"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage("启动时不显示窗口"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("单条添加"),
-    "singleValueTip": m55,
+    "singleValueTip": m59,
     "size": MessageLookupByLibrary.simpleMessage("尺寸"),
     "slide": MessageLookupByLibrary.simpleMessage("滑动"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Socks端口"),
@@ -1293,7 +1354,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("上传"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("通过URL获取配置文件"),
-    "urlTip": m56,
+    "urlTip": m60,
     "useHosts": MessageLookupByLibrary.simpleMessage("使用Hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("使用系统Hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("已用流量"),
@@ -1314,7 +1375,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "同时设置系统时钟，Android上不生效",
     ),
-    "yearsAgo": m57,
+    "yearsAgo": m61,
     "yes": MessageLookupByLibrary.simpleMessage("是"),
     "zhCN": MessageLookupByLibrary.simpleMessage("中文简体"),
   };

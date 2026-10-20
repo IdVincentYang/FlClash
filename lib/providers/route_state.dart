@@ -222,7 +222,7 @@ class RouteTracker extends _$RouteTracker {
   }
 
   void detach() {
-    if (_watchers == 0) {
+    if (!ref.mounted || _watchers == 0) {
       return;
     }
     if (--_watchers == 0) {

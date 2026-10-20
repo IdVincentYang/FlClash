@@ -4327,7 +4327,7 @@ as int,
 /// @nodoc
 mixin _$ServiceCheckParams {
 
-@JsonKey(name: 'proxy-name') String get proxyName; List<String> get names; int get timeout;
+ String get purpose;@JsonKey(name: 'proxy-name') String get proxyName; List<String> get names; int get timeout;
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -4341,20 +4341,20 @@ $ServiceCheckParamsCopyWith<ServiceCheckParams> get copyWith => _$ServiceCheckPa
 @override
 bool operator ==(Object other) {
   final _this = this as ServiceCheckParams;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckParams&&(identical(other.proxyName, _this.proxyName) || other.proxyName == _this.proxyName)&&const DeepCollectionEquality().equals(other.names, _this.names)&&(identical(other.timeout, _this.timeout) || other.timeout == _this.timeout));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckParams&&(identical(other.purpose, _this.purpose) || other.purpose == _this.purpose)&&(identical(other.proxyName, _this.proxyName) || other.proxyName == _this.proxyName)&&const DeepCollectionEquality().equals(other.names, _this.names)&&(identical(other.timeout, _this.timeout) || other.timeout == _this.timeout));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as ServiceCheckParams;
-  return Object.hash(runtimeType,_this.proxyName,const DeepCollectionEquality().hash(_this.names),_this.timeout);
+  return Object.hash(runtimeType,_this.purpose,_this.proxyName,const DeepCollectionEquality().hash(_this.names),_this.timeout);
 }
 
 @override
 String toString() {
   final _this = this as ServiceCheckParams;
-  return 'ServiceCheckParams(proxyName: ${_this.proxyName}, names: ${_this.names}, timeout: ${_this.timeout})';
+  return 'ServiceCheckParams(purpose: ${_this.purpose}, proxyName: ${_this.proxyName}, names: ${_this.names}, timeout: ${_this.timeout})';
 }
 
 
@@ -4365,7 +4365,7 @@ abstract mixin class $ServiceCheckParamsCopyWith<$Res>  {
   factory $ServiceCheckParamsCopyWith(ServiceCheckParams value, $Res Function(ServiceCheckParams) _then) = _$ServiceCheckParamsCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout
+ String purpose,@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout
 });
 
 
@@ -4382,9 +4382,10 @@ class _$ServiceCheckParamsCopyWithImpl<$Res>
 
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? proxyName = null,Object? names = null,Object? timeout = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? purpose = null,Object? proxyName = null,Object? names = null,Object? timeout = null,}) {
   return _then(ServiceCheckParams(
-proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
+purpose: null == purpose ? _self.purpose : purpose // ignore: cast_nullable_to_non_nullable
+as String,proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
 as String,names: null == names ? _self.names : names // ignore: cast_nullable_to_non_nullable
 as List<String>,timeout: null == timeout ? _self.timeout : timeout // ignore: cast_nullable_to_non_nullable
 as int,
@@ -4472,10 +4473,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String purpose, @JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ServiceCheckParams() when $default != null:
-return $default(_that.proxyName,_that.names,_that.timeout);case _:
+return $default(_that.purpose,_that.proxyName,_that.names,_that.timeout);case _:
   return orElse();
 
 }
@@ -4493,10 +4494,10 @@ return $default(_that.proxyName,_that.names,_that.timeout);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String purpose, @JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)  $default,) {final _that = this;
 switch (_that) {
 case _ServiceCheckParams():
-return $default(_that.proxyName,_that.names,_that.timeout);case _:
+return $default(_that.purpose,_that.proxyName,_that.names,_that.timeout);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -4513,10 +4514,10 @@ return $default(_that.proxyName,_that.names,_that.timeout);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String purpose, @JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)?  $default,) {final _that = this;
 switch (_that) {
 case _ServiceCheckParams() when $default != null:
-return $default(_that.proxyName,_that.names,_that.timeout);case _:
+return $default(_that.purpose,_that.proxyName,_that.names,_that.timeout);case _:
   return null;
 
 }
@@ -4528,9 +4529,10 @@ return $default(_that.proxyName,_that.names,_that.timeout);case _:
 @JsonSerializable()
 
 class _ServiceCheckParams implements ServiceCheckParams {
-  const _ServiceCheckParams({@JsonKey(name: 'proxy-name') this.proxyName = '',  List<String> names = const [], required this.timeout}): _names = names;
+  const _ServiceCheckParams({this.purpose = 'basic', @JsonKey(name: 'proxy-name') this.proxyName = '',  List<String> names = const [], required this.timeout}): _names = names;
   factory _ServiceCheckParams.fromJson(Map<String, dynamic> json) => _$ServiceCheckParamsFromJson(json);
 
+@override@JsonKey() final  String purpose;
 @override@JsonKey(name: 'proxy-name') final  String proxyName;
  final  List<String> _names;
 @override@JsonKey() List<String> get names {
@@ -4554,18 +4556,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckParams&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&const DeepCollectionEquality().equals(other.names, _names)&&(identical(other.timeout, timeout) || other.timeout == timeout));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckParams&&(identical(other.purpose, purpose) || other.purpose == purpose)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&const DeepCollectionEquality().equals(other.names, _names)&&(identical(other.timeout, timeout) || other.timeout == timeout));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,proxyName,const DeepCollectionEquality().hash(_names),timeout);
+    return Object.hash(runtimeType,purpose,proxyName,const DeepCollectionEquality().hash(_names),timeout);
 }
 
 @override
 String toString() {
-    return 'ServiceCheckParams(proxyName: $proxyName, names: $names, timeout: $timeout)';
+    return 'ServiceCheckParams(purpose: $purpose, proxyName: $proxyName, names: $names, timeout: $timeout)';
 }
 
 
@@ -4576,7 +4578,7 @@ abstract mixin class _$ServiceCheckParamsCopyWith<$Res> implements $ServiceCheck
   factory _$ServiceCheckParamsCopyWith(_ServiceCheckParams value, $Res Function(_ServiceCheckParams) _then) = __$ServiceCheckParamsCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout
+ String purpose,@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout
 });
 
 
@@ -4593,9 +4595,10 @@ class __$ServiceCheckParamsCopyWithImpl<$Res>
 
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? proxyName = null,Object? names = null,Object? timeout = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? purpose = null,Object? proxyName = null,Object? names = null,Object? timeout = null,}) {
   return _then(_ServiceCheckParams(
-proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
+purpose: null == purpose ? _self.purpose : purpose // ignore: cast_nullable_to_non_nullable
+as String,proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
 as String,names: null == names ? _self._names : names // ignore: cast_nullable_to_non_nullable
 as List<String>,timeout: null == timeout ? _self.timeout : timeout // ignore: cast_nullable_to_non_nullable
 as int,
@@ -4609,7 +4612,7 @@ as int,
 /// @nodoc
 mixin _$ServiceCheckItem {
 
- String get name; String get status; String get region; int get delay; List<String> get chains;@JsonKey(name: 'checked-at') int get checkedAt;@JsonKey(name: 'core-epoch') int get coreEpoch;@JsonKey(name: 'picks-version') int get picksVersion;
+ String get purpose; String get reason;@JsonKey(name: 'http-status') int get httpStatus; int get elapsed; List<ServiceCheckStep> get steps; String get name; String get status; String get region; int get delay; List<String> get chains;@JsonKey(name: 'checked-at') int get checkedAt;@JsonKey(name: 'core-epoch') int get coreEpoch;@JsonKey(name: 'picks-version') int get picksVersion;
 /// Create a copy of ServiceCheckItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -4623,20 +4626,20 @@ $ServiceCheckItemCopyWith<ServiceCheckItem> get copyWith => _$ServiceCheckItemCo
 @override
 bool operator ==(Object other) {
   final _this = this as ServiceCheckItem;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckItem&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.region, _this.region) || other.region == _this.region)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&const DeepCollectionEquality().equals(other.chains, _this.chains)&&(identical(other.checkedAt, _this.checkedAt) || other.checkedAt == _this.checkedAt)&&(identical(other.coreEpoch, _this.coreEpoch) || other.coreEpoch == _this.coreEpoch)&&(identical(other.picksVersion, _this.picksVersion) || other.picksVersion == _this.picksVersion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckItem&&(identical(other.purpose, _this.purpose) || other.purpose == _this.purpose)&&(identical(other.reason, _this.reason) || other.reason == _this.reason)&&(identical(other.httpStatus, _this.httpStatus) || other.httpStatus == _this.httpStatus)&&(identical(other.elapsed, _this.elapsed) || other.elapsed == _this.elapsed)&&const DeepCollectionEquality().equals(other.steps, _this.steps)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.region, _this.region) || other.region == _this.region)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&const DeepCollectionEquality().equals(other.chains, _this.chains)&&(identical(other.checkedAt, _this.checkedAt) || other.checkedAt == _this.checkedAt)&&(identical(other.coreEpoch, _this.coreEpoch) || other.coreEpoch == _this.coreEpoch)&&(identical(other.picksVersion, _this.picksVersion) || other.picksVersion == _this.picksVersion));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as ServiceCheckItem;
-  return Object.hash(runtimeType,_this.name,_this.status,_this.region,_this.delay,const DeepCollectionEquality().hash(_this.chains),_this.checkedAt,_this.coreEpoch,_this.picksVersion);
+  return Object.hash(runtimeType,_this.purpose,_this.reason,_this.httpStatus,_this.elapsed,const DeepCollectionEquality().hash(_this.steps),_this.name,_this.status,_this.region,_this.delay,const DeepCollectionEquality().hash(_this.chains),_this.checkedAt,_this.coreEpoch,_this.picksVersion);
 }
 
 @override
 String toString() {
   final _this = this as ServiceCheckItem;
-  return 'ServiceCheckItem(name: ${_this.name}, status: ${_this.status}, region: ${_this.region}, delay: ${_this.delay}, chains: ${_this.chains}, checkedAt: ${_this.checkedAt}, coreEpoch: ${_this.coreEpoch}, picksVersion: ${_this.picksVersion})';
+  return 'ServiceCheckItem(purpose: ${_this.purpose}, reason: ${_this.reason}, httpStatus: ${_this.httpStatus}, elapsed: ${_this.elapsed}, steps: ${_this.steps}, name: ${_this.name}, status: ${_this.status}, region: ${_this.region}, delay: ${_this.delay}, chains: ${_this.chains}, checkedAt: ${_this.checkedAt}, coreEpoch: ${_this.coreEpoch}, picksVersion: ${_this.picksVersion})';
 }
 
 
@@ -4647,7 +4650,7 @@ abstract mixin class $ServiceCheckItemCopyWith<$Res>  {
   factory $ServiceCheckItemCopyWith(ServiceCheckItem value, $Res Function(ServiceCheckItem) _then) = _$ServiceCheckItemCopyWithImpl;
 @useResult
 $Res call({
- String name, String status, String region, int delay, List<String> chains,@JsonKey(name: 'checked-at') int checkedAt,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
+ String purpose, String reason,@JsonKey(name: 'http-status') int httpStatus, int elapsed, List<ServiceCheckStep> steps, String name, String status, String region, int delay, List<String> chains,@JsonKey(name: 'checked-at') int checkedAt,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
 });
 
 
@@ -4664,9 +4667,14 @@ class _$ServiceCheckItemCopyWithImpl<$Res>
 
 /// Create a copy of ServiceCheckItem
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? status = null,Object? region = null,Object? delay = null,Object? chains = null,Object? checkedAt = null,Object? coreEpoch = null,Object? picksVersion = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? purpose = null,Object? reason = null,Object? httpStatus = null,Object? elapsed = null,Object? steps = null,Object? name = null,Object? status = null,Object? region = null,Object? delay = null,Object? chains = null,Object? checkedAt = null,Object? coreEpoch = null,Object? picksVersion = null,}) {
   return _then(ServiceCheckItem(
-name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+purpose: null == purpose ? _self.purpose : purpose // ignore: cast_nullable_to_non_nullable
+as String,reason: null == reason ? _self.reason : reason // ignore: cast_nullable_to_non_nullable
+as String,httpStatus: null == httpStatus ? _self.httpStatus : httpStatus // ignore: cast_nullable_to_non_nullable
+as int,elapsed: null == elapsed ? _self.elapsed : elapsed // ignore: cast_nullable_to_non_nullable
+as int,steps: null == steps ? _self.steps : steps // ignore: cast_nullable_to_non_nullable
+as List<ServiceCheckStep>,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,region: null == region ? _self.region : region // ignore: cast_nullable_to_non_nullable
 as String,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
@@ -4759,10 +4767,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String status,  String region,  int delay,  List<String> chains, @JsonKey(name: 'checked-at')  int checkedAt, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String purpose,  String reason, @JsonKey(name: 'http-status')  int httpStatus,  int elapsed,  List<ServiceCheckStep> steps,  String name,  String status,  String region,  int delay,  List<String> chains, @JsonKey(name: 'checked-at')  int checkedAt, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ServiceCheckItem() when $default != null:
-return $default(_that.name,_that.status,_that.region,_that.delay,_that.chains,_that.checkedAt,_that.coreEpoch,_that.picksVersion);case _:
+return $default(_that.purpose,_that.reason,_that.httpStatus,_that.elapsed,_that.steps,_that.name,_that.status,_that.region,_that.delay,_that.chains,_that.checkedAt,_that.coreEpoch,_that.picksVersion);case _:
   return orElse();
 
 }
@@ -4780,10 +4788,10 @@ return $default(_that.name,_that.status,_that.region,_that.delay,_that.chains,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String status,  String region,  int delay,  List<String> chains, @JsonKey(name: 'checked-at')  int checkedAt, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String purpose,  String reason, @JsonKey(name: 'http-status')  int httpStatus,  int elapsed,  List<ServiceCheckStep> steps,  String name,  String status,  String region,  int delay,  List<String> chains, @JsonKey(name: 'checked-at')  int checkedAt, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)  $default,) {final _that = this;
 switch (_that) {
 case _ServiceCheckItem():
-return $default(_that.name,_that.status,_that.region,_that.delay,_that.chains,_that.checkedAt,_that.coreEpoch,_that.picksVersion);case _:
+return $default(_that.purpose,_that.reason,_that.httpStatus,_that.elapsed,_that.steps,_that.name,_that.status,_that.region,_that.delay,_that.chains,_that.checkedAt,_that.coreEpoch,_that.picksVersion);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -4800,10 +4808,10 @@ return $default(_that.name,_that.status,_that.region,_that.delay,_that.chains,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String status,  String region,  int delay,  List<String> chains, @JsonKey(name: 'checked-at')  int checkedAt, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String purpose,  String reason, @JsonKey(name: 'http-status')  int httpStatus,  int elapsed,  List<ServiceCheckStep> steps,  String name,  String status,  String region,  int delay,  List<String> chains, @JsonKey(name: 'checked-at')  int checkedAt, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,) {final _that = this;
 switch (_that) {
 case _ServiceCheckItem() when $default != null:
-return $default(_that.name,_that.status,_that.region,_that.delay,_that.chains,_that.checkedAt,_that.coreEpoch,_that.picksVersion);case _:
+return $default(_that.purpose,_that.reason,_that.httpStatus,_that.elapsed,_that.steps,_that.name,_that.status,_that.region,_that.delay,_that.chains,_that.checkedAt,_that.coreEpoch,_that.picksVersion);case _:
   return null;
 
 }
@@ -4815,8 +4823,19 @@ return $default(_that.name,_that.status,_that.region,_that.delay,_that.chains,_t
 @JsonSerializable()
 
 class _ServiceCheckItem implements ServiceCheckItem {
-  const _ServiceCheckItem({this.name = '', this.status = '', this.region = '', this.delay = 0,  List<String> chains = const [], @JsonKey(name: 'checked-at') this.checkedAt = 0, @JsonKey(name: 'core-epoch') this.coreEpoch = 0, @JsonKey(name: 'picks-version') this.picksVersion = 0}): _chains = chains;
+  const _ServiceCheckItem({this.purpose = 'basic', this.reason = '', @JsonKey(name: 'http-status') this.httpStatus = 0, this.elapsed = 0,  List<ServiceCheckStep> steps = const [], this.name = '', this.status = '', this.region = '', this.delay = 0,  List<String> chains = const [], @JsonKey(name: 'checked-at') this.checkedAt = 0, @JsonKey(name: 'core-epoch') this.coreEpoch = 0, @JsonKey(name: 'picks-version') this.picksVersion = 0}): _steps = steps,_chains = chains;
   factory _ServiceCheckItem.fromJson(Map<String, dynamic> json) => _$ServiceCheckItemFromJson(json);
+
+@override@JsonKey() final  String purpose;
+@override@JsonKey() final  String reason;
+@override@JsonKey(name: 'http-status') final  int httpStatus;
+@override@JsonKey() final  int elapsed;
+ final  List<ServiceCheckStep> _steps;
+@override@JsonKey() List<ServiceCheckStep> get steps {
+  if (_steps is EqualUnmodifiableListView) return _steps;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_steps);
+}
 
 @override@JsonKey() final  String name;
 @override@JsonKey() final  String status;
@@ -4846,18 +4865,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckItem&&(identical(other.name, name) || other.name == name)&&(identical(other.status, status) || other.status == status)&&(identical(other.region, region) || other.region == region)&&(identical(other.delay, delay) || other.delay == delay)&&const DeepCollectionEquality().equals(other.chains, _chains)&&(identical(other.checkedAt, checkedAt) || other.checkedAt == checkedAt)&&(identical(other.coreEpoch, coreEpoch) || other.coreEpoch == coreEpoch)&&(identical(other.picksVersion, picksVersion) || other.picksVersion == picksVersion));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckItem&&(identical(other.purpose, purpose) || other.purpose == purpose)&&(identical(other.reason, reason) || other.reason == reason)&&(identical(other.httpStatus, httpStatus) || other.httpStatus == httpStatus)&&(identical(other.elapsed, elapsed) || other.elapsed == elapsed)&&const DeepCollectionEquality().equals(other.steps, _steps)&&(identical(other.name, name) || other.name == name)&&(identical(other.status, status) || other.status == status)&&(identical(other.region, region) || other.region == region)&&(identical(other.delay, delay) || other.delay == delay)&&const DeepCollectionEquality().equals(other.chains, _chains)&&(identical(other.checkedAt, checkedAt) || other.checkedAt == checkedAt)&&(identical(other.coreEpoch, coreEpoch) || other.coreEpoch == coreEpoch)&&(identical(other.picksVersion, picksVersion) || other.picksVersion == picksVersion));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,name,status,region,delay,const DeepCollectionEquality().hash(_chains),checkedAt,coreEpoch,picksVersion);
+    return Object.hash(runtimeType,purpose,reason,httpStatus,elapsed,const DeepCollectionEquality().hash(_steps),name,status,region,delay,const DeepCollectionEquality().hash(_chains),checkedAt,coreEpoch,picksVersion);
 }
 
 @override
 String toString() {
-    return 'ServiceCheckItem(name: $name, status: $status, region: $region, delay: $delay, chains: $chains, checkedAt: $checkedAt, coreEpoch: $coreEpoch, picksVersion: $picksVersion)';
+    return 'ServiceCheckItem(purpose: $purpose, reason: $reason, httpStatus: $httpStatus, elapsed: $elapsed, steps: $steps, name: $name, status: $status, region: $region, delay: $delay, chains: $chains, checkedAt: $checkedAt, coreEpoch: $coreEpoch, picksVersion: $picksVersion)';
 }
 
 
@@ -4868,7 +4887,7 @@ abstract mixin class _$ServiceCheckItemCopyWith<$Res> implements $ServiceCheckIt
   factory _$ServiceCheckItemCopyWith(_ServiceCheckItem value, $Res Function(_ServiceCheckItem) _then) = __$ServiceCheckItemCopyWithImpl;
 @override @useResult
 $Res call({
- String name, String status, String region, int delay, List<String> chains,@JsonKey(name: 'checked-at') int checkedAt,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
+ String purpose, String reason,@JsonKey(name: 'http-status') int httpStatus, int elapsed, List<ServiceCheckStep> steps, String name, String status, String region, int delay, List<String> chains,@JsonKey(name: 'checked-at') int checkedAt,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
 });
 
 
@@ -4885,15 +4904,320 @@ class __$ServiceCheckItemCopyWithImpl<$Res>
 
 /// Create a copy of ServiceCheckItem
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? status = null,Object? region = null,Object? delay = null,Object? chains = null,Object? checkedAt = null,Object? coreEpoch = null,Object? picksVersion = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? purpose = null,Object? reason = null,Object? httpStatus = null,Object? elapsed = null,Object? steps = null,Object? name = null,Object? status = null,Object? region = null,Object? delay = null,Object? chains = null,Object? checkedAt = null,Object? coreEpoch = null,Object? picksVersion = null,}) {
   return _then(_ServiceCheckItem(
-name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+purpose: null == purpose ? _self.purpose : purpose // ignore: cast_nullable_to_non_nullable
+as String,reason: null == reason ? _self.reason : reason // ignore: cast_nullable_to_non_nullable
+as String,httpStatus: null == httpStatus ? _self.httpStatus : httpStatus // ignore: cast_nullable_to_non_nullable
+as int,elapsed: null == elapsed ? _self.elapsed : elapsed // ignore: cast_nullable_to_non_nullable
+as int,steps: null == steps ? _self._steps : steps // ignore: cast_nullable_to_non_nullable
+as List<ServiceCheckStep>,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,region: null == region ? _self.region : region // ignore: cast_nullable_to_non_nullable
 as String,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
 as int,chains: null == chains ? _self._chains : chains // ignore: cast_nullable_to_non_nullable
 as List<String>,checkedAt: null == checkedAt ? _self.checkedAt : checkedAt // ignore: cast_nullable_to_non_nullable
 as int,coreEpoch: null == coreEpoch ? _self.coreEpoch : coreEpoch // ignore: cast_nullable_to_non_nullable
+as int,picksVersion: null == picksVersion ? _self.picksVersion : picksVersion // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ServiceCheckStep {
+
+ String get endpoint;@JsonKey(name: 'http-status') int get httpStatus; int get delay; List<String> get chains; String get outcome; String get observation; String get region;@JsonKey(name: 'core-epoch') int get coreEpoch;@JsonKey(name: 'picks-version') int get picksVersion;
+/// Create a copy of ServiceCheckStep
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ServiceCheckStepCopyWith<ServiceCheckStep> get copyWith => _$ServiceCheckStepCopyWithImpl<ServiceCheckStep>(this as ServiceCheckStep, _$identity);
+
+  /// Serializes this ServiceCheckStep to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  final _this = this as ServiceCheckStep;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckStep&&(identical(other.endpoint, _this.endpoint) || other.endpoint == _this.endpoint)&&(identical(other.httpStatus, _this.httpStatus) || other.httpStatus == _this.httpStatus)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&const DeepCollectionEquality().equals(other.chains, _this.chains)&&(identical(other.outcome, _this.outcome) || other.outcome == _this.outcome)&&(identical(other.observation, _this.observation) || other.observation == _this.observation)&&(identical(other.region, _this.region) || other.region == _this.region)&&(identical(other.coreEpoch, _this.coreEpoch) || other.coreEpoch == _this.coreEpoch)&&(identical(other.picksVersion, _this.picksVersion) || other.picksVersion == _this.picksVersion));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode {
+  final _this = this as ServiceCheckStep;
+  return Object.hash(runtimeType,_this.endpoint,_this.httpStatus,_this.delay,const DeepCollectionEquality().hash(_this.chains),_this.outcome,_this.observation,_this.region,_this.coreEpoch,_this.picksVersion);
+}
+
+@override
+String toString() {
+  final _this = this as ServiceCheckStep;
+  return 'ServiceCheckStep(endpoint: ${_this.endpoint}, httpStatus: ${_this.httpStatus}, delay: ${_this.delay}, chains: ${_this.chains}, outcome: ${_this.outcome}, observation: ${_this.observation}, region: ${_this.region}, coreEpoch: ${_this.coreEpoch}, picksVersion: ${_this.picksVersion})';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ServiceCheckStepCopyWith<$Res>  {
+  factory $ServiceCheckStepCopyWith(ServiceCheckStep value, $Res Function(ServiceCheckStep) _then) = _$ServiceCheckStepCopyWithImpl;
+@useResult
+$Res call({
+ String endpoint,@JsonKey(name: 'http-status') int httpStatus, int delay, List<String> chains, String outcome, String observation, String region,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
+});
+
+
+
+
+}
+/// @nodoc
+class _$ServiceCheckStepCopyWithImpl<$Res>
+    implements $ServiceCheckStepCopyWith<$Res> {
+  _$ServiceCheckStepCopyWithImpl(this._self, this._then);
+
+  final ServiceCheckStep _self;
+  final $Res Function(ServiceCheckStep) _then;
+
+/// Create a copy of ServiceCheckStep
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? endpoint = null,Object? httpStatus = null,Object? delay = null,Object? chains = null,Object? outcome = null,Object? observation = null,Object? region = null,Object? coreEpoch = null,Object? picksVersion = null,}) {
+  return _then(ServiceCheckStep(
+endpoint: null == endpoint ? _self.endpoint : endpoint // ignore: cast_nullable_to_non_nullable
+as String,httpStatus: null == httpStatus ? _self.httpStatus : httpStatus // ignore: cast_nullable_to_non_nullable
+as int,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
+as int,chains: null == chains ? _self.chains : chains // ignore: cast_nullable_to_non_nullable
+as List<String>,outcome: null == outcome ? _self.outcome : outcome // ignore: cast_nullable_to_non_nullable
+as String,observation: null == observation ? _self.observation : observation // ignore: cast_nullable_to_non_nullable
+as String,region: null == region ? _self.region : region // ignore: cast_nullable_to_non_nullable
+as String,coreEpoch: null == coreEpoch ? _self.coreEpoch : coreEpoch // ignore: cast_nullable_to_non_nullable
+as int,picksVersion: null == picksVersion ? _self.picksVersion : picksVersion // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ServiceCheckStep].
+extension ServiceCheckStepPatterns on ServiceCheckStep {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ServiceCheckStep value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ServiceCheckStep() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ServiceCheckStep value)  $default,){
+final _that = this;
+switch (_that) {
+case _ServiceCheckStep():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ServiceCheckStep value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ServiceCheckStep() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String endpoint, @JsonKey(name: 'http-status')  int httpStatus,  int delay,  List<String> chains,  String outcome,  String observation,  String region, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ServiceCheckStep() when $default != null:
+return $default(_that.endpoint,_that.httpStatus,_that.delay,_that.chains,_that.outcome,_that.observation,_that.region,_that.coreEpoch,_that.picksVersion);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String endpoint, @JsonKey(name: 'http-status')  int httpStatus,  int delay,  List<String> chains,  String outcome,  String observation,  String region, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)  $default,) {final _that = this;
+switch (_that) {
+case _ServiceCheckStep():
+return $default(_that.endpoint,_that.httpStatus,_that.delay,_that.chains,_that.outcome,_that.observation,_that.region,_that.coreEpoch,_that.picksVersion);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String endpoint, @JsonKey(name: 'http-status')  int httpStatus,  int delay,  List<String> chains,  String outcome,  String observation,  String region, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,) {final _that = this;
+switch (_that) {
+case _ServiceCheckStep() when $default != null:
+return $default(_that.endpoint,_that.httpStatus,_that.delay,_that.chains,_that.outcome,_that.observation,_that.region,_that.coreEpoch,_that.picksVersion);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ServiceCheckStep implements ServiceCheckStep {
+  const _ServiceCheckStep({this.endpoint = '', @JsonKey(name: 'http-status') this.httpStatus = 0, this.delay = 0,  List<String> chains = const [], this.outcome = '', this.observation = '', this.region = '', @JsonKey(name: 'core-epoch') this.coreEpoch = 0, @JsonKey(name: 'picks-version') this.picksVersion = 0}): _chains = chains;
+  factory _ServiceCheckStep.fromJson(Map<String, dynamic> json) => _$ServiceCheckStepFromJson(json);
+
+@override@JsonKey() final  String endpoint;
+@override@JsonKey(name: 'http-status') final  int httpStatus;
+@override@JsonKey() final  int delay;
+ final  List<String> _chains;
+@override@JsonKey() List<String> get chains {
+  if (_chains is EqualUnmodifiableListView) return _chains;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_chains);
+}
+
+@override@JsonKey() final  String outcome;
+@override@JsonKey() final  String observation;
+@override@JsonKey() final  String region;
+@override@JsonKey(name: 'core-epoch') final  int coreEpoch;
+@override@JsonKey(name: 'picks-version') final  int picksVersion;
+
+/// Create a copy of ServiceCheckStep
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ServiceCheckStepCopyWith<_ServiceCheckStep> get copyWith => __$ServiceCheckStepCopyWithImpl<_ServiceCheckStep>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ServiceCheckStepToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckStep&&(identical(other.endpoint, endpoint) || other.endpoint == endpoint)&&(identical(other.httpStatus, httpStatus) || other.httpStatus == httpStatus)&&(identical(other.delay, delay) || other.delay == delay)&&const DeepCollectionEquality().equals(other.chains, _chains)&&(identical(other.outcome, outcome) || other.outcome == outcome)&&(identical(other.observation, observation) || other.observation == observation)&&(identical(other.region, region) || other.region == region)&&(identical(other.coreEpoch, coreEpoch) || other.coreEpoch == coreEpoch)&&(identical(other.picksVersion, picksVersion) || other.picksVersion == picksVersion));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode {
+    return Object.hash(runtimeType,endpoint,httpStatus,delay,const DeepCollectionEquality().hash(_chains),outcome,observation,region,coreEpoch,picksVersion);
+}
+
+@override
+String toString() {
+    return 'ServiceCheckStep(endpoint: $endpoint, httpStatus: $httpStatus, delay: $delay, chains: $chains, outcome: $outcome, observation: $observation, region: $region, coreEpoch: $coreEpoch, picksVersion: $picksVersion)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ServiceCheckStepCopyWith<$Res> implements $ServiceCheckStepCopyWith<$Res> {
+  factory _$ServiceCheckStepCopyWith(_ServiceCheckStep value, $Res Function(_ServiceCheckStep) _then) = __$ServiceCheckStepCopyWithImpl;
+@override @useResult
+$Res call({
+ String endpoint,@JsonKey(name: 'http-status') int httpStatus, int delay, List<String> chains, String outcome, String observation, String region,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
+});
+
+
+
+
+}
+/// @nodoc
+class __$ServiceCheckStepCopyWithImpl<$Res>
+    implements _$ServiceCheckStepCopyWith<$Res> {
+  __$ServiceCheckStepCopyWithImpl(this._self, this._then);
+
+  final _ServiceCheckStep _self;
+  final $Res Function(_ServiceCheckStep) _then;
+
+/// Create a copy of ServiceCheckStep
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? endpoint = null,Object? httpStatus = null,Object? delay = null,Object? chains = null,Object? outcome = null,Object? observation = null,Object? region = null,Object? coreEpoch = null,Object? picksVersion = null,}) {
+  return _then(_ServiceCheckStep(
+endpoint: null == endpoint ? _self.endpoint : endpoint // ignore: cast_nullable_to_non_nullable
+as String,httpStatus: null == httpStatus ? _self.httpStatus : httpStatus // ignore: cast_nullable_to_non_nullable
+as int,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
+as int,chains: null == chains ? _self._chains : chains // ignore: cast_nullable_to_non_nullable
+as List<String>,outcome: null == outcome ? _self.outcome : outcome // ignore: cast_nullable_to_non_nullable
+as String,observation: null == observation ? _self.observation : observation // ignore: cast_nullable_to_non_nullable
+as String,region: null == region ? _self.region : region // ignore: cast_nullable_to_non_nullable
+as String,coreEpoch: null == coreEpoch ? _self.coreEpoch : coreEpoch // ignore: cast_nullable_to_non_nullable
 as int,picksVersion: null == picksVersion ? _self.picksVersion : picksVersion // ignore: cast_nullable_to_non_nullable
 as int,
   ));

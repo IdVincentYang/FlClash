@@ -8,27 +8,41 @@ import 'package:riverpod/riverpod.dart';
 import 'app.dart';
 import 'route_state.dart';
 
-enum ProbePhase { empty, probing, fresh, failed }
+enum ProbePhase { empty, queued, probing, fresh, failed }
+
+class ProbeSchedule {
+  const ProbeSchedule({required this.minimumInterval, required this.maxAge});
+  final Duration minimumInterval;
+  final Duration maxAge;
+}
 
 @immutable
 class ProbeEntry<V> {
-  const ProbeEntry({required this.phase, this.value, this.stamp});
+  const ProbeEntry({
+    required this.phase,
+    this.value,
+    this.stamp,
+    this.expired = false,
+  });
 
   final ProbePhase phase;
   final V? value;
   final RouteStamp? stamp;
+  final bool expired;
 
-  bool get isLoading => phase == ProbePhase.probing;
+  bool get isLoading =>
+      phase == ProbePhase.probing || phase == ProbePhase.queued;
 
   @override
   bool operator ==(Object other) =>
       other is ProbeEntry<V> &&
       other.phase == phase &&
       other.value == value &&
-      other.stamp == stamp;
+      other.stamp == stamp &&
+      other.expired == expired;
 
   @override
-  int get hashCode => Object.hash(phase, value, stamp);
+  int get hashCode => Object.hash(phase, value, stamp, expired);
 }
 
 @immutable
@@ -76,8 +90,154 @@ class ProbeAnswer<V> {
 mixin RoutedProbe<K, V>
     on AnyNotifier<RoutedProbeState<K, V>, RoutedProbeState<K, V>> {
   final Map<K, int> _watchers = {};
+  final Map<K, int> _automaticWatchers = {};
+  final Map<K, Duration> _launchedAt = {};
+  final Map<K, Duration> _completedAt = {};
+  final Stopwatch _clock = Stopwatch()..start();
+  Timer? _wake;
+  bool _routeHeld = false;
+  late RouteTracker _tracker;
+
+  @protected
+  Duration get monotonicElapsed => _clock.elapsed;
+
+  @protected
+  ProbeSchedule? get probeSchedule => null;
+
+  @protected
+  bool Function() captureProbeGuard(K target) {
+    final run = _inFlight[target]?.id;
+    return () =>
+        run != null &&
+        ref.mounted &&
+        _inFlight[target]?.id == run &&
+        isEligible(target) &&
+        _route.live &&
+        ref.read(appVisibleProvider);
+  }
+
+  @protected
+  bool isEligible(K target) => true;
+
+  @protected
+  bool allowsAutomatic(K target) => true;
+
+  bool _automatic(K target) =>
+      (_automaticWatchers[target] ?? 0) > 0 &&
+      allowsAutomatic(target) &&
+      isEligible(target);
+
+  bool _expired(K target) {
+    final completed = _completedAt[target];
+    final schedule = probeSchedule;
+    return schedule != null &&
+        completed != null &&
+        monotonicElapsed - completed >= schedule.maxAge;
+  }
+
+  void _holdRoute() {
+    final wanted =
+        _watchers.keys.any(isEligible) ||
+        probeSchedule != null && (_due.isNotEmpty || _inFlight.isNotEmpty);
+    if (wanted == _routeHeld || !ref.mounted) return;
+    _routeHeld = wanted;
+    if (wanted) {
+      _tracker.attach();
+    } else {
+      _tracker.detach();
+    }
+  }
+
+  void _armWake() {
+    _wake?.cancel();
+    _wake = null;
+    final schedule = probeSchedule;
+    if (schedule == null || !ref.mounted || !ref.read(appVisibleProvider)) {
+      return;
+    }
+    Duration? next;
+    void consider(Duration value) {
+      if (next == null || value < next!) next = value;
+    }
+
+    for (final target in _due.keys) {
+      if (!isEligible(target)) continue;
+      final last = _launchedAt[target];
+      if (last != null) {
+        final left = schedule.minimumInterval - (monotonicElapsed - last);
+        if (left > Duration.zero) consider(left);
+      }
+    }
+    for (final target in _watchers.keys) {
+      final completed = _completedAt[target];
+      if (!isEligible(target) || completed == null || _expired(target)) {
+        continue;
+      }
+      consider(schedule.maxAge - (monotonicElapsed - completed));
+    }
+    if (next != null) _wake = Timer(next!, _onWake);
+  }
+
+  void _onWake() {
+    if (!ref.mounted) return;
+    final entries = Map<K, ProbeEntry<V>>.of(state.entries);
+    for (final target in _watchers.keys) {
+      if (!isEligible(target) || !_expired(target)) continue;
+      final entry = entries[target];
+      if (entry != null) {
+        entries[target] = ProbeEntry(
+          phase: entry.phase,
+          value: entry.value,
+          stamp: entry.stamp,
+          expired: true,
+        );
+      }
+      if (_automatic(target) && !_inFlight.containsKey(target)) {
+        _mark(target, keepValue: true);
+      }
+    }
+    state = RoutedProbeState(entries);
+    if (_due.isNotEmpty) _schedule();
+    _armWake();
+  }
+
+  void cancel(Iterable<K> targets) {
+    if (!ref.mounted) return;
+    final entries = Map<K, ProbeEntry<V>>.of(state.entries);
+    for (final target in targets.toList()) {
+      _due.remove(target);
+      _inFlight.remove(target);
+      _completedAt.remove(target);
+      _staleUnder.remove(target);
+      cancelProbe(target);
+      entries.remove(target);
+    }
+    state = RoutedProbeState(entries);
+    _holdRoute();
+    _armWake();
+  }
+
+  @protected
+  void reconcileEligibility() {
+    if (!ref.mounted) return;
+    cancel(
+      {
+        ..._due.keys,
+        ..._inFlight.keys,
+        ...state.entries.keys,
+      }.where((target) => !isEligible(target)),
+    );
+    for (final target in _watchers.keys) {
+      if (_automatic(target) &&
+          (_entryOf(target).phase != ProbePhase.fresh || _expired(target))) {
+        _mark(target);
+      }
+    }
+    _holdRoute();
+  }
+
   final Map<K, ({bool keepValue, bool forced, bool supersede})> _due = {};
-  final Map<K, int> _inFlight = {};
+  final Map<K, ({int id, bool forced})> _inFlight = {};
   int _runs = 0;
   final Map<K, RouteState> _staleUnder = {};
   bool _scheduled = false;
@@ -96,7 +256,11 @@ mixin RoutedProbe<K, V>
 
   @protected
   RoutedProbeState<K, V> buildProbe() {
+    _tracker = ref.read(routeTrackerProvider.notifier);
     ref.onDispose(() {
+      _wake?.cancel();
+      _clock.stop();
+      if (_routeHeld) scheduleMicrotask(_tracker.detach);
       for (final target in _inFlight.keys.toList()) {
         cancelProbe(target);
       }
@@ -104,7 +268,10 @@ mixin RoutedProbe<K, V>
     _route = ref.read(routeTrackerProvider);
     ref.listen(routeTrackerProvider, _onRoute);
     ref.listen(appVisibleProvider, (_, visible) {
-      if (!visible) {
+      if (!visible && probeSchedule != null) {
+        _wake?.cancel();
+        cancel({..._due.keys, ..._inFlight.keys});
+      } else if (!visible) {
         final entries = Map<K, ProbeEntry<V>>.of(state.entries);
         for (final target in _inFlight.keys.toList()) {
           _inFlight.remove(target);
@@ -112,58 +279,95 @@ mixin RoutedProbe<K, V>
         }
         state = RoutedProbeState(entries);
       }
-      if (visible && _due.isNotEmpty) {
-        _schedule();
+      if (visible) {
+        if (probeSchedule != null) {
+          _onWake();
+          for (final target in _watchers.keys) {
+            if (_automatic(target) &&
+                (_entryOf(target).phase != ProbePhase.fresh ||
+                    _expired(target))) {
+              _mark(target, keepValue: true);
+            }
+          }
+        }
+        if (_due.isNotEmpty) _schedule();
+        _armWake();
       }
     });
     return RoutedProbeState<K, V>();
   }
 
-  void watch(K target) {
-    final count = _watchers[target] ?? 0;
-    _watchers[target] = count + 1;
-    if (count > 0) {
-      return;
+  void watch(K target, {bool automatic = true}) {
+    final wasAutomatic = _automatic(target);
+    _watchers[target] = (_watchers[target] ?? 0) + 1;
+    if (automatic) {
+      _automaticWatchers[target] = (_automaticWatchers[target] ?? 0) + 1;
     }
-    if (_watchers.length == 1) {
-      ref.read(routeTrackerProvider.notifier).attach();
-    }
-    if (_entryOf(target).phase != ProbePhase.fresh) {
+    _holdRoute();
+    if (automatic &&
+        !wasAutomatic &&
+        _automatic(target) &&
+        (_entryOf(target).phase != ProbePhase.fresh || _expired(target))) {
       _mark(target);
     }
+    if (_expired(target)) {
+      scheduleMicrotask(() {
+        if (ref.mounted) _onWake();
+      });
+    }
+    _armWake();
   }
 
-  void unwatch(K target) {
+  void unwatch(K target, {bool automatic = true}) {
     final count = _watchers[target];
-    if (count == null) {
-      return;
+    if (count == null) return;
+    if (automatic) {
+      final count = _automaticWatchers[target] ?? 0;
+      if (count <= 1) {
+        _automaticWatchers.remove(target);
+      } else {
+        _automaticWatchers[target] = count - 1;
+      }
     }
     if (count > 1) {
       _watchers[target] = count - 1;
-      return;
+    } else {
+      _watchers.remove(target);
     }
-    _watchers.remove(target);
-    cancelProbe(target);
+    if (probeSchedule == null) {
+      if (!_watchers.containsKey(target)) cancelProbe(target);
+    } else {
+      final closed = !allowsAutomatic(target) && !_watchers.containsKey(target);
+      final run = _inFlight[target];
+      if (closed || run != null && !run.forced && !_automatic(target)) {
+        _inFlight.remove(target);
+        cancelProbe(target);
+        scheduleMicrotask(() => _forget(target));
+      }
+      if (closed) {
+        _due.remove(target);
+      }
+    }
     final due = _due[target];
-    if (due != null && !due.forced) {
+    if (due != null && !due.forced && !_automatic(target)) {
       _due.remove(target);
       scheduleMicrotask(() => _forget(target));
     }
-    if (_watchers.isEmpty && ref.mounted) {
-      ref.read(routeTrackerProvider.notifier).detach();
-    }
+    _holdRoute();
+    _armWake();
   }
 
   /// A re-probe dropped before it launched would leave its entry loading
   /// with nothing left to settle it.
   void _forget(K target) {
     if (!ref.mounted ||
-        _watchers.containsKey(target) ||
+        _automatic(target) ||
         _due.containsKey(target) ||
         _inFlight.containsKey(target) ||
         !_entryOf(target).isLoading) {
       return;
     }
+    _completedAt.remove(target);
     state = RoutedProbeState(Map.of(state.entries)..remove(target));
   }
 
@@ -184,7 +388,13 @@ mixin RoutedProbe<K, V>
   ProbeEntry<V> _entryOf(K target) => state.entryOf(target);
 
   void _mark(K target, {bool keepValue = false, bool forced = false}) {
-    if (_inFlight.containsKey(target)) {
+    if (probeSchedule != null && !ref.read(appVisibleProvider)) return;
+    if (!isEligible(target) || !forced && !_automatic(target)) {
+      return;
+    }
+    final run = _inFlight[target];
+    if (run != null) {
+      if (forced) _inFlight[target] = (id: run.id, forced: true);
       return;
     }
     final previous = _due[target];
@@ -193,6 +403,7 @@ mixin RoutedProbe<K, V>
       forced: forced || (previous?.forced ?? false),
       supersede: previous?.supersede ?? false,
     );
+    _holdRoute();
     _schedule();
   }
 
@@ -206,33 +417,61 @@ mixin RoutedProbe<K, V>
 
   void _launch() {
     _scheduled = false;
-    if (!ref.mounted || !_route.live || !ref.read(appVisibleProvider)) {
+    if (!ref.mounted) return;
+    if (!_route.live || !ref.read(appVisibleProvider)) {
+      if (probeSchedule != null && ref.read(appVisibleProvider)) {
+        final entries = Map<K, ProbeEntry<V>>.of(state.entries);
+        for (final target in _due.keys.where(isEligible)) {
+          entries[target] = ProbeEntry(phase: ProbePhase.queued);
+        }
+        state = RoutedProbeState(entries);
+      }
       return;
     }
     final route = _route;
-    final targets = <K>[];
+    final targets = <K, bool>{};
     final entries = Map<K, ProbeEntry<V>>.of(state.entries);
+    final waiting = <K, ({bool keepValue, bool forced, bool supersede})>{};
     for (final MapEntry(key: target, value: due) in _due.entries) {
-      final wanted = due.forced || _watchers.containsKey(target);
+      final wanted = isEligible(target) && (due.forced || _automatic(target));
       if (!wanted || (_inFlight.containsKey(target) && !due.supersede)) {
         continue;
       }
-      targets.add(target);
+      final last = _launchedAt[target];
+      final interval = probeSchedule?.minimumInterval ?? Duration.zero;
+      if (last != null && monotonicElapsed - last < interval) {
+        waiting[target] = due;
+        entries[target] = ProbeEntry(
+          phase: ProbePhase.queued,
+          value: due.keepValue ? entries[target]?.value : null,
+          stamp: due.keepValue ? entries[target]?.stamp : null,
+          expired: entries[target]?.expired ?? false,
+        );
+        continue;
+      }
+      targets[target] = due.forced;
       entries[target] = ProbeEntry(
         phase: ProbePhase.probing,
         value: due.keepValue ? entries[target]?.value : null,
+        expired: entries[target]?.expired ?? false,
       );
     }
-    _due.clear();
+    _due
+      ..clear()
+      ..addAll(waiting);
+    state = RoutedProbeState(entries);
+    _armWake();
     if (targets.isEmpty) {
+      _holdRoute();
       return;
     }
-    state = RoutedProbeState(entries);
     final run = ++_runs;
-    for (final target in targets) {
-      _inFlight[target] = run;
+    for (final MapEntry(key: target, value: forced) in targets.entries) {
+      _inFlight[target] = (id: run, forced: forced);
+      _launchedAt[target] = monotonicElapsed;
     }
-    for (final target in targets) {
+    _holdRoute();
+    for (final target in targets.keys) {
       unawaited(_run(target, route, run));
     }
   }
@@ -244,17 +483,21 @@ mixin RoutedProbe<K, V>
       answers = await probe(target, route);
     } catch (error) {
       commonPrint.log(
-        'probe failed: $error',
+        probeSchedule == null
+            ? 'probe failed: $error'
+            : 'service probe incomplete',
         logLevel: coreFailureLogLevel(error),
       );
     }
     if (!ref.mounted ||
-        _inFlight[target] != run ||
+        _inFlight[target]?.id != run ||
+        !isEligible(target) ||
         !ref.read(appVisibleProvider) ||
         !_route.live) {
       return;
     }
     _inFlight.remove(target);
+    _completedAt[target] = monotonicElapsed;
     final current = _route;
     final entries = Map<K, ProbeEntry<V>>.of(state.entries);
     final answer = answers[target] ?? const ProbeAnswer();
@@ -283,7 +526,10 @@ mixin RoutedProbe<K, V>
     }
     for (final MapEntry(key: other, value: answer) in answers.entries) {
       final value = answer.value;
-      if (other == target || value == null || isFailure(value)) {
+      if (!isEligible(other) ||
+          other == target ||
+          value == null ||
+          isFailure(value)) {
         continue;
       }
       final stamp = _stampOf(answer, route);
@@ -302,9 +548,9 @@ mixin RoutedProbe<K, V>
     if (behind) {
       ref.read(routeTrackerProvider.notifier).resync();
     }
-    if (_due.isNotEmpty) {
-      _schedule();
-    }
+    if (_due.isNotEmpty) _schedule();
+    _holdRoute();
+    _armWake();
   }
 
   RouteStamp _stampOf(ProbeAnswer<V> answer, RouteState route) => RouteStamp(
@@ -329,6 +575,16 @@ mixin RoutedProbe<K, V>
             next.proxied != previous.proxied ||
             !next.live);
     for (final MapEntry(key: target, value: entry) in state.entries.entries) {
+      final picksMoved =
+          previous != null && next.picksVersion != previous.picksVersion;
+      if (probeSchedule != null &&
+          !allowsAutomatic(target) &&
+          previous?.synced == true &&
+          (moved || picksMoved) &&
+          (_due.containsKey(target) || _inFlight.containsKey(target))) {
+        _invalidate(target, entries);
+        continue;
+      }
       if (_inFlight.containsKey(target)) {
         if (moved) {
           _invalidate(target, entries);
@@ -343,7 +599,7 @@ mixin RoutedProbe<K, V>
         _invalidate(target, entries);
       } else if (resumed &&
           entry.phase == ProbePhase.failed &&
-          _watchers.containsKey(target)) {
+          _automatic(target)) {
         _due[target] = (keepValue: false, forced: false, supersede: false);
       }
     }
@@ -353,6 +609,8 @@ mixin RoutedProbe<K, V>
     if (_due.isNotEmpty) {
       _schedule();
     }
+    _holdRoute();
+    _armWake();
   }
 
   /// A stale entry is asked again while someone watches it and forgotten
@@ -360,12 +618,18 @@ mixin RoutedProbe<K, V>
   void _invalidate(K target, Map<K, ProbeEntry<V>> entries) {
     cancelProbe(target);
     _inFlight.remove(target);
-    if (_watchers.containsKey(target)) {
+    if (_automatic(target)) {
       entries[target] = ProbeEntry(phase: ProbePhase.probing);
       _due[target] = (keepValue: false, forced: false, supersede: true);
     } else {
       _inFlight.remove(target);
-      entries.remove(target);
+      _due.remove(target);
+      _completedAt.remove(target);
+      if (probeSchedule != null && _watchers.containsKey(target)) {
+        entries[target] = ProbeEntry(phase: ProbePhase.failed, expired: true);
+      } else {
+        entries.remove(target);
+      }
     }
   }
 }

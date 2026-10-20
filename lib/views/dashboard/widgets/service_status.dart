@@ -4,10 +4,8 @@ import 'dart:ui';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/providers/outbound_ip.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/routed_probe.dart';
 import 'package:fl_clash/providers/service_status.dart';
@@ -23,7 +21,10 @@ import 'package:material_ui/material_ui.dart';
 String _statusLabel(BuildContext context, ServiceProbeStatus status) {
   final localizations = context.appLocalizations;
   return switch (status) {
-    ServiceProbeStatus.available => localizations.serviceAvailable,
+    ServiceProbeStatus.available => localizations.serviceResponded,
+    ServiceProbeStatus.redirected => localizations.serviceRedirected,
+    ServiceProbeStatus.httpResponse => localizations.serviceHttpResponse,
+    ServiceProbeStatus.observed => localizations.serviceObserved,
     ServiceProbeStatus.restricted => localizations.serviceRestricted,
     ServiceProbeStatus.unavailable => localizations.serviceUnavailable,
     ServiceProbeStatus.disallowedIsp => localizations.serviceDisallowedIsp,
@@ -40,6 +41,9 @@ String _statusLabel(BuildContext context, ServiceProbeStatus status) {
 Color _statusColor(BuildContext context, ServiceProbeStatus status) {
   return switch (status) {
     ServiceProbeStatus.available => context.colorScheme.success,
+    ServiceProbeStatus.observed => context.colorScheme.onSurfaceVariant,
+    ServiceProbeStatus.redirected ||
+    ServiceProbeStatus.httpResponse => context.colorScheme.warning,
     ServiceProbeStatus.restricted ||
     ServiceProbeStatus.disallowedIsp ||
     ServiceProbeStatus.blocked ||
@@ -55,16 +59,31 @@ Color _statusColor(BuildContext context, ServiceProbeStatus status) {
 (String, Color) _statusOf(
   BuildContext context,
   ServiceCheck? check,
-  ProbePhase phase,
-) {
+  ProbePhase phase, {
+  bool expired = false,
+}) {
   final localizations = context.appLocalizations;
+  if (phase == ProbePhase.queued) {
+    return (localizations.serviceQueued, context.colorScheme.onSurfaceVariant);
+  }
   if (phase == ProbePhase.probing) {
     return (localizations.loading, context.colorScheme.onSurfaceVariant);
   }
+  if (expired && check == null) {
+    return (localizations.serviceRouteChanged, context.colorScheme.warning);
+  }
   if (check != null) {
+    final label =
+        check.status == ServiceProbeStatus.failed && check.reason.isNotEmpty
+        ? _serviceReason(context, check.reason)
+        : _statusLabel(context, check.status);
     return (
-      _statusLabel(context, check.status),
-      _statusColor(context, check.status),
+      expired
+          ? localizations.serviceExpired(label)
+          : '$label${check.httpStatus > 0 && check.purpose == ServiceProbePurpose.basic ? ' · HTTP ${check.httpStatus}' : ''}',
+      expired
+          ? context.colorScheme.warning
+          : _statusColor(context, check.status),
     );
   }
   if (phase == ProbePhase.failed) {
@@ -83,35 +102,8 @@ class ServiceStatusCard extends ConsumerStatefulWidget {
   ConsumerState<ServiceStatusCard> createState() => _ServiceStatusCardState();
 }
 
-mixin _NodeAddressWatch<T extends ConsumerStatefulWidget> on ConsumerState<T> {
-  late final OutboundIpProbe _ips;
-  String? _node;
-
-  @override
-  void initState() {
-    super.initState();
-    _ips = ref.read(outboundIpProbeProvider.notifier);
-  }
-
-  @override
-  void dispose() {
-    _showNode(null);
-    super.dispose();
-  }
-
-  void _showNode(String? node) {
-    final previous = _node;
-    if (node == previous) return;
-    _node = node;
-    if (node != null) _ips.watch(node);
-    if (previous != null) _ips.unwatch(previous);
-  }
-}
-
 class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
-    with
-        ProbeStartHold<ServiceStatusCard>,
-        _NodeAddressWatch<ServiceStatusCard> {
+    with ProbeStartHold<ServiceStatusCard> {
   static const _gap = 12.0;
   // The badge sits the same distance from the start, top and bottom edges. At
   // this inset a concentric radius would square it off, so it takes the card's
@@ -123,12 +115,14 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
   ServiceTarget? _shown;
   bool _scrolling = false;
 
-  static ServiceTarget _savedIn(List<ServiceTarget> targets, String? id) {
+  static ServiceTarget? _savedIn(List<ServiceTarget> targets, String? id) {
     final saved = id == null ? null : ServiceTarget.byId(id);
-    return saved != null && targets.contains(saved) ? saved : targets.first;
+    return saved != null && targets.contains(saved)
+        ? saved
+        : targets.firstOrNull;
   }
 
-  ServiceTarget _targetIn(List<ServiceTarget> targets) =>
+  ServiceTarget? _targetIn(List<ServiceTarget> targets) =>
       _savedIn(targets, ref.read(appSettingProvider).currentService);
 
   void _select(ServiceTarget target) {
@@ -143,7 +137,10 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     _services = ref.read(serviceStatusProvider.notifier);
     final targets = ref.read(enabledServiceTargetsProvider);
     _controller = PageController(
-      initialPage: targets.indexOf(_targetIn(targets)),
+      initialPage: max(
+        0,
+        targets.indexWhere((target) => target == _targetIn(targets)),
+      ),
     );
   }
 
@@ -158,8 +155,8 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     final previous = _shown;
     if (target == previous) return;
     _shown = target;
-    if (target != null) _services.watch(target);
-    if (previous != null) _services.unwatch(previous);
+    if (target != null) _services.watch(target.basic);
+    if (previous != null) _services.unwatch(previous.basic);
   }
 
   void _onTargetChanged(List<ServiceTarget> targets, int index) {
@@ -185,11 +182,18 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     List<ServiceTarget>? previous,
     List<ServiceTarget> next,
   ) {
+    if (next.isEmpty) {
+      _show(null);
+      return;
+    }
     final current = _targetIn(previous ?? next);
     final kept = next.contains(current);
     final index = kept
-        ? next.indexOf(current)
-        : (previous?.indexOf(current) ?? 0).clamp(0, next.length - 1);
+        ? next.indexWhere((target) => target == current)
+        : (previous?.indexWhere((target) => target == current) ?? 0).clamp(
+            0,
+            next.length - 1,
+          );
     _select(next[index]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_controller.hasClients) return;
@@ -225,24 +229,18 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     return Consumer(
       builder: (context, ref, _) {
         final entry = ref.watch(
-          serviceStatusProvider.select((state) => state.entryOf(target)),
+          serviceStatusProvider.select((state) => state.entryOf(target.basic)),
         );
         final phase = settled ? shownPhase(entry) : entry.phase;
         final loading = _isLoading(phase, settled: settled);
         final check = entry.value;
         final node = check?.node;
-        final ipEntry = node != null
-            ? ref.watch(
-                outboundIpProbeProvider.select((state) => state.entryOf(node)),
-              )
-            : null;
-        final outboundIp = ipEntry?.value;
-        final ipPending =
-            ipEntry != null &&
-            (settled ? shownPhase(ipEntry) : ipEntry.phase) !=
-                ProbePhase.failed &&
-            outboundIp == null;
-        final (label, color) = _statusOf(context, check, phase);
+        final (label, color) = _statusOf(
+          context,
+          check,
+          phase,
+          expired: entry.expired,
+        );
         return _ServicePage(
           target: target,
           badgeSize: badgeSize,
@@ -250,10 +248,8 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
           label: label,
           color: color,
           loading: loading,
-          region: check?.region,
           node: node,
-          outboundIp: loading ? null : outboundIp,
-          ipPending: !loading && ipPending,
+          checkedAt: check?.checkedAt,
         );
       },
     );
@@ -263,17 +259,29 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
   Widget build(BuildContext context) {
     ref.listen(enabledServiceTargetsProvider, _onTargetsChanged);
     final targets = ref.watch(enabledServiceTargetsProvider);
+    if (targets.isEmpty) {
+      _show(null);
+      return SizedBox(
+        height: DashboardWidgetMetrics.heightOf(context, 1),
+        child: CommonCard(
+          radius: DashboardWidgetMetrics.radiusOf(context),
+          onPressed: _openSheet,
+          child: Center(
+            child: Text(context.appLocalizations.serviceAllDisabled),
+          ),
+        ),
+      );
+    }
     final target = _savedIn(
       targets,
       ref.watch(appSettingProvider.select((state) => state.currentService)),
-    );
+    )!;
     if (!_scrolling) _show(target);
     final entry = ref.watch(
-      serviceStatusProvider.select((state) => state.entryOf(target)),
+      serviceStatusProvider.select((state) => state.entryOf(target.basic)),
     );
     final check = entry.value;
     final loading = _isLoading(shownPhase(entry), settled: true);
-    _showNode(check?.node);
 
     final inset = DashboardWidgetMetrics.insetOf(context);
     final height = DashboardWidgetMetrics.heightOf(context, 1);
@@ -342,10 +350,8 @@ class _ServicePage extends StatelessWidget {
     required this.label,
     required this.color,
     required this.loading,
-    required this.region,
     required this.node,
-    required this.outboundIp,
-    required this.ipPending,
+    required this.checkedAt,
   });
 
   final ServiceTarget target;
@@ -354,10 +360,8 @@ class _ServicePage extends StatelessWidget {
   final String label;
   final Color color;
   final bool loading;
-  final String? region;
   final String? node;
-  final IpInfo? outboundIp;
-  final bool ipPending;
+  final DateTime? checkedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -396,12 +400,13 @@ class _ServicePage extends StatelessWidget {
               if (loading)
                 SkeletonText(width: 96, style: secondary)
               else
-                _OutboundIpLine(
-                  ip: outboundIp,
-                  region: region,
-                  pending: ipPending,
-                  fallback: node,
-                  style: secondary,
+                Tooltip(
+                  message: checkedAt == null
+                      ? context.appLocalizations.servicePending
+                      : context.appLocalizations.serviceCheckedAt(
+                          checkedAt!.showFull,
+                        ),
+                  child: _NodeLine(node: node, style: secondary),
                 ),
             ],
           ),
@@ -474,86 +479,18 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-/// Node names tend to carry their own flag emoji, so a service shows where
-/// its traffic leaves from as a flag and the address instead, and falls
-/// back to the node only when the address could not be looked up.
-class _OutboundIpLine extends StatelessWidget {
-  const _OutboundIpLine({
-    required this.ip,
-    required this.region,
-    required this.pending,
-    required this.fallback,
-    required this.style,
-  });
-
-  final IpInfo? ip;
-  final String? region;
-  final bool pending;
-  final String? fallback;
+class _NodeLine extends StatelessWidget {
+  const _NodeLine({this.node, this.style});
+  final String? node;
   final TextStyle? style;
 
   @override
-  Widget build(BuildContext context) {
-    final ip = this.ip;
-    final fallback = this.fallback;
-    final flag = ip?.countryCode ?? region;
-    if (flag == null && ip == null && !pending && fallback == null) {
-      return _NoValue(style: style);
-    }
-    final line = Row(
-      spacing: 4,
-      children: [
-        if (flag != null)
-          Text(
-            flag.countryFlagEmoji,
-            style: style?.copyWith(fontFamily: FontFamily.twEmoji.value),
-          ),
-        if (ip != null)
-          Flexible(
-            child: IpQualityText(ip: ip.ip, style: style),
-          )
-        else if (pending)
-          Flexible(child: SkeletonText(width: 88, style: style))
-        else if (fallback != null)
-          Flexible(
-            child: Text(
-              fallback,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
-          ),
-      ],
-    );
-    if (ip == null) return line;
-    return Tooltip(
-      message: context.appLocalizations.outboundIp,
-      child: InkWell(
-        onTap: () => showIpQualitySheet(context, ip: ip.ip),
-        customBorder: AppShape.xs,
-        hoverColor: Colors.transparent,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        child: line,
-      ),
-    );
-  }
-}
-
-class _NoValue extends StatelessWidget {
-  const _NoValue({this.style});
-
-  final TextStyle? style;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Text(
-        '—',
-        style: style?.copyWith(color: context.colorScheme.outline),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Text(
+    node ?? context.appLocalizations.serviceUnknownRoute,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: style,
+  );
 }
 
 class _ServiceAside extends StatelessWidget {
@@ -862,7 +799,7 @@ class ServiceStatusSheet extends ConsumerWidget {
       ref.watch(appSettingProvider.select((state) => state.currentService)) ??
           '',
     );
-    final current = targets.contains(saved) ? saved : targets.first;
+    final current = targets.contains(saved) ? saved : targets.firstOrNull;
     final services = ref.read(serviceStatusProvider.notifier);
     final localizations = context.appLocalizations;
     return ConstrainedBox(
@@ -873,8 +810,20 @@ class ServiceStatusSheet extends ConsumerWidget {
           IconButtonData(
             glyph: AppGlyphs.bolt,
             tooltip: localizations.serviceCheckAll,
-            isLoading: targets.any(state.isLoading),
-            onPressed: () => services.refresh(targets),
+            isLoading: targets.any((target) => state.isLoading(target.basic)),
+            onPressed: targets.isEmpty
+                ? null
+                : () => services.refresh(targets.map((target) => target.basic)),
+          ),
+          IconButtonData(
+            glyph: AppGlyphs.close,
+            tooltip: localizations.cancel,
+            onPressed: () => services.cancel([
+              for (final target in ServiceTarget.values) ...[
+                target.basic,
+                target.advanced,
+              ],
+            ]),
           ),
           IconButtonData(
             glyph: AppGlyphs.sliders,
@@ -890,6 +839,16 @@ class ServiceStatusSheet extends ConsumerWidget {
             SliverToBoxAdapter(
               child: SizedBox(height: context.contentTopPadding),
             ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  targets.isEmpty
+                      ? localizations.serviceAllDisabled
+                      : localizations.serviceBasicExplanation,
+                ),
+              ),
+            ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               sliver: SliverList.builder(
@@ -900,10 +859,11 @@ class ServiceStatusSheet extends ConsumerWidget {
                     position: ItemPosition.get(index, targets.length),
                     child: _ServiceRow(
                       target: target,
-                      entry: state.entryOf(target),
+                      key: ValueKey(target),
+                      entry: state.entryOf(target.basic),
                       selected: target == current,
                       onTap: () => context.safeNestedPop(target),
-                      onCheck: () => services.refresh([target]),
+                      onCheck: () => services.refresh([target.basic]),
                     ),
                   );
                 },
@@ -914,6 +874,152 @@ class ServiceStatusSheet extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _AdvancedServiceView extends ConsumerStatefulWidget {
+  const _AdvancedServiceView({required this.target});
+  final ServiceTarget target;
+
+  @override
+  ConsumerState<_AdvancedServiceView> createState() =>
+      _AdvancedServiceViewState();
+}
+
+class _AdvancedServiceViewState extends ConsumerState<_AdvancedServiceView> {
+  late final ServiceStatus _services;
+
+  @override
+  void initState() {
+    super.initState();
+    _services = ref.read(serviceStatusProvider.notifier);
+    _services.watch(widget.target.basic, automatic: false);
+    _services.watch(widget.target.advanced, automatic: false);
+  }
+
+  @override
+  void dispose() {
+    _services.unwatch(widget.target.basic, automatic: false);
+    _services.unwatch(widget.target.advanced, automatic: false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = context.appLocalizations;
+    final target = widget.target;
+    final enabled = ref.watch(enabledServiceTargetsProvider).contains(target);
+    final state = ref.watch(serviceStatusProvider);
+    final basic = state.entryOf(target.basic);
+    final advanced = state.entryOf(target.advanced);
+    final check = advanced.value;
+    final (basicLabel, _) = _statusOf(
+      context,
+      basic.value,
+      basic.phase,
+      expired: basic.expired,
+    );
+    final (advancedLabel, _) = _statusOf(
+      context,
+      check,
+      advanced.phase,
+      expired: advanced.expired,
+    );
+    final exits =
+        check?.steps.map((step) => step.chains.firstOrNull).toSet() ?? {};
+    final exitLabel = exits.contains(null) || exits.isEmpty
+        ? text.serviceUnknownRoute
+        : exits.length == 1
+        ? exits.single!
+        : text.serviceMultipleRoutes;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: ref.sheetHeight(context, 0.85)),
+      child: CommonScaffold(
+        title: '${target.label} · ${text.serviceAdvanced}',
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          shrinkWrap: true,
+          children: [
+            Text(text.serviceAdvancedExplanation),
+            const SizedBox(height: 12),
+            Text(text.serviceRecipients(target.advancedRecipients.join(', '))),
+            if (target == ServiceTarget.disneyPlus) ...[
+              const SizedBox(height: 12),
+              Text(text.serviceDisneyExplanation),
+            ],
+            const SizedBox(height: 16),
+            Text('${text.serviceBasic}: $basicLabel'),
+            const SizedBox(height: 8),
+            Text('${text.serviceAdvanced}: $advancedLabel'),
+            if (check?.checkedAt != null)
+              Text(text.serviceCheckedAt(check!.checkedAt!.showFull)),
+            if (check != null) ...[
+              Text(text.serviceElapsed(check.elapsed)),
+              Text(exitLabel),
+              if (check.region != null)
+                Text(text.serviceDetectedRegion(check.region!)),
+              if (check.status == ServiceProbeStatus.failed)
+                Text(_serviceReason(context, check.reason)),
+            ],
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: !enabled || advanced.isLoading
+                  ? null
+                  : () => _services.refresh([target.advanced]),
+              child: Text(text.serviceStartAdvanced),
+            ),
+            if (advanced.isLoading)
+              TextButton(
+                onPressed: () => _services.cancel([target.advanced]),
+                child: Text(text.cancel),
+              ),
+            if (!enabled) Text('${target.label} · ${text.disabled}'),
+            Text(text.serviceAdvancedTiming),
+            for (final step in check?.steps ?? <ServiceCheckStep>[])
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(step.endpoint),
+                subtitle: Text(
+                  [
+                    if (step.httpStatus > 0) 'HTTP ${step.httpStatus}',
+                    _serviceReason(context, step.outcome),
+                    if (step.observation.isNotEmpty)
+                      _statusLabel(
+                        context,
+                        ServiceProbeStatus.byId(step.observation),
+                      ),
+                    if (step.region.isNotEmpty)
+                      text.serviceDetectedRegion(step.region),
+                    step.chains.isEmpty
+                        ? text.serviceUnknownRoute
+                        : step.chains.join(' ← '),
+                  ].join(' · '),
+                ),
+                trailing: Text('${step.delay} ms'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _serviceReason(BuildContext context, String reason) {
+  final text = context.appLocalizations;
+  return switch (reason) {
+    'headers' => text.serviceHeaders,
+    'complete' => text.serviceBodyComplete,
+    'marker' => text.serviceMarkerFound,
+    'body-limit' => text.serviceBodyLimit,
+    'read-error' => text.serviceReadError,
+    'recipient-blocked' || 'redirect-blocked' => text.serviceRecipientBlocked,
+    'request-limit' => text.serviceRequestLimit,
+    'route-changed' => text.serviceRouteChanged,
+    'timeout' => text.timeout,
+    'dns-failed' => text.serviceDnsFailed,
+    'tls-failed' => text.serviceTlsFailed,
+    'connect-failed' => text.serviceConnectFailed,
+    _ => text.serviceIndeterminate,
+  };
 }
 
 class ServiceManageView extends ConsumerWidget {
@@ -951,14 +1057,13 @@ class ServiceManageView extends ConsumerWidget {
     Widget itemAt(int index) {
       final target = targets[index];
       final isEnabled = enabled.contains(target);
-      final locked = isEnabled && enabled.length == 1;
       return _ServiceManageItem(
         key: ValueKey(target),
         target: target,
         index: index,
         position: ItemPosition.get(index, targets.length),
         enabled: isEnabled,
-        onChanged: locked ? null : (value) => toggle(target, value),
+        onChanged: (value) => toggle(target, value),
       );
     }
 
@@ -1053,6 +1158,7 @@ class _ServiceManageItem extends StatelessWidget {
 
 class _ServiceRow extends ConsumerStatefulWidget {
   const _ServiceRow({
+    super.key,
     required this.target,
     required this.entry,
     required this.selected,
@@ -1070,8 +1176,31 @@ class _ServiceRow extends ConsumerStatefulWidget {
   ConsumerState<_ServiceRow> createState() => _ServiceRowState();
 }
 
-class _ServiceRowState extends ConsumerState<_ServiceRow>
-    with _NodeAddressWatch<_ServiceRow> {
+class _ServiceRowState extends ConsumerState<_ServiceRow> {
+  late final ServiceStatus _services;
+
+  @override
+  void initState() {
+    super.initState();
+    _services = ref.read(serviceStatusProvider.notifier);
+    _services.watch(widget.target.basic, automatic: false);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ServiceRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.target != widget.target) {
+      _services.unwatch(oldWidget.target.basic, automatic: false);
+      _services.watch(widget.target.basic, automatic: false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _services.unwatch(widget.target.basic, automatic: false);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = context.appLocalizations;
@@ -1083,14 +1212,12 @@ class _ServiceRowState extends ConsumerState<_ServiceRow>
     final check = entry.value;
     final loading = entry.isLoading;
     final node = check?.node;
-    _showNode(node);
-    final ipEntry = node != null
-        ? ref.watch(
-            outboundIpProbeProvider.select((state) => state.entryOf(node)),
-          )
-        : null;
-    final outboundIp = ipEntry?.value;
-    final (label, color) = _statusOf(context, check, entry.phase);
+    final (label, color) = _statusOf(
+      context,
+      check,
+      entry.phase,
+      expired: entry.expired,
+    );
     return DecorationListItem(
       isSelected: widget.selected,
       minVerticalPadding: _rowBadgeInset,
@@ -1114,25 +1241,30 @@ class _ServiceRowState extends ConsumerState<_ServiceRow>
       // there and a check does not resize the row.
       subtitle: loading
           ? SkeletonText(width: 96, style: secondary)
-          : _OutboundIpLine(
-              ip: outboundIp,
-              region: check?.region,
-              pending:
-                  ipEntry != null &&
-                  ipEntry.phase != ProbePhase.failed &&
-                  outboundIp == null,
-              fallback: node,
-              style: secondary,
-            ),
+          : _NodeLine(node: node, style: secondary),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         spacing: 4,
         children: [
           _ServiceRowTrailing(check: check, style: secondary),
+          if (target.hasAdvanced)
+            IconButton(
+              tooltip: localizations.serviceAdvanced,
+              onPressed: () => Navigator.of(context).push(
+                PagedSheetRoute(
+                  builder: (_) => _AdvancedServiceView(target: target),
+                ),
+              ),
+              icon: const GlyphIcon(AppGlyphs.info),
+            ),
           IconButton(
-            tooltip: localizations.serviceCheck,
-            onPressed: loading ? null : widget.onCheck,
-            icon: const GlyphIcon(AppGlyphs.refresh),
+            tooltip: loading
+                ? localizations.cancel
+                : localizations.serviceCheck,
+            onPressed: loading
+                ? () => _services.cancel([target.basic])
+                : widget.onCheck,
+            icon: GlyphIcon(loading ? AppGlyphs.close : AppGlyphs.refresh),
           ),
         ],
       ),

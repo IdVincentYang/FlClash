@@ -160,11 +160,20 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m54(time) => "Проверено в ${time}";
 
-  static String m55(label) => "«${label}» — только одно значение";
+  static String m55(region) => "Регион по ответу: ${region}";
 
-  static String m56(label) => "Значение «${label}» должно быть URL";
+  static String m56(milliseconds) =>
+      "Всего (включая очередь и тело): ${milliseconds} мс";
 
-  static String m57(count) =>
+  static String m57(result) => "Устарело: ${result}";
+
+  static String m58(hosts) => "Адресаты: ${hosts}";
+
+  static String m59(label) => "«${label}» — только одно значение";
+
+  static String m60(label) => "Значение «${label}» должно быть URL";
+
+  static String m61(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1633,28 +1642,111 @@ class MessageLookup extends MessageLookupByLibrary {
     "selected": MessageLookupByLibrary.simpleMessage("Выбрано"),
     "selectedCountTitle": m53,
     "server": MessageLookupByLibrary.simpleMessage("Сервер"),
+    "serviceAdvanced": MessageLookupByLibrary.simpleMessage(
+      "Проверка региона и сервиса",
+    ),
+    "serviceAdvancedExplanation": MessageLookupByLibrary.simpleMessage(
+      "Необязательная разовая проверка региона и страницы сервиса анонимными запросами. Возможны обращения к дополнительным адресатам ниже. Cookie входа и данные подписки не передаются. Результат не подтверждает права аккаунта, воспроизведение или защиту всего устройства. Базовый ответ оценивается отдельно.",
+    ),
+    "serviceAdvancedTiming": MessageLookupByLibrary.simpleMessage(
+      "Срок результата — 5 минут, интервал — не менее 30 секунд. Без автоповторов; выход со страницы отменяет незавершённую проверку. Время шага измеряется до заголовков, это не ping и не скорость.",
+    ),
+    "serviceAllDisabled": MessageLookupByLibrary.simpleMessage(
+      "Все сервисы отключены · Управление",
+    ),
     "serviceAvailable": MessageLookupByLibrary.simpleMessage("Доступен"),
+    "serviceBasic": MessageLookupByLibrary.simpleMessage("Базовый ответ HTTPS"),
+    "serviceBasicExplanation": MessageLookupByLibrary.simpleMessage(
+      "Отображаемый сервис проверяется автоматически на переднем плане. Результат устаревает через 5 минут; смена маршрута или возврат в приложение может вызвать проверку. Интервал не менее 30 секунд. Общая проверка охватывает только включённые сервисы. Читаются лишь заголовки, без переходов и ресурсов страницы. Ответ не подтверждает функции сайта, права аккаунта или защиту всего устройства.",
+    ),
     "serviceBlocked": MessageLookupByLibrary.simpleMessage("Заблокировано"),
+    "serviceBodyComplete": MessageLookupByLibrary.simpleMessage(
+      "Ответ прочитан полностью",
+    ),
+    "serviceBodyLimit": MessageLookupByLibrary.simpleMessage(
+      "Достигнут предел ответа",
+    ),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Проверить"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Проверить все"),
     "serviceCheckedAt": m54,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Скоро появится"),
+    "serviceConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось получить ответ на запрос",
+    ),
+    "serviceDetectedRegion": m55,
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Недопустимый провайдер",
     ),
-    "serviceFailed": MessageLookupByLibrary.simpleMessage("Ошибка проверки"),
+    "serviceDisneyExplanation": MessageLookupByLibrary.simpleMessage(
+      "При запуске регистрируется анонимное устройство браузера, получается временный токен и запрашивается сеанс. Токены используются только в этой проверке и не сохраняются.",
+    ),
+    "serviceDnsFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось разрешить имя для запроса",
+    ),
+    "serviceElapsed": m56,
+    "serviceExpired": m57,
+    "serviceFailed": MessageLookupByLibrary.simpleMessage(
+      "Невозможно определить",
+    ),
+    "serviceHeaders": MessageLookupByLibrary.simpleMessage(
+      "Заголовки получены",
+    ),
+    "serviceHttpResponse": MessageLookupByLibrary.simpleMessage("Ответ HTTP"),
+    "serviceIndeterminate": MessageLookupByLibrary.simpleMessage(
+      "Невозможно определить: проверка не завершена или формат ответа изменился.",
+    ),
     "serviceManage": MessageLookupByLibrary.simpleMessage(
       "Управление сервисами",
+    ),
+    "serviceMarkerFound": MessageLookupByLibrary.simpleMessage(
+      "Нужный маркер найден",
+    ),
+    "serviceMultipleRoutes": MessageLookupByLibrary.simpleMessage(
+      "Разные выходы · см. запросы",
+    ),
+    "serviceObserved": MessageLookupByLibrary.simpleMessage(
+      "Получены сведения о сервисе",
     ),
     "serviceOriginalsOnly": MessageLookupByLibrary.simpleMessage(
       "Только оригиналы",
     ),
     "servicePending": MessageLookupByLibrary.simpleMessage("Не проверено"),
+    "serviceQueued": MessageLookupByLibrary.simpleMessage(
+      "Ожидание интервала проверки",
+    ),
+    "serviceReadError": MessageLookupByLibrary.simpleMessage(
+      "Ответ прерван или не читается",
+    ),
+    "serviceRecipientBlocked": MessageLookupByLibrary.simpleMessage(
+      "Адресат или переход вне проверки",
+    ),
+    "serviceRecipients": m58,
+    "serviceRedirected": MessageLookupByLibrary.simpleMessage(
+      "Перенаправление (не выполнено)",
+    ),
+    "serviceRequestLimit": MessageLookupByLibrary.simpleMessage(
+      "Достигнут предел запросов",
+    ),
+    "serviceResponded": MessageLookupByLibrary.simpleMessage("Ответ получен"),
     "serviceRestricted": MessageLookupByLibrary.simpleMessage(
       "Доступ ограничен",
     ),
+    "serviceRouteChanged": MessageLookupByLibrary.simpleMessage(
+      "Маршрут изменён · повторите вручную",
+    ),
+    "serviceStartAdvanced": MessageLookupByLibrary.simpleMessage(
+      "Запустить разовую проверку",
+    ),
     "serviceStatus": MessageLookupByLibrary.simpleMessage("Состояние сервисов"),
-    "serviceUnavailable": MessageLookupByLibrary.simpleMessage("Недоступен"),
+    "serviceTlsFailed": MessageLookupByLibrary.simpleMessage(
+      "Проверка TLS для запроса не пройдена",
+    ),
+    "serviceUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Нет корректного ответа на запрос",
+    ),
+    "serviceUnknownRoute": MessageLookupByLibrary.simpleMessage(
+      "Маршрут неизвестен",
+    ),
     "serviceUnsupportedRegion": MessageLookupByLibrary.simpleMessage(
       "Регион не поддерживается",
     ),
@@ -1678,7 +1770,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Запускаться без показа окна",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("По одному"),
-    "singleValueTip": m55,
+    "singleValueTip": m59,
     "size": MessageLookupByLibrary.simpleMessage("Размер"),
     "slide": MessageLookupByLibrary.simpleMessage("Сдвиг"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Порт SOCKS"),
@@ -1786,7 +1878,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("Получить профиль по URL"),
-    "urlTip": m56,
+    "urlTip": m60,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системный hosts",
@@ -1819,7 +1911,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Также устанавливать системные часы; Android это игнорирует",
     ),
-    "yearsAgo": m57,
+    "yearsAgo": m61,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

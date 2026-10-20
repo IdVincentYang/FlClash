@@ -203,7 +203,8 @@ type probeRequest struct {
 	noRedirect bool
 
 	// until sees the latest chunk and probeScanOverlap bytes before it.
-	until func(tail string) bool
+	until  func(tail string) bool
+	policy *serviceProbePolicy
 }
 
 func handleProbe(params *ProbeParams) *ProbeResult {
@@ -291,6 +292,11 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport}
+	if req.policy != nil {
+		transport.DisableKeepAlives = true
+		client.Transport = &serviceProbeTransport{base: transport, policy: req.policy, dialer: dialer}
+		client.CheckRedirect = req.policy.redirect
+	}
 	if req.noRedirect {
 		client.CheckRedirect = func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -315,7 +321,11 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 		result.RulePayload = route.rulePayload
 	}
 	if req.maxBody > 0 {
-		result.Body = readProbeBody(response.Body, req.maxBody, req.until)
+		if req.policy == nil {
+			result.Body = readProbeBody(response.Body, req.maxBody, req.until)
+		} else {
+			result.Body, result.bodyState = readServiceBody(response.Body, req.maxBody, req.until)
+		}
 	}
 	if err := requestscope.Check(lease); err != nil {
 		return fail(err)

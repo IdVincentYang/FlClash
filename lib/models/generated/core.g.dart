@@ -338,6 +338,7 @@ Map<String, dynamic> _$OutboundIpResultToJson(_OutboundIpResult instance) =>
 
 _ServiceCheckParams _$ServiceCheckParamsFromJson(Map<String, dynamic> json) =>
     _ServiceCheckParams(
+      purpose: json['purpose'] as String? ?? 'basic',
       proxyName: json['proxy-name'] as String? ?? '',
       names:
           (json['names'] as List<dynamic>?)?.map((e) => e as String).toList() ??
@@ -347,6 +348,7 @@ _ServiceCheckParams _$ServiceCheckParamsFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$ServiceCheckParamsToJson(_ServiceCheckParams instance) =>
     <String, dynamic>{
+      'purpose': instance.purpose,
       'proxy-name': instance.proxyName,
       'names': instance.names,
       'timeout': instance.timeout,
@@ -354,6 +356,15 @@ Map<String, dynamic> _$ServiceCheckParamsToJson(_ServiceCheckParams instance) =>
 
 _ServiceCheckItem _$ServiceCheckItemFromJson(Map<String, dynamic> json) =>
     _ServiceCheckItem(
+      purpose: json['purpose'] as String? ?? 'basic',
+      reason: json['reason'] as String? ?? '',
+      httpStatus: (json['http-status'] as num?)?.toInt() ?? 0,
+      elapsed: (json['elapsed'] as num?)?.toInt() ?? 0,
+      steps:
+          (json['steps'] as List<dynamic>?)
+              ?.map((e) => ServiceCheckStep.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
       name: json['name'] as String? ?? '',
       status: json['status'] as String? ?? '',
       region: json['region'] as String? ?? '',
@@ -370,12 +381,47 @@ _ServiceCheckItem _$ServiceCheckItemFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$ServiceCheckItemToJson(_ServiceCheckItem instance) =>
     <String, dynamic>{
+      'purpose': instance.purpose,
+      'reason': instance.reason,
+      'http-status': instance.httpStatus,
+      'elapsed': instance.elapsed,
+      'steps': instance.steps,
       'name': instance.name,
       'status': instance.status,
       'region': instance.region,
       'delay': instance.delay,
       'chains': instance.chains,
       'checked-at': instance.checkedAt,
+      'core-epoch': instance.coreEpoch,
+      'picks-version': instance.picksVersion,
+    };
+
+_ServiceCheckStep _$ServiceCheckStepFromJson(Map<String, dynamic> json) =>
+    _ServiceCheckStep(
+      endpoint: json['endpoint'] as String? ?? '',
+      httpStatus: (json['http-status'] as num?)?.toInt() ?? 0,
+      delay: (json['delay'] as num?)?.toInt() ?? 0,
+      chains:
+          (json['chains'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      outcome: json['outcome'] as String? ?? '',
+      observation: json['observation'] as String? ?? '',
+      region: json['region'] as String? ?? '',
+      coreEpoch: (json['core-epoch'] as num?)?.toInt() ?? 0,
+      picksVersion: (json['picks-version'] as num?)?.toInt() ?? 0,
+    );
+
+Map<String, dynamic> _$ServiceCheckStepToJson(_ServiceCheckStep instance) =>
+    <String, dynamic>{
+      'endpoint': instance.endpoint,
+      'http-status': instance.httpStatus,
+      'delay': instance.delay,
+      'chains': instance.chains,
+      'outcome': instance.outcome,
+      'observation': instance.observation,
+      'region': instance.region,
       'core-epoch': instance.coreEpoch,
       'picks-version': instance.picksVersion,
     };
