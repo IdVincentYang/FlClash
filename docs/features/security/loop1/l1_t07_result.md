@@ -1,7 +1,7 @@
 # L1-T07：实施与验证记录
 
-implementation_v2 已获 M1 实现复审通过，I1–I4 全部关闭；当前本地收尾，尚未提交合入。implementation_v1
-保留原未通过结论；design_v1 已通过。
+本项已完成本地交付并结束；源码已快进合入本地 `security/android`，任务分支已删除，未推送。M1 已通过 design_v1 及
+implementation_v2，I1–I4 全部关闭；implementation_v1 保留原未通过结论。
 范围及正式语义见[设计](l1_t07_plan.md)，归属、授权与交付终点见[任务入口](loop1_tasks.md#l1-t07-修改常用站点诊断)。
 
 ## 实际证明的范围
@@ -16,7 +16,7 @@ implementation_v2 已获 M1 实现复审通过，I1–I4 全部关闭；当前�
 
 ## 运行与静态结果
 
-本轮源码快照、精确命令、原始输出、1,328 项输入哈希及制品见本地忽略目录中的
+获审 v2 的源码快照、精确命令、原始输出、1,328 项输入哈希及制品见本地忽略目录中的
 [implementation_v2/binding.json](../../../../build/verification/l1-t07/implementation_v2/binding.json)
 。日志中的旧失败轮次保留当时结论，最终通过轮次为 `flutter_final.jsonl` 和 `go_affected.jsonl`。
 
@@ -92,19 +92,25 @@ GOPROXY 和 GOSUMDB，仅连接受控 loopback。
 
 ## 收尾与本地集成
 
+源码提交 `2de2f3460f7f420e3bd5f88ae12093ca18fc4534` 已从 `e25b4dd` 快进合入本地
+`security/android`；任务分支 `security/l1-t07-service-diagnostics` 已删除。本项只有共享主
+checkout，没有临时 worktree；共享目录、独立聊天、已审冻结包和有效复现材料保留。
+最终关闭文档提交、当前树与源码/获审/构建对象的关系见本地忽略目录中的
+[交付绑定](../../../../build/verification/l1-t07/delivery_v1/binding.json)。
+
 提交前结构检查覆盖本项修改的 RoutedProbe/Request/RouteTracker 边界、服务 transport/规则/调度、模型及诊断页面；
 未增加并行状态或通用适配层。
 按既有收尾授权删除 Netflix 已被非 2xx 提前返回覆盖的旧 403 分支及对应不可达判断，移除重复状态赋值和失效说明；公开契约与已审失败语义保持一致。
 整理后 Go 原精确 75 项选择和 47 个子用例、go vet 通过；两个生成 locale 文件经标准格式化并比对 token 完全一致，其余 Dart、
-测试、依赖及生成文件与获审 v2 逐字节一致，复用 178 项 Flutter 和全仓静态结果。新 APK 重新构建，最终绑定在本地交付时补入。
+测试、依赖及生成文件与获审 v2 逐字节一致，复用 178 项 Flutter 和全仓静态结果。新 APK 重新构建，最终版本关系已记录到交付绑定。
 三份手写 Markdown 检查按 80 字符正文换行，GFM 表格和代码块不限制列宽；其它规则使用 markdownlint 默认值。路径与锚点、
-comment-density 和提交信息随最终提交检查。
+comment-density 和提交信息检查通过；关闭文档的补记只改变文档，复用同一生产与制品证据。
 
 收尾后
 [APK](../../../../build/verification/l1-t07/delivery_v1/artifacts/FlClash-0.8.99-android-arm64-v8a.apk)
 SHA-256 为 `c234b6c45d9fa3eb6d94d72a18e8092f8697c4cbaeaf3b9ae03059b7c27532ee`，
 包信息及签名与获审 v2 相同。新构建对应上述两份 Go 文件的等价整理，构建前后 1,328 项输入相同；初轮 hook 提示保留，温重跑无提示。
-最终提交与获审/构建关系由交付绑定记录。
+最终源码另含两个 locale 生成文件的标准格式化；其 token 与构建输入完全相同，字节差异由交付绑定明确列出。
 
 ### 用户体验入口
 
@@ -118,4 +124,4 @@ SHA-256 为 `c234b6c45d9fa3eb6d94d72a18e8092f8697c4cbaeaf3b9ae03059b7c27532ee`�
 
 未访问公开站点、真实订阅/DB/备份/凭据，未安装或启动应用，未改变宿主 TUN/系统代理，也未上传或 push。
 T04/T05 全面整改、T08 的 IP 产品选择和其它任务未启动；设备、外部出口、当前服务协议兼容仍无实测结论。
-实现复审已通过，当前按既有授权完成整理、自验、本地提交合入和任务分支清理。整个 L2-T02 完成前仍不推送。
+实现复审、本地提交合入及任务分支清理均已完成，本项结束。整个 L2-T02 完成前仍不推送。

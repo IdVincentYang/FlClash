@@ -1,7 +1,8 @@
 # L1-T07：常用站点诊断设计
 
 本项保留所选服务的基础 HTTPS 响应诊断，将地区、Premium 与内容检测改为用户主动选择的独立用途，并解除诊断展示对第三方 IP 查询的触发。
-design_v1 已获 M1 评审通过，implementation_v2 已获 M1 实现复审通过，I1–I4 全部关闭；当前本地收尾，尚未完成交付。
+design_v1 已获 M1 评审通过，implementation_v2 已获 M1 实现复审通过，I1–I4 全部关闭；已完成本地交付，未推送，
+实际提交及制品关系见[结果](l1_t07_result.md#收尾与本地集成)。
 已审快照保留在本地 `build/verification/l1-t07/design_v1/`。归属、许可及交付终点由
 [任务入口](loop1_tasks.md#l1-t07-修改常用站点诊断)维护；共同依据为
 [安全目标](../security_requirements.md)和[Loop 1 方向](loop1_plan.md#功能决定与待细化事项)。
