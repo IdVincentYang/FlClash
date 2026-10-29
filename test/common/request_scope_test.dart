@@ -329,10 +329,7 @@ void main() {
     container.listen(configProvider, (_, _) {});
     container
         .read(appSettingProvider.notifier)
-        .update(
-          (state) =>
-              state.copyWith(disclaimerAccepted: true, checkCertificate: false),
-        );
+        .update((state) => state.copyWith(checkCertificate: false));
     client = Request.scoped(native: native, isAndroid: true)..attach(container);
     await client.ready();
   });

@@ -107,6 +107,22 @@ void main() {
   });
 
   group('AppSettingProps JSON round-trip', () {
+    for (final accepted in [false, true]) {
+      test('ignores removed disclaimer state $accepted in old settings', () {
+        final restored = AppSettingProps.fromJson({
+          'disclaimerAccepted': accepted,
+          'silentLaunch': true,
+          'checkCertificate': false,
+          'hideIp': true,
+        });
+
+        expect(restored.silentLaunch, isTrue);
+        expect(restored.checkCertificate, isFalse);
+        expect(restored.hideIp, isTrue);
+        expect(restored.toJson(), isNot(contains('disclaimerAccepted')));
+      });
+    }
+
     test('default values survive round-trip', () {
       const props = AppSettingProps();
       final restored = roundTrip(

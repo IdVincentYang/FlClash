@@ -17,7 +17,6 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/views/disclaimer.dart';
 import 'package:fl_clash/views/navigation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -157,7 +156,6 @@ class Bootstrap {
       unawaited(window?.hide());
     }
     await _handleFailedPreference();
-    await _handlerDisclaimer();
     await request.ready();
     await _showCrashRecoveryTip();
     await _container.read(coreActionProvider.notifier).startCore();
@@ -222,21 +220,6 @@ class Bootstrap {
     }
     // Saving here would rewrite the preferences file the user just chose to delete.
     await _container.read(systemActionProvider.notifier).handleExit(false);
-  }
-
-  Future<void> _handlerDisclaimer() async {
-    if (_container.read(
-      appSettingProvider.select((state) => state.disclaimerAccepted),
-    )) {
-      return;
-    }
-    final isDisclaimerAccepted = await requestDisclaimerConsent();
-    if (!isDisclaimerAccepted) {
-      await _container.read(systemActionProvider.notifier).handleExit();
-    }
-    _container
-        .read(appSettingProvider.notifier)
-        .update((state) => state.copyWith(disclaimerAccepted: true));
   }
 }
 

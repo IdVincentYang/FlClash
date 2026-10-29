@@ -23,12 +23,6 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     ref.listen(appVisibleProvider, (previous, visible) {
       if (visible && previous != true) unawaited(autoUpdateProfiles());
     });
-    ref.listen(appSettingProvider.select((value) => value.disclaimerAccepted), (
-      _,
-      accepted,
-    ) {
-      if (accepted) unawaited(autoUpdateProfiles());
-    });
     ref.listen(nativeRequestStateProvider, (_, next) {
       unawaited(_cancelExpiredDemands());
       if (next['phase'] == 'started' &&

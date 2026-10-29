@@ -612,9 +612,6 @@ class Request with ServiceListener {
     if (container == null) {
       throw const RequestUnavailable('request_not_attached');
     }
-    if (!container.read(appSettingProvider).disclaimerAccepted) {
-      throw const RequestUnavailable('request_not_accepted');
-    }
     final snapshot = await _control({
       'action': 'inspect',
       'client': _client,

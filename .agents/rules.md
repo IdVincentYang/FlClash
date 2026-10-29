@@ -253,8 +253,8 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
   `handledExitAt` so the same exit cannot be counted twice.
 - `BootGuard` is an Android-only mechanism and gates itself: on every other platform `evaluate`, `markRunning` and
   `markClosed` return without touching preferences. The desktop has no `ApplicationExitInfo` equivalent,
-  so a bare sentinel there would read a window closed on
-  the disclaimer dialog, or a session ended by shutdown, as a failed launch. Keep the platform check inside the guard;
+  so a bare sentinel there would read a session ended by shutdown as a failed launch.
+  Keep the platform check inside the guard;
   callers in `bootstrap.dart` and `SystemAction` stay unconditional.
 - Recovery is graded: the first failed launch only skips `initStatus`, and `currentProfileId` is cleared only from
   `crashRecoveryClearThreshold` consecutive failures on. Do not let a single interrupted launch write to the config.

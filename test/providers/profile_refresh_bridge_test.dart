@@ -290,10 +290,7 @@ void main() {
           () => NativeRequestState.scoped(native),
         ),
         appSettingProvider.overrideWithBuild(
-          (_, _) => const AppSettingProps(
-            disclaimerAccepted: true,
-            testUrl: 'http://127.0.0.1/',
-          ),
+          (_, _) => const AppSettingProps(testUrl: 'http://127.0.0.1/'),
         ),
         currentProfileIdProvider.overrideWithBuild((_, _) => 1),
         patchClashConfigProvider.overrideWithBuild(

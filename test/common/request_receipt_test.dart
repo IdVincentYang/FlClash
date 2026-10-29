@@ -95,9 +95,6 @@ void main() {
     container = ProviderContainer();
     globalState.container = container;
     container.listen(configProvider, (_, _) {});
-    container
-        .read(appSettingProvider.notifier)
-        .update((state) => state.copyWith(disclaimerAccepted: true));
     client = Request.scoped(native: native, isAndroid: true)..attach(container);
     await client.ready();
   });

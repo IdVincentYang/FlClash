@@ -6,7 +6,6 @@ import 'package:fl_clash/manager/status_manager.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/views/disclaimer.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -236,42 +235,6 @@ void main() {
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
     expect(await result, isTrue);
-  });
-
-  testWidgets(
-    'requestDisclaimerConsent maps agree, exit, and back to a boolean',
-    (tester) async {
-      await _pumpHost(tester);
-
-      final agreed = requestDisclaimerConsent();
-      await tester.pumpAndSettle();
-      expect(find.text('Data collection and privacy'), findsOneWidget);
-      await tester.tap(find.text('Agree'));
-      await tester.pumpAndSettle();
-      expect(await agreed, isTrue);
-
-      final declined = requestDisclaimerConsent();
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Exit'));
-      await tester.pumpAndSettle();
-      expect(await declined, isFalse);
-
-      final dismissed = requestDisclaimerConsent();
-      await tester.pumpAndSettle();
-      rootNavigatorKey.currentState!.pop();
-      await tester.pumpAndSettle();
-      expect(await dismissed, isFalse);
-    },
-  );
-
-  testWidgets('DisclaimerView without consent shows no agree or exit', (
-    tester,
-  ) async {
-    await _pumpHost(tester, homeBuilder: (_) => const DisclaimerView());
-
-    expect(find.text('Disclaimer'), findsWidgets);
-    expect(find.text('Agree'), findsNothing);
-    expect(find.text('Exit'), findsNothing);
   });
 
   testWidgets('showNotifier delivers text through the StatusManager host', (
