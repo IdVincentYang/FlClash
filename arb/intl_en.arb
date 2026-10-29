@@ -885,5 +885,8 @@
   "ipFlagHosting": "Hosting detection",
   "ipFlagAnonymous": "Anonymous detection",
   "ipFlagScraper": "Scraper detection",
-  "ipLookupSourceWarning": "Source warning: the result was returned, but quota or access restrictions may apply."
+  "ipLookupSourceWarning": "Source warning: the result was returned, but quota or access restrictions may apply.",
+  "qrImageBusy": "Image recognition is busy. Use the camera or import a URL or file.",
+  "qrImageTimeout": "Image recognition timed out. Try again later or use the camera.",
+  "qrImageReadFailed": "Unable to read this image. Choose another local image."
 }

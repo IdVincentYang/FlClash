@@ -904,10 +904,9 @@ packages:
   mobile_scanner:
     dependency: "direct main"
     description:
-      name: mobile_scanner
-      sha256: "5a51ea79f0cf8293f616a5d08baae185b59b5e6bb24df01f2a63037ade0bade0"
-      url: "https://pub.dev"
-    source: hosted
+      path: "plugins/mobile_scanner"
+      relative: true
+    source: path
     version: "7.4.2"
   mockito:
     dependency: transitive

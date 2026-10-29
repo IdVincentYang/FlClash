@@ -108,6 +108,19 @@ void main() {
   });
 
   group('profileUrlFromQrCodes', () {
+    test(
+      'malformed installation query is skipped without exposing QR text',
+      () {
+        expect(
+          profileUrlFromQrCodes([
+            'flclash://install-config?url=%FFSYNTHETIC_SECRET',
+            'https://example.invalid/valid',
+          ]),
+          'https://example.invalid/valid',
+        );
+      },
+    );
+
     test('accepts a bare url with surrounding whitespace', () {
       expect(
         profileUrlFromQrCodes([' https://example.com/sub?token=1\n']),

@@ -29,6 +29,29 @@ class _FakeScannerPlatform extends MobileScannerPlatform {
   MobileScannerException? startError;
   Completer<void>? startGate;
 
+  late final gallerySelection = Completer<int?>();
+  late final galleryDecoded = Completer<BarcodeCapture?>();
+  int galleryDecodeCalls = 0;
+  final galleryClients = <int>[];
+  int galleryCancelCalls = 0;
+
+  @override
+  Future<int?> pickQrImage(int clientId) {
+    galleryClients.add(clientId);
+    return gallerySelection.future;
+  }
+
+  @override
+  Future<BarcodeCapture?> decodeQrImage(int handle) {
+    galleryDecodeCalls++;
+    return galleryDecoded.future;
+  }
+
+  @override
+  Future<void> cancelQrImage(int clientId) async {
+    galleryCancelCalls++;
+  }
+
   void emit(BarcodeCapture capture) => _barcodes.add(capture);
 
   void emitError(Object error) => _barcodes.addError(error);
@@ -129,6 +152,7 @@ void main() {
     WidgetTester tester, {
     required void Function(String? result) onPopped,
     VoidCallback? onBelowPopped,
+    bool? useAndroidQr,
   }) async {
     late BuildContext hostContext;
     await tester.pumpWidget(
@@ -156,7 +180,9 @@ void main() {
     unawaited(
       navigator
           .push<String>(
-            MaterialPageRoute<String>(builder: (_) => const ScanPage()),
+            MaterialPageRoute<String>(
+              builder: (_) => ScanPage(useAndroidQr: useAndroidQr),
+            ),
           )
           .then(onPopped),
     );
@@ -214,6 +240,128 @@ void main() {
       // Two things stop this: the subscription is cancelled in dispose, and
       // `_handleBarcode` re-checks `mounted` for anything already dispatched.
       expect(popped, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('ScanPage album ownership', () {
+    testWidgets(
+      'album ignores in-flight camera and completes from selected image once',
+      (tester) async {
+        String? result;
+        await sendLifecycle(tester, AppLifecycleState.resumed);
+        await pumpScanPage(
+          tester,
+          onPopped: (url) => result = url,
+          useAndroidQr: true,
+        );
+        await tester.tap(find.byTooltip(currentAppLocalizations.pickFromAlbum));
+        await tester.pump();
+        expect(platform.galleryClients, hasLength(1));
+        platform.emit(
+          _capture(
+            type: BarcodeType.url,
+            rawValue: 'https://example.invalid/camera',
+          ),
+        );
+        await tester.pump();
+        expect(result, isNull);
+        expect(tester.binding.lifecycleState, AppLifecycleState.resumed);
+        expect(platform.galleryCancelCalls, 0);
+        platform.gallerySelection.complete(41);
+        await tester.pump(const Duration(milliseconds: 1));
+        await tester.pump();
+        expect(
+          platform.galleryDecodeCalls,
+          1,
+          reason: 'selected image must reach decoder while resumed',
+        );
+        platform.galleryDecoded.complete(
+          _capture(
+            type: BarcodeType.url,
+            rawValue: 'https://example.invalid/album',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(result, 'https://example.invalid/album');
+        expect(platform.galleryDecodeCalls, 1);
+        expect(platform.galleryCancelCalls, 1);
+      },
+    );
+
+    testWidgets(
+      'selection waits for resume and duplicate taps do not replace it',
+      (tester) async {
+        String? result;
+        await sendLifecycle(tester, AppLifecycleState.resumed);
+        await pumpScanPage(
+          tester,
+          onPopped: (url) => result = url,
+          useAndroidQr: true,
+        );
+        final album = find.byTooltip(currentAppLocalizations.pickFromAlbum);
+        await tester.tap(album);
+        await tester.tap(album);
+        await tester.pump();
+        expect(platform.galleryClients, hasLength(1));
+        await sendLifecycle(tester, AppLifecycleState.inactive);
+        platform.gallerySelection.complete(41);
+        await tester.pump();
+        expect(platform.galleryDecodeCalls, 0);
+        await sendLifecycle(tester, AppLifecycleState.resumed);
+        await tester.pump();
+        expect(platform.galleryDecodeCalls, 1);
+        platform.galleryDecoded.complete(
+          _capture(
+            type: BarcodeType.url,
+            rawValue: 'https://example.invalid/album',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(result, 'https://example.invalid/album');
+      },
+    );
+
+    testWidgets('background during decode discards its late URL', (
+      tester,
+    ) async {
+      var pops = 0;
+      await sendLifecycle(tester, AppLifecycleState.resumed);
+      await pumpScanPage(tester, onPopped: (_) => pops++, useAndroidQr: true);
+      await tester.tap(find.byTooltip(currentAppLocalizations.pickFromAlbum));
+      await tester.pump();
+      platform.gallerySelection.complete(41);
+      await tester.pump();
+      expect(platform.galleryDecodeCalls, 1);
+      await sendLifecycle(tester, AppLifecycleState.paused);
+      await tester.pump();
+      expect(platform.galleryCancelCalls, 1);
+      platform.galleryDecoded.complete(
+        _capture(
+          type: BarcodeType.url,
+          rawValue: 'https://example.invalid/late',
+        ),
+      );
+      await tester.pump();
+      expect(pops, 0);
+      expect(find.byType(ScanPage), findsOneWidget);
+      await sendLifecycle(tester, AppLifecycleState.resumed);
+    });
+
+    testWidgets('leaving during album selection rejects its late handle', (
+      tester,
+    ) async {
+      await sendLifecycle(tester, AppLifecycleState.resumed);
+      await pumpScanPage(tester, onPopped: (_) {}, useAndroidQr: true);
+      await tester.tap(find.byTooltip(currentAppLocalizations.pickFromAlbum));
+      await tester.pump();
+      expect(platform.galleryClients, hasLength(1));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(platform.galleryCancelCalls, 1);
+      platform.gallerySelection.complete(41);
+      await tester.pump();
+      expect(platform.galleryDecodeCalls, 0);
       expect(tester.takeException(), isNull);
     });
   });
@@ -372,6 +520,21 @@ void main() {
   });
 
   group('ScanPage app lifecycle', () {
+    testWidgets('closing during a pending start rejects its late completion', (
+      tester,
+    ) async {
+      final gate = Completer<void>();
+      platform.startGate = gate;
+      await pumpScanPage(tester, onPopped: (_) {});
+      expect(platform.startCalls, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      gate.complete();
+      await tester.pump();
+      expect(platform.disposeCalls, 1);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a resume during a pending start does not start again', (
       tester,
     ) async {

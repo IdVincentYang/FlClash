@@ -7542,6 +7542,36 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Image recognition is busy. Use the camera or import a URL or file.`
+  String get qrImageBusy {
+    return Intl.message(
+      'Image recognition is busy. Use the camera or import a URL or file.',
+      name: 'qrImageBusy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Image recognition timed out. Try again later or use the camera.`
+  String get qrImageTimeout {
+    return Intl.message(
+      'Image recognition timed out. Try again later or use the camera.',
+      name: 'qrImageTimeout',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unable to read this image. Choose another local image.`
+  String get qrImageReadFailed {
+    return Intl.message(
+      'Unable to read this image. Choose another local image.',
+      name: 'qrImageReadFailed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

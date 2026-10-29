@@ -29,7 +29,9 @@ const _systemUiOverlayStyle = SystemUiOverlayStyle(
 const _invalidHintDuration = Duration(seconds: 2);
 
 class ScanPage extends ConsumerStatefulWidget {
-  const ScanPage({super.key});
+  const ScanPage({super.key, this.useAndroidQr});
+
+  final bool? useAndroidQr;
 
   @override
   ConsumerState<ScanPage> createState() => _ScanPageState();
@@ -56,6 +58,8 @@ class _ScanPageState extends ConsumerState<ScanPage>
   bool _completed = false;
   bool _picking = false;
   bool _restartAfterSettings = false;
+  QrImageOperation? _imageOperation;
+  Completer<void>? _resumeDecode;
 
   @override
   void initState() {
@@ -88,7 +92,11 @@ class _ScanPageState extends ConsumerState<ScanPage>
   // the first start is still pending, and a second `start` would throw.
   Future<void> _start() async {
     final state = _controller.value;
-    if (_completed || state.isStarting || state.isRunning) {
+    if (!mounted ||
+        _completed ||
+        _picking ||
+        state.isStarting ||
+        state.isRunning) {
       return;
     }
     try {
@@ -104,7 +112,7 @@ class _ScanPageState extends ConsumerState<ScanPage>
   }
 
   void _handleCapture(BarcodeCapture capture) {
-    if (_completed || !mounted || capture.barcodes.isEmpty) {
+    if (_completed || _picking || !mounted || capture.barcodes.isEmpty) {
       return;
     }
     final url = profileUrlFromQrCodes(
@@ -149,13 +157,40 @@ class _ScanPageState extends ConsumerState<ScanPage>
       return;
     }
     _picking = true;
+    final operation = (widget.useAndroidQr ?? system.isAndroid)
+        ? QrImageOperation(
+            beforeDecode: () async {
+              if (WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed) {
+                _resumeDecode = Completer<void>();
+                await _resumeDecode!.future;
+                _resumeDecode = null;
+              }
+              if (!mounted ||
+                  _completed ||
+                  ModalRoute.isCurrentOf(context) == false) {
+                await _imageOperation?.cancel();
+              }
+            },
+          )
+        : null;
+    _imageOperation = operation;
     try {
-      final url = await globalState.safeRun(picker.pickerConfigQRCode);
-      if (url != null && mounted && !_completed) {
-        _complete(url);
-      }
+      await _controller.stop();
+      final url = await globalState.safeRun(
+        () => picker.pickerConfigQRCode(operation: operation),
+      );
+      if (url != null && mounted && !_completed) _complete(url);
     } finally {
+      await operation?.cancel();
+      _imageOperation = null;
       _picking = false;
+      if (mounted &&
+          !_completed &&
+          ModalRoute.isCurrentOf(context) != false &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_start());
+      }
     }
   }
 
@@ -171,8 +206,13 @@ class _ScanPageState extends ConsumerState<ScanPage>
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
+        unawaited(_controller.stop());
+        if (_imageOperation?.isDecoding ?? false) {
+          unawaited(_imageOperation?.cancel());
+        }
         return;
       case AppLifecycleState.resumed:
+        if (_resumeDecode?.isCompleted == false) _resumeDecode!.complete();
         // Retrying a denied permission on every resume would reopen the
         // system dialog as soon as the user dismisses it.
         final denied =
@@ -184,7 +224,10 @@ class _ScanPageState extends ConsumerState<ScanPage>
           unawaited(_start());
         }
       case AppLifecycleState.inactive:
-        unawaited(_controller.stop());
+        if (!_controller.value.isStarting) unawaited(_controller.stop());
+        if (_imageOperation?.isDecoding ?? false) {
+          unawaited(_imageOperation?.cancel());
+        }
     }
   }
 
@@ -347,6 +390,8 @@ class _ScanPageState extends ConsumerState<ScanPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_imageOperation?.cancel());
+    if (_resumeDecode?.isCompleted == false) _resumeDecode!.complete();
     _invalidHintTimer?.cancel();
     unawaited(_subscription?.cancel());
     _subscription = null;

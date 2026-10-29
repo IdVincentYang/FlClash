@@ -885,5 +885,8 @@
   "ipFlagHosting": "ホスティング検出",
   "ipFlagAnonymous": "匿名サービス検出",
   "ipFlagScraper": "スクレイピング検出",
-  "ipLookupSourceWarning": "取得元の警告：結果は返されましたが、割当量やアクセス制限に注意してください。"
+  "ipLookupSourceWarning": "取得元の警告：結果は返されましたが、割当量やアクセス制限に注意してください。",
+  "qrImageBusy": "画像の認識は処理中です。カメラ、URL、またはファイルから取り込んでください。",
+  "qrImageTimeout": "画像の認識がタイムアウトしました。後でもう一度試すか、カメラを使用してください。",
+  "qrImageReadFailed": "この画像を読み取れません。別のローカル画像を選択してください。"
 }

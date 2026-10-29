@@ -1088,6 +1088,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "pruneCache": MessageLookupByLibrary.simpleMessage("キャッシュを整理"),
     "pureBlack": MessageLookupByLibrary.simpleMessage("ピュアブラック"),
     "pureBlackMode": MessageLookupByLibrary.simpleMessage("ピュアブラックモード"),
+    "qrImageBusy": MessageLookupByLibrary.simpleMessage(
+      "画像の認識は処理中です。カメラ、URL、またはファイルから取り込んでください。",
+    ),
+    "qrImageReadFailed": MessageLookupByLibrary.simpleMessage(
+      "この画像を読み取れません。別のローカル画像を選択してください。",
+    ),
+    "qrImageTimeout": MessageLookupByLibrary.simpleMessage(
+      "画像の認識がタイムアウトしました。後でもう一度試すか、カメラを使用してください。",
+    ),
     "qrcode": MessageLookupByLibrary.simpleMessage("QRコード"),
     "qrcodeDesc": MessageLookupByLibrary.simpleMessage(
       "QRコードをスキャンしてプロファイルを取得します",

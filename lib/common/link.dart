@@ -22,9 +22,13 @@ String? profileUrlFromQrCodes(Iterable<String?> values) {
     if (uri == null || !protocolSchemes.contains(uri.scheme)) {
       continue;
     }
-    final url = _installConfigUrl(uri)?.trim();
-    if (url != null && url.isUrl) {
-      return url;
+    try {
+      final url = _installConfigUrl(uri)?.trim();
+      if (url != null && url.isUrl) {
+        return url;
+      }
+    } on FormatException {
+      continue;
     }
   }
   return null;

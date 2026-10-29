@@ -61,6 +61,18 @@ module of `plugins/rust_api`, both trimmed to what FlClash uses.
 `plugins/code_forge/README.md` records what was kept and what was removed;
 upstream's MIT notice stays in `plugins/code_forge/LICENSE`.
 
+### Local scanner backend
+
+`plugins/mobile_scanner` is derived from the published 7.4.2 package (BSD-3-Clause).
+The Android backend uses ZXing Java core 3.5.4 (Apache-2.0) instead of ML Kit; other
+platform backends remain upstream. Local automated verification is recorded in the
+T09 Result; device acceptance remains pending.
+The root image_picker dependency still includes Android registration and a
+Manifest;
+the app removes only the exact Photo Picker installation metadata name.
+Current source attribution is image_picker_android; upgrades must recheck it.
+See [plugin maintenance](../plugins/mobile_scanner/README.md) for maintenance.
+
 ## Dependency Ceilings
 
 `flutter pub outdated` lists only upstream-held entries, so treat them as

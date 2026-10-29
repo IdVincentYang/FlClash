@@ -885,5 +885,8 @@
   "ipFlagHosting": "托管检测",
   "ipFlagAnonymous": "匿名服务检测",
   "ipFlagScraper": "抓取服务检测",
-  "ipLookupSourceWarning": "来源警告：已返回结果，但可能涉及限额或访问限制。"
+  "ipLookupSourceWarning": "来源警告：已返回结果，但可能涉及限额或访问限制。",
+  "qrImageBusy": "图片识别正忙，请使用相机，或通过链接、文件导入。",
+  "qrImageTimeout": "图片识别超时，请稍后重试或使用相机。",
+  "qrImageReadFailed": "无法读取此图片，请选择另一张本地图片。"
 }

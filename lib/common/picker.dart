@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class Picker {
@@ -39,7 +40,10 @@ class Picker {
     return uri;
   }
 
-  Future<String?> pickerConfigQRCode() async {
+  Future<String?> pickerConfigQRCode({QrImageOperation? operation}) async {
+    if (operation != null || system.isAndroid) {
+      return (operation ?? QrImageOperation()).read();
+    }
     final xFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (xFile == null) {
       return null;
@@ -67,3 +71,71 @@ extension PlatformFileExt on PlatformFile {
 }
 
 final picker = Picker();
+
+class QrImageOperation {
+  QrImageOperation({this.beforeDecode});
+
+  static int _nextClient = 0;
+  final int _client = ++_nextClient;
+  final Future<void> Function()? beforeDecode;
+  bool _cancelled = false;
+  bool isDecoding = false;
+
+  Future<void> cancel() async {
+    if (_cancelled) return;
+    _cancelled = true;
+    unawaited(_cancelNative(_client));
+  }
+
+  static Future<void> _cancelNative(int client) async {
+    try {
+      await MobileScannerPlatform.instance.cancelQrImage(client);
+    } on Object {
+      // The engine may already have detached; local acceptance stays revoked.
+    }
+  }
+
+  Future<String?> read() async {
+    try {
+      if (_cancelled) return null;
+      final handle = await MobileScannerPlatform.instance.pickQrImage(_client);
+      if (_cancelled || handle == null) return null;
+      await beforeDecode?.call().timeout(const Duration(seconds: 5));
+      if (_cancelled) return null;
+      isDecoding = true;
+      final clock = Stopwatch()..start();
+      final capture = await MobileScannerPlatform.instance
+          .decodeQrImage(handle)
+          .timeout(const Duration(seconds: 5));
+      if (_cancelled || capture == null) return null;
+      if (clock.elapsed >= const Duration(seconds: 5)) {
+        throw TimeoutException('qr_timeout');
+      }
+      final url = profileUrlFromQrCodes(
+        capture.barcodes.map((barcode) => barcode.rawValue),
+      );
+      if (url == null) {
+        throw MessageException(currentAppLocalizations.pleaseUploadValidQrcode);
+      }
+      return url;
+    } on MessageException {
+      rethrow;
+    } on Object catch (error) {
+      if (_cancelled ||
+          error is PlatformException && error.code == 'qr_cancelled') {
+        return null;
+      }
+      final code = error is PlatformException ? error.code : '';
+      throw MessageException(
+        code == 'qr_busy'
+            ? currentAppLocalizations.qrImageBusy
+            : error is TimeoutException || code == 'qr_timeout'
+            ? currentAppLocalizations.qrImageTimeout
+            : currentAppLocalizations.qrImageReadFailed,
+      );
+    } finally {
+      isDecoding = false;
+      await cancel();
+    }
+  }
+}

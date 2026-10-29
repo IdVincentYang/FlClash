@@ -1367,6 +1367,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "pruneCache": MessageLookupByLibrary.simpleMessage("Очистить кэш"),
     "pureBlack": MessageLookupByLibrary.simpleMessage("Чисто чёрный"),
     "pureBlackMode": MessageLookupByLibrary.simpleMessage("Чисто чёрный режим"),
+    "qrImageBusy": MessageLookupByLibrary.simpleMessage(
+      "Распознавание изображения занято. Используйте камеру или импортируйте URL либо файл.",
+    ),
+    "qrImageReadFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось прочитать изображение. Выберите другое локальное изображение.",
+    ),
+    "qrImageTimeout": MessageLookupByLibrary.simpleMessage(
+      "Время распознавания изображения истекло. Повторите позже или используйте камеру.",
+    ),
     "qrcode": MessageLookupByLibrary.simpleMessage("QR-код"),
     "qrcodeDesc": MessageLookupByLibrary.simpleMessage(
       "Сканируйте QR-код, чтобы получить профиль",

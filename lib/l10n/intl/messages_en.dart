@@ -1308,6 +1308,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "pruneCache": MessageLookupByLibrary.simpleMessage("Prune cache"),
     "pureBlack": MessageLookupByLibrary.simpleMessage("Pure black"),
     "pureBlackMode": MessageLookupByLibrary.simpleMessage("Pure black mode"),
+    "qrImageBusy": MessageLookupByLibrary.simpleMessage(
+      "Image recognition is busy. Use the camera or import a URL or file.",
+    ),
+    "qrImageReadFailed": MessageLookupByLibrary.simpleMessage(
+      "Unable to read this image. Choose another local image.",
+    ),
+    "qrImageTimeout": MessageLookupByLibrary.simpleMessage(
+      "Image recognition timed out. Try again later or use the camera.",
+    ),
     "qrcode": MessageLookupByLibrary.simpleMessage("QR code"),
     "qrcodeDesc": MessageLookupByLibrary.simpleMessage(
       "Scan a QR code to obtain a profile",

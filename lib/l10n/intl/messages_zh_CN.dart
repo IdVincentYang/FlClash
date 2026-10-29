@@ -981,6 +981,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "pruneCache": MessageLookupByLibrary.simpleMessage("修剪缓存"),
     "pureBlack": MessageLookupByLibrary.simpleMessage("纯黑"),
     "pureBlackMode": MessageLookupByLibrary.simpleMessage("纯黑模式"),
+    "qrImageBusy": MessageLookupByLibrary.simpleMessage(
+      "图片识别正忙，请使用相机，或通过链接、文件导入。",
+    ),
+    "qrImageReadFailed": MessageLookupByLibrary.simpleMessage(
+      "无法读取此图片，请选择另一张本地图片。",
+    ),
+    "qrImageTimeout": MessageLookupByLibrary.simpleMessage(
+      "图片识别超时，请稍后重试或使用相机。",
+    ),
     "qrcode": MessageLookupByLibrary.simpleMessage("二维码"),
     "qrcodeDesc": MessageLookupByLibrary.simpleMessage("扫描二维码获取配置文件"),
     "quickAdd": MessageLookupByLibrary.simpleMessage("快捷添加"),

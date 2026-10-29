@@ -867,6 +867,15 @@ Local native crash debugging needs the matching unstripped libraries. The Androi
 - `wifi_ssid`: Wi-Fi SSID detection.
 - `code_forge`: the text editor behind `EditorPage`, derived from upstream `code_forge`. See below.
 
+## Android QR Scanning
+
+The local scanner backend is implemented; device acceptance remains pending.
+`ScanPage` owns user intent; the plugin owns camera bindings, native result
+identity and process-scoped worker quotas. Subscription confirmation and
+Request remain separate.
+See [QR scanning design](../docs/features/security/qr_scanning_design.md) for cancellation,
+I/O limits, callback identity and the app Manifest exclusion.
+
 ## code_forge Plugin
 
 `CodeForgeController` is the document: text lives in the Rust `RopeBridge`, and the controller's methods are split by
