@@ -561,6 +561,7 @@ class Request with ServiceListener {
     RequestMode mode = RequestMode.auto,
     String? proxy,
     bool automatic = false,
+    bool diagnostic = false,
     bool allowBootstrap = false,
     bool bootstrapIfUnconfigured = false,
     String? label,
@@ -605,7 +606,13 @@ class Request with ServiceListener {
           throw const RequestUnavailable('request_cancelled');
         }
       });
-      final session = _makeSession(key, null, const {}, null);
+      final session = _makeSession(
+        key,
+        null,
+        const {},
+        null,
+        diagnostic: diagnostic,
+      );
       _sessions.add(session);
       return session;
     }
@@ -750,7 +757,13 @@ class Request with ServiceListener {
         'password': separator < 0 ? '' : credential.substring(separator + 1),
       });
     });
-    final session = _makeSession(key, result['id'] as String, state, result);
+    final session = _makeSession(
+      key,
+      result['id'] as String,
+      state,
+      result,
+      diagnostic: diagnostic,
+    );
     if ((_cancellations[key] ?? 0) != generation) {
       session.close();
       throw const RequestUnavailable('request_cancelled');
@@ -786,10 +799,12 @@ class Request with ServiceListener {
     String key,
     String? id,
     Map<String, Object?> state,
-    Map<String, Object?>? grant,
-  ) {
+    Map<String, Object?>? grant, {
+    bool diagnostic = false,
+  }) {
     final container = _container;
     if (container == null) {
+      if (diagnostic) throw const RequestUnavailable('request_not_attached');
       return RequestSession._(
         this,
         key,
@@ -805,11 +820,15 @@ class Request with ServiceListener {
       () => HttpClient(),
       _SessionHttpOverrides(),
     );
-    final ua = container.read(patchClashConfigProvider).globalUa.takeFirstValid(
-      [userAgent, globalState.packageInfo.ua],
-    );
+    final ua = diagnostic
+        ? browserUa
+        : container.read(patchClashConfigProvider).globalUa.takeFirstValid([
+            userAgent,
+            globalState.packageInfo.ua,
+          ]);
     client.userAgent = ua;
     client.badCertificateCallback = (certificate, host, port) =>
+        !diagnostic &&
         FlClashHttpOverrides.allowBadCertificate(
           container,
           certificate,
@@ -820,10 +839,15 @@ class Request with ServiceListener {
       client.findProxy = (_) =>
           'PROXY ${grant['user']}:${grant['password']}@${grant['endpoint']}';
     } else {
-      client.findProxy = (url) =>
-          FlClashHttpOverrides.findProxyFor(container, url);
+      client.findProxy = (url) => FlClashHttpOverrides.findProxyFor(
+        container,
+        url,
+        logRequest: !diagnostic,
+      );
     }
-    final scopedDio = Dio(BaseOptions(headers: {'User-Agent': ua}));
+    final scopedDio = Dio(
+      BaseOptions(headers: {'User-Agent': ua}, followRedirects: !diagnostic),
+    );
     scopedDio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () => client,
     );
@@ -842,6 +866,10 @@ class Request with ServiceListener {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           try {
+            if (diagnostic) {
+              options.followRedirects = false;
+              options.headers = {'User-Agent': browserUa};
+            }
             await session.check();
             handler.next(options);
           } catch (error) {
@@ -879,6 +907,8 @@ class Request with ServiceListener {
     RequestMode mode = RequestMode.auto,
     String? proxy,
     bool automatic = false,
+    bool diagnostic = false,
+    Future<bool> Function()? sourceIsCurrent,
     String? explicitTarget,
     required Future<T> Function(RequestSession session) action,
   }) async {
@@ -888,6 +918,8 @@ class Request with ServiceListener {
       mode: mode,
       proxy: proxy,
       automatic: automatic,
+      diagnostic: diagnostic,
+      sourceIsCurrent: sourceIsCurrent,
       explicitTarget: explicitTarget,
     );
     try {

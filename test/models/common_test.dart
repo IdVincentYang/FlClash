@@ -200,70 +200,20 @@ void main() {
     });
   });
 
-  group('IpInfo parsers', () {
-    test('parse supported response shapes', () {
+  group('IpInfo parser', () {
+    test('parses the Cloudflare trace only', () {
       expect(
-        IpInfo.fromIpInfoIoJson({'ip': '1.1.1.1', 'country': 'US'}),
-        const IpInfo(ip: '1.1.1.1', countryCode: 'US'),
-      );
-      expect(
-        IpInfo.fromIdentMeJson({'ip': '2.2.2.2', 'cc': 'JP'}),
-        const IpInfo(ip: '2.2.2.2', countryCode: 'JP'),
-      );
-      expect(
-        IpInfo.fromIpAPIJson({'query': '3.3.3.3', 'countryCode': 'CN'}),
-        const IpInfo(ip: '3.3.3.3', countryCode: 'CN'),
-      );
-      expect(
-        IpInfo.fromGeoJsJson({'ip': '4.4.4.4', 'country_code': 'DE'}),
-        const IpInfo(ip: '4.4.4.4', countryCode: 'DE'),
-      );
-      expect(
-        IpInfo.fromCountryIsJson({'ip': '5.5.5.5', 'country': 'FR'}),
-        const IpInfo(ip: '5.5.5.5', countryCode: 'FR'),
+        IpInfo.fromCloudflareTrace('ip=1.1.1.1\nloc=AU\n'),
+        const IpInfo(ip: '1.1.1.1', countryCode: 'AU'),
       );
     });
-
-    test('parse the ipquery.io country from its location object', () {
+    test('rejects missing and duplicate fields', () {
       expect(
-        IpInfo.fromIpQueryJson({
-          'ip': '203.0.113.9',
-          'isp': {'asn': 'AS64500', 'org': '', 'isp': 'Example'},
-          'location': {'country': 'United Kingdom', 'country_code': 'GB'},
-          'risk': {'is_datacenter': false},
-        }),
-        const IpInfo(ip: '203.0.113.9', countryCode: 'GB'),
-      );
-    });
-
-    test('parse the Cloudflare trace key-value text', () {
-      expect(
-        IpInfo.fromCloudflareTrace(
-          'fl=0f0\nh=www.cloudflare.com\nip=203.0.113.9\nts=1757800000.1\n'
-          'visit_scheme=https\ncolo=LHR\nhttp=http/2\nloc=GB\ntls=TLSv1.3\n',
-        ),
-        const IpInfo(ip: '203.0.113.9', countryCode: 'GB'),
-      );
-    });
-
-    test('throw FormatException for unsupported response shapes', () {
-      expect(
-        () => IpInfo.fromIpInfoIoJson({'ip': '1.1.1.1'}),
+        () => IpInfo.fromCloudflareTrace('ip=1.1.1.1\n'),
         throwsFormatException,
       );
       expect(
-        () => IpInfo.fromGeoJsJson({'ip': '1.1.1.1'}),
-        throwsFormatException,
-      );
-      expect(
-        () => IpInfo.fromIpQueryJson({
-          'ip': '1.1.1.1',
-          'location': <String, dynamic>{},
-        }),
-        throwsFormatException,
-      );
-      expect(
-        () => IpInfo.fromCloudflareTrace('ip=1.1.1.1\ncolo=LHR\n'),
+        () => IpInfo.fromCloudflareTrace('ip=1.1.1.1\nip=8.8.8.8\nloc=US\n'),
         throwsFormatException,
       );
     });

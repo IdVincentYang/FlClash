@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/dav_client.dart';
+import 'package:fl_clash/common/ip_lookup.dart';
 import 'package:drift/native.dart';
 import 'package:fl_clash/database/database.dart' as db;
 import 'package:fl_clash/core/controller.dart';
@@ -234,6 +235,8 @@ void main() {
   final originHeaders = <String?>[];
   final sockets = <Socket>[];
   final bridgeStates = <String>[];
+  void Function()? slowConnected;
+  void Function()? slowClosed;
 
   setUpAll(() async {
     temporary = await Directory.systemTemp.createTemp('flclash-scope-');
@@ -254,6 +257,8 @@ void main() {
     proxyHeaders.clear();
     originHeaders.clear();
     bridgeStates.clear();
+    slowConnected = null;
+    slowClosed = null;
     proxy = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     proxy.listen((inbound) {
       sockets.add(inbound);
@@ -298,6 +303,13 @@ void main() {
               outbound!.add(pending.sublist(end + 4));
             }
             subscription.resume();
+          } else if (first[1].contains('/ip-lookup-deadline')) {
+            inbound.write(
+              'HTTP/1.1 200 OK\r\nContent-Length: 99999\r\n\r\npartial',
+            );
+            await inbound.flush();
+            slowConnected?.call();
+            subscription.resume();
           } else {
             inbound.write(
               'HTTP/1.1 200 OK\r\nContent-Length: 9\r\nConnection: close\r\n\r\nsynthetic',
@@ -307,6 +319,7 @@ void main() {
           }
         },
         onDone: () {
+          slowClosed?.call();
           outbound?.destroy();
           unawaited(subscription.cancel());
         },
@@ -1144,6 +1157,70 @@ void main() {
       ['GLOBAL'],
     );
     expect(proxyHeaders, isEmpty);
+  });
+
+  test(
+    'IP session rejects an untrusted certificate even when global checks are off',
+    () async {
+      final tls = SecurityContext()
+        ..useCertificateChain('test/fixtures/request_tls/cert.pem')
+        ..usePrivateKey('test/fixtures/request_tls/key.pem');
+      final origin = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        tls,
+      );
+      addTearDown(() => origin.close(force: true));
+      var requests = 0;
+      origin.listen((incoming) async {
+        requests++;
+        incoming.response.write('unexpected');
+        await incoming.response.close();
+      });
+      final url = 'https://127.0.0.1:${origin.port}/';
+      await expectLater(
+        withIpSession(
+          client: client,
+          key: 'ipQuality:fixture',
+          url: url,
+          timeout: const Duration(seconds: 2),
+          current: () => true,
+          action: (session, _) =>
+              readIpBody(session.dio, url, session.cancelToken, 4096),
+        ),
+        throwsA(isA<IpLookupException>()),
+      );
+      expect(requests, 0);
+    },
+  );
+
+  test('IP whole-round deadline closes a real body without fallback', () async {
+    final connected = Completer<void>(), closed = Completer<void>();
+    slowConnected = connected.complete;
+    slowClosed = () {
+      if (!closed.isCompleted) closed.complete();
+    };
+    const url = 'http://127.0.0.1/ip-lookup-deadline';
+    final result = withIpSession(
+      client: client,
+      key: 'ipQuality:deadline',
+      url: url,
+      timeout: const Duration(milliseconds: 300),
+      current: () => true,
+      action: (session, _) =>
+          readIpBody(session.dio, url, session.cancelToken, 65536),
+    );
+    final checked = expectLater(
+      result,
+      throwsA(
+        isA<IpLookupException>().having((e) => e.code, 'code', 'timeout'),
+      ),
+    );
+    await connected.future.timeout(const Duration(seconds: 2));
+    await checked;
+    await closed.future.timeout(const Duration(seconds: 2));
+    expect(native.calls.where((c) => c['action'] == 'begin').length, 1);
+    expect(native.calls.where((c) => c['action'] == 'cancel'), isNotEmpty);
   });
 
   test('HTTPS CONNECT keeps proxy credentials out of the origin', () async {

@@ -241,13 +241,13 @@ void main() {
   });
 
   group('lookupOutboundIp', () {
-    test('hands the Core every source and parses the one that won', () async {
+    test('hands the Core only the Cloudflare source', () async {
       late OutboundIpParams sent;
       when(() => core.outboundIp(any())).thenAnswer((invocation) async {
         sent = invocation.positionalArguments.single as OutboundIpParams;
         return const OutboundIpResult(
           url: 'https://www.cloudflare.com/cdn-cgi/trace',
-          body: 'fl=1\nip=203.0.113.7\nloc=US\n',
+          body: 'fl=1\nip=1.1.1.1\nloc=US\n',
         );
       });
 
@@ -258,23 +258,28 @@ void main() {
       expect(sent.urls, ipInfoSources.keys.toList());
       expect(sent.proxyName, 'HK-01');
       expect(sent.timeout, outboundIpTimeoutDuration.inMilliseconds);
-      expect(ipInfo, const IpInfo(ip: '203.0.113.7', countryCode: 'US'));
+      expect(ipInfo?.ip, '1.1.1.1');
+      expect(ipInfo?.countryCode, 'US');
+      expect(ipInfo?.checkedAt, isNotNull);
     });
 
-    test('parses whichever source answered, not just the first', () async {
-      when(() => core.outboundIp(any())).thenAnswer(
-        (_) async => OutboundIpResult(
-          url: 'https://api.country.is',
-          body: jsonEncode({'ip': '198.51.100.4', 'country': 'DE'}),
-        ),
-      );
+    test(
+      'rejects an unselected source instead of accepting its answer',
+      () async {
+        when(() => core.outboundIp(any())).thenAnswer(
+          (_) async => OutboundIpResult(
+            url: 'https://api.country.is',
+            body: jsonEncode({'ip': '198.51.100.4', 'country': 'DE'}),
+          ),
+        );
 
-      final ipInfo = parseOutboundIp(
-        await lookupOutboundIp(controller, 'DE-01'),
-      );
+        final ipInfo = parseOutboundIp(
+          await lookupOutboundIp(controller, 'DE-01'),
+        );
 
-      expect(ipInfo, const IpInfo(ip: '198.51.100.4', countryCode: 'DE'));
-    });
+        expect(ipInfo, isNull);
+      },
+    );
 
     test('gives up on an error, an empty body or an unparseable one', () async {
       final answers = <OutboundIpResult?>[

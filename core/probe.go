@@ -200,7 +200,8 @@ type probeRequest struct {
 	maxBody   int64
 
 	// A followed redirect loses the Location that Netflix names its region in.
-	noRedirect bool
+	noRedirect   bool
+	completeBody bool
 
 	// until sees the latest chunk and probeScanOverlap bytes before it.
 	until  func(tail string) bool
@@ -228,6 +229,9 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	result.CoreEpoch, result.PicksVersion = routeStamp()
 	fail := func(err error) *ProbeResult {
 		result.Error = probeErrorKind(err)
+		if req.completeBody {
+			result.Error = serviceErrorReason(err)
+		}
 		result.Message = err.Error()
 		return result
 	}
@@ -321,7 +325,7 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 		result.RulePayload = route.rulePayload
 	}
 	if req.maxBody > 0 {
-		if req.policy == nil {
+		if req.policy == nil && !req.completeBody {
 			result.Body = readProbeBody(response.Body, req.maxBody, req.until)
 		} else {
 			result.Body, result.bodyState = readServiceBody(response.Body, req.maxBody, req.until)

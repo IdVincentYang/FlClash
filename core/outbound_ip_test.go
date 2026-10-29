@@ -1,147 +1,149 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-func TestHandleOutboundIpTakesTheFirstUsableAnswer(t *testing.T) {
-	withProbeProxies(t, "node-a")
-	slow := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(400 * time.Millisecond)
-		_, _ = w.Write([]byte("slow"))
-	})
-	empty := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	quick := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("ip=203.0.113.7"))
-	})
-
-	result := handleOutboundIp(&OutboundIpParams{
-		ProxyName: "node-a",
-		Urls:      []string{slow.URL, empty.URL, quick.URL},
-		Timeout:   4000,
-	})
-
-	if result.Error != "" {
-		t.Fatalf("error = %q, want none", result.Error)
+func outboundFixture(t *testing.T, handler http.HandlerFunc, trusted bool, names ...string) *diagnosticProxy {
+	t.Helper()
+	if len(names) == 0 {
+		names = []string{"www.cloudflare.com"}
 	}
-	if result.Body != "ip=203.0.113.7" {
-		t.Errorf("body = %q, want the quick source's", result.Body)
-	}
-	if result.Url != quick.URL {
-		t.Errorf("url = %q, want %q", result.Url, quick.URL)
-	}
+	proxy := diagnosticFixture(t, handler, trusted, names...)
+	proxy.allowed["www.cloudflare.com"] = true
+	return proxy
 }
-
-func TestHandleOutboundIpSkipsAnAnswerWithoutAnAddress(t *testing.T) {
-	withProbeProxies(t, "node-a")
-	limited := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"error":"rate limited"}`))
-	})
-	later := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(200 * time.Millisecond)
-		_, _ = w.Write([]byte(`{"ip":"2001:db8::7","country":"JP"}`))
-	})
-
-	result := handleOutboundIp(&OutboundIpParams{
-		ProxyName: "node-a",
-		Urls:      []string{limited.URL, later.URL},
-		Timeout:   4000,
-	})
-
-	if result.Url != later.URL {
-		t.Errorf("url = %q, want the source that named an address", result.Url)
-	}
+func outboundCheck(timeout int64) *OutboundIpResult {
+	return handleOutboundIp(&OutboundIpParams{ProxyName: "diagnostic-node", Urls: []string{outboundIPURL}, Timeout: timeout})
 }
-
-func TestMentionsIpNeedsAWholeAddress(t *testing.T) {
-	cases := map[string]bool{
-		"fl=12f\nip=203.0.113.7\nts=1700000000.1": true,
-		`{"ip":"2001:db8::7","country":"JP"}`:     true,
-		`{"ip":"::ffff:203.0.113.7"}`:             true,
-		`a::after{content:""}`:                    false,
-		`div::before,li::marker{color:#fff}`:      false,
-		`::-webkit-scrollbar{width:0}`:            false,
-		`<a href="http://127.0.0.1/login">`:       false,
+func TestOutboundIPSingleRecipient(t *testing.T) {
+	var calls atomic.Int32
+	outboundFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path != "/cdn-cgi/trace" || r.URL.RawQuery != "" || r.UserAgent() != browserUserAgent || r.Header.Get("Cookie") != "" || r.Header.Get("Referer") != "" {
+			t.Error("unexpected outbound request")
+		}
+		fmt.Fprint(w, "ip=1.1.1.1\nloc=AU\n")
+	}, true)
+	result := outboundCheck(1000)
+	if result.Error != "" || result.Url != outboundIPURL || calls.Load() != 1 {
+		t.Fatalf("result=%+v calls=%d", result, calls.Load())
 	}
-	for body, want := range cases {
-		if got := mentionsIp(body); got != want {
-			t.Errorf("mentionsIp(%q) = %v, want %v", body, got, want)
+	for _, urls := range [][]string{nil, {"http://www.cloudflare.com/cdn-cgi/trace"}, {outboundIPURL, outboundIPURL}, {outboundIPURL + "?extra=1"}, {"https://example.invalid/"}} {
+		result = handleOutboundIp(&OutboundIpParams{ProxyName: "diagnostic-node", Urls: urls})
+		if result.Error != "recipient-blocked" || calls.Load() != 1 {
+			t.Fatal("unexpected recipient accepted")
 		}
 	}
 }
+func TestOutboundIPRejectsAllRedirects(t *testing.T) {
+	for _, status := range []int{301, 302, 303, 307, 308} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			var calls atomic.Int32
+			outboundFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				w.Header().Set("Location", "http://another.invalid/trace")
+				w.WriteHeader(status)
+			}, true)
+			if result := outboundCheck(1000); result.Error != "http-failed" || calls.Load() != 1 {
+				t.Fatalf("result=%+v calls=%d", result, calls.Load())
+			}
+		})
+	}
+}
+func TestOutboundIPRequiresCompleteBoundedBody(t *testing.T) {
+	for name, body := range map[string]string{"large": "ip=1.1.1.1\nloc=US\n" + strings.Repeat("x", 4096), "invalid": "ip=not-an-ip\nloc=US\n", "private": "ip=::ffff:192.168.1.1\nloc=US\n", "missing": "ip=1.1.1.1\n", "duplicate": "ip=1.1.1.1\nip=8.8.8.8\nloc=US\n"} {
+		t.Run(name, func(t *testing.T) {
+			outboundFixture(t, func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, body) }, true)
+			if result := outboundCheck(1000); result.Error == "" {
+				t.Fatal("accepted invalid body")
+			}
+		})
+	}
+	t.Run("truncated", func(t *testing.T) {
+		outboundFixture(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Length", "200")
+			fmt.Fprint(w, "ip=1.1.1.1\nloc=US\n")
+		}, true)
+		if result := outboundCheck(1000); result.Error == "" {
+			t.Fatal("accepted truncated response")
+		}
+	})
+}
+func TestOutboundIPLimitCancelsUnfinishedBody(t *testing.T) {
+	cancelled := make(chan struct{})
+	outboundFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "ip=1.1.1.1\nloc=US\n"+strings.Repeat("x", 5000))
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+		close(cancelled)
+	}, true)
+	if result := outboundCheck(1000); result.Error != "body-limit" {
+		t.Fatalf("result=%+v", result)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("over-limit body kept its connection")
+	}
+}
 
-func TestMentionsIpSkipsLocalAddresses(t *testing.T) {
-	for _, body := range []string{
-		"ip=192.168.1.1",
-		`{"ip":"10.20.30.40"}`,
-		"ip=172.16.0.9",
-		"ip=100.64.12.34",
-		`{"ip":"fd00::1"}`,
-		`{"ip":"::ffff:192.168.1.1"}`,
-	} {
-		if mentionsIp(body) {
-			t.Errorf("mentionsIp(%q) = true, want false", body)
+func TestOutboundIPCancelsActualBodyRead(t *testing.T) {
+	cancelled := make(chan struct{})
+	outboundFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "ip=1.1.1.1\nloc=US\n")
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+		close(cancelled)
+	}, true)
+	if result := outboundCheck(50); result.Error == "" {
+		t.Fatal("partial body accepted")
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("body connection not cancelled")
+	}
+}
+func TestOutboundIPStrictTLSAndFailedProxy(t *testing.T) {
+	t.Run("untrusted", func(t *testing.T) {
+		outboundFixture(t, func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, "ip=1.1.1.1\nloc=US\n") }, false)
+		if result := outboundCheck(1000); result.Error != "tls-failed" {
+			t.Fatalf("result=%+v", result)
+		}
+	})
+	t.Run("wrong-name", func(t *testing.T) {
+		outboundFixture(t, func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, "ip=1.1.1.1\nloc=US\n") }, true, "wrong.invalid")
+		if result := outboundCheck(1000); result.Error != "tls-failed" {
+			t.Fatalf("result=%+v", result)
+		}
+	})
+	t.Run("failed-proxy", func(t *testing.T) {
+		var calls atomic.Int32
+		p := outboundFixture(t, func(w http.ResponseWriter, _ *http.Request) { calls.Add(1) }, true)
+		p.fail = true
+		if result := outboundCheck(1000); result.Error == "" || calls.Load() != 0 {
+			t.Fatalf("result=%+v calls=%d", result, calls.Load())
+		}
+	})
+}
+func TestPublicIPNormalizationAndTrace(t *testing.T) {
+	for _, ip := range []string{"1.1.1.1", "8.8.8.8", "2606:4700:4700::1111", "::ffff:1.1.1.1"} {
+		if !publicIPAddress(ip) {
+			t.Errorf("rejected %s", ip)
 		}
 	}
-}
-
-func TestHandleOutboundIpCancelsTheLosers(t *testing.T) {
-	withProbeProxies(t, "node-a")
-	var cancelled atomic.Bool
-	losing := probeServer(t, func(w http.ResponseWriter, r *http.Request) {
-		select {
-		case <-r.Context().Done():
-			cancelled.Store(true)
-		case <-time.After(3 * time.Second):
+	for _, ip := range []string{"0.1.2.3", "10.0.0.1", "100.64.0.1", "127.0.0.1", "169.254.1.1", "172.31.1.1", "192.168.1.1", "192.0.2.1", "198.18.0.1", "198.51.100.1", "203.0.113.1", "224.0.0.1", "240.1.1.1", "::", "::1", "fe80::1", "ff02::1", "fc00::1", "2001:db8::1", "3fff::1", "3fff:0fff:ffff::1", "::ffff:10.0.0.1", "2606:4700::1%en0", "https://1.1.1.1"} {
+		if publicIPAddress(ip) {
+			t.Errorf("accepted %s", ip)
 		}
-	})
-	winning := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("ip=203.0.113.9"))
-	})
-
-	result := handleOutboundIp(&OutboundIpParams{
-		ProxyName: "node-a",
-		Urls:      []string{losing.URL, winning.URL},
-		Timeout:   5000,
-	})
-
-	if result.Body != "ip=203.0.113.9" {
-		t.Fatalf("body = %q, want the winning source's", result.Body)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for !cancelled.Load() && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if !cancelled.Load() {
-		t.Error("the losing request kept running, want it cancelled once the race was won")
-	}
-}
-
-func TestHandleOutboundIpReportsWhenEverySourceFails(t *testing.T) {
-	withProbeProxies(t, "node-a")
-	broken := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
-
-	result := handleOutboundIp(&OutboundIpParams{
-		ProxyName: "node-a",
-		Urls:      []string{broken.URL, broken.URL},
-		Timeout:   3000,
-	})
-
-	if result.Error != probeErrorFailed {
-		t.Errorf("error = %q, want %q", result.Error, probeErrorFailed)
-	}
-}
-
-func TestHandleOutboundIpRejectsAnEmptySourceList(t *testing.T) {
-	result := handleOutboundIp(&OutboundIpParams{ProxyName: "node-a", Timeout: 1000})
-	if result.Error != probeErrorFailed {
-		t.Errorf("error = %q, want %q", result.Error, probeErrorFailed)
+	if !validOutboundTrace("ip=2606:4700:4700::1111\nloc=US\n") {
+		t.Fatal("valid IPv6 trace rejected")
 	}
 }

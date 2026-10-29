@@ -15,3 +15,5 @@
 共用资料入口：[Android 审计基线](android_security_baseline.md)、**[fork 与官方同步约定](../../../CONTRIBUTING.md)**、[Android 构建指南](../../development/android_build_guide.md)。
 
 其它平台待定。
+
+当前能力契约：[IP 查询设计](ip_lookup_design.md)（触发、接收方、数据及失败边界）。

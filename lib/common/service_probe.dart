@@ -1,9 +1,9 @@
-import 'dart:convert';
-
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
+
+import 'ip_lookup.dart';
 
 const directOutbound = 'DIRECT';
 const routedOutbound = '';
@@ -216,20 +216,8 @@ Future<Map<ServiceTarget, ServiceCheck>> checkServices(
   };
 }
 
-IpInfo Function(String) _json(IpInfo Function(Map<String, dynamic>) parse) {
-  return (body) => parse(jsonDecode(body) as Map<String, dynamic>);
-}
-
 final Map<String, IpInfo Function(String)> ipInfoSources = {
-  'https://www.cloudflare.com/cdn-cgi/trace': IpInfo.fromCloudflareTrace,
-  'https://api.ip.sb/geoip': _json(IpInfo.fromIpSbJson),
-  'https://ipinfo.io/json': _json(IpInfo.fromIpInfoIoJson),
-  'https://ipwho.is': _json(IpInfo.fromIpWhoIsJson),
-  'http://ip-api.com/json': _json(IpInfo.fromIpAPIJson),
-  'https://get.geojs.io/v1/ip/geo.json': _json(IpInfo.fromGeoJsJson),
-  'https://api.country.is': _json(IpInfo.fromCountryIsJson),
-  'https://api.ipquery.io/?format=json': _json(IpInfo.fromIpQueryJson),
-  'https://ident.me/json': _json(IpInfo.fromIdentMeJson),
+  outboundIpUrl: IpInfo.fromCloudflareTrace,
 };
 
 /// Raw so the route stamp survives; [parseOutboundIp] reads the address.
@@ -242,7 +230,7 @@ Future<OutboundIpResult?> lookupOutboundIp(
     OutboundIpParams(
       proxyName: proxyName,
       urls: ipInfoSources.keys.toList(),
-      timeout: timeout.inMilliseconds,
+      timeout: timeout.inMilliseconds.clamp(1, 6000),
     ),
   );
 }
@@ -254,7 +242,12 @@ IpInfo? parseOutboundIp(OutboundIpResult? result) {
   final parse = ipInfoSources[result.url];
   if (parse == null) return null;
   try {
-    return parse(result.body);
+    final value = parse(result.body);
+    final address = publicIp(value.ip);
+    if (address == null || !RegExp(r'^[A-Z]{2}$').hasMatch(value.countryCode)) {
+      return null;
+    }
+    return value.copyWith(ip: address.address, checkedAt: DateTime.now());
   } on FormatException {
     return null;
   } on TypeError {

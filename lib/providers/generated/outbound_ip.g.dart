@@ -8,19 +8,13 @@ part of '../outbound_ip.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Keyed by the outbound a lookup pins: a node name, `DIRECT`, or
-/// [routedOutbound] for whatever the rules pick right now.
 
 @ProviderFor(OutboundIpProbe)
 final outboundIpProbeProvider = OutboundIpProbeProvider._();
 
-/// Keyed by the outbound a lookup pins: a node name, `DIRECT`, or
-/// [routedOutbound] for whatever the rules pick right now.
 final class OutboundIpProbeProvider
     extends
         $NotifierProvider<OutboundIpProbe, RoutedProbeState<String, IpInfo>> {
-  /// Keyed by the outbound a lookup pins: a node name, `DIRECT`, or
-  /// [routedOutbound] for whatever the rules pick right now.
   OutboundIpProbeProvider._()
     : super(
         from: null,
@@ -50,10 +44,7 @@ final class OutboundIpProbeProvider
   }
 }
 
-String _$outboundIpProbeHash() => r'1d9fb8324445c86879868f9bfad4a4ae3a70ac65';
-
-/// Keyed by the outbound a lookup pins: a node name, `DIRECT`, or
-/// [routedOutbound] for whatever the rules pick right now.
+String _$outboundIpProbeHash() => r'016b9eeb12483f5d6c52ace67895b770e9a73f7d';
 
 abstract class _$OutboundIpProbe
     extends $Notifier<RoutedProbeState<String, IpInfo>> {

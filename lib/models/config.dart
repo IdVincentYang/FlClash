@@ -150,6 +150,7 @@ abstract class AppSettingProps with _$AppSettingProps {
     @JsonKey(readValue: _readUserAgents)
     List<String> userAgents,
     @Default(false) bool hideIp,
+    @Default(false) bool automaticOutboundIp,
     @Default(false) bool editorLineWrap,
     @Default(EditorFontSize.standard) EditorFontSize editorFontSize,
     @Default([]) List<String> serviceOrder,

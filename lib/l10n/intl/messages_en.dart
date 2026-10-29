@@ -717,20 +717,67 @@ class MessageLookup extends MessageLookupByLibrary {
     "invalidSubRule": m20,
     "ipAddress": MessageLookupByLibrary.simpleMessage("IP address"),
     "ipAsn": MessageLookupByLibrary.simpleMessage("ASN"),
-    "ipFlagAbuser": MessageLookupByLibrary.simpleMessage("Abuse history"),
+    "ipClassificationDisclosure": MessageLookupByLibrary.simpleMessage(
+      "This button sends this IP to proxycheck.io over HTTPS for classification. The service also sees the request exit IP, which may differ. Anonymous use is limited to 100 queries a day and may be refused from proxy exits. Refusal never changes the route or source. Missing fields mean unknown; no safety guarantee. The request disables optional positive-detection dashboard saving, not all server logging.",
+    ),
+    "ipClassificationStart": MessageLookupByLibrary.simpleMessage(
+      "Classify this IP",
+    ),
+    "ipFlagAnonymous": MessageLookupByLibrary.simpleMessage(
+      "Anonymous detection",
+    ),
+    "ipFlagCompromised": MessageLookupByLibrary.simpleMessage("Compromised"),
+    "ipFlagHosting": MessageLookupByLibrary.simpleMessage("Hosting detection"),
     "ipFlagProxy": MessageLookupByLibrary.simpleMessage("Proxy"),
+    "ipFlagScraper": MessageLookupByLibrary.simpleMessage("Scraper detection"),
     "ipFlagTor": MessageLookupByLibrary.simpleMessage("Tor"),
     "ipFlagVpn": MessageLookupByLibrary.simpleMessage("VPN"),
     "ipFlags": MessageLookupByLibrary.simpleMessage("Flags"),
+    "ipLookupAutomatic": MessageLookupByLibrary.simpleMessage(
+      "Automatic on dashboard",
+    ),
+    "ipLookupBodyLimit": MessageLookupByLibrary.simpleMessage(
+      "Response too large",
+    ),
+    "ipLookupCancelled": MessageLookupByLibrary.simpleMessage(
+      "Query cancelled",
+    ),
+    "ipLookupCheckedAt": MessageLookupByLibrary.simpleMessage("Observed at"),
+    "ipLookupDisclosure": MessageLookupByLibrary.simpleMessage(
+      "Checks your request exit and country with Cloudflare over HTTPS. Automatic checks run only while the app is in front, the dashboard is shown and the service is running. One observation does not describe every website.",
+    ),
+    "ipLookupDisplayOnly": MessageLookupByLibrary.simpleMessage(
+      "Display only; copying uses the original IP. This setting does not stop network queries.",
+    ),
+    "ipLookupHttpFailed": MessageLookupByLibrary.simpleMessage(
+      "Source rejected the request",
+    ),
+    "ipLookupInvalid": MessageLookupByLibrary.simpleMessage(
+      "Invalid or incomplete response",
+    ),
+    "ipLookupIpMismatch": MessageLookupByLibrary.simpleMessage(
+      "Response IP does not match",
+    ),
+    "ipLookupManual": MessageLookupByLibrary.simpleMessage("Check exit IP"),
+    "ipLookupNotChecked": MessageLookupByLibrary.simpleMessage("Not checked"),
+    "ipLookupRoutes": MessageLookupByLibrary.simpleMessage("Current rules"),
+    "ipLookupSourceWarning": MessageLookupByLibrary.simpleMessage(
+      "Source warning: the result was returned, but quota or access restrictions may apply.",
+    ),
+    "ipLookupStale": MessageLookupByLibrary.simpleMessage(
+      "Previous observation",
+    ),
+    "ipLookupTlsFailed": MessageLookupByLibrary.simpleMessage(
+      "Certificate verification failed",
+    ),
+    "ipLookupWaiting": MessageLookupByLibrary.simpleMessage(
+      "Waiting for the 30-second interval",
+    ),
     "ipOrganization": MessageLookupByLibrary.simpleMessage("Organization"),
     "ipQualityFailed": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t determine the IP type",
     ),
-    "ipQualityGood": MessageLookupByLibrary.simpleMessage("Good"),
-    "ipQualityLevel": MessageLookupByLibrary.simpleMessage("Level"),
-    "ipQualityNormal": MessageLookupByLibrary.simpleMessage("Normal"),
     "ipQualityRetry": MessageLookupByLibrary.simpleMessage("Check again"),
-    "ipQualityRisky": MessageLookupByLibrary.simpleMessage("Risky"),
     "ipQualitySource": MessageLookupByLibrary.simpleMessage("Answered by"),
     "ipQualitySources": MessageLookupByLibrary.simpleMessage("Sources"),
     "ipSourceIpMismatch": MessageLookupByLibrary.simpleMessage(
@@ -741,8 +788,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ipType": MessageLookupByLibrary.simpleMessage("Type"),
     "ipTypeBusiness": MessageLookupByLibrary.simpleMessage("Business"),
     "ipTypeHosting": MessageLookupByLibrary.simpleMessage("Data center"),
-    "ipTypeMobile": MessageLookupByLibrary.simpleMessage("Mobile network"),
     "ipTypeResidential": MessageLookupByLibrary.simpleMessage("Residential"),
+    "ipTypeWireless": MessageLookupByLibrary.simpleMessage(
+      "Wireless (cellular or satellite)",
+    ),
     "ipv6Desc": MessageLookupByLibrary.simpleMessage(
       "When enabled, IPv6 traffic can be received",
     ),

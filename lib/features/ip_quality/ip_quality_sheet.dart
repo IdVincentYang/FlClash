@@ -1,9 +1,8 @@
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/ip_quality.dart';
-import 'package:fl_clash/icons/icons.dart';
-import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/ip_quality.dart';
+import 'package:fl_clash/providers/routed_probe.dart';
+import 'package:fl_clash/providers/route_state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -23,30 +22,149 @@ Future<void> showIpQualitySheet(BuildContext context, {required String ip}) {
   );
 }
 
-class _IpQualitySheet extends ConsumerWidget {
+class _IpQualitySheet extends ConsumerStatefulWidget {
   const _IpQualitySheet({required this.ip});
-
   final String ip;
+  @override
+  ConsumerState<_IpQualitySheet> createState() => _IpQualitySheetState();
+}
+
+class _IpQualitySheetState extends ConsumerState<_IpQualitySheet> {
+  late IpQualityProbe _probe;
+  late ProviderSubscription<IpQualityProbe> _observation;
+  @override
+  void initState() {
+    super.initState();
+    _observation = ref.listenManual(ipQualityProbeProvider.notifier, (
+      previous,
+      next,
+    ) {
+      previous?.unwatch(widget.ip, automatic: false);
+      _probe = next;
+      _probe.watch(widget.ip, automatic: false);
+    }, fireImmediately: true);
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localizations = context.appLocalizations;
-    final isLoading = ref.watch(
-      ipQualityProvider(ip).select((result) => result.isLoading),
+  void dispose() {
+    _observation.close();
+    _probe.unwatch(widget.ip, automatic: false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.appLocalizations;
+    final ip = widget.ip;
+    final entry = ref.watch(
+      ipQualityProbeProvider.select((s) => s.entryOf(ip)),
     );
+    final quality = entry.value;
+    final proxied = ref.watch(routeTrackerProvider.select((s) => s.proxied));
+    Widget text(String? value) => Text(value ?? l.unknown);
+    String flag(bool? value) => value == null
+        ? l.unknown
+        : value
+        ? l.yes
+        : l.no;
     final page = CommonScaffold(
-      title: localizations.outboundIp,
-      actions: [
-        AppBarActionButton(
-          data: IconButtonData(
-            glyph: AppGlyphs.refresh,
-            tooltip: localizations.ipQualityRetry,
-            isLoading: isLoading,
-            onPressed: () => ref.invalidate(ipQualityProvider(ip)),
+      title: l.outboundIp,
+      body: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(l.ipClassificationDisclosure),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: entry.isLoading ? null : () => _probe.refresh([ip]),
+            child: Text(l.ipClassificationStart),
           ),
-        ),
-      ],
-      body: _IpQualityDetail(ip: ip),
+          if (entry.isLoading)
+            Text(
+              entry.phase == ProbePhase.queued ? l.ipLookupWaiting : l.loading,
+            ),
+          if (entry.phase == ProbePhase.failed)
+            Text(ipLookupReason(context, entry.reason)),
+          if (entry.phase == ProbePhase.empty) Text(l.ipLookupNotChecked),
+          if (entry.expired) Text(l.ipLookupStale),
+          if (quality?.warning == true) Text(l.ipLookupSourceWarning),
+          generateSectionV3(
+            title: l.basicInfo,
+            items: [
+              DetailRow(
+                title: l.ipAddress,
+                copyText: ip,
+                value: IpQualityText(ip: ip),
+              ),
+              DetailRow(
+                title: l.requestMode,
+                value: Text(proxied ? l.ipLookupRoutes : l.direct),
+              ),
+              DetailRow(
+                title: l.ipQualitySource,
+                value: const Text('proxycheck.io'),
+              ),
+              DetailRow(
+                title: l.ipLookupCheckedAt,
+                value: text(quality?.checkedAt?.toLocal().toString()),
+              ),
+              DetailRow(
+                title: l.ipType,
+                value: text(quality?.type?.label(context)),
+              ),
+            ],
+          ),
+          generateSectionV3(
+            title: l.ipFlags,
+            items: [
+              DetailRow(
+                title: l.ipFlagProxy,
+                value: Text(flag(quality?.isProxy)),
+              ),
+              DetailRow(title: l.ipFlagVpn, value: Text(flag(quality?.isVpn))),
+              DetailRow(title: l.ipFlagTor, value: Text(flag(quality?.isTor))),
+              DetailRow(
+                title: l.ipFlagCompromised,
+                value: Text(flag(quality?.isCompromised)),
+              ),
+              DetailRow(
+                title: l.ipFlagHosting,
+                value: Text(flag(quality?.isHosting)),
+              ),
+              DetailRow(
+                title: l.ipFlagAnonymous,
+                value: Text(flag(quality?.isAnonymous)),
+              ),
+              DetailRow(
+                title: l.ipFlagScraper,
+                value: Text(flag(quality?.isScraper)),
+              ),
+            ],
+          ),
+          generateSectionV3(
+            title: l.network,
+            items: [
+              DetailRow(
+                title: l.ipOrganization,
+                copyText: quality?.organization,
+                value: text(quality?.organization),
+              ),
+              DetailRow(
+                title: l.ipAsn,
+                value: text(quality?.asn == null ? null : 'AS${quality!.asn}'),
+              ),
+            ],
+          ),
+          ConfigToggleItem(
+            selector: appSettingProvider.select((s) => s.hideIp),
+            title: (l) => l.hideIp,
+            subtitle: (l) => l.ipLookupDisplayOnly,
+            onChanged: (ref, value) => ref
+                .read(appSettingProvider.notifier)
+                .update((s) => s.copyWith(hideIp: value)),
+          ),
+        ],
+      ),
     );
     if (!isSheetPage(context)) return page;
     return ConstrainedBox(
@@ -55,182 +173,5 @@ class _IpQualitySheet extends ConsumerWidget {
       ),
       child: page,
     );
-  }
-}
-
-class _HideIpItem extends ConsumerWidget {
-  const _HideIpItem();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hideIp = ref.watch(
-      appSettingProvider.select((state) => state.hideIp),
-    );
-    void update(bool value) => ref
-        .read(appSettingProvider.notifier)
-        .update((state) => state.copyWith(hideIp: value));
-    return DecorationListItem(
-      title: Text(context.appLocalizations.hideIp),
-      onPressed: () => update(!hideIp),
-      trailing: Switch(value: hideIp, onChanged: update),
-    );
-  }
-}
-
-class _IpQualityDetail extends ConsumerWidget {
-  const _IpQualityDetail({required this.ip});
-
-  /// The optical edge of the xl-radius cards, as in the memory sheet.
-  static const _tipInset = 5.0;
-
-  final String ip;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localizations = context.appLocalizations;
-    final result = ref.watch(ipQualityProvider(ip));
-    final quality = result.value;
-    final error = result.error;
-    final failed = quality == null && !result.isLoading;
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ).copyWith(bottom: 20, top: context.contentTopPadding),
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(_tipInset, 8, _tipInset, 0),
-          child: Text(
-            localizations.detectionTip,
-            style: context.textTheme.bodyLarge?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        generateSectionV3(
-          title: localizations.basicInfo,
-          items: [
-            DetailRow(
-              title: localizations.ipAddress,
-              copyText: ip,
-              value: IpQualityText(ip: ip),
-            ),
-            if (failed)
-              DetailRow(
-                title: localizations.ipType,
-                value: Text(
-                  localizations.ipQualityFailed,
-                  style: TextStyle(color: context.colorScheme.error),
-                ),
-              )
-            else
-              ..._qualityRows(context, quality),
-          ],
-        ),
-        if (!failed)
-          generateSectionV3(
-            title: localizations.network,
-            items: _networkRows(context, quality),
-          ),
-        if (failed && error is IpQualityLookupException)
-          generateSectionV3(
-            title: localizations.ipQualitySources,
-            items: [
-              for (final failure in error.failures)
-                DetailRow(
-                  title: failure.source.label,
-                  value: Text(failure.status.label(context)),
-                ),
-            ],
-          ),
-        generateSectionV3(
-          title: localizations.other,
-          items: const [_HideIpItem()],
-        ),
-      ],
-    );
-  }
-
-  /// A lookup still running lays out every row it will fill, so the page
-  /// keeps its height when the values arrive.
-  List<Widget> _qualityRows(BuildContext context, IpQuality? quality) {
-    final localizations = context.appLocalizations;
-    if (quality == null) {
-      return [
-        DetailRow(
-          title: localizations.ipQualityLevel,
-          value: const SkeletonText(width: 40),
-        ),
-        DetailRow(
-          title: localizations.ipType,
-          value: const SkeletonText(width: 64),
-        ),
-        DetailRow(
-          title: localizations.ipFlags,
-          value: const SkeletonText(width: 40),
-        ),
-      ];
-    }
-    final flags = [
-      if (quality.isTor) localizations.ipFlagTor,
-      if (quality.isAbuser) localizations.ipFlagAbuser,
-      if (quality.isVpn) localizations.ipFlagVpn,
-      if (quality.isProxy) localizations.ipFlagProxy,
-    ];
-    return [
-      DetailRow(
-        title: localizations.ipQualityLevel,
-        value: Text(
-          quality.level.label(context),
-          style: TextStyle(color: quality.level.color(context)),
-        ),
-      ),
-      DetailRow(
-        title: localizations.ipType,
-        value: Text(quality.type.label(context)),
-      ),
-      DetailRow(
-        title: localizations.ipFlags,
-        value: flags.isEmpty
-            ? Text(localizations.none)
-            : Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                alignment: WrapAlignment.end,
-                children: [for (final flag in flags) MetaChip(label: flag)],
-              ),
-      ),
-    ];
-  }
-
-  List<Widget> _networkRows(BuildContext context, IpQuality? quality) {
-    final localizations = context.appLocalizations;
-    Widget valueOf(String? text, {required double width}) =>
-        switch ((quality, text)) {
-          (null, _) => SkeletonText(width: width),
-          (_, final text?) => Text(text),
-          _ => const Text('—'),
-        };
-    final organization = quality?.organization;
-    final asn = switch (quality?.asn) {
-      final asn? => 'AS$asn',
-      null => null,
-    };
-    return [
-      DetailRow(
-        title: localizations.ipOrganization,
-        copyText: organization,
-        value: valueOf(organization, width: 120),
-      ),
-      DetailRow(
-        title: localizations.ipAsn,
-        copyText: asn,
-        value: valueOf(asn, width: 56),
-      ),
-      DetailRow(
-        title: localizations.ipQualitySource,
-        value: valueOf(quality?.source.label, width: 72),
-      ),
-    ];
   }
 }

@@ -8,26 +8,18 @@ abstract class IpQuality with _$IpQuality {
   const factory IpQuality({
     required String ip,
     required IpQualitySource source,
-    required IpType type,
+    IpType? type,
+    DateTime? checkedAt,
     String? organization,
     int? asn,
-    @Default(false) bool isProxy,
-    @Default(false) bool isVpn,
-    @Default(false) bool isTor,
-    @Default(false) bool isAbuser,
+    bool? isProxy,
+    bool? isVpn,
+    bool? isTor,
+    bool? isCompromised,
+    bool? isHosting,
+    bool? isAnonymous,
+    bool? isScraper,
+    @Default(false) bool warning,
+    Duration? retryAfter,
   }) = _IpQuality;
-}
-
-extension IpQualityExt on IpQuality {
-  IpQualityLevel get level {
-    if (isTor || isAbuser) {
-      return IpQualityLevel.risky;
-    }
-    return switch (type) {
-      IpType.residential ||
-      IpType.mobile ||
-      IpType.business => IpQualityLevel.good,
-      IpType.hosting => IpQualityLevel.normal,
-    };
-  }
 }

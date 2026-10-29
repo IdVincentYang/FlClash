@@ -23,12 +23,14 @@ class ProbeEntry<V> {
     this.value,
     this.stamp,
     this.expired = false,
+    this.reason,
   });
 
   final ProbePhase phase;
   final V? value;
   final RouteStamp? stamp;
   final bool expired;
+  final String? reason;
 
   bool get isLoading =>
       phase == ProbePhase.probing || phase == ProbePhase.queued;
@@ -39,10 +41,11 @@ class ProbeEntry<V> {
       other.phase == phase &&
       other.value == value &&
       other.stamp == stamp &&
-      other.expired == expired;
+      other.expired == expired &&
+      other.reason == reason;
 
   @override
-  int get hashCode => Object.hash(phase, value, stamp, expired);
+  int get hashCode => Object.hash(phase, value, stamp, expired, reason);
 }
 
 @immutable
@@ -73,12 +76,14 @@ class RoutedProbeState<K, V> {
 class ProbeAnswer<V> {
   const ProbeAnswer({
     this.value,
+    this.reason,
     this.coreEpoch,
     this.picksVersion,
     this.chains = const [],
   });
 
   final V? value;
+  final String? reason;
   final int? coreEpoch;
   final int? picksVersion;
   final List<String> chains;
@@ -105,6 +110,16 @@ mixin RoutedProbe<K, V>
   ProbeSchedule? get probeSchedule => null;
 
   @protected
+  bool get waitsForRoute => true;
+
+  @protected
+  bool get sharedInterval => false;
+
+  Duration? _lastLaunch(K target) =>
+      sharedInterval ? _sourceLaunchedAt : _launchedAt[target];
+  Duration? _sourceLaunchedAt;
+
+  @protected
   bool Function() captureProbeGuard(K target) {
     final run = _inFlight[target]?.id;
     return () =>
@@ -120,7 +135,14 @@ mixin RoutedProbe<K, V>
   bool isEligible(K target) => true;
 
   @protected
+  bool isManualProbe(K target) =>
+      _inFlight[target]?.forced == true || _due[target]?.forced == true;
+
+  @protected
   bool allowsAutomatic(K target) => true;
+
+  @protected
+  bool cancelManualOnUnwatch(K target) => !allowsAutomatic(target);
 
   bool _automatic(K target) =>
       (_automaticWatchers[target] ?? 0) > 0 &&
@@ -162,7 +184,7 @@ mixin RoutedProbe<K, V>
 
     for (final target in _due.keys) {
       if (!isEligible(target)) continue;
-      final last = _launchedAt[target];
+      final last = _lastLaunch(target);
       if (last != null) {
         final left = schedule.minimumInterval - (monotonicElapsed - last);
         if (left > Duration.zero) consider(left);
@@ -256,14 +278,22 @@ mixin RoutedProbe<K, V>
 
   @protected
   RoutedProbeState<K, V> buildProbe() {
+    _clock.start();
     _tracker = ref.read(routeTrackerProvider.notifier);
+    final tracker = _tracker;
     ref.onDispose(() {
       _wake?.cancel();
+      _wake = null;
       _clock.stop();
-      if (_routeHeld) scheduleMicrotask(_tracker.detach);
+      if (_routeHeld) scheduleMicrotask(tracker.detach);
+      _routeHeld = false;
       for (final target in _inFlight.keys.toList()) {
         cancelProbe(target);
       }
+      _inFlight.clear();
+      _due.clear();
+      _completedAt.clear();
+      _staleUnder.clear();
     });
     _route = ref.read(routeTrackerProvider);
     ref.listen(routeTrackerProvider, _onRoute);
@@ -294,6 +324,11 @@ mixin RoutedProbe<K, V>
         _armWake();
       }
     });
+    scheduleMicrotask(() {
+      if (!ref.mounted) return;
+      _holdRoute();
+      _armWake();
+    });
     return RoutedProbeState<K, V>();
   }
 
@@ -319,6 +354,7 @@ mixin RoutedProbe<K, V>
   }
 
   void unwatch(K target, {bool automatic = true}) {
+    if (!ref.mounted) return;
     final count = _watchers[target];
     if (count == null) return;
     if (automatic) {
@@ -337,7 +373,8 @@ mixin RoutedProbe<K, V>
     if (probeSchedule == null) {
       if (!_watchers.containsKey(target)) cancelProbe(target);
     } else {
-      final closed = !allowsAutomatic(target) && !_watchers.containsKey(target);
+      final closed =
+          cancelManualOnUnwatch(target) && !_watchers.containsKey(target);
       final run = _inFlight[target];
       if (closed || run != null && !run.forced && !_automatic(target)) {
         _inFlight.remove(target);
@@ -422,9 +459,17 @@ mixin RoutedProbe<K, V>
       if (probeSchedule != null && ref.read(appVisibleProvider)) {
         final entries = Map<K, ProbeEntry<V>>.of(state.entries);
         for (final target in _due.keys.where(isEligible)) {
-          entries[target] = ProbeEntry(phase: ProbePhase.queued);
+          entries[target] = ProbeEntry(
+            phase: waitsForRoute ? ProbePhase.queued : ProbePhase.failed,
+            reason: waitsForRoute ? null : 'route-unavailable',
+          );
         }
         state = RoutedProbeState(entries);
+        if (!waitsForRoute) {
+          _due.clear();
+          _holdRoute();
+          _armWake();
+        }
       }
       return;
     }
@@ -437,7 +482,9 @@ mixin RoutedProbe<K, V>
       if (!wanted || (_inFlight.containsKey(target) && !due.supersede)) {
         continue;
       }
-      final last = _launchedAt[target];
+      final last = sharedInterval && targets.isNotEmpty
+          ? monotonicElapsed
+          : _lastLaunch(target);
       final interval = probeSchedule?.minimumInterval ?? Duration.zero;
       if (last != null && monotonicElapsed - last < interval) {
         waiting[target] = due;
@@ -468,9 +515,14 @@ mixin RoutedProbe<K, V>
     final run = ++_runs;
     for (final MapEntry(key: target, value: forced) in targets.entries) {
       _inFlight[target] = (id: run, forced: forced);
-      _launchedAt[target] = monotonicElapsed;
+      if (sharedInterval) {
+        _sourceLaunchedAt = monotonicElapsed;
+      } else {
+        _launchedAt[target] = monotonicElapsed;
+      }
     }
     _holdRoute();
+    _armWake();
     for (final target in targets.keys) {
       unawaited(_run(target, route, run));
     }
@@ -520,6 +572,7 @@ mixin RoutedProbe<K, V>
       final failed = value == null || isFailure(value);
       entries[target] = ProbeEntry(
         phase: failed ? ProbePhase.failed : ProbePhase.fresh,
+        reason: answer.reason,
         value: value,
         stamp: stamp,
       );

@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'widget_metrics.dart';
+import 'widgets/network_detection.dart';
 import 'widget_registry.dart';
 import 'widgets/core_status_button.dart';
 import 'widgets/start_button.dart';
@@ -294,6 +295,10 @@ class _AddDashboardWidgetModal extends StatelessWidget {
               .map(
                 (item) => item.wrap(
                   builder: (child) {
+                    if (dashboardWidgetOf(item) ==
+                        DashboardWidget.networkDetection) {
+                      child = const NetworkDetection(preview: true);
+                    }
                     return _AddedContainer(
                       onAdd: (from) => onAdd(item, from),
                       child: child,

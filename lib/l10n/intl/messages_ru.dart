@@ -734,20 +734,71 @@ class MessageLookup extends MessageLookupByLibrary {
     "invalidSubRule": m20,
     "ipAddress": MessageLookupByLibrary.simpleMessage("IP-адрес"),
     "ipAsn": MessageLookupByLibrary.simpleMessage("ASN"),
-    "ipFlagAbuser": MessageLookupByLibrary.simpleMessage("Злоупотребления"),
+    "ipClassificationDisclosure": MessageLookupByLibrary.simpleMessage(
+      "Кнопка отправляет этот IP в proxycheck.io по HTTPS для классификации. Сервис также видит выходной IP запроса, который может отличаться. Лимит без регистрации — 100 запросов в день; запрос через прокси может быть отклонён. При отказе маршрут и источник не меняются. Нет поля — неизвестно; гарантий безопасности нет. Запрос отключает необязательное сохранение положительных проверок в панели, но не все журналы сервера.",
+    ),
+    "ipClassificationStart": MessageLookupByLibrary.simpleMessage(
+      "Классифицировать этот IP",
+    ),
+    "ipFlagAnonymous": MessageLookupByLibrary.simpleMessage("Анонимный сервис"),
+    "ipFlagCompromised": MessageLookupByLibrary.simpleMessage(
+      "Скомпрометированный узел",
+    ),
+    "ipFlagHosting": MessageLookupByLibrary.simpleMessage("Признак хостинга"),
     "ipFlagProxy": MessageLookupByLibrary.simpleMessage("Прокси"),
+    "ipFlagScraper": MessageLookupByLibrary.simpleMessage(
+      "Сервис сбора данных",
+    ),
     "ipFlagTor": MessageLookupByLibrary.simpleMessage("Tor"),
     "ipFlagVpn": MessageLookupByLibrary.simpleMessage("VPN"),
     "ipFlags": MessageLookupByLibrary.simpleMessage("Метки"),
+    "ipLookupAutomatic": MessageLookupByLibrary.simpleMessage(
+      "Автопроверка на панели",
+    ),
+    "ipLookupBodyLimit": MessageLookupByLibrary.simpleMessage(
+      "Слишком большой ответ",
+    ),
+    "ipLookupCancelled": MessageLookupByLibrary.simpleMessage("Запрос отменён"),
+    "ipLookupCheckedAt": MessageLookupByLibrary.simpleMessage(
+      "Время наблюдения",
+    ),
+    "ipLookupDisclosure": MessageLookupByLibrary.simpleMessage(
+      "Проверка выходного IP и страны через Cloudflare по HTTPS. Автопроверка работает только на открытой панели, когда приложение на переднем плане и служба запущена. Результат не описывает все сайты.",
+    ),
+    "ipLookupDisplayOnly": MessageLookupByLibrary.simpleMessage(
+      "Скрывает только отображение. Копируется исходный IP; сетевые запросы не блокируются.",
+    ),
+    "ipLookupHttpFailed": MessageLookupByLibrary.simpleMessage(
+      "Источник отклонил запрос",
+    ),
+    "ipLookupInvalid": MessageLookupByLibrary.simpleMessage(
+      "Недопустимый или неполный ответ",
+    ),
+    "ipLookupIpMismatch": MessageLookupByLibrary.simpleMessage(
+      "IP в ответе не совпадает",
+    ),
+    "ipLookupManual": MessageLookupByLibrary.simpleMessage(
+      "Проверить выходной IP",
+    ),
+    "ipLookupNotChecked": MessageLookupByLibrary.simpleMessage("Не проверено"),
+    "ipLookupRoutes": MessageLookupByLibrary.simpleMessage("Текущие правила"),
+    "ipLookupSourceWarning": MessageLookupByLibrary.simpleMessage(
+      "Предупреждение источника: результат получен, но возможны ограничения квоты или доступа.",
+    ),
+    "ipLookupStale": MessageLookupByLibrary.simpleMessage(
+      "Предыдущее наблюдение",
+    ),
+    "ipLookupTlsFailed": MessageLookupByLibrary.simpleMessage(
+      "Проверка сертификата не пройдена",
+    ),
+    "ipLookupWaiting": MessageLookupByLibrary.simpleMessage(
+      "Ожидание интервала 30 секунд",
+    ),
     "ipOrganization": MessageLookupByLibrary.simpleMessage("Организация"),
     "ipQualityFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось определить тип IP",
     ),
-    "ipQualityGood": MessageLookupByLibrary.simpleMessage("Хороший"),
-    "ipQualityLevel": MessageLookupByLibrary.simpleMessage("Уровень"),
-    "ipQualityNormal": MessageLookupByLibrary.simpleMessage("Обычный"),
     "ipQualityRetry": MessageLookupByLibrary.simpleMessage("Проверить снова"),
-    "ipQualityRisky": MessageLookupByLibrary.simpleMessage("Рискованный"),
     "ipQualitySource": MessageLookupByLibrary.simpleMessage("Источник ответа"),
     "ipQualitySources": MessageLookupByLibrary.simpleMessage("Источники"),
     "ipSourceIpMismatch": MessageLookupByLibrary.simpleMessage(
@@ -760,8 +811,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ipType": MessageLookupByLibrary.simpleMessage("Тип"),
     "ipTypeBusiness": MessageLookupByLibrary.simpleMessage("Бизнес"),
     "ipTypeHosting": MessageLookupByLibrary.simpleMessage("Дата-центр"),
-    "ipTypeMobile": MessageLookupByLibrary.simpleMessage("Мобильная сеть"),
     "ipTypeResidential": MessageLookupByLibrary.simpleMessage("Домашний"),
+    "ipTypeWireless": MessageLookupByLibrary.simpleMessage(
+      "Беспроводной (сотовая или спутниковая связь)",
+    ),
     "ipv6Desc": MessageLookupByLibrary.simpleMessage(
       "При включении можно принимать трафик IPv6",
     ),

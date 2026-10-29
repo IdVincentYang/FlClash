@@ -458,24 +458,14 @@ enum DashboardWidget {
 
 enum DnsQueryInitiator { app, rule, direct, proxy, other }
 
-enum IpType { residential, mobile, business, hosting }
-
-enum IpQualityLevel { good, normal, risky }
+enum IpType { residential, wireless, business, hosting }
 
 enum IpQualitySource {
-  identMe('ident.me'),
-  ipApiCom('ip-api.com'),
-  ipQuery('ipquery.io'),
-  ipLocate('iplocate.io'),
-  proxyCheck('proxycheck.io'),
-  ipApiIs('ipapi.is');
+  proxyCheck('proxycheck.io');
 
   const IpQualitySource(this.label);
-
   final String label;
 }
-
-enum IpQualitySourceStatus { noType, timeout, rateLimited, failed, ipMismatch }
 
 enum GeodataLoader { standard, memconservative }
 

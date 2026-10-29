@@ -169,7 +169,7 @@ void main() {
           ),
         ),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-        ipQualityProvider.overrideWith(
+        ipQualityProbeProvider.overrideWithBuild(
           (_, _) => throw StateError('Diagnostics requested IP quality'),
         ),
       ],

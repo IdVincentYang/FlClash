@@ -177,6 +177,7 @@ abstract class ProbeResult with _$ProbeResult {
 }
 
 @freezed
+/// Only the fixed Cloudflare trace URL is accepted; timeout is remaining round time in milliseconds.
 abstract class OutboundIpParams with _$OutboundIpParams {
   const factory OutboundIpParams({
     @JsonKey(name: 'proxy-name') @Default('') String proxyName,

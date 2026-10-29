@@ -1,60 +1,89 @@
-import 'dart:async';
-
-import 'package:dio/dio.dart';
-import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/ip_lookup.dart';
 import 'package:fl_clash/common/ip_quality.dart';
-import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/enum/enum.dart';
+
+import 'app.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'request_state.dart';
+
+import 'route_state.dart';
+import 'routed_probe.dart';
 
 part 'generated/ip_quality.g.dart';
 
-Duration? _noRetry(int retryCount, Object error) => null;
-
 @Riverpod(keepAlive: true)
-Duration ipQualityFailureCooldown(Ref ref) => const Duration(minutes: 5);
-
-@Riverpod(retry: _noRetry)
-Future<IpQuality> ipQuality(Ref ref, String ip) async {
-  if (system.isAndroid) ref.watch(nativeRequestStateProvider);
-  final cancelToken = CancelToken();
-  final session = await request.begin(
-    key: 'ipQuality:$ip',
-    url: 'https://ipwho.is/$ip',
-    automatic: true,
-  );
-  if (!ref.mounted) {
-    session.close();
-    throw const RequestUnavailable('request_cancelled');
+class IpQualityProbe extends _$IpQualityProbe
+    with RoutedProbe<String, IpQuality> {
+  @override
+  RoutedProbeState<String, IpQuality> build() {
+    ref.listen(currentPageLabelProvider, (_, _) => reconcileEligibility());
+    return buildProbe();
   }
-  ref.onDispose(session.close);
-  unawaited(session.cancelToken.whenCancel.then((_) => cancelToken.cancel()));
-  ref.onDispose(cancelToken.cancel);
-  try {
-    final quality = await lookupIpQuality(
-      session.dio,
-      ip,
-      cancelToken: cancelToken,
-    );
-    await session.check();
-    ref.keepAlive();
-    return quality;
-  } on IpQualityLookupException catch (error) {
-    if (!ref.mounted) {
-      rethrow;
+
+  @override
+  bool isEligible(String target) =>
+      ref.read(currentPageLabelProvider) == PageLabel.dashboard;
+
+  @override
+  bool get waitsForRoute => false;
+
+  @override
+  bool get sharedInterval => true;
+
+  @override
+  ProbeSchedule get probeSchedule => const ProbeSchedule(
+    minimumInterval: Duration(seconds: 30),
+    maxAge: Duration(minutes: 5),
+  );
+
+  @override
+  bool allowsAutomatic(String target) => false;
+
+  @override
+  void cancelProbe(String target) =>
+      requestClient.cancelKey('ipQuality:$target');
+
+  Request get requestClient => request;
+
+  Duration _retryNotBefore = Duration.zero;
+
+  @override
+  Future<Map<String, ProbeAnswer<IpQuality>>> probe(
+    String target,
+    RouteState route,
+  ) async {
+    if (monotonicElapsed < _retryNotBefore) {
+      return {target: const ProbeAnswer(reason: 'rate-limited')};
     }
-    commonPrint.log(
-      'ip quality lookup failed for $ip: '
-      '${error.failures.map((f) => '${f.source.label} ${f.status.name}').join(', ')}',
-      logLevel: LogLevel.warning,
-    );
-    await session.check();
-    final link = ref.keepAlive();
-    final timer = Timer(ref.read(ipQualityFailureCooldownProvider), link.close);
-    ref.onDispose(timer.cancel);
-    rethrow;
-  } finally {
-    session.close();
+    final current = captureProbeGuard(target);
+    final address = publicIp(target);
+    if (address == null) {
+      return {target: const ProbeAnswer(reason: 'invalid-ip')};
+    }
+    final url = classificationUri(address.address);
+    try {
+      final value = await withIpSession(
+        client: requestClient,
+        key: 'ipQuality:$target',
+        url: url.toString(),
+        timeout: const Duration(seconds: 8),
+        current: current,
+        action: (session, _) => lookupIpQuality(
+          session.dio,
+          address.address,
+          cancelToken: session.cancelToken,
+        ),
+      );
+      if (value.retryAfter != null) {
+        _retryNotBefore = monotonicElapsed + value.retryAfter!;
+      }
+      return {target: ProbeAnswer(value: value)};
+    } on IpLookupException catch (error) {
+      if (error.retryAfter != null) {
+        _retryNotBefore = monotonicElapsed + error.retryAfter!;
+      }
+      return {target: ProbeAnswer(reason: error.code)};
+    }
   }
 }

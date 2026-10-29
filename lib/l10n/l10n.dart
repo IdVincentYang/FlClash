@@ -5583,26 +5583,6 @@ class AppLocalizations {
     return Intl.message('IP address', name: 'ipAddress', desc: '', args: []);
   }
 
-  /// `Level`
-  String get ipQualityLevel {
-    return Intl.message('Level', name: 'ipQualityLevel', desc: '', args: []);
-  }
-
-  /// `Good`
-  String get ipQualityGood {
-    return Intl.message('Good', name: 'ipQualityGood', desc: '', args: []);
-  }
-
-  /// `Normal`
-  String get ipQualityNormal {
-    return Intl.message('Normal', name: 'ipQualityNormal', desc: '', args: []);
-  }
-
-  /// `Risky`
-  String get ipQualityRisky {
-    return Intl.message('Risky', name: 'ipQualityRisky', desc: '', args: []);
-  }
-
   /// `Type`
   String get ipType {
     return Intl.message('Type', name: 'ipType', desc: '', args: []);
@@ -5613,16 +5593,6 @@ class AppLocalizations {
     return Intl.message(
       'Residential',
       name: 'ipTypeResidential',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Mobile network`
-  String get ipTypeMobile {
-    return Intl.message(
-      'Mobile network',
-      name: 'ipTypeMobile',
       desc: '',
       args: [],
     );
@@ -5661,16 +5631,6 @@ class AppLocalizations {
   /// `Tor`
   String get ipFlagTor {
     return Intl.message('Tor', name: 'ipFlagTor', desc: '', args: []);
-  }
-
-  /// `Abuse history`
-  String get ipFlagAbuser {
-    return Intl.message(
-      'Abuse history',
-      name: 'ipFlagAbuser',
-      desc: '',
-      args: [],
-    );
   }
 
   /// `Organization`
@@ -7348,6 +7308,236 @@ class AppLocalizations {
     return Intl.message(
       'This request could not establish a response',
       name: 'serviceConnectFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checks your request exit and country with Cloudflare over HTTPS. Automatic checks run only while the app is in front, the dashboard is shown and the service is running. One observation does not describe every website.`
+  String get ipLookupDisclosure {
+    return Intl.message(
+      'Checks your request exit and country with Cloudflare over HTTPS. Automatic checks run only while the app is in front, the dashboard is shown and the service is running. One observation does not describe every website.',
+      name: 'ipLookupDisclosure',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This button sends this IP to proxycheck.io over HTTPS for classification. The service also sees the request exit IP, which may differ. Anonymous use is limited to 100 queries a day and may be refused from proxy exits. Refusal never changes the route or source. Missing fields mean unknown; no safety guarantee. The request disables optional positive-detection dashboard saving, not all server logging.`
+  String get ipClassificationDisclosure {
+    return Intl.message(
+      'This button sends this IP to proxycheck.io over HTTPS for classification. The service also sees the request exit IP, which may differ. Anonymous use is limited to 100 queries a day and may be refused from proxy exits. Refusal never changes the route or source. Missing fields mean unknown; no safety guarantee. The request disables optional positive-detection dashboard saving, not all server logging.',
+      name: 'ipClassificationDisclosure',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Automatic on dashboard`
+  String get ipLookupAutomatic {
+    return Intl.message(
+      'Automatic on dashboard',
+      name: 'ipLookupAutomatic',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check exit IP`
+  String get ipLookupManual {
+    return Intl.message(
+      'Check exit IP',
+      name: 'ipLookupManual',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Classify this IP`
+  String get ipClassificationStart {
+    return Intl.message(
+      'Classify this IP',
+      name: 'ipClassificationStart',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Not checked`
+  String get ipLookupNotChecked {
+    return Intl.message(
+      'Not checked',
+      name: 'ipLookupNotChecked',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Previous observation`
+  String get ipLookupStale {
+    return Intl.message(
+      'Previous observation',
+      name: 'ipLookupStale',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observed at`
+  String get ipLookupCheckedAt {
+    return Intl.message(
+      'Observed at',
+      name: 'ipLookupCheckedAt',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Current rules`
+  String get ipLookupRoutes {
+    return Intl.message(
+      'Current rules',
+      name: 'ipLookupRoutes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Display only; copying uses the original IP. This setting does not stop network queries.`
+  String get ipLookupDisplayOnly {
+    return Intl.message(
+      'Display only; copying uses the original IP. This setting does not stop network queries.',
+      name: 'ipLookupDisplayOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Waiting for the 30-second interval`
+  String get ipLookupWaiting {
+    return Intl.message(
+      'Waiting for the 30-second interval',
+      name: 'ipLookupWaiting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Response too large`
+  String get ipLookupBodyLimit {
+    return Intl.message(
+      'Response too large',
+      name: 'ipLookupBodyLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Response IP does not match`
+  String get ipLookupIpMismatch {
+    return Intl.message(
+      'Response IP does not match',
+      name: 'ipLookupIpMismatch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Invalid or incomplete response`
+  String get ipLookupInvalid {
+    return Intl.message(
+      'Invalid or incomplete response',
+      name: 'ipLookupInvalid',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Certificate verification failed`
+  String get ipLookupTlsFailed {
+    return Intl.message(
+      'Certificate verification failed',
+      name: 'ipLookupTlsFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source rejected the request`
+  String get ipLookupHttpFailed {
+    return Intl.message(
+      'Source rejected the request',
+      name: 'ipLookupHttpFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Query cancelled`
+  String get ipLookupCancelled {
+    return Intl.message(
+      'Query cancelled',
+      name: 'ipLookupCancelled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Wireless (cellular or satellite)`
+  String get ipTypeWireless {
+    return Intl.message(
+      'Wireless (cellular or satellite)',
+      name: 'ipTypeWireless',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Compromised`
+  String get ipFlagCompromised {
+    return Intl.message(
+      'Compromised',
+      name: 'ipFlagCompromised',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Hosting detection`
+  String get ipFlagHosting {
+    return Intl.message(
+      'Hosting detection',
+      name: 'ipFlagHosting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Anonymous detection`
+  String get ipFlagAnonymous {
+    return Intl.message(
+      'Anonymous detection',
+      name: 'ipFlagAnonymous',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Scraper detection`
+  String get ipFlagScraper {
+    return Intl.message(
+      'Scraper detection',
+      name: 'ipFlagScraper',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source warning: the result was returned, but quota or access restrictions may apply.`
+  String get ipLookupSourceWarning {
+    return Intl.message(
+      'Source warning: the result was returned, but quota or access restrictions may apply.',
+      name: 'ipLookupSourceWarning',
       desc: '',
       args: [],
     );

@@ -107,6 +107,19 @@ void main() {
   });
 
   group('AppSettingProps JSON round-trip', () {
+    test('new and old settings default to manual outbound IP queries', () {
+      expect(const AppSettingProps().automaticOutboundIp, isFalse);
+      expect(
+        AppSettingProps.fromJson({'hideIp': true}).automaticOutboundIp,
+        isFalse,
+      );
+      expect(
+        AppSettingProps.fromJson({
+          'automaticOutboundIp': true,
+        }).automaticOutboundIp,
+        isTrue,
+      );
+    });
     for (final accepted in [false, true]) {
       test('ignores removed disclaimer state $accepted in old settings', () {
         final restored = AppSettingProps.fromJson({

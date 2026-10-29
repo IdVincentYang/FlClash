@@ -150,7 +150,9 @@ abstract class CoreHandlerInterface with CoreInterface {
     return await handleWatch(
       onStart: () {
         commonPrint.log(
-          'Invoke method ${method.name} ${DateTime.now()} $arguments',
+          method == CoreMethod.outboundIp
+              ? 'Invoke method outboundIp'
+              : 'Invoke method ${method.name} ${DateTime.now()} $arguments',
         );
       },
       function: () async {

@@ -12,11 +12,19 @@ class FlClashHttpOverrides extends HttpOverrides {
 
   FlClashHttpOverrides(this._container);
 
-  static String findProxyFor(ProviderContainer container, Uri url) {
-    return findProxyForReader(container.read, url);
+  static String findProxyFor(
+    ProviderContainer container,
+    Uri url, {
+    bool logRequest = true,
+  }) {
+    return findProxyForReader(container.read, url, logRequest: logRequest);
   }
 
-  static String findProxyForReader(ProviderReader read, Uri url) {
+  static String findProxyForReader(
+    ProviderReader read,
+    Uri url, {
+    bool logRequest = true,
+  }) {
     if ([localhost].contains(url.host)) {
       return 'DIRECT';
     }
@@ -25,7 +33,7 @@ class FlClashHttpOverrides extends HttpOverrides {
     }
     final isStart = read(isStartProvider);
     final suspend = read(suspendProvider);
-    commonPrint.log('find $url proxy: $isStart');
+    if (logRequest) commonPrint.log('find $url proxy: $isStart');
     if (!isStart || suspend) return 'DIRECT';
     final mixedPort = read(
       patchClashConfigProvider.select((state) => state.mixedPort),

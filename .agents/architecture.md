@@ -252,9 +252,10 @@ failure shows at once, a stop cancels it, and a failure still standing when it e
 
 ## Route Consistency
 
-A probe result on the dashboard — the exit IP, a node's exit IP, a service check — either describes the route in
-force or is being asked again. The full design is `docs/plans/probe-route-consistency.md`; the mechanism has three
-parts.
+A dashboard probe result is judged against the current route. Invalidated
+manual observations require another
+explicit action; eligible automatic observations follow their provider
+schedule. The mechanism has three parts.
 
 - The Core is the source of truth for the route. `core/route.go` keeps a structural epoch (advanced by a config
   apply, a mode or IPv6 switch, any proxy provider whose version changed, and any rule set that loaded new content,
@@ -273,21 +274,32 @@ parts.
   It also releases the Core while the app is hidden and reads it again on return, keeping `synced`: the Core and its
   counters are the same ones, so the fresh snapshot invalidates only what moved. On Android the Core drops the watch
   itself when the event listener is cleared, because an engine that goes away never sends `watchRoute(false)`.
-- `RoutedProbe` in `lib/providers/routed_probe.dart` is the one cache both `OutboundIpProbe` and `ServiceStatus` mix
-  in. A widget `watch`es the target it shows and `unwatch`es on the way out; only watched targets are probed, one
-  request in flight per target. An answer is stamped with the Core's counters and the host state at launch, and
-  `RouteState.isFresh` walks its chain against the picks, so a selection change only invalidates results that went
-  through the changed group while an epoch change invalidates everything. A stale watched entry is asked again at
-  once; an unwatched one is dropped. Nothing launches while the app is hidden: what falls due waits for it to be shown.
-  Failures wait for `retry`, `refresh`, or the app resuming (`markResumed`), and
-  a service check that timed out is a failure that still shows its status. `refresh` is the user's own request and
-  runs for unwatched targets too: the service sheet reads the cache and never watches its rows, because one service
-  check is one to four full HTTPS fetches where a delay test is a single empty request.
+- `RoutedProbe` in `lib/providers/routed_probe.dart` owns the per-target cache,
+  request generation, watcher holds,
+  optional minimum interval/TTL and cancellation. Providers define eligibility
+  and automatic permission. Passive
+  detail watches do not send requests; explicit refresh creates a manual
+  intent. Route stamps carry the Core and
+  host counters and selected chains. Stale manual values do not silently
+  restart, while eligible automatic targets
+  can be scheduled again. Removing the relevant observer, hiding the app or
+  revoking eligibility cancels pending
+  work and prevents stale results from committing. No parallel queue or route
+  authority belongs in widget code.
 
-`ipQuality(ip)` in `lib/providers/ip_quality.dart` is keyed by the outbound IP found, so a route change reaches it as
-a new IP and an unchanged IP reuses the result. A lookup races its sources the way the IP check does and takes the
-first one that determines a type. A success is kept for the session with `ref.keepAlive()`; a failure is not cached,
-and Riverpod's automatic retry is off because a retry after an HTTP 429 spends the same per-outbound-IP quota again.
+The current IP lookup contract is [IP lookup design](../docs/features/security/ip_lookup_design.md).
+Outbound observations use one Cloudflare endpoint and never populate a
+node-wide IP alias. Classification uses
+an explicit action against one Proxycheck v3 endpoint; reading state or
+rebuilding a provider does not start a request.
+Both reuse RequestSession and RoutedProbe ownership, cancellation and route
+tracking. Rebuilding a reused notifier
+revokes old intents while retaining passive watches, source intervals and
+backoff; route holds and timers follow the
+new lifecycle. Public lookup defaults to manual, with optional foreground
+dashboard automation. Implementation and
+verification scope are recorded by L1-T08; external API availability and device
+behavior require separate evidence.
 
 ## Icons
 
