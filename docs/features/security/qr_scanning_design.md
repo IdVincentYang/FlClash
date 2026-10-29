@@ -1,8 +1,7 @@
 # Android QR scanning design
 
 Android 扫码在本地解码，输入来自 CameraX 或用户主动选择的图片。二维码只产生候选 URL；
-用户确认导入后才进入已有订阅 Request。当前实现已接入且本地实现评审通过，设备验收仍未完成；
-自动化及产物核对范围见 [T09 Result](loop1/l1_t09_result.md)。
+用户确认导入后才进入已有订阅 Request。当前实现已完成本地交付，设备验收仍未完成。
 共同判定依据为[安全要求](security_requirements.md)。
 
 ## 实现边界与职责
@@ -127,7 +126,8 @@ Dart 映射为 localized busy/timeout/read-failed 或无效二维码提示；不
 
 回归使用独立 Python writer 的固定合成 QR、真实 ZXing、ImageProxy/provider 消费者、Dart channel 和页面；
 fake UI 结果仅证明协作。原生受控 open 与注入的 read/close 阻塞分别标识，不能推导任意 provider 可被停止。
-设备 CameraX、权限、真实 Photo Picker、进程重建、光学困难集/低端机性能及 UID 运行观测仍需单独验收；
+设备 CameraX、权限、真实 Photo Picker、进程重建、光学困难集/低端机性能及 UID 运行观测
+由 [Loop 7 整体验收](loop7/loop7_plan.md)接续，执行前须取得相应设备运行许可；
 最终包静态核查不替代这些运行证据。
 
 [photo-picker]: https://developer.android.com/training/data-storage/shared/photo-picker

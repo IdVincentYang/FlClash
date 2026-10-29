@@ -65,8 +65,10 @@ upstream's MIT notice stays in `plugins/code_forge/LICENSE`.
 
 `plugins/mobile_scanner` is derived from the published 7.4.2 package (BSD-3-Clause).
 The Android backend uses ZXing Java core 3.5.4 (Apache-2.0) instead of ML Kit; other
-platform backends remain upstream. Local automated verification is recorded in the
-T09 Result; device acceptance remains pending.
+platform backends remain upstream.
+The [QR contract](../docs/features/security/qr_scanning_design.md) describes
+current behavior and unverified device boundaries; plugin maintenance includes
+regression commands.
 The root image_picker dependency still includes Android registration and a
 Manifest;
 the app removes only the exact Photo Picker installation metadata name.

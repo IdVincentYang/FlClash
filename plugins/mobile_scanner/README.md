@@ -53,10 +53,18 @@ stride/crop/rotation oracles and controlled provider/AtomicFile failures. The
 API24 storage failure model is separate from actual sdk34 execution. No writer
 or test fixture dependency is part of the runtime.
 
-The [result](../../docs/features/security/loop1/l1_t09_result.md) distinguishes
-actual local coverage from unverified device behavior. Package ARM64 through the
-existing [build guide](../../docs/development/android_build_guide.md). Inspect
+The [gallery regressions][gallery-tests] exercise native ownership and failures;
+the [import consumer tests][import-tests] cover the real Dart codec, confirmation
+and Request download/save chain with a synthetic native endpoint.
+Device CameraX, permissions, OS picker/process behavior, optical performance and
+UID observations remain unverified; [Loop 7 acceptance][device-acceptance]
+carries those checks. Package ARM64 through the existing
+[build guide](../../docs/development/android_build_guide.md). Inspect
 release graph, merger/blame, final manifest, R8 mapping, assets and native
 libraries: ZXing must have a real consumer while ML Kit/models/transport and the
 Photo Picker installation metadata must be absent. Retain the generic service,
 action and lawful providers/consumers.
+
+[gallery-tests]: android/src/test/kotlin/dev/steenbakker/mobile_scanner/QrGalleryTest.kt
+[import-tests]: ../../test/providers/qr_import_test.dart
+[device-acceptance]: ../../docs/features/security/loop7/loop7_plan.md
