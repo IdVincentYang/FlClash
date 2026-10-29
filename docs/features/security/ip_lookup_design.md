@@ -1,9 +1,8 @@
 # IP 查询设计
 
-本文件维护公网出口观测与 IP 分类的有效契约；T08 已实现、通过 M1 实现评审并完成本地合成验证。
+本文件定义公网出口观测与 IP 分类的触发、接收方和失败行为。
 依据 [共同需求](security_requirements.md)与 [Loop 1 决定](loop1/loop1_plan.md#功能决定与待细化事项)。
-实际受测对象、制品与未验证边界见 [T08 Result](loop1/l1_t08_result.md)。
-以下使用入口可在获准运行时体验；来源线上可达性与设备行为仍受文末验证范围限制。
+使用入口和验证边界见下文；来源线上可达性、分类准确性与设备行为未由本地合成测试证明。
 
 ## 用途与数据
 
@@ -73,5 +72,10 @@ IPv6 文档段包含 `2001:db8::/32` 与 `3fff::/20`，依据 [IANA Special-Purp
 
 手动出口入口给出 Cloudflare、路由模式与刷新动作；分类详情先说明 proxycheck.io 将收到被查 IP，再由按钮开始单次查询。
 结果显示来源、IP、时间，必要时标 stale／失败；分类字段分别表达 unknown。请求取消后只能由新的显式动作重试。
-使用本地合成 adapter、受控时钟、loopback HTTP/TLS／假代理验证 UI→provider→begin→Go 消费链及失败反例；
-实际通过范围由当次结果记录维护。测试不接触真实配置／凭据，不发外部测试流量，不替代设备／JNI 或全设备验收。
+本地测试使用合成 adapter、受控时钟和 loopback HTTP/TLS／假代理，覆盖请求链和失败反例：
+
+- [界面触发](../../../test/views/dashboard/network_detection_test.dart)
+- [Dart → Go 请求链](../../../test/providers/ip_lookup_bridge_test.dart)
+- [Go HTTP/TLS consumer](../../../core/outbound_ip_test.go)
+
+测试不接触真实配置／凭据，不发外部测试流量，不替代设备／JNI 或全设备验收。
