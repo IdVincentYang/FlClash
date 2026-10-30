@@ -310,6 +310,14 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
   costs one comparison per event. Holding the pending `Runnable` to `removeCallbacks` it changes no behaviour and adds
   state that has to stay in sync with the map.
 
+## Local Crash Evidence
+
+The [report contract](../docs/features/security/crash_reports_design.md) defines
+Android private evidence. Reports belong only in noBackupFilesDir,
+never app files/DB/preferences, ordinary logs, backup ZIPs or automatic uploads.
+Report persistence cannot own startup recovery or service intent. Preserve the
+original error/termination path even if capture, formatting or IO fails.
+
 ## Testing Rules
 
 The `core/` directory is excluded from automated coverage accounting. Do not add coverage instrumentation or coverage

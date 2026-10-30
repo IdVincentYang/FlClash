@@ -138,6 +138,10 @@ APK 中的库可用 `unzip -p <apk> lib/arm64-v8a/<库名>` 写入本地证据�
 这些路径覆盖现有 Go/JNI 和 R8 本地排障材料，不保证完整 Dart、Rust 或 Flutter 符号。
 符号、mapping 与 APK 均不自动上传；长期留存及工具来源审查继续由 Loop 5 处理。
 
+本地报告的[构建身份契约](../features/security/crash_reports_design.md#构建身份与隐私)
+用 APK 摘要与有限 ELF note 关联本地材料，缺失不猜测；设备行为尚未验收。
+历史退出只读其自身身份，不能套用升级后的包版本；Rust 或截断 trace 不保证取得 ID。
+
 ## 排查与维护
 
 | 现象 | 检查和处理 |

@@ -85,7 +85,9 @@ NativeRequestStateProvider 仍接受的同 epoch/revision/phase，旧观察不�
 
 guard 从 migration 读取配置之后开始，不完整覆盖更早 Rust／system／migration 故障。
 磁盘断电持久性、设备 ApplicationExitInfo 可用性和 Activity 重建需要设备验收。
-新报告保存及用户清理顺序在报告能力接入时复验；本项不能证明跨启动 dump 已保存。
+独立采集与私有保存见[本地故障报告](crash_reports_design.md)。
+报告保存与去重独立于 handledExitAt；恢复／preferences 清理不清报告，也不等待其成功。
+恢复契约不能证明跨启动 dump 已保存。
 
 ## 本地验证入口
 

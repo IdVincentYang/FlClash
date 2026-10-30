@@ -10,6 +10,7 @@ import 'package:rust_api/rust_api.dart';
 import 'application.dart';
 import 'bootstrap.dart';
 import 'common/common.dart';
+import 'common/crash_reports.dart';
 import 'common/window.dart';
 
 void main(List<String> args) {
@@ -19,14 +20,14 @@ void main(List<String> args) {
       if (Platform.isLinux) {
         linkManager.seedInitialLink(args);
       }
-      FlutterError.onError = (details) {
+      errorReports.install((details) {
         Future.microtask(() {
           commonPrint.log(
             'exception: ${details.exception} stack: ${details.stack}',
             logLevel: LogLevel.warning,
           );
         });
-      };
+      });
       try {
         await RustLib.init();
         final version = await system.init();
@@ -40,18 +41,18 @@ void main(List<String> args) {
           ),
         );
       } catch (e, s) {
-        runApp(
-          MaterialApp(
-            home: InitErrorScreen(error: e, stack: s),
-          ),
-        );
-        unawaited(window?.showInitFailure());
+        errorReports.startupError(e, s, () {
+          runApp(
+            MaterialApp(
+              home: InitErrorScreen(error: e, stack: s),
+            ),
+          );
+          unawaited(window?.showInitFailure());
+        });
       }
     },
     (error, stack) {
-      FlutterError.reportError(
-        FlutterErrorDetails(exception: error, stack: stack),
-      );
+      errorReports.reportZone(error, stack);
     },
   );
 }

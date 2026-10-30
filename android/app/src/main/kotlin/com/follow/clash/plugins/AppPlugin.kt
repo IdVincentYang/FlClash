@@ -24,6 +24,7 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
 import com.follow.clash.R
 import com.follow.clash.BootRecords
+import com.follow.clash.CrashReports
 import com.follow.clash.common.Components
 import com.follow.clash.common.GlobalState
 import com.follow.clash.common.PendingCallback
@@ -188,6 +189,8 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             "openAppSettings" -> {
                 result.success(openAppSettings())
             }
+
+            "captureErrorReport" -> CrashReports.capture(call.arguments) { result.success(it) }
 
             "bootRecord" -> BootRecords.store.handle(
                 bootGeneration,

@@ -163,6 +163,15 @@ class App {
     return methodChannel.invokeMethod<bool>('openAppSettings');
   }
 
+  Future<Map<String, Object?>> captureErrorReport(
+    Map<String, Object?> value,
+  ) async =>
+      await methodChannel.invokeMapMethod<String, Object?>(
+        'captureErrorReport',
+        value,
+      ) ??
+      const {'status': 'io'};
+
   Future<Map<String, Object?>> bootRecord(
     String action,
     Map<String, Object?> arguments,

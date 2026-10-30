@@ -126,6 +126,12 @@ owned writes to the existing boot record; `ServiceState` owns running intent.
 Normal automatic refresh for an already started service remains governed by
 T06/Request, including its post/apply path.
 
+Android private report storage follows
+[local crash reports](../docs/features/security/crash_reports_design.md).
+FlClashApplication/CrashReports collect native evidence independently of BootGuard
+and ServiceState. ErrorReports connects main.dart to AppPlugin; CrashReportStore
+owns bounded no-backup transactions. Reports never join ordinary backups.
+
 Application exit is centralized in `SystemAction` and `SystemExitCoordinator`:
 
 1. Optionally save config and clean up DNS, system proxy, and tray resources in parallel.
