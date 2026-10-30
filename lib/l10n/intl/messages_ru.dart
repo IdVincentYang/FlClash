@@ -898,6 +898,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "loading": MessageLookupByLibrary.simpleMessage("Загрузка…"),
     "local": MessageLookupByLibrary.simpleMessage("Локально"),
+    "localCrashReports": MessageLookupByLibrary.simpleMessage(
+      "Локальные отчёты о сбоях",
+    ),
     "localNetworkDeniedTip": MessageLookupByLibrary.simpleMessage(
       "Доступ к локальной сети запрещён: используется стек gvisor, локальная сеть недоступна.",
     ),
@@ -1443,6 +1446,82 @@ class MessageLookup extends MessageLookupByLibrary {
     "remove": MessageLookupByLibrary.simpleMessage("Убрать"),
     "replace": MessageLookupByLibrary.simpleMessage("Заменить"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("Заменить все"),
+    "reportBuildIdentity": MessageLookupByLibrary.simpleMessage(
+      "Данные сборки (отсутствующие поля неизвестны)",
+    ),
+    "reportBusy": MessageLookupByLibrary.simpleMessage(
+      "Занято или истекло время ожидания. Ввод-вывод может продолжаться; обновите позже.",
+    ),
+    "reportCancelled": MessageLookupByLibrary.simpleMessage(
+      "Отменено. Проверьте, не осталась ли неполная копия.",
+    ),
+    "reportCorrupt": MessageLookupByLibrary.simpleMessage(
+      "Повреждённый или неподдерживаемый элемент",
+    ),
+    "reportDeleteAll": MessageLookupByLibrary.simpleMessage(
+      "Удалить текущие отчёты",
+    ),
+    "reportDeleteWarning": MessageLookupByLibrary.simpleMessage(
+      "Удалить выбранный отчёт или все отчёты текущего снимка? Новые отчёты могут остаться. Записи дедупликации и экспортированные копии сохраняются. Новые сбои по-прежнему будут записываться.",
+    ),
+    "reportDeleted": MessageLookupByLibrary.simpleMessage(
+      "Выбранные отчёты удалены",
+    ),
+    "reportDestinationWarning": MessageLookupByLibrary.simpleMessage(
+      "Проверьте место сохранения: провайдер может синхронизировать данные с облаком. Приложение не отправляет отчёт автоматически. После отмены или сбоя может остаться неполная копия.",
+    ),
+    "reportEmpty": MessageLookupByLibrary.simpleMessage(
+      "Сохранённых отчётов нет",
+    ),
+    "reportExportRaw": MessageLookupByLibrary.simpleMessage(
+      "Экспортировать исходный отчёт (ZIP)",
+    ),
+    "reportExportSummary": MessageLookupByLibrary.simpleMessage(
+      "Экспортировать сводку (JSON)",
+    ),
+    "reportExported": MessageLookupByLibrary.simpleMessage(
+      "Сохранено и проверено",
+    ),
+    "reportFailed": MessageLookupByLibrary.simpleMessage(
+      "Операция не выполнена или выполнена частично. Обновите список и проверьте место экспорта.",
+    ),
+    "reportIntegrity": MessageLookupByLibrary.simpleMessage(
+      "Проверка целостности не пройдена. Проверьте наличие неполной копии.",
+    ),
+    "reportLimited": MessageLookupByLibrary.simpleMessage(
+      "Достигнут предел обработки каталога. Некоторые элементы не обработаны.",
+    ),
+    "reportMetadataOnly": MessageLookupByLibrary.simpleMessage(
+      "Только метаданные; trace не будет дополнен автоматически",
+    ),
+    "reportRawMissing": MessageLookupByLibrary.simpleMessage(
+      "Исходное содержимое отсутствует или не совпадает",
+    ),
+    "reportRawUnverified": MessageLookupByLibrary.simpleMessage(
+      "Исходное содержимое не проверено",
+    ),
+    "reportRawWarning": MessageLookupByLibrary.simpleMessage(
+      "Исходный отчёт может содержать учётные данные, адреса и фрагменты памяти. Экспортируйте только для нужного получателя. Провайдер назначения может синхронизировать данные с облаком. После отмены или сбоя может остаться неполная копия. Продолжить?",
+    ),
+    "reportRefresh": MessageLookupByLibrary.simpleMessage("Обновить"),
+    "reportRetention": MessageLookupByLibrary.simpleMessage(
+      "Лимиты: 20 отчётов, 16 МиБ, 30 дней. Автоочистка выполняется по возможности.",
+    ),
+    "reportStale": MessageLookupByLibrary.simpleMessage(
+      "Отчёт изменился или выбор устарел. Обновите список и выберите снова.",
+    ),
+    "reportTruncated": MessageLookupByLibrary.simpleMessage(
+      "Материалы усечены; это не полный dump",
+    ),
+    "reportUnknownFormat": MessageLookupByLibrary.simpleMessage(
+      "Неизвестный формат отчёта",
+    ),
+    "reportUsage": MessageLookupByLibrary.simpleMessage(
+      "Занятое место (включая неизвестные элементы и внутренний индекс)",
+    ),
+    "reportWrittenUnverified": MessageLookupByLibrary.simpleMessage(
+      "Записано; содержимое назначения не проверено",
+    ),
     "request": MessageLookupByLibrary.simpleMessage("Запрос"),
     "requestDirectRecoveryMessage": m50,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(

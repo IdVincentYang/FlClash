@@ -34,6 +34,57 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [30, 31], shadows = [ReportCoreShadow::class])
 class CrashReportsAndroidTest {
+    @Test @Config(sdk = [24, 31], shadows = [ReportCoreShadow::class, ReportOsShadow::class])
+    fun realAppPluginManagesAndCancelsReportsThroughTheSharedCollectorStore() {
+        val context = RuntimeEnvironment.getApplication()
+        CrashReports.start(context)
+        val plugin = AppPlugin()
+        fun invoke(method: String, args: Map<String, Any?>): Map<*, *> {
+            var result: Map<*, *>? = null
+            plugin.onMethodCall(MethodCall(method, args), object : MethodChannel.Result {
+                override fun success(value: Any?) { result = value as? Map<*, *> ?: emptyMap<Any, Any>() }
+                override fun error(code: String, message: String?, details: Any?) { throw AssertionError(code) }
+                override fun notImplemented() { throw AssertionError(method) }
+            })
+            val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (result == null && System.nanoTime() < end) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                Thread.sleep(5)
+            }
+            return result ?: throw AssertionError("no native reply")
+        }
+        assertEquals("stored", invoke("captureErrorReport", mapOf("source" to "startup", "raw" to "PRIVATE_MANAGEMENT_SECRET"))["status"])
+        val inventory = invoke("manageReports", mapOf("action" to "inventory"))
+        assertEquals("ready", inventory["status"])
+        assertFalse(inventory.toString().contains("PRIVATE_MANAGEMENT_SECRET"))
+        val row = (inventory["items"] as List<*>).single() as Map<*, *>
+        val args = mapOf("revision" to inventory["revision"], "token" to row["token"])
+        assertEquals("ready", invoke("manageReports", args + ("action" to "summary"))["status"])
+        val adapter = CrashReportExport(context)
+        ReflectionHelpers.setField(plugin, "reportExport", adapter)
+        val activity = org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().get()
+        ReflectionHelpers.setField(plugin, "activity", activity)
+        var exportStatus: String? = null
+        plugin.onMethodCall(MethodCall("exportReport", args + mapOf("kind" to "summary", "nonce" to "owned")), object : MethodChannel.Result {
+            override fun success(value: Any?) { exportStatus = (value as Map<*, *>)["status"] as String }
+            override fun error(code: String, message: String?, details: Any?) { throw AssertionError(code) }
+            override fun notImplemented() { throw AssertionError() }
+        })
+        val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        var launched = false
+        while (!launched && exportStatus == null && System.nanoTime() < end) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            launched = Shadows.shadowOf(activity).nextStartedActivityForResult != null
+            Thread.sleep(5)
+        }
+        assertTrue(launched)
+        plugin.onDetachedFromActivityForConfigChanges()
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals("cancelled", exportStatus)
+        assertEquals("deleted", invoke("manageReports", args + ("action" to "delete"))["status"])
+        assertTrue((invoke("manageReports", mapOf("action" to "inventory"))["items"] as List<*>).isEmpty())
+    }
+
     @After fun finishSyntheticProcess() {
         val collector = ReflectionHelpers.getStaticField<CrashReportCollector?>(CrashReports::class.java, "collector")
         if (collector != null) {

@@ -638,6 +638,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "liveConnections": MessageLookupByLibrary.simpleMessage("实时连接"),
     "loading": MessageLookupByLibrary.simpleMessage("加载中…"),
     "local": MessageLookupByLibrary.simpleMessage("本地"),
+    "localCrashReports": MessageLookupByLibrary.simpleMessage("本地故障报告"),
     "localNetworkDeniedTip": MessageLookupByLibrary.simpleMessage(
       "本地网络权限被拒绝：已改用 gvisor 栈，局域网无法访问。",
     ),
@@ -1035,6 +1036,56 @@ class MessageLookup extends MessageLookupByLibrary {
     "remove": MessageLookupByLibrary.simpleMessage("移除"),
     "replace": MessageLookupByLibrary.simpleMessage("替换"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("全部替换"),
+    "reportBuildIdentity": MessageLookupByLibrary.simpleMessage(
+      "构建身份（缺失字段为未知）",
+    ),
+    "reportBusy": MessageLookupByLibrary.simpleMessage(
+      "忙或超时；底层 I/O 可能仍在进行，请稍后刷新。",
+    ),
+    "reportCancelled": MessageLookupByLibrary.simpleMessage(
+      "已取消；请检查目标是否留下部分副本。",
+    ),
+    "reportCorrupt": MessageLookupByLibrary.simpleMessage("损坏或不支持的项目"),
+    "reportDeleteAll": MessageLookupByLibrary.simpleMessage("删除当前报告"),
+    "reportDeleteWarning": MessageLookupByLibrary.simpleMessage(
+      "删除所选报告，或当前快照中的全部报告？新报告可能保留。内部去重记录与已导出副本不会删除，后续新故障仍可记录。",
+    ),
+    "reportDeleted": MessageLookupByLibrary.simpleMessage("所选报告已删除"),
+    "reportDestinationWarning": MessageLookupByLibrary.simpleMessage(
+      "请核对保存位置：其提供方可能同步至云端。应用不会自动发送此报告；取消或失败可能留下部分副本。",
+    ),
+    "reportEmpty": MessageLookupByLibrary.simpleMessage("没有已保存报告"),
+    "reportExportRaw": MessageLookupByLibrary.simpleMessage("导出原始报告（ZIP）"),
+    "reportExportSummary": MessageLookupByLibrary.simpleMessage("导出摘要（JSON）"),
+    "reportExported": MessageLookupByLibrary.simpleMessage("已保存并核验"),
+    "reportFailed": MessageLookupByLibrary.simpleMessage(
+      "操作失败或仅部分完成，请刷新；导出时另检查目标位置。",
+    ),
+    "reportIntegrity": MessageLookupByLibrary.simpleMessage(
+      "完整性核验失败；请检查目标是否留下部分副本。",
+    ),
+    "reportLimited": MessageLookupByLibrary.simpleMessage("目录达到处理上限，部分项目未能处理。"),
+    "reportMetadataOnly": MessageLookupByLibrary.simpleMessage(
+      "仅元信息；后续不会自动补齐 trace",
+    ),
+    "reportRawMissing": MessageLookupByLibrary.simpleMessage("原文缺失或不一致"),
+    "reportRawUnverified": MessageLookupByLibrary.simpleMessage("原文尚未核验"),
+    "reportRawWarning": MessageLookupByLibrary.simpleMessage(
+      "原始报告可能含凭据、地址和内存片段，请仅向预期接收方导出。系统目的地可能由云端提供方同步；取消或失败可能留下部分副本。继续导出原始报告？",
+    ),
+    "reportRefresh": MessageLookupByLibrary.simpleMessage("刷新"),
+    "reportRetention": MessageLookupByLibrary.simpleMessage(
+      "上限：20 份、16 MiB、30 天。自动清理为尽力维护。",
+    ),
+    "reportStale": MessageLookupByLibrary.simpleMessage(
+      "报告已变化或选择已过期，请刷新后重新选择。",
+    ),
+    "reportTruncated": MessageLookupByLibrary.simpleMessage("材料已截断，不是完整 dump"),
+    "reportUnknownFormat": MessageLookupByLibrary.simpleMessage("未知报告格式"),
+    "reportUsage": MessageLookupByLibrary.simpleMessage("存储占用（含未知项目及内部索引）"),
+    "reportWrittenUnverified": MessageLookupByLibrary.simpleMessage(
+      "已写入，目标内容未核验",
+    ),
     "request": MessageLookupByLibrary.simpleMessage("请求"),
     "requestDirectRecoveryMessage": m50,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(

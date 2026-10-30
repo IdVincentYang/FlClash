@@ -131,6 +131,12 @@ Android private report storage follows
 FlClashApplication/CrashReports collect native evidence independently of BootGuard
 and ServiceState. ErrorReports connects main.dart to AppPlugin; CrashReportStore
 owns bounded no-backup transactions. Reports never join ordinary backups.
+Report management connects Tools/provider through
+AppPlugin to the same Store/Worker. Store owns metadata-only inventory tokens;
+the report-only SAF adapter owns one cancellable destination session. Each page
+owns its provider generation and request nonce, releasing them on exit. URI and
+raw bytes stay native; summary display never loads raw. See the report contract
+for snapshot deletion, bounded export and provider failure semantics.
 
 Application exit is centralized in `SystemAction` and `SystemExitCoordinator`:
 

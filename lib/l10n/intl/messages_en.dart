@@ -865,6 +865,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "liveConnections": MessageLookupByLibrary.simpleMessage("Live connections"),
     "loading": MessageLookupByLibrary.simpleMessage("Loading…"),
     "local": MessageLookupByLibrary.simpleMessage("Local"),
+    "localCrashReports": MessageLookupByLibrary.simpleMessage(
+      "Local crash reports",
+    ),
     "localNetworkDeniedTip": MessageLookupByLibrary.simpleMessage(
       "Local network permission denied: using the gvisor stack, LAN is unreachable.",
     ),
@@ -1378,6 +1381,80 @@ class MessageLookup extends MessageLookupByLibrary {
     "remove": MessageLookupByLibrary.simpleMessage("Remove"),
     "replace": MessageLookupByLibrary.simpleMessage("Replace"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("Replace all"),
+    "reportBuildIdentity": MessageLookupByLibrary.simpleMessage(
+      "Build identity (missing fields are unknown)",
+    ),
+    "reportBusy": MessageLookupByLibrary.simpleMessage(
+      "Busy or timed out. I/O may still be running; refresh later.",
+    ),
+    "reportCancelled": MessageLookupByLibrary.simpleMessage(
+      "Cancelled. Check the destination for a possible partial copy.",
+    ),
+    "reportCorrupt": MessageLookupByLibrary.simpleMessage(
+      "Damaged or unsupported item",
+    ),
+    "reportDeleteAll": MessageLookupByLibrary.simpleMessage(
+      "Delete current reports",
+    ),
+    "reportDeleteWarning": MessageLookupByLibrary.simpleMessage(
+      "Delete the selected report, or all reports in this snapshot? New reports may remain. Internal deduplication records and exported copies are kept. Future faults can still be recorded.",
+    ),
+    "reportDeleted": MessageLookupByLibrary.simpleMessage(
+      "Selected reports deleted",
+    ),
+    "reportDestinationWarning": MessageLookupByLibrary.simpleMessage(
+      "Choose the destination carefully: its provider may sync to the cloud. The app does not automatically send this report. Cancellation or failure may leave a partial copy.",
+    ),
+    "reportEmpty": MessageLookupByLibrary.simpleMessage("No saved reports"),
+    "reportExportRaw": MessageLookupByLibrary.simpleMessage(
+      "Export raw report (ZIP)",
+    ),
+    "reportExportSummary": MessageLookupByLibrary.simpleMessage(
+      "Export summary (JSON)",
+    ),
+    "reportExported": MessageLookupByLibrary.simpleMessage(
+      "Saved and verified",
+    ),
+    "reportFailed": MessageLookupByLibrary.simpleMessage(
+      "Operation failed or only partly completed. Refresh; check any export destination.",
+    ),
+    "reportIntegrity": MessageLookupByLibrary.simpleMessage(
+      "Integrity check failed. Check the destination for a partial copy.",
+    ),
+    "reportLimited": MessageLookupByLibrary.simpleMessage(
+      "Directory limit reached; some items could not be processed.",
+    ),
+    "reportMetadataOnly": MessageLookupByLibrary.simpleMessage(
+      "Metadata only; trace will not be filled in later",
+    ),
+    "reportRawMissing": MessageLookupByLibrary.simpleMessage(
+      "Raw contents missing or inconsistent",
+    ),
+    "reportRawUnverified": MessageLookupByLibrary.simpleMessage(
+      "Raw contents not verified",
+    ),
+    "reportRawWarning": MessageLookupByLibrary.simpleMessage(
+      "Raw reports may contain credentials, addresses and memory fragments. Export only for an intended recipient. The system destination may sync to a cloud provider. Cancellation or failure may leave a partial copy. Continue with raw export?",
+    ),
+    "reportRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
+    "reportRetention": MessageLookupByLibrary.simpleMessage(
+      "Limits: 20 reports, 16 MiB, 30 days. Automatic cleanup is best effort.",
+    ),
+    "reportStale": MessageLookupByLibrary.simpleMessage(
+      "Report changed or selection expired. Refresh and select again.",
+    ),
+    "reportTruncated": MessageLookupByLibrary.simpleMessage(
+      "Truncated material; not a complete dump",
+    ),
+    "reportUnknownFormat": MessageLookupByLibrary.simpleMessage(
+      "Unknown report format",
+    ),
+    "reportUsage": MessageLookupByLibrary.simpleMessage(
+      "Storage usage (including unknown items and internal index)",
+    ),
+    "reportWrittenUnverified": MessageLookupByLibrary.simpleMessage(
+      "Written; destination contents could not be verified",
+    ),
     "request": MessageLookupByLibrary.simpleMessage("Request"),
     "requestDirectRecoveryMessage": m50,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(

@@ -709,6 +709,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "liveConnections": MessageLookupByLibrary.simpleMessage("リアルタイム接続"),
     "loading": MessageLookupByLibrary.simpleMessage("読み込み中…"),
     "local": MessageLookupByLibrary.simpleMessage("ローカル"),
+    "localCrashReports": MessageLookupByLibrary.simpleMessage("ローカル障害レポート"),
     "localNetworkDeniedTip": MessageLookupByLibrary.simpleMessage(
       "ローカルネットワークの権限が拒否されたため gvisor スタックを使用します。LAN にはアクセスできません。",
     ),
@@ -1148,6 +1149,62 @@ class MessageLookup extends MessageLookupByLibrary {
     "remove": MessageLookupByLibrary.simpleMessage("削除"),
     "replace": MessageLookupByLibrary.simpleMessage("置換"),
     "replaceAll": MessageLookupByLibrary.simpleMessage("すべて置換"),
+    "reportBuildIdentity": MessageLookupByLibrary.simpleMessage(
+      "ビルド情報（欠落項目は不明）",
+    ),
+    "reportBusy": MessageLookupByLibrary.simpleMessage(
+      "処理中またはタイムアウトです。I/O は続行中の可能性があります。後で更新してください。",
+    ),
+    "reportCancelled": MessageLookupByLibrary.simpleMessage(
+      "キャンセルしました。保存先に不完全なコピーがないか確認してください。",
+    ),
+    "reportCorrupt": MessageLookupByLibrary.simpleMessage("破損または未対応の項目"),
+    "reportDeleteAll": MessageLookupByLibrary.simpleMessage("現在のレポートを削除"),
+    "reportDeleteWarning": MessageLookupByLibrary.simpleMessage(
+      "選択したレポート、または現在のスナップショット全体を削除しますか？新しいレポートは残る場合があります。重複防止記録とエクスポート済みコピーは保持され、今後の障害は引き続き記録されます。",
+    ),
+    "reportDeleted": MessageLookupByLibrary.simpleMessage("選択したレポートを削除しました"),
+    "reportDestinationWarning": MessageLookupByLibrary.simpleMessage(
+      "保存先を確認してください。プロバイダーがクラウドに同期する場合があります。アプリは自動送信しません。キャンセル・失敗後に不完全なコピーが残る場合があります。",
+    ),
+    "reportEmpty": MessageLookupByLibrary.simpleMessage("保存されたレポートはありません"),
+    "reportExportRaw": MessageLookupByLibrary.simpleMessage("原文をエクスポート（ZIP）"),
+    "reportExportSummary": MessageLookupByLibrary.simpleMessage(
+      "概要をエクスポート（JSON）",
+    ),
+    "reportExported": MessageLookupByLibrary.simpleMessage("保存して検証しました"),
+    "reportFailed": MessageLookupByLibrary.simpleMessage(
+      "処理に失敗、または一部のみ完了しました。更新し、エクスポート先も確認してください。",
+    ),
+    "reportIntegrity": MessageLookupByLibrary.simpleMessage(
+      "整合性の検証に失敗しました。保存先の不完全なコピーを確認してください。",
+    ),
+    "reportLimited": MessageLookupByLibrary.simpleMessage(
+      "ディレクトリの処理上限に達しました。一部を処理できませんでした。",
+    ),
+    "reportMetadataOnly": MessageLookupByLibrary.simpleMessage(
+      "メタデータのみ。trace は後から自動補完されません",
+    ),
+    "reportRawMissing": MessageLookupByLibrary.simpleMessage("原文がないか一致しません"),
+    "reportRawUnverified": MessageLookupByLibrary.simpleMessage("原文は未検証です"),
+    "reportRawWarning": MessageLookupByLibrary.simpleMessage(
+      "原文には認証情報、アドレス、メモリの断片が含まれる可能性があります。意図した相手のみに渡してください。保存先がクラウドに同期する場合や、キャンセル・失敗後に不完全なコピーが残る場合があります。原文をエクスポートしますか？",
+    ),
+    "reportRefresh": MessageLookupByLibrary.simpleMessage("更新"),
+    "reportRetention": MessageLookupByLibrary.simpleMessage(
+      "上限：20 件、16 MiB、30 日。自動削除はベストエフォートです。",
+    ),
+    "reportStale": MessageLookupByLibrary.simpleMessage(
+      "レポートが変更されたか選択が期限切れです。更新して再選択してください。",
+    ),
+    "reportTruncated": MessageLookupByLibrary.simpleMessage(
+      "切り詰められた資料です。完全な dump ではありません",
+    ),
+    "reportUnknownFormat": MessageLookupByLibrary.simpleMessage("不明なレポート形式"),
+    "reportUsage": MessageLookupByLibrary.simpleMessage("使用容量（不明な項目と内部索引を含む）"),
+    "reportWrittenUnverified": MessageLookupByLibrary.simpleMessage(
+      "書き込み済み。保存先の内容は未検証です",
+    ),
     "request": MessageLookupByLibrary.simpleMessage("リクエスト"),
     "requestDirectRecoveryMessage": m50,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(

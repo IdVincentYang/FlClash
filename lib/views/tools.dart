@@ -16,9 +16,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/advanced.dart';
 import 'developer.dart';
 import 'theme.dart';
+import 'reports.dart';
 
 class ToolsView extends ConsumerStatefulWidget {
-  const ToolsView({super.key});
+  final bool? isAndroid;
+
+  const ToolsView({super.key, this.isAndroid});
 
   @override
   ConsumerState<ToolsView> createState() => _ToolViewState();
@@ -51,6 +54,12 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     return generateSection(
       title: context.appLocalizations.other,
       items: [
+        if (widget.isAndroid ?? system.isAndroid)
+          ListItem.open(
+            leading: const GlyphIcon(AppGlyphs.logs),
+            title: Text(context.appLocalizations.localCrashReports),
+            widget: const ReportsView(),
+          ),
         if (enableDeveloperMode) const _DeveloperItem(),
         const _InfoItem(),
       ],

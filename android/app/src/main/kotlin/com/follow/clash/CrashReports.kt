@@ -11,6 +11,8 @@ import java.util.UUID
 internal object CrashReports {
     @Volatile private var collector: CrashReportCollector? = null
     @Volatile private var identity: Map<String, Any?> = emptyMap()
+    private var storage: Lazy<CrashReportStore>? = null
+    private var io: CrashReportWorker? = null
     private val clock = SystemClock::elapsedRealtime
 
     @Synchronized fun start(context: Context) {
@@ -19,7 +21,10 @@ internal object CrashReports {
             "pid" to Process.myPid(), "processEpoch" to UUID.randomUUID().toString(),
             "api" to Build.VERSION.SDK_INT, "is64Bit" to Process.is64Bit(), "buildStatus" to "pending")
         val worker = CrashReportWorker(clock)
-        val store by lazy { CrashReportStore(reportRoot(context), clock = clock) }
+        val backend = lazy { CrashReportStore(reportRoot(context), clock = clock) }
+        storage = backend
+        io = worker
+        val store by backend
         val capture = CrashReportCollector({ store }, worker, { identity }, clock)
         collector = capture
         Thread.getDefaultUncaughtExceptionHandler()?.let { previous ->
@@ -50,6 +55,23 @@ internal object CrashReports {
                 }
             }
         }
+    }
+
+    fun enqueue(task: (CrashReportStore, Long) -> Map<String, Any?>, reply: (Map<String, Any?>) -> Unit) {
+        val worker = io
+        val backend = storage
+        if (collector == null || worker == null || backend == null) {
+            reply(mapOf("status" to "unsupported")); return
+        }
+        worker.submitValue({ mapOf<String, Any?>("status" to it) }) { deadline ->
+            try { task(backend.value, deadline) }
+            catch (error: ReportFailure) { mapOf("status" to error.status) }
+        }.whenComplete { value, _ -> reply(value ?: mapOf("status" to "io")) }
+    }
+
+    fun manage(arguments: Any?, reply: (Map<String, Any?>) -> Unit) {
+        val values = arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+        enqueue({ store, deadline -> store.manage(values["action"] as? String ?: "", values, deadline) }, reply)
     }
 
     private fun summary(context: Context) {

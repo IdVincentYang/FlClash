@@ -172,6 +172,45 @@ class App {
       ) ??
       const {'status': 'io'};
 
+  Future<Map<String, Object?>> manageReports(
+    Map<String, Object?> arguments,
+  ) async {
+    try {
+      return await methodChannel
+              .invokeMapMethod<String, Object?>('manageReports', arguments)
+              .timeout(_platformProbeTimeout) ??
+          const {'status': 'io'};
+    } on TimeoutException {
+      return const {'status': 'deadline'};
+    } catch (_) {
+      return const {'status': 'io'};
+    }
+  }
+
+  Future<Map<String, Object?>> exportReport(
+    Map<String, Object?> arguments,
+  ) async {
+    try {
+      return await methodChannel
+              .invokeMapMethod<String, Object?>('exportReport', arguments)
+              .timeout(const Duration(minutes: 5, seconds: 2)) ??
+          const {'status': 'io'};
+    } on TimeoutException {
+      await cancelReportExport(arguments['nonce'] as String);
+      return const {'status': 'deadline'};
+    } catch (_) {
+      return const {'status': 'io'};
+    }
+  }
+
+  Future<void> cancelReportExport(String nonce) async {
+    try {
+      await methodChannel
+          .invokeMethod<void>('cancelReportExport', {'nonce': nonce})
+          .timeout(_platformProbeTimeout);
+    } catch (_) {}
+  }
+
   Future<Map<String, Object?>> bootRecord(
     String action,
     Map<String, Object?> arguments,

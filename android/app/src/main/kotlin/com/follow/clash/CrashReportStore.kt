@@ -31,6 +31,13 @@ internal class CrashReportStore(
     private val gson = Gson()
     private val idPattern = Regex("[0-9a-f]{64}")
     private data class Entry(val file: File, val report: CrashReport?, val bytes: Long)
+    private val management by lazy { CrashReportManagement(root, clock, ::checkRoot, ::read, remove) }
+
+    @Synchronized fun manage(action: String, arguments: Map<*, *>, deadline: Long): Map<String, Any?> =
+        management.handle(action, arguments, deadline)
+
+    @Synchronized fun export(arguments: Map<*, *>, deadline: Long): ByteArray =
+        management.export(arguments, deadline)
 
     @Synchronized fun save(material: CrashMaterial, deadline: Long): String {
         if (!idPattern.matches(material.id) || material.source !in SOURCES ||

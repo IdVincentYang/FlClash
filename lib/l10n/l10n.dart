@@ -7727,6 +7727,271 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Local crash reports`
+  String get localCrashReports {
+    return Intl.message(
+      'Local crash reports',
+      name: 'localCrashReports',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Selected reports deleted`
+  String get reportDeleted {
+    return Intl.message(
+      'Selected reports deleted',
+      name: 'reportDeleted',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Saved and verified`
+  String get reportExported {
+    return Intl.message(
+      'Saved and verified',
+      name: 'reportExported',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Written; destination contents could not be verified`
+  String get reportWrittenUnverified {
+    return Intl.message(
+      'Written; destination contents could not be verified',
+      name: 'reportWrittenUnverified',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cancelled. Check the destination for a possible partial copy.`
+  String get reportCancelled {
+    return Intl.message(
+      'Cancelled. Check the destination for a possible partial copy.',
+      name: 'reportCancelled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Report changed or selection expired. Refresh and select again.`
+  String get reportStale {
+    return Intl.message(
+      'Report changed or selection expired. Refresh and select again.',
+      name: 'reportStale',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Busy or timed out. I/O may still be running; refresh later.`
+  String get reportBusy {
+    return Intl.message(
+      'Busy or timed out. I/O may still be running; refresh later.',
+      name: 'reportBusy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Directory limit reached; some items could not be processed.`
+  String get reportLimited {
+    return Intl.message(
+      'Directory limit reached; some items could not be processed.',
+      name: 'reportLimited',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Integrity check failed. Check the destination for a partial copy.`
+  String get reportIntegrity {
+    return Intl.message(
+      'Integrity check failed. Check the destination for a partial copy.',
+      name: 'reportIntegrity',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Operation failed or only partly completed. Refresh; check any export destination.`
+  String get reportFailed {
+    return Intl.message(
+      'Operation failed or only partly completed. Refresh; check any export destination.',
+      name: 'reportFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Metadata only; trace will not be filled in later`
+  String get reportMetadataOnly {
+    return Intl.message(
+      'Metadata only; trace will not be filled in later',
+      name: 'reportMetadataOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Raw contents not verified`
+  String get reportRawUnverified {
+    return Intl.message(
+      'Raw contents not verified',
+      name: 'reportRawUnverified',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Raw contents missing or inconsistent`
+  String get reportRawMissing {
+    return Intl.message(
+      'Raw contents missing or inconsistent',
+      name: 'reportRawMissing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unknown report format`
+  String get reportUnknownFormat {
+    return Intl.message(
+      'Unknown report format',
+      name: 'reportUnknownFormat',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Damaged or unsupported item`
+  String get reportCorrupt {
+    return Intl.message(
+      'Damaged or unsupported item',
+      name: 'reportCorrupt',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delete the selected report, or all reports in this snapshot? New reports may remain. Internal deduplication records and exported copies are kept. Future faults can still be recorded.`
+  String get reportDeleteWarning {
+    return Intl.message(
+      'Delete the selected report, or all reports in this snapshot? New reports may remain. Internal deduplication records and exported copies are kept. Future faults can still be recorded.',
+      name: 'reportDeleteWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Raw reports may contain credentials, addresses and memory fragments. Export only for an intended recipient. The system destination may sync to a cloud provider. Cancellation or failure may leave a partial copy. Continue with raw export?`
+  String get reportRawWarning {
+    return Intl.message(
+      'Raw reports may contain credentials, addresses and memory fragments. Export only for an intended recipient. The system destination may sync to a cloud provider. Cancellation or failure may leave a partial copy. Continue with raw export?',
+      name: 'reportRawWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose the destination carefully: its provider may sync to the cloud. The app does not automatically send this report. Cancellation or failure may leave a partial copy.`
+  String get reportDestinationWarning {
+    return Intl.message(
+      'Choose the destination carefully: its provider may sync to the cloud. The app does not automatically send this report. Cancellation or failure may leave a partial copy.',
+      name: 'reportDestinationWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delete current reports`
+  String get reportDeleteAll {
+    return Intl.message(
+      'Delete current reports',
+      name: 'reportDeleteAll',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Storage usage (including unknown items and internal index)`
+  String get reportUsage {
+    return Intl.message(
+      'Storage usage (including unknown items and internal index)',
+      name: 'reportUsage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Limits: 20 reports, 16 MiB, 30 days. Automatic cleanup is best effort.`
+  String get reportRetention {
+    return Intl.message(
+      'Limits: 20 reports, 16 MiB, 30 days. Automatic cleanup is best effort.',
+      name: 'reportRetention',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No saved reports`
+  String get reportEmpty {
+    return Intl.message(
+      'No saved reports',
+      name: 'reportEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Build identity (missing fields are unknown)`
+  String get reportBuildIdentity {
+    return Intl.message(
+      'Build identity (missing fields are unknown)',
+      name: 'reportBuildIdentity',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Truncated material; not a complete dump`
+  String get reportTruncated {
+    return Intl.message(
+      'Truncated material; not a complete dump',
+      name: 'reportTruncated',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Export summary (JSON)`
+  String get reportExportSummary {
+    return Intl.message(
+      'Export summary (JSON)',
+      name: 'reportExportSummary',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Export raw report (ZIP)`
+  String get reportExportRaw {
+    return Intl.message(
+      'Export raw report (ZIP)',
+      name: 'reportExportRaw',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Refresh`
+  String get reportRefresh {
+    return Intl.message('Refresh', name: 'reportRefresh', desc: '', args: []);
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

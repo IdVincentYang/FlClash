@@ -13,16 +13,20 @@ internal class CrashReportWorker(
         ArrayBlockingQueue(4), { task -> Thread(task, "FlClashReports").apply { isDaemon = true } })
 
     fun submit(budget: Long = 1500, task: (Long) -> String): CompletableFuture<String> {
-        val result = CompletableFuture<String>()
+        return submitValue({ it }, budget, task)
+    }
+
+    fun <T> submitValue(failure: (String) -> T, budget: Long = 1500, task: (Long) -> T): CompletableFuture<T> {
+        val result = CompletableFuture<T>()
         val deadline = clock() + budget
         try {
             executor.execute {
-                val status = if (clock() >= deadline) "deadline" else try {
+                val status = if (clock() >= deadline) failure("deadline") else try {
                     task(deadline)
-                } catch (_: Throwable) { "io" }
+                } catch (_: Throwable) { failure("io") }
                 result.complete(status)
             }
-        } catch (_: RejectedExecutionException) { result.complete("busy") }
+        } catch (_: RejectedExecutionException) { result.complete(failure("busy")) }
         return result
     }
 

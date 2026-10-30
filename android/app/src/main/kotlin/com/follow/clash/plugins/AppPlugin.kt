@@ -25,6 +25,7 @@ import androidx.core.net.toUri
 import com.follow.clash.R
 import com.follow.clash.BootRecords
 import com.follow.clash.CrashReports
+import com.follow.clash.CrashReportExport
 import com.follow.clash.common.Components
 import com.follow.clash.common.GlobalState
 import com.follow.clash.common.PendingCallback
@@ -51,6 +52,7 @@ import kotlinx.coroutines.launch
 class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
 
     private var bootGeneration = 0L
+    private var reportExport: CrashReportExport? = null
 
     private var activity: Activity? = null
 
@@ -191,6 +193,20 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             }
 
             "captureErrorReport" -> CrashReports.capture(call.arguments) { result.success(it) }
+
+            "manageReports" -> CrashReports.manage(call.arguments) { result.success(it) }
+
+            "exportReport" -> {
+                val export = reportExport
+                if (export == null) result.success(mapOf("status" to "unsupported")) else onMainThread {
+                    export.start(call.arguments as? Map<*, *> ?: emptyMap<Any, Any>(), activity) { result.success(it) }
+                }
+            }
+
+            "cancelReportExport" -> onMainThread {
+                reportExport?.cancel(call.argument<String>("nonce"))
+                result.success(null)
+            }
 
             "bootRecord" -> BootRecords.store.handle(
                 bootGeneration,
@@ -416,6 +432,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        reportExport = CrashReportExport(flutterPluginBinding.applicationContext)
         bootGeneration = BootRecords.store.attach()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         channel =
@@ -436,6 +453,8 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        reportExport?.cancel()
+        reportExport = null
         BootRecords.store.detach(bootGeneration)
         packageChangeContext?.unregisterReceiver(packageChangeReceiver)
         packageChangeContext = null
@@ -460,6 +479,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun detachFromActivity() {
+        reportExport?.cancel()
         activity = null
         val binding = activityBinding ?: return
         activityBinding = null
@@ -485,6 +505,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (reportExport?.onResult(requestCode, resultCode, data) == true) return true
         if (requestCode != VPN_PERMISSION_REQUEST_CODE) {
             return false
         }
