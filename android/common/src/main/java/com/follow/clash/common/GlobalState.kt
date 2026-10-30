@@ -56,19 +56,23 @@ object GlobalState : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatch
         Log.d("FlClash", text)
     }
 
-    fun lastExitInfo(): Map<String, Any?>? {
+    fun lastExitInfo(pid: Int = ANY_PID): Map<String, Any?>? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         val manager = application.getSystemService(ActivityManager::class.java) ?: return null
         val info = runCatching {
             manager.getHistoricalProcessExitReasons(
                 application.packageName,
-                ANY_PID,
+                pid,
                 EVERY_EXIT_RECORD,
             )
-        }.getOrNull()?.firstOrNull { it.processName == application.packageName } ?: return null
+        }.getOrNull()?.firstOrNull {
+            it.processName == application.packageName && (pid == ANY_PID || it.pid == pid)
+        } ?: return null
         return mapOf(
             "reason" to info.reason,
             "timestamp" to info.timestamp,
+            "pid" to info.pid,
+            "processName" to info.processName,
             "description" to info.description,
         )
     }

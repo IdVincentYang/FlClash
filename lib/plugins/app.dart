@@ -163,15 +163,25 @@ class App {
     return methodChannel.invokeMethod<bool>('openAppSettings');
   }
 
-  Future<AppExitInfo?> getLastExitInfo() async {
+  Future<Map<String, Object?>> bootRecord(
+    String action,
+    Map<String, Object?> arguments,
+  ) async =>
+      await methodChannel.invokeMapMethod<String, Object?>('bootRecord', {
+        'action': action,
+        ...arguments,
+      }) ??
+      const {'status': 'io'};
+
+  Future<AppExitInfo?> getLastExitInfo({int? pid}) async {
     try {
       final raw = await methodChannel
-          .invokeMapMethod<String, Object?>('getLastExitInfo')
+          .invokeMapMethod<String, Object?>('getLastExitInfo', {'pid': ?pid})
           .timeout(_platformProbeTimeout);
       return AppExitInfo.fromJson(raw);
-    } catch (error) {
+    } catch (_) {
       commonPrint.log(
-        'Failed to read the last process exit info: ${compactError(error)}',
+        'Failed to read process exit information.',
         logLevel: LogLevel.warning,
       );
       return null;

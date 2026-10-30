@@ -237,16 +237,19 @@ class SetupAction extends _$SetupAction {
               startTime.millisecondsSinceEpoch;
   }
 
+  bool _nativeSnapshotCurrent(Map<String, Object?> snapshot) {
+    if (!ref.mounted) return false;
+    final current = ref.read(nativeRequestStateProvider);
+    return current['processEpoch'] == snapshot['processEpoch'] &&
+        current['revision'] == snapshot['revision'] &&
+        current['phase'] == snapshot['phase'];
+  }
+
   Future<void> _syncNativeRuntime(Map<String, Object?> snapshot) async {
+    if (snapshot['phase'] != 'started') return;
     try {
       final startedAt = await _service?.getRunTime();
-      if (!ref.mounted) return;
-      final current = ref.read(nativeRequestStateProvider);
-      if (current['processEpoch'] != snapshot['processEpoch'] ||
-          current['revision'] != snapshot['revision'] ||
-          current['phase'] != 'started') {
-        return;
-      }
+      if (!_nativeSnapshotCurrent(snapshot)) return;
       _startTime = startedAt;
       if (startedAt == null) {
         _stopRuntimeTicker();
@@ -255,7 +258,9 @@ class SetupAction extends _$SetupAction {
         _setLocalRunning(true);
       }
     } catch (_) {
-      if (ref.mounted) ref.read(runTimeProvider.notifier).value = null;
+      if (_nativeSnapshotCurrent(snapshot)) {
+        ref.read(runTimeProvider.notifier).value = null;
+      }
     }
   }
 
@@ -263,7 +268,33 @@ class SetupAction extends _$SetupAction {
     _startTime = await _service?.getRunTime();
   }
 
-  Future<void> initStatus() async {
+  Future<void> initStatus({
+    bool recovery = false,
+    Future<bool> Function()? isCurrent,
+  }) async {
+    if (recovery) {
+      if (isCurrent != null && !await isCurrent()) return;
+      if (_isAndroid) {
+        final snapshot = await _service!.getRequestState();
+        if (isCurrent != null && !await isCurrent()) return;
+        await _service!.initializeRequestState(
+          snapshot['revision'] as int,
+          recovery: true,
+        );
+        final latest = await _service!.getRequestState();
+        if (isCurrent != null && !await isCurrent()) return;
+        ref.read(nativeRequestStateProvider.notifier).onRequestState(latest);
+        if (_nativeSnapshotCurrent(latest)) {
+          if (latest['phase'] == 'started') {
+            await _syncNativeRuntime(latest);
+          } else {
+            _setLocalRunning(false);
+          }
+        }
+      }
+      globalState.needInitStatus = false;
+      return;
+    }
     if (!globalState.needInitStatus) {
       commonPrint.log('init status cancel');
       return;
@@ -280,6 +311,7 @@ class SetupAction extends _$SetupAction {
         native?['intentRunning'] == true ||
         _isRunning ||
         ref.read(appSettingProvider).autoRun;
+    if (isCurrent != null && !await isCurrent()) return;
     if (shouldRun) {
       await setRunning(
         true,
@@ -517,6 +549,7 @@ class SetupAction extends _$SetupAction {
   Future<ProfileApplicationOutcome> applyRefreshedProfile({
     required Future<bool> Function() isCurrent,
     required ConfigFact previous,
+    Future<bool> Function()? canSubmit,
   }) async {
     if (!await isCurrent()) return ProfileApplicationOutcome.superseded;
     ConfigApplyResult? accepted;
@@ -524,6 +557,7 @@ class SetupAction extends _$SetupAction {
       silence: true,
       force: true,
       isCurrent: isCurrent,
+      canSubmit: canSubmit,
       onApplied: (value) => accepted = value,
     );
     if (result == _SetupTaskResult.superseded ||
@@ -549,6 +583,7 @@ class SetupAction extends _$SetupAction {
     bool force = false,
     Future<bool> Function()? isCurrent,
     void Function(ConfigApplyResult)? onApplied,
+    Future<bool> Function()? canSubmit,
   }) async {
     final generation = ++_setupGeneration;
     unawaited(
@@ -573,6 +608,7 @@ class SetupAction extends _$SetupAction {
               isLatestSetup: () => generation == _setupGeneration,
               onCleanupDeferred: (cleanup) => deferredCleanup = cleanup,
               onApplied: onApplied,
+              canSubmit: canSubmit,
               retryAllowed: retryAllowed,
               onUpdated: (current) async {
                 await ref
@@ -843,6 +879,7 @@ class SetupAction extends _$SetupAction {
     required bool Function() isLatestSetup,
     required void Function(Future<void>) onCleanupDeferred,
     bool retryAllowed = true,
+    Future<bool> Function()? canSubmit,
   }) async {
     final nativeContext = _isAndroid ? await _service!.getRequestState() : null;
     final failureCore = _core;
@@ -1076,7 +1113,7 @@ class SetupAction extends _$SetupAction {
           final snapshot = captured!;
           final runtimeEpoch = snapshot.fact.runtimeEpoch;
           await _requests.mutate(() async {
-            if (!await current()) {
+            if (!await current() || canSubmit != null && !await canSubmit()) {
               throw const RequestUnavailable('request_cancelled');
             }
             if (_isAndroid) {
@@ -1106,7 +1143,7 @@ class SetupAction extends _$SetupAction {
             await appPath.ensureProviderDirs(profileId);
           }
           for (var attempt = 0; ; attempt++) {
-            if (!await current()) {
+            if (!await current() || canSubmit != null && !await canSubmit()) {
               throw const RequestUnavailable('request_cancelled');
             }
             if (_isAndroid) {

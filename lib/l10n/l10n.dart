@@ -2995,10 +2995,10 @@ class AppLocalizations {
     );
   }
 
-  /// `The app failed to finish launching twice in a row. To break the loop, the profile {name} has been deselected and automatic setup was skipped. You can select it again at any time.`
+  /// `The system reported an abnormal exit during startup. Previous profile: {name}. Automatic setup is skipped this time; your current selection and files are preserved.`
   String crashDetectedTip(Object name) {
     return Intl.message(
-      'The app failed to finish launching twice in a row. To break the loop, the profile $name has been deselected and automatic setup was skipped. You can select it again at any time.',
+      'The system reported an abnormal exit during startup. Previous profile: $name. Automatic setup is skipped this time; your current selection and files are preserved.',
       name: 'crashDetectedTip',
       desc: '',
       args: [name],
@@ -3015,10 +3015,10 @@ class AppLocalizations {
     );
   }
 
-  /// `The app exited unexpectedly while it was starting up last time. Automatic setup was skipped for this launch; you can start it manually to retry.`
+  /// `The previous launch did not finish. The cause is unknown. Automatic setup is skipped this time. Your selection and files are preserved; you can start manually.`
   String get launchInterruptedTip {
     return Intl.message(
-      'The app exited unexpectedly while it was starting up last time. Automatic setup was skipped for this launch; you can start it manually to retry.',
+      'The previous launch did not finish. The cause is unknown. Automatic setup is skipped this time. Your selection and files are preserved; you can start manually.',
       name: 'launchInterruptedTip',
       desc: '',
       args: [],
@@ -7568,6 +7568,161 @@ class AppLocalizations {
     return Intl.message(
       'Unable to read this image. Choose another local image.',
       name: 'qrImageReadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The startup protection record is damaged. Automatic setup is skipped. Rebuild only this record, or keep it and continue? Profiles, settings and diagnostic files are preserved.`
+  String get bootRecordDamaged {
+    return Intl.message(
+      'The startup protection record is damaged. Automatic setup is skipped. Rebuild only this record, or keep it and continue? Profiles, settings and diagnostic files are preserved.',
+      name: 'bootRecordDamaged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The startup record uses a newer format and will be preserved. Automatic setup is skipped; you can use the app manually.`
+  String get bootRecordNewer {
+    return Intl.message(
+      'The startup record uses a newer format and will be preserved. Automatic setup is skipped; you can use the app manually.',
+      name: 'bootRecordNewer',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Startup protection could not save or read its record. Automatic setup is skipped this time. Existing service and files are preserved; manual controls remain available.`
+  String get bootRecordUnavailable {
+    return Intl.message(
+      'Startup protection could not save or read its record. Automatic setup is skipped this time. Existing service and files are preserved; manual controls remain available.',
+      name: 'bootRecordUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Rebuild startup record`
+  String get bootRecordRebuild {
+    return Intl.message(
+      'Rebuild startup record',
+      name: 'bootRecordRebuild',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Keep and continue`
+  String get bootRecordKeep {
+    return Intl.message(
+      'Keep and continue',
+      name: 'bootRecordKeep',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Startup has been interrupted repeatedly. Check or reselect a profile in the profile list before starting manually.`
+  String get bootRecoveryRepeated {
+    return Intl.message(
+      'Startup has been interrupted repeatedly. Check or reselect a profile in the profile list before starting manually.',
+      name: 'bootRecoveryRepeated',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Previous stage: {phase}`
+  String bootRecoveryPhase(Object phase) {
+    return Intl.message(
+      'Previous stage: $phase',
+      name: 'bootRecoveryPhase',
+      desc: '',
+      args: [phase],
+    );
+  }
+
+  /// `System exit reason: {reason}`
+  String bootRecoveryReason(Object reason) {
+    return Intl.message(
+      'System exit reason: $reason',
+      name: 'bootRecoveryReason',
+      desc: '',
+      args: [reason],
+    );
+  }
+
+  /// `Preparing the app`
+  String get bootPhaseBootstrap {
+    return Intl.message(
+      'Preparing the app',
+      name: 'bootPhaseBootstrap',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recovery prompt`
+  String get bootPhaseRecovery {
+    return Intl.message(
+      'Recovery prompt',
+      name: 'bootPhaseRecovery',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connecting to Core`
+  String get bootPhaseCore {
+    return Intl.message(
+      'Connecting to Core',
+      name: 'bootPhaseCore',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Initializing configuration`
+  String get bootPhaseSetup {
+    return Intl.message(
+      'Initializing configuration',
+      name: 'bootPhaseSetup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `App crash`
+  String get bootExitCrash {
+    return Intl.message('App crash', name: 'bootExitCrash', desc: '', args: []);
+  }
+
+  /// `Native crash`
+  String get bootExitNativeCrash {
+    return Intl.message(
+      'Native crash',
+      name: 'bootExitNativeCrash',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `App not responding`
+  String get bootExitAnr {
+    return Intl.message(
+      'App not responding',
+      name: 'bootExitAnr',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Process initialization failed`
+  String get bootExitInitialization {
+    return Intl.message(
+      'Process initialization failed',
+      name: 'bootExitInitialization',
       desc: '',
       args: [],
     );

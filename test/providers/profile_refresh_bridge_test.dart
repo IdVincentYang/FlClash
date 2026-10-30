@@ -13,6 +13,7 @@ import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:fl_clash/models/profile_refresh.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -25,9 +26,33 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/policy_core_bridge.dart';
+import '../helpers/boot_fixture.dart';
 import '../helpers/test_profiles.dart';
 
 class _Native extends Mock implements Service {}
+
+class _RecoverySetup extends SetupAction {
+  _RecoverySetup(Service native, Request client)
+    : super.scoped(isAndroid: true, native: native, requests: client);
+  Completer<void>? postEntered, postGate;
+  final outcomes = <ProfileApplicationOutcome>[];
+  @override
+  Future<ProfileApplicationOutcome> applyRefreshedProfile({
+    required Future<bool> Function() isCurrent,
+    required ConfigFact previous,
+    Future<bool> Function()? canSubmit,
+  }) async {
+    postEntered?.complete();
+    await postGate?.future;
+    final result = await super.applyRefreshedProfile(
+      isCurrent: isCurrent,
+      previous: previous,
+      canSubmit: canSubmit,
+    );
+    outcomes.add(result);
+    return result;
+  }
+}
 
 class _Shared extends Fake implements SharedState {}
 
@@ -194,6 +219,7 @@ void main() {
   final responses = <String, String>{};
   final controls = <Map<String, Object?>>[];
   String? ackFault;
+  Completer<void>? nextNativeRead;
   const yaml =
       'mixed-port: 0\nmode: rule\ndns: {enable: false, nameserver: ["127.0.0.1:1"]}\nrules: ["MATCH,DIRECT"]\n';
 
@@ -224,6 +250,7 @@ void main() {
     responses.clear();
     controls.clear();
     ackFault = null;
+    nextNativeRead = null;
     bridge = PolicyCoreBridge(
       await Process.start(
         executable!,
@@ -270,20 +297,20 @@ void main() {
       }
       return result;
     });
-    when(native.getRequestState).thenAnswer((_) => bridge.call('nativeState'));
+    when(native.getRequestState).thenAnswer((_) async {
+      final state = await bridge.call('nativeState');
+      final observed = nextNativeRead;
+      nextNativeRead = null;
+      observed?.complete();
+      return state;
+    });
     when(native.getRunTime).thenAnswer((_) async => DateTime(2026));
     when(() => native.syncState(any())).thenAnswer((_) async => '');
     client = Request.scoped(native: native, isAndroid: true);
     container = ProviderContainer(
       overrides: [
         profilesActionProvider.overrideWith(() => _Profiles(client)),
-        setupActionProvider.overrideWith(
-          () => SetupAction.scoped(
-            isAndroid: true,
-            native: native,
-            requests: client,
-          ),
-        ),
+        setupActionProvider.overrideWith(() => _RecoverySetup(native, client)),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesProvider.overrideWith(() => _StoredProfiles(client)),
         nativeRequestStateProvider.overrideWith(
@@ -345,6 +372,171 @@ void main() {
         await file.writeAsString(yaml);
       }
     }
+  }
+
+  Future<void> until(Future<bool> Function() condition) async {
+    final clock = Stopwatch()..start();
+    while (!await condition()) {
+      if (clock.elapsed > const Duration(seconds: 5)) {
+        fail('consumer did not finish');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+  }
+
+  Future<void> existingService() async {
+    await put([profile(1)]);
+    expect(await setup.applyProfile(force: true), true);
+    await bridge.call('refreshRunning');
+    expect(
+      await setup.setRunning(true, initialize: true, preparedRequestId: 2),
+      true,
+    );
+    when(
+      () => native.initializeRequestState(any(), recovery: true),
+    ).thenAnswer((_) async => false);
+  }
+
+  Future<void> enableAutomatic({
+    Duration delay = Duration.zero,
+    bool notify = true,
+  }) async {
+    final entry = profile(1).copyWith(
+      autoUpdate: true,
+      autoUpdateDuration: delay == Duration.zero
+          ? const Duration(days: 1)
+          : delay,
+      // Match Drift's persisted second precision before scheduling the timer.
+      lastUpdateDate: delay == Duration.zero
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              DateTime.now().millisecondsSinceEpoch ~/ 1000 * 1000,
+            ),
+    );
+    if (notify) {
+      await put([entry]);
+    } else {
+      await store.profilesDao.putAll([entry.toCompanion()]);
+    }
+  }
+
+  for (final wake in ['attach', 'visible', 'started', 'timer']) {
+    test(
+      'recovery with unavailable record preserves started service and automatic $wake maintenance',
+      () async {
+        await existingService();
+        final guard = (BootFixture()..writeStatus = 'io').guard();
+        await guard.evaluate(profileId: 1);
+        final before = await core.getConfigState();
+        await setup.initStatus(recovery: guard.decision.isDegraded);
+        expect((await core.getConfigState()).owner, before.owner);
+        final observed = setup as _RecoverySetup;
+        core.nativeAfterActivation = 'phase';
+        if (wake == 'visible') {
+          container.read(appVisibleProvider.notifier).value = false;
+        }
+        await enableAutomatic(
+          delay: wake == 'timer' ? const Duration(seconds: 2) : Duration.zero,
+          notify: wake == 'timer',
+        );
+        switch (wake) {
+          case 'attach':
+            await profiles.autoUpdateProfiles();
+          case 'visible':
+            container.read(appVisibleProvider.notifier).value = true;
+          case 'started':
+            final state = await bridge.call('nativeState');
+            final next = {...state, 'revision': (state['revision'] as int) + 1};
+            await bridge.call('control', {'action': 'publish', 'state': next});
+            container
+                .read(nativeRequestStateProvider.notifier)
+                .onRequestState(next);
+          case 'timer':
+            await profiles.autoUpdateProfiles();
+        }
+        await until(() async => observed.outcomes.isNotEmpty);
+        expect(received, ['/1']);
+        expect(observed.outcomes.single, ProfileApplicationOutcome.activated);
+        expect((await core.getConfigState()).businessActive, true);
+        expect((await bridge.call('nativeState'))['intentRevision'], 2);
+        expect(container.read(currentProfileIdProvider), 1);
+        expect(
+          controls.where((c) => c['action'] == 'begin').last['mode'],
+          'direct',
+        );
+      },
+      skip: executable == null,
+    );
+  }
+
+  for (final phase in ['stopped', 'failed']) {
+    test(
+      'recovery $phase blocks a previously scheduled automatic timer',
+      () async {
+        await existingService();
+        await enableAutomatic(delay: const Duration(seconds: 2));
+        await profiles.autoUpdateProfiles();
+        final state = await bridge.call('nativeState');
+        await bridge.call('control', {
+          'action': 'publish',
+          'state': {
+            ...state,
+            'revision': (state['revision'] as int) + 1,
+            'phase': phase,
+            'reason': 'recovery',
+          },
+        });
+        final timerRead = nextNativeRead = Completer<void>();
+        await timerRead.future.timeout(const Duration(seconds: 3));
+        await profiles.autoUpdateProfiles();
+        container.read(appVisibleProvider.notifier).value = true;
+        expect(received, isEmpty);
+        expect((setup as _RecoverySetup).outcomes, isEmpty);
+      },
+      skip: executable == null,
+    );
+
+    test(
+      'automatic material saved before external $phase cannot reapply the profile',
+      () async {
+        await existingService();
+        final observed = setup as _RecoverySetup;
+        observed.postEntered = Completer<void>();
+        observed.postGate = Completer<void>();
+        addTearDown(() {
+          if (!observed.postGate!.isCompleted) observed.postGate!.complete();
+        });
+        await enableAutomatic();
+        await profiles.autoUpdateProfiles();
+        await observed.postEntered!.future.timeout(const Duration(seconds: 5));
+        final registrations = core.calls
+            .where((m) => m == CoreMethod.registerConfigInput)
+            .length;
+        final state = await bridge.call('nativeState');
+        await bridge.call('control', {
+          'action': 'publish',
+          'state': {
+            ...state,
+            'revision': (state['revision'] as int) + 1,
+            'phase': phase,
+            'reason': 'externalFailure',
+          },
+        });
+        observed.postGate!.complete();
+        await until(() async => observed.outcomes.isNotEmpty);
+        expect(received, ['/1']);
+        expect(
+          observed.outcomes.single,
+          isNot(ProfileApplicationOutcome.activated),
+        );
+        expect(
+          core.calls.where((m) => m == CoreMethod.registerConfigInput).length,
+          registrations,
+        );
+        expect((await bridge.call('nativeState'))['phase'], phase);
+      },
+      skip: executable == null,
+    );
   }
 
   test(

@@ -92,14 +92,19 @@ class ApplicationState extends ConsumerState<Application> {
     SystemNavigator.setFrameworkHandlesBack(true);
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
       if (globalState.navigatorKey.currentContext != null) {
-        await bootstrap.attach();
+        await bootstrap.runAfterAttach([
+          () {
+            unawaited(
+              ref.read(profilesActionProvider.notifier).autoUpdateProfiles(),
+            );
+          },
+          _initLink,
+          () {
+            if (!safeModeBuild) unawaited(app?.initShortcuts());
+          },
+        ]);
       } else {
         exit(0);
-      }
-      unawaited(ref.read(profilesActionProvider.notifier).autoUpdateProfiles());
-      _initLink();
-      if (!safeModeBuild) {
-        unawaited(app?.initShortcuts());
       }
     });
   }

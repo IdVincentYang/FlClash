@@ -23,6 +23,7 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
 import com.follow.clash.R
+import com.follow.clash.BootRecords
 import com.follow.clash.common.Components
 import com.follow.clash.common.GlobalState
 import com.follow.clash.common.PendingCallback
@@ -47,6 +48,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
+
+    private var bootGeneration = 0L
 
     private var activity: Activity? = null
 
@@ -186,8 +189,14 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 result.success(openAppSettings())
             }
 
+            "bootRecord" -> BootRecords.store.handle(
+                bootGeneration,
+                call.argument<String>("action") ?: "",
+                call.arguments as? Map<*, *> ?: emptyMap<Any, Any>(),
+            ) { runCatching { result.success(it) } }
+
             "getLastExitInfo" -> reply(result) {
-                GlobalState.lastExitInfo()
+                GlobalState.lastExitInfo(call.argument<Number>("pid")?.toInt() ?: 0)
             }
 
             else -> {
@@ -404,6 +413,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        bootGeneration = BootRecords.store.attach()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         channel =
             MethodChannel(flutterPluginBinding.binaryMessenger, "${Components.PACKAGE_NAME}/app")
@@ -423,6 +433,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        BootRecords.store.detach(bootGeneration)
         packageChangeContext?.unregisterReceiver(packageChangeReceiver)
         packageChangeContext = null
         channel.setMethodCallHandler(null)

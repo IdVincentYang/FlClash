@@ -117,6 +117,15 @@ callers must not try to reuse a closed platform implementation.
 - The provider is an orchestration and presentation layer, not a process owner. Platform lifecycle code remains responsible
   for determining whether a Core process/service is actually running.
 
+Android frontend startup recovery belongs to `BootGuard`. `Bootstrap` orchestrates
+the prompt and `SetupAction` observes native state without replaying autoRun.
+The [startup recovery contract](../docs/features/security/boot_recovery_design.md)
+defines the implemented boundary: `AppPlugin` adapts process identity and bounded,
+owned writes to the existing boot record; `ServiceState` owns running intent.
+`Application` stops post-attach startup actions after aborted initialization.
+Normal automatic refresh for an already started service remains governed by
+T06/Request, including its post/apply path.
+
 Application exit is centralized in `SystemAction` and `SystemExitCoordinator`:
 
 1. Optionally save config and clean up DNS, system proxy, and tray resources in parallel.

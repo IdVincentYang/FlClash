@@ -4,6 +4,9 @@ part of '../action.dart';
 class SystemAction extends _$SystemAction {
   CoreController get _core => ref.read(coreHandlerProvider);
 
+  @protected
+  BootGuard get startupGuard => bootGuard;
+
   SystemExitCoordinator? _exitCoordinator;
 
   @override
@@ -26,6 +29,7 @@ class SystemAction extends _$SystemAction {
   }
 
   Future<void> handleExit([bool needSave = true]) {
+    unawaited(startupGuard.markClosed());
     final coordinator = _exitCoordinator ??= SystemExitCoordinator(
       watchdogDuration: exitWatchdogDuration,
       closeWindow: closeWindow,
@@ -54,7 +58,7 @@ class SystemAction extends _$SystemAction {
     }
     await Future.wait([
       ?saveOperation,
-      bootGuard.markClosed(),
+      startupGuard.markClosed(),
       if (systemDnsCoordinator != null) systemDnsCoordinator!.shutdown(),
       if (proxy != null) proxy!.stopProxy(),
     ]);

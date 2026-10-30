@@ -278,6 +278,39 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
 class ServiceStateMachineTest {
 
     @Test
+    fun `recovery initializer cannot overwrite a new preparing started or stopped intent`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine()
+        val idle = machine.getRequestState()
+        val start = machine.prepareRunIntent(true)
+        val preparing = machine.getRequestState()
+        assertFalse(machine.initializeRequestState(idle.revision, true))
+        assertFalse(machine.initializeRequestState(preparing.revision, true))
+        assertEquals(preparing, machine.getRequestState())
+        machine.syncSharedState(configuredState())
+        assertTrue(machine.requestStart(start).await())
+        val started = machine.getRequestState()
+        assertFalse(machine.initializeRequestState(started.revision, true))
+        assertEquals(started, machine.getRequestState())
+        val stop = machine.prepareRunIntent(false)
+        machine.requestStop(stop).await()
+        val stopped = machine.getRequestState()
+        assertFalse(machine.initializeRequestState(stopped.revision, true))
+        assertEquals(stopped, machine.getRequestState())
+    }
+
+    @Test
+    fun `recovery initializer only marks pristine idle state without starting a service`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine()
+        assertTrue(machine.initializeRequestState(machine.getRequestState().revision, true))
+        assertEquals("recovery", machine.getRequestState().reason)
+        assertEquals("failed", machine.getRequestState().phase)
+        assertEquals(0, host.startCalls)
+        assertFalse(machine.getRequestState().intentRunning)
+    }
+
+    @Test
     fun `intent is published before setup or permission waits and reads are inert`() = runTest {
         val host = ConfigServiceTestHost(backgroundScope)
         val machine = host.createMachine()

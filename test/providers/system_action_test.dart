@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show Brightness, Color;
 
 import 'package:fl_clash/common/app_ports.dart';
+import 'package:fl_clash/common/boot_guard.dart';
 import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/models/config.dart';
 import 'package:fl_clash/providers/action.dart';
@@ -11,6 +12,8 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../helpers/boot_fixture.dart';
 
 class TestSystemAction extends SystemAction {
   final List<String> calls = [];
@@ -46,6 +49,19 @@ class TestSystemAction extends SystemAction {
 
   @override
   Future<void> exitApplication() async => calls.add('exit');
+}
+
+class _BootExitAction extends TestSystemAction {
+  _BootExitAction(this.startupGuard);
+  @override
+  final BootGuard startupGuard;
+  final cleanup = Completer<void>();
+  @override
+  Future<void> cleanupExitResources(bool needSave) async {
+    calls.add('cleanup');
+    await cleanup.future;
+    await startupGuard.markClosed();
+  }
 }
 
 class _PersistenceSystemAction extends SystemAction {
@@ -92,6 +108,28 @@ class _GeometryWindowPort implements WindowPort {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'exit request closes startup permission before resource cleanup finishes',
+    () async {
+      final fixture = BootFixture();
+      final guard = fixture.guard();
+      await guard.evaluate(profileId: 7);
+      final action = _BootExitAction(guard);
+      final container = ProviderContainer(
+        overrides: [systemActionProvider.overrideWith(() => action)],
+      );
+      addTearDown(container.dispose);
+      final exiting = container
+          .read(systemActionProvider.notifier)
+          .handleExit(false);
+      expect(await guard.isCurrent(), false);
+      expect(action.calls, ['cleanup']);
+      action.cleanup.complete();
+      await exiting;
+      expect(action.calls.last, 'exit');
+      expect(fixture.record?.stage?.name, 'closed');
+    },
+  );
 
   test('coalesces repeated exit requests and runs cleanup once', () async {
     final closeCoreCompleter = Completer<void>();

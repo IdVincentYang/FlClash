@@ -540,6 +540,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
             .applyRefreshedProfile(
               isCurrent: current,
               previous: observation.fact,
+              canSubmit: job.automatic
+                  ? () => _automaticRunEligible(job.profile)
+                  : null,
             );
       } else if (!material.materialSaved ||
           job.dependencyUnknown ||

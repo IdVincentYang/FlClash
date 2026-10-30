@@ -245,19 +245,24 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
 
 ## Lifecycle Rules
 
-- Crash recovery is owned by `BootGuard` (`lib/common/boot_guard.dart`), and the signal it acts on is the persisted
-  `BootRecord`, never a crash reporter. The record is stamped `starting` before `startCore` and `running` once
-  `_initApp` finishes, so only a launch that died before reaching `running` is a failed launch — a crash after hours of
-  runtime, or a process the system reclaimed in the background, is not one. `ApplicationExitInfo` can only veto a
-  failure (user stop, low memory, signal, package change), never create one, and its timestamp is consumed through
-  `handledExitAt` so the same exit cannot be counted twice.
+- Android startup recovery is owned by `BootGuard`, using persisted `BootRecord`,
+  never a crash reporter. Only an unfinished `starting` record triggers recovery;
+  `running` means frontend initialization completed, not that Core/VPN started.
+  Match exit information by process identity and time. Missing information is
+  unknown, external termination vetoes a failure, and a runtime crash never
+  creates a startup failure. The current boundary and limits are in the
+  [startup recovery contract](../docs/features/security/boot_recovery_design.md).
 - `BootGuard` is an Android-only mechanism and gates itself: on every other platform `evaluate`, `markRunning` and
   `markClosed` return without touching preferences. The desktop has no `ApplicationExitInfo` equivalent,
   so a bare sentinel there would read a session ended by shutdown as a failed launch.
   Keep the platform check inside the guard;
   callers in `bootstrap.dart` and `SystemAction` stay unconditional.
-- Recovery is graded: the first failed launch only skips `initStatus`, and `currentProfileId` is cleared only from
-  `crashRecoveryClearThreshold` consecutive failures on. Do not let a single interrupted launch write to the config.
+- Recovery preserves `currentProfileId`, files and autoRun. It skips this launch's
+  automatic configuration; two consecutive incomplete launches strengthen the
+  prompt, never clear selection. Legitimate started-service automatic maintenance
+  keeps its existing RequestMode and T06/Request qualifications. Boot-record IO
+  never becomes service or network authority; generation/attempt admission and
+  terminal close protect record writes.
 - Desktop process ownership belongs to `DesktopCoreLifecycle`; do not start/kill `FlClashCore` from providers, widgets,
   managers, or ad hoc exit callbacks. Acquire and release it through a `CoreProcessLease`.
 - `CoreController.close()` and platform `close()` implementations are terminal and idempotent. Application shutdown must
