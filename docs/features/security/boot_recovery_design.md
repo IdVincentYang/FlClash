@@ -1,6 +1,5 @@
 # Android 启动恢复
 
-当前源码已实现，本地合成验证见 [T10 结果](loop1/l1_t10_result.md)，实现仍待评审。
 启动未完成只触发本次启动恢复，
 不会取消选中的配置、删除订阅文件、重置 autoRun 或清理诊断证据。
 BootGuard 决定恢复，ServiceState 决定原生运行意图；本契约不提供堆栈／dump 保存能力。
@@ -87,3 +86,17 @@ NativeRequestStateProvider 仍接受的同 epoch/revision/phase，旧观察不�
 guard 从 migration 读取配置之后开始，不完整覆盖更早 Rust／system／migration 故障。
 磁盘断电持久性、设备 ApplicationExitInfo 可用性和 Activity 重建需要设备验收。
 新报告保存及用户清理顺序在报告能力接入时复验；本项不能证明跨启动 dump 已保存。
+
+## 本地验证入口
+
+- [Bootstrap 消费者][bootstrap-tests]：实际恢复对话框、阶段写入期间退出或替换、并发 attach 与后续动作。
+- [SetupAction 消费者][setup-tests]：恢复只同步状态，旧快照及 runtime 成功／失败不覆盖新状态。
+- [刷新与 Core bridge][refresh-tests]：合法活动服务继续自动维护，停止或失败后的自动任务不迟到应用。
+- [原生记录适配][native-tests]：generation admission、单 IO slot、超时与迟到完成；存储后端为合成数据。
+
+构建环境和命令见[Android 构建指南](../../development/android_build_guide.md)；上述本地验证不能替代设备退出信息或实际磁盘故障验收。
+
+[bootstrap-tests]: ../../../test/bootstrap_test.dart
+[setup-tests]: ../../../test/providers/boot_recovery_setup_test.dart
+[refresh-tests]: ../../../test/providers/profile_refresh_bridge_test.dart
+[native-tests]: ../../../android/tests/app/BootRecordStoreTest.kt
