@@ -38,7 +38,10 @@
 ## 范围、依赖与完成方向
 
 - 基线 Go/Rust 路径可先审，完整范围接收 Loop 5 的实际清单；工具、库或 feature 变化时重新核实受影响判断。
-- 运行缺陷由本轮归纳；联网用途归 [Loop 1](../loop1/loop1_plan.md)，配置/路由归 [Loop 2](../loop2/loop2_plan.md)，本机授权/数据政策归 [Loop 3](../loop3/loop3_plan.md)，来源和数据发布身份归 Loop 5/[Loop 6](../loop6/loop6_plan.md)。
+- 运行缺陷由本轮归纳；已交付联网用途见[用途清单](../android_network_inventory.md)，
+  配置/路由归 [Loop 2](../loop2/loop2_plan.md)，
+  本机授权/数据政策归 [Loop 3](../loop3/loop3_plan.md)，
+  来源和数据发布身份归 Loop 5/[Loop 6](../loop6/loop6_plan.md)。
 - 完成时公告及源码审查发现均有实际条件、结论和处置依据；已修复路径经过针对性验证，所需正常功能保持可用。
 - 重要未解决/未验证项不能当作安全通过，结果与 [Loop 7](../loop7/loop7_plan.md)最终 APK 输入对应。
 - 按[官方同步约定](../../../../CONTRIBUTING.md)关联补丁与上游版本/公告，复用上游修复并撤销等价本地补丁，避免大范围三方源码重写。同步后重核 feature、输入能力与修复条件。

@@ -638,7 +638,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
     final retry = _retryFor(profile);
     final attempted = retry.attempted;
     if (attempted != null) {
-      // Monotonic retry gaps: 1/2/4/8/16/20 minutes; l1_t06_plan.md §3.4.
+      // Monotonic gaps: 1/2/4/8/16/20 min; android_network_inventory.md.
       final minutes = retry.failures == 0
           ? 1
           : (1 << (retry.failures - 1).clamp(0, 5)).clamp(1, 20);

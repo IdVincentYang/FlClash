@@ -3,6 +3,7 @@
 本清单说明应用、Core 和系统移交分别因何联网、接收方能看到什么，以及实际保护和验证边界。
 共同判据见[安全目标](security_requirements.md#正常联网与额外暴露的判定)；接收必要请求不等于额外采集。
 范围是当前 Android 实现及受检 ARM64 dev/release APK；不记录用户实际地址、凭据或访问历史。
+通用身份/跳转与日志的未完成整改由[暂缓备忘](deferred_security_items.md)维护，阶段收尾不消除这些风险。
 
 ## 阅读与执行归属
 
@@ -301,9 +302,10 @@ ProcessLifecycle 是生命周期通知，ProfileInstaller 是本地 baseline pro
 
 ## 证据与尚未闭合边界
 
-本轮核对的源码基线为 `6aff7f3`，生产/生成/测试未改；复用的 T12 APK SHA-256 起始为 `1753d276d13d`，
+T13 核对的源码基线为 `6aff7f3`，当轮生产/生成/测试未改；复用的 T12 APK SHA-256 起始为 `1753d276d13d`，
 包名 com.follow.clash.dev、0.8.99/2026102301、ARM64 release、Debug 签名。
-1000 份构建输入中 998 份与当前字节相同，2 份 locale 为已核实 token 等价的格式差异；不是从本清单提交重新构建的包。
+该受检快照的 1000 份构建输入中，998 份与当时源码字节相同，2 份 locale 为已核实 token 等价的格式差异；
+不是从本清单提交重新构建的包。后续阶段文档清理更新了刷新代码的一条注释指向，未改执行语句。
 
 - 已静态核对：入口正查与网络根反查；当前离线依赖/插件注册、最终 manifest、R8 原始类来源、DEX 和 10 个 native 库。
   未发现 Firebase/ML Kit/DataTransport 依赖/初始化回流；ZXing 及保留的 Emoji 初始化已分别列出。
@@ -317,3 +319,17 @@ ProcessLifecycle 是生命周期通知，ProfileInstaller 是本地 baseline pro
   真实设备网络切换、系统字体/相册/SAF 云端行为及发布签名包。
   对应 Loop 2/3/4/5/7；Geo 内容/分发信任另归 Loop 6。T04/T05 和 L2-T02-04/05 未闭合，
   本清单不以短时零流量、部分通过或完成任务数宣布 Loop 1/全应用安全完成。
+
+## 源码维护与回归入口
+
+运行规则由上述主题及生产实现维护；已结束的阶段任务记录不再作为当前规范入口。
+下面是接续修改时可直接检查的消费者，不代表每次都应重复全量运行。
+
+| 能力 | 真实消费者与回归入口 |
+| --- | --- |
+| 请求资格、三态出口与取消 | [Dart 作用域](../../../test/common/request_scope_test.dart)、[Core 请求](../../../core/app_requests_test.go) |
+| 订阅资格、失败及保存/应用 | [刷新调度](../../../test/providers/profile_refresh_test.dart)、[应用接续](../../../test/providers/profile_refresh_bridge_test.dart) |
+| 站点基本/高级诊断 | [Core 消费者](../../../core/service_diagnostics_test.go)、[页面调度](../../../test/providers/service_status_test.dart) |
+| 核心源码与官方同步 | [构建指南的恢复契约](../../development/android_build_guide.md#核心源码恢复与官方同步契约) |
+
+Loop 1 的计划、任务和结果定稿保存在 `aae1850` 及其祖先历史；未验收项仍按本清单和暂缓备忘接续。

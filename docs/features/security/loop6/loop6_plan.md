@@ -36,7 +36,8 @@
 
 ## 范围、依赖与完成方向
 
-- 历史来源比对可先做；联网下载与认证/出口使用 [Loop 1](../loop1/loop1_plan.md)成果，配置接受和最终规则归 [Loop 2](../loop2/loop2_plan.md)。
+- 历史来源比对可先做；联网下载与出口使用[已交付联网能力](../android_network_inventory.md)，
+  认证/跳转剩余风险见[暂缓备忘](../deferred_security_items.md)，配置接受和最终规则归 [Loop 2](../loop2/loop2_plan.md)。
 - 格式解析缺陷归 [Loop 4](../loop4/loop4_plan.md)，非 Geo 嵌入资产及 APK 对应关系归 [Loop 5](../loop5/loop5_plan.md)。
 - 完成时每份启用数据有发布身份、同版本比对和处置结论，错误来源/摘要/格式被拒绝，正常更新及失败保留路径可用。
 - 实际规则结果绑定实际使用的数据版本；历史未证明项与剩余准确性风险交给 [Loop 7](../loop7/loop7_plan.md)，不把未发现异常写成绝对无篡改。

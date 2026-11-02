@@ -4,7 +4,7 @@
 
 | Loop | 子计划入口 | 状态 | 前置依赖 |
 | --- | --- | --- | --- |
-| 1 | [loop1_plan.md](loop1/loop1_plan.md) | 部分完成，含用户暂缓项 | 无 |
+| 1 | [联网用途与已交付能力](android_network_inventory.md) | 本轮已收尾；[T04/T05 暂缓备忘](deferred_security_items.md)保留 | 无 |
 | 2 | [loop2_plan.md](loop2/loop2_plan.md) | 进行中 | L1-T03 已完成；本地配置/业务出口可先行，联网身份边界接 Loop 1 实际交付 |
 | 3 | [loop3_plan.md](loop3/loop3_plan.md) | 计划待评审，未实施 | 无；与 Loop 1 对齐本地报告边界 |
 | 4 | [loop4_plan.md](loop4/loop4_plan.md) | 计划待评审，未实施 | 可先审基线；完整范围接收 Loop 5 清单 |

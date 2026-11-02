@@ -105,5 +105,5 @@ and verify reconstruction in a separate object directory. Keep the public base a
 the sole parent, or supply the complete required object closure. Remote delivery
 follows the standing parent authorization and task exception above; publishing the
 core repository still requires separate authorization. See the
-[original carrier contract](docs/features/security/loop1/l1_t03_plan.md#核心源码恢复与官方同步契约)
+[current carrier contract](docs/development/android_build_guide.md#核心源码恢复与官方同步契约)
 and [L2-T01 scope](docs/features/security/loop2/l2_t01_plan.md#范围与交付终点).

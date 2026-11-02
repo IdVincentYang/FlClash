@@ -38,6 +38,28 @@ Native Assets 曾选用本机 NDK 29.0.14206865，与 Gradle 声明不同。每�
 
 `setup.dart` 会生成忽略的 env.json，并激活其中指定的 flutter_distributor Git 版本。依赖和工具来自项目配置的数据源；来源核验及进一步固定版本见 Loop 5。
 
+### 核心源码恢复与官方同步契约
+
+当前父仓库携带未单独发布的核心 gitlink，其源码通过
+[`core/patches/l1_t03/`](../../core/patches/l1_t03/manifest.json)
+中的 manifest、Git 二进制文本 patch
+和原始 commit bytes 重建。manifest 记录公开 base commit/tree、目标 tree/commit、patch 摘要及变更 blob；
+材料不包含编译库、凭据、日志或签名私钥，不维护另一套源码树。
+
+[`restore_l1_t03_core.py`](../../tool/restore_l1_t03_core.py) 从项目配置的来源取得 base，
+在隔离临时 index/对象中应用 patch，逐一核对 tree/blob，按原始 commit bytes 重建并核对 gitlink。
+不依赖本机已有的私有 commit 对象；保留签名 bytes 而不重新签名。当前核心以公开 base 为唯一 parent，
+若以后增加未公开祖先，载体必须提供完整对象闭包。已有修改、缺材料、base 不可取得或摘要不符时失败并保留现场，
+不 reset、覆盖或以旧二进制代替源码。
+
+Go 构建 hook 在编译或使用内层缓存前检查恢复内容；patch、manifest、commit bytes、恢复脚本及实际来源配置
+同时进入 Native Assets 的外层依赖，缓存命中也保留这些输入。先恢复/check，再初始化其它子模块并按正常步骤构建；
+普通 recursive checkout 不能直接取得未发布 gitlink。现有 workflow 已接入恢复命令，源码步骤存在不等于远端 CI 已验证。
+
+同步官方时，先选择可取得的新公开 base，再重放窄 patch、解决实际接口/行为冲突，重新生成 commit/tree/blob 材料和父 gitlink。
+不得只改 gitlink 留下失效载体，也不通过选择 ours/theirs 丢弃保护；更新对象不授权改写共享历史或发布核心仓库。
+普通父分支推送的既有 carrier 例外与同步步骤由[贡献指南](../../CONTRIBUTING.md#l1-t03-core-source-carrier)维护。
+
 ### 限定 Gradle 目录并关闭上传任务
 
 本地构建禁止上传或发布。Firebase 构建上传插件已移除；仍使用本项目专用的 Gradle init script，

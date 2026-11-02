@@ -35,7 +35,11 @@
 
 ## 依赖、完成方向与使用结论
 
-- 接收 [Loop 1](../loop1/loop1_plan.md)、[Loop 2](../loop2/loop2_plan.md)、[Loop 3](../loop3/loop3_plan.md)、[Loop 4](../loop4/loop4_plan.md)、[Loop 5](../loop5/loop5_plan.md)、[Loop 6](../loop6/loop6_plan.md)实际交付；发生输入变化后重新核对相关路径。
+- 接收[联网用途及诊断成果](../android_network_inventory.md)、
+  [Loop 2](../loop2/loop2_plan.md)、[Loop 3](../loop3/loop3_plan.md)、
+  [Loop 4](../loop4/loop4_plan.md)、[Loop 5](../loop5/loop5_plan.md)、
+  [Loop 6](../loop6/loop6_plan.md)实际交付；
+  [T04/T05 暂缓风险](../deferred_security_items.md)继续保留，发生输入变化后重新核对相关路径。
 - 完成时正常用途和关键拒绝边界均有实际证据，受测对象与最终包对应；失败、跳过、未验证和适用限制明确说明。
 - 使用结论明确回答：是否仍有隐藏收集/额外上传、非预期改道、凭据泄漏、来源未知执行内容或可达重大缺陷；发生在哪个组件、何时触发、有什么影响及缓解，是否阻止当前版本使用。
 - 将发现区分已修复、已证实不影响、已缓解有剩余风险、未解决和未验证。重大未解决风险或关键证据缺口不能通过“已告知”转为安全通过。
