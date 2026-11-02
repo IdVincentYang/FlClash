@@ -119,6 +119,15 @@ class Service {
     return result;
   }
 
+  Future<Map<String, Object?>> preparePauseIntent(bool paused) async {
+    final result = await methodChannel.invokeMethod<String>(
+      'preparePauseIntent',
+      paused,
+    );
+    if (result == null) throw StateError('Pause request unavailable');
+    return Map<String, Object?>.from(json.decode(result) as Map);
+  }
+
   Future<Map<String, Object?>> failRunIntent(
     int requestId, {
     required int token,

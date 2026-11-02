@@ -8102,6 +8102,76 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Android service`
+  String get androidServiceTitle {
+    return Intl.message(
+      'Android service',
+      name: 'androidServiceTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Stopping service`
+  String get androidServiceStopping {
+    return Intl.message(
+      'Stopping service',
+      name: 'androidServiceStopping',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Suspended`
+  String get androidServiceSuspended {
+    return Intl.message(
+      'Suspended',
+      name: 'androidServiceSuspended',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Stopped`
+  String get androidServiceStopped {
+    return Intl.message(
+      'Stopped',
+      name: 'androidServiceStopped',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN active`
+  String get androidServiceVpnActive {
+    return Intl.message(
+      'VPN active',
+      name: 'androidServiceVpnActive',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy only`
+  String get androidServiceProxyOnly {
+    return Intl.message(
+      'Proxy only',
+      name: 'androidServiceProxyOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Service unavailable`
+  String get androidServiceUnavailable {
+    return Intl.message(
+      'Service unavailable',
+      name: 'androidServiceUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

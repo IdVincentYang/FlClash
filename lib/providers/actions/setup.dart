@@ -160,6 +160,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   final _setupScheduler = SerialTaskScheduler();
   final _listenerScheduler = SerialTaskScheduler();
   _RunRequest? _latestRunRequest;
+  int _runOperation = 0;
   DateTime? _startTime;
   int _setupGeneration = 0;
 
@@ -363,6 +364,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       return Future.value(true);
     }
 
+    _runOperation++;
     final request = _RunRequest(
       running: running,
       initialize: running && initialize,
@@ -377,8 +379,12 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
                 ) ??
                 Future.value(null),
     );
+    return _queueRunRequest(request);
+  }
+
+  Future<bool> _queueRunRequest(_RunRequest request) {
     _latestRunRequest = request;
-    if (!running) {
+    if (!request.running || request.paused) {
       _setupGeneration++;
       unawaited(
         ref.read(profilesActionProvider.notifier)._cancelExpiredDemands(),
@@ -395,7 +401,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     final requestId = await request.nativeRequest;
     if (!_isCurrent(request)) return false;
     Future<bool> dispatch() =>
-        request.running ? _start(request) : _stop(request);
+        request.running && !request.paused ? _start(request) : _stop(request);
     return requestId == null
         ? dispatch()
         : RunRequestScope.run(requestId, dispatch);
@@ -404,11 +410,45 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   Future<void> setPaused(bool paused) async {
     final native = _service;
     if (native == null) return;
-    final snapshot = await native.getRequestState();
-    await setRunning(
-      snapshot['intentRunning'] == true,
-      source: 'ssid',
-      paused: paused,
+    final operation = ++_runOperation;
+    _latestRunRequest = null;
+    final snapshot = await native.preparePauseIntent(paused);
+    if (!ref.mounted || operation != _runOperation) return;
+    final requestId = snapshot['intentRevision'];
+    final epoch = snapshot['processEpoch'];
+    if (requestId is! int ||
+        epoch is! String ||
+        epoch.isEmpty ||
+        snapshot['source'] != 'ssid' ||
+        snapshot['paused'] != paused ||
+        snapshot['intentRunning'] is! bool) {
+      throw StateError('Pause request unavailable');
+    }
+    final observed = ref.read(nativeRequestStateProvider);
+    if (observed['processEpoch'] != null && observed['processEpoch'] != epoch) {
+      return;
+    }
+    ref.read(nativeRequestStateProvider.notifier).onRequestState(snapshot);
+    if (snapshot['phase'] == 'failed' || snapshot['reason'] == 'exiting') {
+      throw StateError('Pause request unavailable');
+    }
+    final current = ref.read(nativeRequestStateProvider);
+    // Network observations can advance revision without superseding this intent.
+    if (current['intentRevision'] != requestId ||
+        current['intentRunning'] != snapshot['intentRunning'] ||
+        current['paused'] != paused ||
+        current['phase'] == 'failed' ||
+        current['reason'] == 'exiting') {
+      return;
+    }
+    await _queueRunRequest(
+      _RunRequest(
+        running: snapshot['intentRunning'] == true,
+        initialize: false,
+        paused: paused,
+        previousStartTime: _startTime,
+        nativeRequest: Future.value(requestId),
+      ),
     );
   }
 
@@ -479,6 +519,10 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
 
   void _rollbackRunning(_RunRequest request) {
     if (!_isCurrent(request)) {
+      return;
+    }
+    if (_isAndroid) {
+      _setLocalRunning(false);
       return;
     }
     _startTime = request.previousStartTime;

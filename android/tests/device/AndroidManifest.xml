@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.follow.clash.testclient">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <application android:label="L2-T03 local probe" android:debuggable="true" android:usesCleartextTraffic="true">
+        <activity android:name=".ProbeActivity" android:exported="true" />
+    </application>
+</manifest>

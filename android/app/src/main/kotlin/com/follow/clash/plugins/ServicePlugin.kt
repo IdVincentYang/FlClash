@@ -55,6 +55,14 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 result.success(gson.toJson(state))
             }
             "prepareRunIntent" -> prepareRunIntent(call, result)
+            "preparePauseIntent" -> {
+                val paused = call.arguments as? Boolean
+                if (paused == null) result.error("INVALID_ARGUMENT", "Missing paused value", null)
+                else runCatching { ServiceState.preparePauseIntent(paused) }
+                    .onSuccess { result.success(gson.toJson(it)) }
+                    .onFailure { result.error("PAUSE_REJECTED", "Pause request unavailable", null) }
+            }
+
             "failRunIntent" -> scope.launch {
                 val args = call.arguments as? Map<*, *>
                 val id = (args?.get("requestId") as? Number)?.toLong()

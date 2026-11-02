@@ -102,9 +102,9 @@ shows the mode picker and text field only on desktop.
 
 ## Managed Profile Materials
 
-The task branch implements the
-[managed material contract](../docs/features/security/managed_updates_design.md);
-implementation review is pending. Pure expansion lives in
+The delivered implementation follows the
+[managed material contract](../docs/features/security/managed_updates_design.md).
+Pure expansion lives in
 `lib/common/managed_material.dart`.
 `lib/providers/actions/policy_material.dart` owns transient candidate capture
 and qualification. Versioned templates resolve frozen profile material,
@@ -189,6 +189,12 @@ Direct launch is used on macOS, inside an AppImage, and as the Windows/Linux fal
 ready. When the Helper is ready, it owns the Core child and Dart owns it through a session-scoped lease.
 
 ### Android Service Lifecycle
+
+The [service contract](../docs/features/security/android_service_design.md)
+defines intent, configuration,
+service identity and UI observations. Its pause/failure/UI contract is implemented;
+[the guide](../docs/features/security/android_service_guide.md) bounds
+English UI and dedicated-AVD verification.
 
 Android deliberately keeps Flutter requests optimistic and the native layer authoritative:
 

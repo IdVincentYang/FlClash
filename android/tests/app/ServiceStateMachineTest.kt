@@ -125,7 +125,7 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
     fun ownedService(): RequestServiceIdentity? = ownedIdentity
     fun replaceOwnedService(identity: RequestServiceIdentity) { ownedIdentity = identity }
 
-    fun createMachine(): ServiceStateMachine = ServiceStateMachine(this).also { machine = it }
+    fun createMachine(host: ServiceStateHost = this): ServiceStateMachine = ServiceStateMachine(host).also { machine = it }
     @Synchronized override fun registerConfigInput(input: JsonObject): ConfigReceipt {
         val token = ++configSequence
         activeInputs[token] = input.get("active").asBoolean
@@ -225,6 +225,9 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
     var setupCalls = 0
     var startCalls = 0
     var stopCalls = 0
+    var stopGate: CompletableDeferred<Unit>? = null
+    var stopEntered: CompletableDeferred<Unit>? = null
+    var stopFailure = false
     var lastInitParams: String? = null
     var lastSetupParams: String? = null
     val requestPublications = mutableListOf<ApplicationRequestState>()
@@ -232,6 +235,7 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
     var blockedRequests = 0
     override fun publishRequestState(state: ApplicationRequestState): Boolean {
         requestPublications += state
+        if (state.phase != "started") lastConfigFact = lastConfigFact.copy(businessActive = false)
         return publishAccepted
     }
     override fun blockRequestState() { blockedRequests++ }
@@ -268,7 +272,13 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
 
     override suspend fun stopService() {
         stopCalls++
+        stopEntered?.complete(Unit)
+        stopGate?.await()
+        if (stopFailure) error("synthetic stop failure")
         runTimeMillis = 0L
+        val previous = ownedIdentity
+        ownedIdentity = null
+        if (previous != null) machine.observeServiceLost(previous.serviceId, previous.requestId)
     }
 
     override suspend fun isVpnServiceActive(): Boolean = vpnServiceActive

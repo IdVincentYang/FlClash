@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/android_service_state.dart';
+import 'package:fl_clash/widgets/android_service_status.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -11,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const _threeDigitHourThreshold = 100 * 60 * 60 * 1000;
 const _widthAnimationDuration = Duration(milliseconds: 200);
 const _buttonHeight = 56.0;
+const _buttonMaxWidth = 220.0;
 const _iconMorphDuration = Duration(milliseconds: 450);
 
 TextStyle? _runTimeTextStyle(BuildContext context) {
@@ -48,7 +51,9 @@ class RunTimeText extends StatelessWidget {
 }
 
 class StartButton extends ConsumerStatefulWidget {
-  const StartButton({super.key});
+  const StartButton({super.key, this.isAndroid});
+
+  final bool? isAndroid;
 
   @override
   ConsumerState<StartButton> createState() => _StartButtonState();
@@ -60,13 +65,13 @@ class _StartButtonState extends ConsumerState<StartButton>
   late Animation<double> _animation;
   double? _twoDigitTextWidth;
   double? _threeDigitTextWidth;
-  double? _suspendedTextWidth;
+  ({String text, double width})? _statusTextWidth;
   int? _displayRunTime;
 
   @override
   void initState() {
     super.initState();
-    final isStart = ref.read(isStartProvider);
+    final isStart = ref.read(runControlProvider);
     _displayRunTime = ref.read(runTimeProvider);
     _controller = AnimationController(
       vsync: this,
@@ -80,7 +85,7 @@ class _StartButtonState extends ConsumerState<StartButton>
     ref.listenManual(runTimeProvider, (_, next) {
       _updateDisplayRunTime(next);
     });
-    ref.listenManual(isStartProvider, (prev, next) {
+    ref.listenManual(runControlProvider, (prev, next) {
       updateController(next);
     }, fireImmediately: true);
   }
@@ -90,7 +95,7 @@ class _StartButtonState extends ConsumerState<StartButton>
     super.didChangeDependencies();
     _twoDigitTextWidth = null;
     _threeDigitTextWidth = null;
-    _suspendedTextWidth = null;
+    _statusTextWidth = null;
   }
 
   @override
@@ -152,14 +157,15 @@ class _StartButtonState extends ConsumerState<StartButton>
     );
   }
 
-  double _getSuspendedTextWidth(BuildContext context, String suspendedText) {
-    return _suspendedTextWidth ??=
+  double _getStatusTextWidth(BuildContext context, String text) {
+    if (_statusTextWidth?.text == text) return _statusTextWidth!.width;
+    final width =
         globalState.measure
-            .computeTextSize(
-              Text(suspendedText, style: context.textTheme.titleMedium),
-            )
+            .computeTextSize(Text(text, style: context.textTheme.titleMedium))
             .width +
         24;
+    _statusTextWidth = (text: text, width: width);
+    return width;
   }
 
   Widget _buildIcon(bool isStart, {required bool suspended}) {
@@ -189,16 +195,38 @@ class _StartButtonState extends ConsumerState<StartButton>
     if (!hasProfile) {
       return Container();
     }
-    final isStart = ref.watch(isStartProvider);
+    final isStart = ref.watch(runControlProvider);
+    final actualRunning = ref.watch(isStartProvider);
     final suspend = ref.watch(suspendProvider);
     final appLocalizations = context.appLocalizations;
-    final suspended = isStart && suspend;
+    final nativeStatus = (widget.isAndroid ?? system.isAndroid)
+        ? ref.watch(androidServiceStatusProvider)
+        : null;
+    final suspended =
+        nativeStatus == AndroidServiceStatus.suspended ||
+        nativeStatus == null && isStart && suspend;
+    final statusText =
+        nativeStatus != null &&
+            const {
+              AndroidServiceStatus.applying,
+              AndroidServiceStatus.stopping,
+              AndroidServiceStatus.suspended,
+            }.contains(nativeStatus)
+        ? androidServiceStatusLabel(appLocalizations, nativeStatus)
+        : suspended
+        ? appLocalizations.suspended
+        : null;
+    final controlTip = (widget.isAndroid ?? system.isAndroid)
+        ? (isStart ? appLocalizations.stop : appLocalizations.start)
+        : suspended
+        ? appLocalizations.suspended
+        : null;
     if (NavigationDock.isDocked(context)) {
       return BreathingFill(
-        active: isStart && !suspend,
+        active: actualRunning && !suspend,
         child: FloatingActionButton(
           heroTag: null,
-          tooltip: suspended ? appLocalizations.suspended : null,
+          tooltip: controlTip,
           onPressed: handleSwitchStart,
           child: _buildIcon(isStart, suspended: suspended),
         ),
@@ -207,8 +235,8 @@ class _StartButtonState extends ConsumerState<StartButton>
     final hasThreeDigitHours =
         (_displayRunTime ?? 0) >= _threeDigitHourThreshold;
     final theme = Theme.of(context);
-    final textWidth = suspend
-        ? _getSuspendedTextWidth(context, appLocalizations.suspended)
+    final textWidth = statusText != null
+        ? _getStatusTextWidth(context, statusText)
         : _getRunTimeTextWidth(context, hasThreeDigitHours: hasThreeDigitHours);
     return RepaintBoundary(
       child: Theme(
@@ -216,7 +244,7 @@ class _StartButtonState extends ConsumerState<StartButton>
           floatingActionButtonTheme: theme.floatingActionButtonTheme.copyWith(
             sizeConstraints: const BoxConstraints(
               minWidth: 56,
-              maxWidth: 220,
+              maxWidth: _buttonMaxWidth,
               minHeight: _buttonHeight,
               maxHeight: _buttonHeight,
             ),
@@ -227,6 +255,7 @@ class _StartButtonState extends ConsumerState<StartButton>
             clipBehavior: Clip.antiAlias,
             materialTapTargetSize: MaterialTapTargetSize.padded,
             heroTag: null,
+            tooltip: controlTip,
             onPressed: () {
               handleSwitchStart();
             },
@@ -253,14 +282,14 @@ class _StartButtonState extends ConsumerState<StartButton>
                   alignment: Alignment.centerLeft,
                   sizeFactor: _animation,
                   child: AnimatedContainer(
-                    width: textWidth,
+                    width: textWidth.clamp(0, _buttonMaxWidth - _buttonHeight),
                     duration: _widthAnimationDuration,
                     curve: Curves.easeOut,
-                    child: suspend
+                    child: statusText != null
                         ? Text(
-                            appLocalizations.suspended,
+                            statusText,
                             maxLines: 1,
-                            overflow: TextOverflow.visible,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   color: context.colorScheme.onPrimaryContainer,

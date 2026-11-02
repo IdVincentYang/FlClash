@@ -16,8 +16,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AppStateManager extends ConsumerStatefulWidget {
   final Widget child;
+  final bool? isAndroid;
 
-  const AppStateManager({super.key, required this.child});
+  const AppStateManager({super.key, this.isAndroid, required this.child});
 
   @override
   ConsumerState<AppStateManager> createState() => _AppStateManagerState();
@@ -25,6 +26,8 @@ class AppStateManager extends ConsumerStatefulWidget {
 
 class _AppStateManagerState extends ConsumerState<AppStateManager>
     with WidgetsBindingObserver {
+  bool get _isAndroid => widget.isAndroid ?? system.isAndroid;
+
   @override
   void initState() {
     super.initState();
@@ -52,8 +55,12 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
       }
     });
     ref.listenManual(suspendProvider, (prev, next) {
-      if (system.isAndroid && prev != next && !ref.read(safeModeProvider)) {
-        unawaited(ref.read(setupActionProvider.notifier).setPaused(next));
+      if (_isAndroid && prev != next && !ref.read(safeModeProvider)) {
+        unawaited(
+          globalState.safeRun(
+            () => ref.read(setupActionProvider.notifier).setPaused(next),
+          ),
+        );
         return;
       }
       final isStart = ref.read(isStartProvider);
@@ -68,7 +75,7 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
         });
       }
     });
-    final systemDns = systemDnsCoordinator;
+    final systemDns = _isAndroid ? null : systemDnsCoordinator;
     if (systemDns != null) {
       ref.listenManual(shouldPatchSystemDnsProvider, (prev, next) {
         unawaited(systemDns.sync(next));

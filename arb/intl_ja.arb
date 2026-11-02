@@ -942,5 +942,12 @@
   "policyMaterialLoaded": "最新の素材を読み込みました。変更された名前を関連付け直してプレビューし、Apply で適用してください。Save は下書きのみ保存します。",
   "policyMaterialUnavailable": "素材が利用できないか互換性がありません。ソースの関連付けを確認して再度プレビューしてください。",
   "policyMaterialCancel": "プレビュー素材を破棄",
-  "policyMaterialBindings": "ソースの関連付け"
+  "policyMaterialBindings": "ソースの関連付け",
+  "androidServiceTitle": "Android サービス",
+  "androidServiceStopping": "サービスを停止中",
+  "androidServiceSuspended": "一時停止中",
+  "androidServiceStopped": "停止済み",
+  "androidServiceVpnActive": "VPN 動作中",
+  "androidServiceProxyOnly": "プロキシのみ",
+  "androidServiceUnavailable": "サービス利用不可"
 }

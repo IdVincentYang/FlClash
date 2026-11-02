@@ -253,6 +253,27 @@ class MessageLookup extends MessageLookupByLibrary {
       "Разрешить приложениям обходить VPN",
     ),
     "allowLan": MessageLookupByLibrary.simpleMessage("Разрешить LAN"),
+    "androidServiceProxyOnly": MessageLookupByLibrary.simpleMessage(
+      "Только прокси",
+    ),
+    "androidServiceStopped": MessageLookupByLibrary.simpleMessage(
+      "Остановлено",
+    ),
+    "androidServiceStopping": MessageLookupByLibrary.simpleMessage(
+      "Остановка службы",
+    ),
+    "androidServiceSuspended": MessageLookupByLibrary.simpleMessage(
+      "Приостановлено",
+    ),
+    "androidServiceTitle": MessageLookupByLibrary.simpleMessage(
+      "Служба Android",
+    ),
+    "androidServiceUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Служба недоступна",
+    ),
+    "androidServiceVpnActive": MessageLookupByLibrary.simpleMessage(
+      "VPN активен",
+    ),
     "answers": MessageLookupByLibrary.simpleMessage("Ответы"),
     "app": MessageLookupByLibrary.simpleMessage("Приложение"),
     "appAccessControl": MessageLookupByLibrary.simpleMessage(

@@ -177,6 +177,8 @@ void main() {
       };
       Completer<void>? completedReplyGate;
       Completer<void>? completedReplyEntered;
+      Completer<void>? pauseReplyGate;
+      Completer<void>? pauseReplyEntered;
       String? lastSubmittedInput;
       var syncFailure = false;
       messenger.setMockMethodCallHandler(native.methodChannel, (call) async {
@@ -187,6 +189,14 @@ void main() {
                   as String;
         }
         final result = await bridge.call(call.method, call.arguments);
+        if ((call.method == 'preparePauseIntent' ||
+                call.method == 'getRequestState') &&
+            pauseReplyGate != null) {
+          final gate = pauseReplyGate!;
+          pauseReplyGate = null;
+          pauseReplyEntered!.complete();
+          await gate.future;
+        }
         if (call.method == 'applyConfig' && completedReplyGate != null) {
           final gate = completedReplyGate!;
           completedReplyGate = null;
@@ -367,6 +377,174 @@ void main() {
           }
           expect(await setup.setRunning(true), isTrue, reason: failure);
         }
+        Future<Map> waitPhase(String phase) async {
+          for (var i = 0; i < 100; i++) {
+            final snapshot = await bridge.call('snapshot') as Map;
+            if ((snapshot['state'] as Map)['phase'] == phase) return snapshot;
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+          throw StateError('Native phase did not settle: $phase');
+        }
+
+        final observedDispatches = <Map<String, Object?>>[];
+        for (final paused in [true, false]) {
+          final before = await bridge.call('snapshot') as Map;
+          final gate = Completer<void>();
+          pauseReplyGate = gate;
+          pauseReplyEntered = Completer<void>();
+          final pending = setup.setPaused(paused);
+          await pauseReplyEntered.future;
+          final prepared =
+              (await bridge.call('snapshot') as Map)['state'] as Map;
+          final observed =
+              await bridge.call('observeNetwork', {
+                    'sourceEpoch': 'pause-observation',
+                    'revision': paused ? 1 : 2,
+                    'defaultNetworkKind': 'nonVpn',
+                    'defaultNetworkId': 'synthetic physical',
+                    'directNetworkId': 'synthetic physical',
+                    'blockedKnown': true,
+                  })
+                  as Map;
+          for (var i = 0; i < 100; i++) {
+            if ((container.read(nativeRequestStateProvider)['revision']
+                    as int) >=
+                (observed['revision'] as int)) {
+              break;
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+          final delivered = container.read(nativeRequestStateProvider);
+          expect(
+            delivered['revision'],
+            greaterThan(prepared['revision'] as int),
+          );
+          expect(delivered['intentRevision'], prepared['intentRevision']);
+          gate.complete();
+          await pending;
+          Map settled = await bridge.call('snapshot') as Map;
+          for (var i = 0; i < 100; i++) {
+            if ((settled['state'] as Map)['phase'] ==
+                (paused ? 'stopped' : 'started')) {
+              break;
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+            settled = await bridge.call('snapshot') as Map;
+          }
+          final state = settled['state'] as Map;
+          observedDispatches.add({
+            'phase': state['phase'],
+            'paused': state['paused'],
+            'intentRunning': state['intentRunning'],
+            'sameIntent': state['intentRevision'] == prepared['intentRevision'],
+            'serviceEmpty': state['serviceId'] == '',
+            'starts': (settled['starts'] as int) - (before['starts'] as int),
+            'stops': (settled['stops'] as int) - (before['stops'] as int),
+          });
+          // Record pause first, then stage resume independently with the same native intent.
+          if (paused) {
+            await bridge.call('stop', prepared['intentRevision']);
+            await waitPhase('stopped');
+          }
+        }
+        expect(observedDispatches, [
+          {
+            'phase': 'stopped',
+            'paused': true,
+            'intentRunning': true,
+            'sameIntent': true,
+            'serviceEmpty': true,
+            'starts': 0,
+            'stops': 1,
+          },
+          {
+            'phase': 'started',
+            'paused': false,
+            'intentRunning': true,
+            'sameIntent': true,
+            'serviceEmpty': false,
+            'starts': 1,
+            'stops': 0,
+          },
+        ]);
+
+        final beforePause = await bridge.call('snapshot') as Map;
+        await setup.setPaused(true);
+        final paused = await waitPhase('stopped');
+        expect((paused['state'] as Map)['intentRunning'], true);
+        expect((paused['state'] as Map)['paused'], true);
+        expect((paused['state'] as Map)['serviceId'], '');
+        expect(paused['stops'], (beforePause['stops'] as int) + 1);
+        expect(container.read(runTimeProvider), isNull);
+        await setup.setPaused(false);
+        final resumed = await waitPhase('started');
+        expect(resumed['starts'], (beforePause['starts'] as int) + 1);
+        await setup.setPaused(true);
+        await waitPhase('stopped');
+        await setup.setRunning(false);
+        await waitPhase('stopped');
+        await setup.setPaused(false);
+        final manuallyStopped = await waitPhase('stopped');
+        expect((manuallyStopped['state'] as Map)['intentRunning'], false);
+        expect(manuallyStopped['starts'], resumed['starts']);
+        expect(await setup.setRunning(true), true);
+        final beforeLate = await waitPhase('started');
+        final lateGate = Completer<void>();
+        pauseReplyGate = lateGate;
+        pauseReplyEntered = Completer<void>();
+        final latePause = setup.setPaused(false);
+        await pauseReplyEntered.future;
+        await setup.setRunning(false);
+        await waitPhase('stopped');
+        lateGate.complete();
+        await latePause;
+        final afterLate = await bridge.call('snapshot') as Map;
+        expect((afterLate['state'] as Map)['intentRunning'], false);
+        expect((afterLate['state'] as Map)['phase'], 'stopped');
+        expect(afterLate['starts'], beforeLate['starts']);
+
+        expect(await setup.setRunning(true), true);
+        final nativeGate = Completer<void>();
+        pauseReplyGate = nativeGate;
+        pauseReplyEntered = Completer<void>();
+        final nativeOvertaken = setup.setPaused(true);
+        await pauseReplyEntered.future;
+        final nativeId = await bridge.call('prepareRunIntent', {
+          'running': true,
+          'paused': false,
+          'source': 'tile',
+        });
+        final external =
+            json.decode(
+                  await bridge.call(
+                        'applyConfig',
+                        json.encode({
+                          'inputId': lastSubmittedInput,
+                          'requestId': nativeId,
+                          'active': true,
+                        }),
+                      )
+                      as String,
+                )
+                as Map;
+        expect(external['status'], 'activated');
+        await waitPhase('started');
+        for (
+          var i = 0;
+          i < 100 && container.read(runTimeProvider) == null;
+          i++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(container.read(runTimeProvider), isNotNull);
+        nativeGate.complete();
+        await nativeOvertaken;
+        expect(container.read(runTimeProvider), isNotNull);
+        expect(
+          (await bridge.call('snapshot') as Map)['starts'],
+          (afterLate['starts'] as int) + 2,
+        );
+
         await setup.setRunning(false);
         setup.buildGate = Completer<void>();
         setup.buildEntered = Completer<void>();

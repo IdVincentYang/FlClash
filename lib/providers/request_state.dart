@@ -1,6 +1,11 @@
 import 'dart:async';
 
 import 'package:fl_clash/plugins/service.dart';
+import 'package:fl_clash/common/system.dart';
+import 'package:fl_clash/common/android_service_state.dart';
+
+import 'config_state.dart';
+import 'state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final nativeRequestStateProvider =
@@ -43,3 +48,15 @@ class NativeRequestState extends Notifier<Map<String, Object?>>
     this.state = Map.unmodifiable(state);
   }
 }
+
+final runControlProvider = Provider<bool>((ref) {
+  if (!system.isAndroid) return ref.watch(isStartProvider);
+  return androidRunRequested(ref.watch(nativeRequestStateProvider));
+});
+
+final androidServiceStatusProvider = Provider<AndroidServiceStatus>((ref) {
+  return androidServiceStatus(
+    ref.watch(nativeRequestStateProvider),
+    ref.watch(configStateProvider).fact,
+  );
+});

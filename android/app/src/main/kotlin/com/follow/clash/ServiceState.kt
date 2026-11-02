@@ -33,6 +33,8 @@ object ServiceState {
         return requestId
     }
 
+    fun preparePauseIntent(paused: Boolean): ApplicationRequestState = machine.preparePauseIntent(paused)
+
     fun initializeRequestState(expectedRevision: Long, recovery: Boolean): Boolean = machine.initializeRequestState(expectedRevision, recovery)
 
     suspend fun failRunIntent(requestId: Long, token: Long) = machine.failRunIntent(requestId, token)

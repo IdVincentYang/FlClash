@@ -1,6 +1,7 @@
 package com.follow.clash
 
 import com.follow.clash.models.SharedState
+import com.follow.clash.common.RequestNetworkFacts
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -50,7 +51,16 @@ object ConfigApplyBridge {
                         reply(id,gson.toJson(state))
                     }
                     "initializeRequestState" -> reply(id, true)
-                    "prepareRunIntent" -> reply(id, machine.prepareRunIntent(arguments.asJsonObject.get("running").asBoolean))
+                    "preparePauseIntent" -> reply(id, gson.toJson(machine.preparePauseIntent(arguments.asBoolean)))
+                    "observeNetwork" -> {
+                        machine.observeNetwork(gson.fromJson(arguments, RequestNetworkFacts::class.java))
+                        reply(id, machine.getRequestState())
+                    }
+                    "prepareRunIntent" -> reply(id, machine.prepareRunIntent(
+                        arguments.asJsonObject.get("running").asBoolean,
+                        arguments.asJsonObject.get("source")?.asString ?: "ui",
+                        arguments.asJsonObject.get("paused")?.asBoolean ?: machine.getRequestState().paused,
+                    ))
                     "getRunTime" -> reply(id, machine.refresh())
                     "stop" -> { machine.requestStop(arguments?.takeUnless { it.isJsonNull }?.asLong); reply(id,true) }
                     "shutdown" -> reply(id,true)

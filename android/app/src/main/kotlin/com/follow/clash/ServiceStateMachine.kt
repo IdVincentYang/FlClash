@@ -78,8 +78,11 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         service to identity
     }
 
-    private fun publish(change: (ApplicationRequestState) -> ApplicationRequestState?): Boolean {
-        var applied = false
+    private fun publish(change: (ApplicationRequestState) -> ApplicationRequestState?): Boolean =
+        publishSnapshot(change) != null
+
+    private fun publishSnapshot(change: (ApplicationRequestState) -> ApplicationRequestState?): ApplicationRequestState? {
+        var published: ApplicationRequestState? = null
         var phaseChanged = false
         synchronized(publicationLock) {
             val previous = mutableRequestState.value
@@ -88,7 +91,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                 var next = candidate.copy(revision = previous.revision + 1)
                 if (!host.publishRequestState(next)) {
                     arbiter.resetToStopped(arbiter.current())
-                    next = next.copy(revision = next.revision + 1, phase = "failed", reason = "setupFailed")
+                    next = next.copy(revision = next.revision + 1, intentRunning = false, phase = "failed", reason = "setupFailed")
                     if (!host.publishRequestState(next)) host.blockRequestState()
                 }
                 mutableRequestState.value = next
@@ -99,14 +102,14 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                     "stopping" -> RunState.STOPPING
                     else -> RunState.STOPPED
                 }
-                applied = true
+                published = next
             }
         }
-        if (applied) {
+        if (published != null) {
             host.finishRequestPublication()
             if (phaseChanged) applySharedState()
         }
-        return applied
+        return published
     }
 
     fun prepareRunIntent(running: Boolean, source: String = "ui", paused: Boolean = getRequestState().paused): Long {
@@ -125,6 +128,23 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
             )
         }
         return token.id
+    }
+
+    fun preparePauseIntent(paused: Boolean): ApplicationRequestState {
+        lateinit var token: RunRequest
+        val snapshot = publishSnapshot { previous ->
+            check(previous.reason != "exiting") { "Application is exiting" }
+            token = arbiter.request(previous.intentRunning && !paused)
+            previous.copy(
+                intentRevision = token.id,
+                paused = paused,
+                source = "ssid",
+                phase = if (token.running) "preparing" else "stopping",
+                reason = if (previous.intentRunning && paused) "excludedSsid" else if (!previous.intentRunning) "userStop" else "none",
+            )
+        } ?: error("Pause request unavailable")
+        check(isCurrent(token) && snapshot.intentRevision == token.id && snapshot.phase != "failed") { "Pause request was not accepted" }
+        return snapshot
     }
 
     fun initializeRequestState(expectedRevision: Long, recovery: Boolean): Boolean = publish { previous ->
@@ -340,7 +360,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                     if (phase == "none") { protection = null; protectionIdentity = null }
                     if (reason == "vpnRevoked" && serviceRequestId == arbiter.current().id) {
                         arbiter.resetToStopped(arbiter.current())
-                        previous.copy(protectPhase = phase, phase = "failed", reason = reason)
+                        previous.copy(intentRunning = false, protectPhase = phase, phase = "failed", reason = reason)
                     } else previous.copy(protectPhase = phase)
                 }
                 else -> null
@@ -353,7 +373,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         publish { previous ->
             val current = arbiter.current()
             if (current.id != requestId || !previous.intentRunning || previous.phase !in setOf("preparing", "starting")) null
-            else { arbiter.resetToStopped(current); previous.copy(phase = "failed", reason = "serviceLost") }
+            else { arbiter.resetToStopped(current); previous.copy(intentRunning = false, phase = "failed", reason = "serviceLost") }
         }
     }
 
@@ -369,7 +389,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                     previous.copy(serviceId = "", protectPhase = "none")
                 } else if (current.id == requestId) {
                     arbiter.resetToStopped(current)
-                    previous.copy(serviceId = "", protectPhase = "none", phase = "failed", reason = "serviceLost")
+                    previous.copy(intentRunning = false, serviceId = "", protectPhase = "none", phase = "failed", reason = if (previous.reason == "vpnRevoked") previous.reason else "serviceLost")
                 } else previous.copy(serviceId = "", protectPhase = "none")
             }
         }
@@ -415,7 +435,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
             return@withLock
         }
         publish { previous ->
-            if (!arbiter.resetToStopped(token)) null else previous.copy(phase = "failed", reason = "serviceLost")
+            if (!arbiter.resetToStopped(token)) null else previous.copy(intentRunning = false, phase = "failed", reason = "serviceLost")
         }
     }
 
@@ -579,8 +599,13 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
             return@withLock true
         }
         setPhase(request, "stopping")
-        host.stopService()
-        setPhase(request, "stopped")
+        try {
+            host.stopService()
+            setPhase(request, "stopped")
+        } catch (error: Exception) {
+            fail(request)
+            throw error
+        }
         isCurrent(request)
     }
 

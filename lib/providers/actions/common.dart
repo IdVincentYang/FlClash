@@ -9,7 +9,7 @@ class CommonAction extends _$CommonAction {
   void build() {}
 
   void toggleRunning() {
-    final running = !ref.read(isStartProvider);
+    final running = !ref.read(runControlProvider);
     unawaited(
       globalState.safeRun(
         () => ref

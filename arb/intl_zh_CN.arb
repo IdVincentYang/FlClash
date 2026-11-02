@@ -942,5 +942,12 @@
   "policyMaterialLoaded": "最新材料已加载。重新绑定变化的名称并预览后，点击 Apply 才会采用。Save 仅保存草稿。",
   "policyMaterialUnavailable": "材料不可用或不兼容。请检查来源绑定并重新预览。",
   "policyMaterialCancel": "丢弃预览材料",
-  "policyMaterialBindings": "来源绑定"
+  "policyMaterialBindings": "来源绑定",
+  "androidServiceTitle": "Android 服务",
+  "androidServiceStopping": "正在停止服务",
+  "androidServiceSuspended": "已暂停",
+  "androidServiceStopped": "已停止",
+  "androidServiceVpnActive": "VPN 已启动",
+  "androidServiceProxyOnly": "仅代理服务",
+  "androidServiceUnavailable": "服务不可用"
 }

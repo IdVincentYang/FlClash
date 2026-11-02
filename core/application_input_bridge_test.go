@@ -160,7 +160,7 @@ func TestApplicationInputBridge(t *testing.T) {
 				t.Fatal(err)
 			}
 			result = registerConfigOperation(methodCallSeq.Add(1), request)
-		case "prepare", "install", "activate":
+		case "prepare", "install", "activate", "abort":
 			var receipt ConfigReceipt
 			if err := json.Unmarshal(call.Arguments, &receipt); err != nil {
 				t.Fatal(err)
@@ -172,6 +172,8 @@ func TestApplicationInputBridge(t *testing.T) {
 				result = installConfig(receipt)
 			case "activate":
 				result = activateConfig(receipt)
+			case "abort":
+				result = abortConfig(receipt)
 			}
 		default:
 			t.Fatal("unknown bridge method")

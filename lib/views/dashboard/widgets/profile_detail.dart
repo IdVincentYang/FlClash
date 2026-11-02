@@ -10,6 +10,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/profiles/preview.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/android_service_status.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -245,6 +246,16 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
                   applied.profileId != profile.id ||
                   !active)
                 ListItem(title: Text(status)),
+              if (system.isAndroid)
+                ListItem(
+                  title: Text(appLocalizations.androidServiceTitle),
+                  subtitle: Text(
+                    androidServiceStatusLabel(
+                      appLocalizations,
+                      ref.watch(androidServiceStatusProvider),
+                    ),
+                  ),
+                ),
               _InfoRow(
                 label: appLocalizations.lastUpdated,
                 value: LastUpdateTimeText(

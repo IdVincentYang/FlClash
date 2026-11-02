@@ -159,24 +159,26 @@ object ServiceController {
     }
 
     private suspend fun tearDownServices() {
-        binding?.useService { service -> service.stop() }
-            ?.onFailure { error ->
-                GlobalState.log("Unable to stop background service: $error")
-            }
-        clearBinding()
-        stopServices()
+        try {
+            binding?.useService { service -> service.stop() }?.getOrThrow()
+            clearBinding()
+        } finally {
+            stopServices()
+        }
     }
 
     // A service the system started itself — always-on VPN, or the sticky restart
     // after the process was killed — outlives every binding this process holds, so
     // unbinding alone leaves the tunnel up while the app reports it stopped.
     private fun stopServices() {
+        var failure: Throwable? = null
         listOf(VpnService::class.intent, ProxyService::class.intent).forEach { intent ->
             runCatching { GlobalState.application.stopService(intent) }
                 .onFailure { error ->
-                    GlobalState.log("Unable to stop ${intent.component?.className}: $error")
+                    if (failure == null) failure = error else failure?.addSuppressed(error)
                 }
         }
+        failure?.let { throw it }
     }
 
     suspend fun isVpnServiceActive(): Boolean = lock.withLock {

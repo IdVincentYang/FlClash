@@ -942,5 +942,12 @@
   "policyMaterialLoaded": "Latest material loaded. Rebind changed names, preview, then Apply to adopt it. Save only stores the draft.",
   "policyMaterialUnavailable": "Material is unavailable or incompatible. Check the source binding and preview again.",
   "policyMaterialCancel": "Discard preview material",
-  "policyMaterialBindings": "Source bindings"
+  "policyMaterialBindings": "Source bindings",
+  "androidServiceTitle": "Android service",
+  "androidServiceStopping": "Stopping service",
+  "androidServiceSuspended": "Suspended",
+  "androidServiceStopped": "Stopped",
+  "androidServiceVpnActive": "VPN active",
+  "androidServiceProxyOnly": "Proxy only",
+  "androidServiceUnavailable": "Service unavailable"
 }
