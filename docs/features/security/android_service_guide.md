@@ -1,7 +1,8 @@
 # Android 服务状态与接管范围指南
 
 本指南对应[服务契约](android_service_design.md)。
-实际覆盖见[L2-T03 结果](loop2/l2_t03_result.md)；JVM/Core、专用 AVD 与物理设备证据分别判断。
+JVM/Core、专用 AVD 与物理设备证据分别判断；范围和限制见下文，
+受测对象及详细结果可从[Loop 2 记录的历史入口](loop2/loop2_tasks.md#l2-t03-服务状态过渡与业务接管范围)取回。
 
 ## English UI
 
@@ -89,5 +90,6 @@ Profile detail 从 Dashboard 的 Profiles 卡片打开。普通使用可经 Edit
 本地合成验证入场前必须避开 Add gallery、Service status 和远程图标入口，
 保持 automatic outbound IP 关闭，不点击 Check exit IP；配置中不放远程 icon/provider。
 Add gallery 会实例化其它卡片并可能触发公共诊断；本地 REJECT 规则或失败文案不能证明零外发。
+本项一次图库预览的历史诊断是否实际外发未知；缺少当次逐请求审计，未将其计为网络隔离证明。
 若专用测试布局尚无 Profiles 卡片，跳过 detail 的设备观察并记录限制，
 不要为读取状态临时打开 gallery。系统镜像后台行为不在 fixture 计数范围。

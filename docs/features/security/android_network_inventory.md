@@ -31,7 +31,7 @@
 | [本地与移交](#原生插件及系统移交) | 初始化/权限/用户选择→原生或提供方 | 本地处理；外部应用/提供方按各自行为联网 |
 
 服务、VPN/Proxy-only 与排除范围见[服务契约](android_service_design.md)及[操作指南](android_service_guide.md)。
-L2-T03 的专用 AVD 与物理网络证据分别判断，实际覆盖见[验证结果](loop2/l2_t03_result.md)。
+专用 AVD 与物理网络证据分别判断，已验证范围和未验证边界见[服务指南](android_service_guide.md)。
 
 ## 应用请求的共同边界
 

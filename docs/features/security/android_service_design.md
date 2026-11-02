@@ -1,8 +1,8 @@
 # Android 服务与业务接管契约
 
 本契约规定运行意图、配置接受、服务/TUN 身份和界面之间的关系。
-以下说明当前实现契约；实际覆盖与未验证边界见
-[L2-T03 结果](loop2/l2_t03_result.md)，实现评审及交付状态由任务清单维护。
+以下说明当前实现契约；实际覆盖与未验证边界见[服务指南](android_service_guide.md)，
+验收定稿的历史入口由[Loop 2 任务记录](loop2/loop2_tasks.md#l2-t03-服务状态过渡与业务接管范围)维护。
 既有配置/业务接受规则沿 [ConfigInput 设计](loop2/l2_t01_plan.md)，
 受管材料沿[材料契约](managed_updates_design.md)。
 
@@ -44,7 +44,7 @@ CommonAction/StartButton 使用同一个只读控制事实：有有效运行意�
 | Stopped | native stopped、无服务/保护身份，且没有保留运行意图 |
 | VPN active | native started、有当前服务和 ready 保护身份，Core 业务 active |
 | Proxy only | native started、有服务但无 VPN 保护，Core 业务 active |
-| Service unavailable | failed、清理未确认、身份不一致或其它未知事实 |
+| Service unavailable | failed、清理失败、身份不一致或其它未知事实 |
 
 以上不把 desired VPN/access/bypass 设置当作已应用范围；设置沿现有 ApplicationInput/接受流程生效，
 过渡显示 Applying。真实接管范围还受下面的系统规则限制。
