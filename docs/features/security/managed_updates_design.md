@@ -1,7 +1,6 @@
 # Managed Profile 材料更新契约
 
-当前任务分支已实现并完成本地自验，待实现评审；验证与未覆盖项见[本次结果](loop2/l2_t02_04_result.md)。
-业务/DNS 仍由同一严格编译器生成，
+Profile 显式绑定的材料经冻结、校验和展开后，由同一严格编译器生成业务/DNS 配置，
 使用步骤及本地合成夹具见[更新指南](managed_updates_guide.md)。
 Request、来源票据、ConfigInput/T01 与 ServiceState 分别保留下载、来源、实际采用与运行意图权威。
 

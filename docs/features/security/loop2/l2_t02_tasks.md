@@ -1,9 +1,8 @@
 # L2-T02 子任务：同源分流与 DNS 配置
 
 本清单细化 [M1 总体设计](l2_t02_plan.md)，父任务见 [Loop 2 任务](loop2_tasks.md#l2-t02-dns-接收方出口与失败回退)。
-01–03 已交付并包含在累计推送中；04 实现已通过复审，后续 L2-T03／05 尚未启动，整个 L2-T02 未完成。
-M1 已派工 D-02 完成 04，design_v1 已通过，implementation_v1 未通过；
-I1–I3 修订与自验完成，implementation_v2 复审通过，D 收尾中。L2-T03 和 05 已获串行完成授权，均尚未启动。
+01–04 已交付并合入 `security/android`；后续 L2-T03／05 已获串行完成授权，尚未启动，整个 L2-T02 未完成。
+04 的设计和 implementation_v2 均经 M1 评审通过；交付定稿的历史入口见本项记录。
 
 M 为 M1，01–04 的 D 为 D-02；联系入口和授权边界沿用 [Loop 2 协作约定](loop2_tasks.md#协作授权与交付)。
 后续项按上述串行授权和 M1 的基线交接接续；逐任务交付规则见[贡献指南](../../../../CONTRIBUTING.md#task-completion-and-remote-delivery)。
@@ -15,7 +14,7 @@ M 为 M1，01–04 的 D 为 D-02；联系入口和授权边界沿用 [Loop 2 �
 | L2-T02-01 | [静态策略编译与本地消费闭环](l2_t02_01_plan.md) | L2-T01；M1 总体设计 | 已交付并累计推送 |
 | L2-T02-02 | [Profile 策略编辑、持久化与迁移](l2_t02_02_plan.md) | 01 的严格策略契约 | 已交付并累计推送 |
 | L2-T02-03 | [最终合成、受管应用与恢复](l2_t02_03_plan.md) | 01、02；L2-T01 | design_v2 通过；已交付并累计推送 |
-| L2-T02-04 | [订阅、集合与资产更新](l2_t02_04_plan.md) | 03 的受管应用边界 | implementation_v2 复审通过，D 收尾中 |
+| L2-T02-04 | [订阅、集合与资产更新](../managed_updates_design.md) | 03 的受管应用边界 | 已交付并合入 security/android |
 | L2-T02-05 | [整项验收与能力说明](#l2-t02-05-整项验收与能力说明) | 01–04、L2-T03 实际结果 | 已授权，待验收设计 |
 
 这是一个拆解层级，按可核验成果划分。后续项只确定目标、依赖及出口，接手时再细化；不因下游未实施而阻塞首项的独立本地出口。
@@ -57,16 +56,22 @@ M 为 M1，01–04 的 D 为 D-02；联系入口和授权边界沿用 [Loop 2 �
 
 ## L2-T02-04 订阅、集合与资产更新
 
-- 归属与阶段：M1 / D-02；起点 `a9919a2`，design_v1 已通过。
-  implementation_v1 未通过 M1 实现评审；I1–I3 已修订并自验，implementation_v2 复审通过，D 收尾中。
-- 设计入口：[本项方案](l2_t02_04_plan.md)已通过；当前支持与拒绝上限见[材料更新契约](../managed_updates_design.md)。
+- 归属与交付：M1 / D-02；设计及 implementation_v2 经评审通过，已合入 `security/android`，交付为 `0ea9bb2`。
+- 当前支持与拒绝上限见[材料更新契约](../managed_updates_design.md)。
 - 目标：保留订阅自动刷新，将候选材料冻结、展开、重编译并统一应用，避免源订阅独立改变用户的业务/DNS 策略。
 - 出口：同 Profile 固定 IP SOCKS5、源 select 组及 inline 域名/地址集合的更新闭环；预检失败保护仍合资格的旧输入，
   源提交后沿 T01 重新判定采用。页面区分草稿保存、临时预览、材料保存与实际采用。
 - 未覆盖：远程 provider、Geo、其它协议/自动组、keyword/regex 等扩展仍需另行设计和授权，不能由 04 完成推导已支持；
   05 只验收已交付能力，不静默承接这些扩展。DoH 和更广的来源信任边界保持原限制。
 - 验证与体验：[操作指南](../managed_updates_guide.md)给出 English UI、本地合成夹具及用户自行操作的 AVD 入口；
-  实际结果见[验证记录](l2_t02_04_result.md)，不把本地自验写成 M1 实现评审通过。
+  真实业务/DNS 收件、I1–I3 红绿反例、制品绑定及未覆盖项保留在交付历史的 Plan/Result，当前副本已按收尾规范删除。
+
+```bash
+delivery_revision=0ea9bb293bd8e9c1a2e9bcde1457d07397081a6f
+records_directory=docs/features/security/loop2
+git show "$delivery_revision:$records_directory/l2_t02_04_plan.md"
+git show "$delivery_revision:$records_directory/l2_t02_04_result.md"
+```
 
 ## L2-T02-05 整项验收与能力说明
 
