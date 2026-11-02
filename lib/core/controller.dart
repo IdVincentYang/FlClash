@@ -241,6 +241,8 @@ class CoreController {
     return _readConfig(await appPath.getProfilePath(id.toString()));
   }
 
+  Future<Map<String, dynamic>> getConfigPath(String path) => _readConfig(path);
+
   Future<Map<String, dynamic>> getAppliedConfig() async {
     final result = await _interface.invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.getAppliedInput,

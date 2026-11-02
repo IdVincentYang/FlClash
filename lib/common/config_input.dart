@@ -8,6 +8,7 @@ import 'package:path/path.dart' as path;
 
 import '../models/config_state.dart';
 import 'request.dart';
+import 'managed_material.dart';
 
 class ConfigInput {
   const ConfigInput(this.id, this.sources, this.markerName, this.home);
@@ -93,6 +94,41 @@ class ConfigInput {
     }
   }
 
+  static Future<Map<String, dynamic>?> acceptedMaterials({
+    required String home,
+    required ConfigFact accepted,
+    required Future<ConfigFact> Function() readFact,
+  }) async {
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(accepted.inputId) ||
+        !sameAcceptedInput(accepted, await readFact())) {
+      return null;
+    }
+    try {
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in File(
+        path.join(home, 'config-inputs', '${accepted.inputId}.json'),
+      ).openRead()) {
+        if (bytes.length + chunk.length > 4 * 1024 * 1024) return null;
+        bytes.add(chunk);
+      }
+      final data = bytes.takeBytes();
+      if (sha256.convert(data).toString() != accepted.inputId) return null;
+      final manifest = jsonDecode(utf8.decode(data));
+      if (manifest is! Map ||
+          manifest['profileId'] != accepted.profileId ||
+          manifest['managedMaterials'] is! Map<String, dynamic> ||
+          !validManagedMaterialsReceipt(manifest['managedMaterials']) ||
+          !sameAcceptedInput(accepted, await readFact())) {
+        return null;
+      }
+      return Map<String, dynamic>.unmodifiable(manifest['managedMaterials']);
+    } on FileSystemException {
+      return null;
+    } on FormatException {
+      return null;
+    }
+  }
+
   static Future<ConfigInput> write({
     required String home,
     required String yaml,
@@ -103,7 +139,14 @@ class ConfigInput {
     required String testUrl,
     required List<RequestSource> sources,
     Map<String, Object?>? managedPolicy,
+    Map<String, Object?>? managedMaterials,
   }) async {
+    if (managedMaterials != null &&
+        (managedPolicy == null ||
+            !validManagedMaterialsReceipt(managedMaterials) ||
+            managedMaterials['profileId'] != profileId)) {
+      throw const FormatException('invalid managed material receipt');
+    }
     if (yaml.trim().isEmpty) throw StateError('Configuration is empty');
     final directory = Directory(path.join(home, 'config-inputs'));
     await directory.create(recursive: true);
@@ -120,6 +163,7 @@ class ConfigInput {
         'testUrl': testUrl,
         'acceptedOverrides': <String, Object?>{},
         'managedPolicy': ?managedPolicy,
+        'managedMaterials': ?managedMaterials,
       }),
     );
     final id = sha256.convert(manifest).toString();

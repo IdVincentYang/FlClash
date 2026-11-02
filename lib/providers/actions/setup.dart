@@ -59,10 +59,33 @@ class _SetupInputs {
   final VpnState vpn;
   final ConfigFact fact;
   final SelectedPolicy? policy;
+
+  _SetupInputs resolved(SelectedPolicy next) {
+    final selected = Map<String, String>.unmodifiable(
+      next.picks(profile.selectedMap),
+    );
+    return _SetupInputs(
+      state: state,
+      profile: profile,
+      patch: patch,
+      network: network,
+      overrideDns: overrideDns,
+      overrideNtp: overrideNtp,
+      safeMode: safeMode,
+      testUrl: testUrl,
+      picks: selected,
+      shared: shared.copyWith(
+        setupParams: SetupParams(selectedMap: selected, testUrl: testUrl),
+      ),
+      vpn: vpn,
+      fact: fact,
+      policy: next,
+    );
+  }
 }
 
 @Riverpod(keepAlive: true)
-class SetupAction extends _$SetupAction {
+class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   SetupAction() : _android = null, _native = null, _requestClient = null;
 
   @visibleForTesting
@@ -79,8 +102,10 @@ class SetupAction extends _$SetupAction {
   final Request? _requestClient;
   bool get _isAndroid => _android ?? system.isAndroid;
   Service? get _service => _native ?? service;
+  @override
   Request get _requests => _requestClient ?? request;
 
+  @override
   CoreController get _core => ref.read(coreHandlerProvider);
 
   Future<ConfigFailureObservation?> captureConfigFailure(Request client) async {
@@ -800,6 +825,26 @@ class SetupAction extends _$SetupAction {
 
   Future<String> getProfileWithId(int profileId) async {
     try {
+      final selection = await database.profilePolicySelectionsDao
+          .query(profileId)
+          .getSingleOrNull();
+      if (selection != null &&
+          SelectedPolicy.decode(selection.rawContent).usesMaterials) {
+        final candidate = await capturePolicyMaterial(profileId);
+        try {
+          final built = await _buildMaterialProfile(
+            candidate._inputs,
+            candidate._frame,
+            (_) {},
+          );
+          if (!await candidate.current()) {
+            throw const PolicyDraftProblem('materialSource');
+          }
+          return built.yaml;
+        } finally {
+          await candidate.close();
+        }
+      }
       ref.invalidate(setupStateProvider(profileId));
       final setupState = await ref.read(setupStateProvider(profileId).future);
       final patchClashConfig = ref.read(patchClashConfigProvider);
@@ -814,6 +859,7 @@ class SetupAction extends _$SetupAction {
     return '';
   }
 
+  @override
   PatchClashConfig _effectivePatchConfig(PatchClashConfig patchConfig) {
     if (ref.read(safeModeProvider)) {
       return patchConfig.copyWith(
@@ -956,6 +1002,7 @@ class SetupAction extends _$SetupAction {
     }
     final sources = <RequestSource>[];
     _SetupInputs? captured;
+    _ManagedMaterialFrame? materialFrame;
     final realProfile = await globalState.safeRun(() async {
       if (_requests.partialCommit) return null;
       final selectedProfile = profile;
@@ -982,8 +1029,11 @@ class SetupAction extends _$SetupAction {
                 ? null
                 : SelectedPolicy.decode(selection.rawContent);
             final picks = Map<String, String>.unmodifiable(
-              policy?.picks(actualProfile.selectedMap) ??
-                  actualProfile.selectedMap,
+              policy == null
+                  ? actualProfile.selectedMap
+                  : policy.usesMaterials
+                  ? <String, String>{}
+                  : policy.picks(actualProfile.selectedMap),
             );
             final effective = _effectivePatchConfig(
               ref.read(patchClashConfigProvider),
@@ -1000,9 +1050,7 @@ class SetupAction extends _$SetupAction {
                 );
             if (policy != null) {
               shared = shared.copyWith(
-                vpnOptions: shared.vpnOptions?.copyWith(
-                  port: policy.policy.mixedPort,
-                ),
+                vpnOptions: shared.vpnOptions?.copyWith(port: policy.mixedPort),
               );
             }
             captured = _SetupInputs(
@@ -1020,16 +1068,24 @@ class SetupAction extends _$SetupAction {
               fact: await _core.getConfigState(),
               policy: policy,
             );
+            if (policy?.usesMaterials == true) {
+              materialFrame = await _ManagedMaterialFrame.capture(
+                actualProfile,
+                setupState,
+              );
+            }
             final keys = <String>{'profile:${selectedProfile.id}'};
             if (selection != null) keys.add('application-config');
-            if (setupState.overwriteType == OverwriteType.standard) {
+            if (setupState.overwriteType == OverwriteType.standard &&
+                policy?.usesMaterials != true) {
               keys.add('global-rules');
             }
             if (setupState.overwriteType == OverwriteType.script &&
                 setupState.script != null) {
               keys.add('script:${setupState.script!.id}');
             }
-            if (setupState.overwriteType == OverwriteType.custom) {
+            if (setupState.overwriteType == OverwriteType.custom &&
+                policy?.usesMaterials != true) {
               final proxyUses = {
                 for (final group in setupState.proxyGroups) ...?group.use,
               };
@@ -1054,16 +1110,25 @@ class SetupAction extends _$SetupAction {
             }
             return setupState;
           })
-          .then(
-            (setupState) => getProfile(
+          .then((setupState) async {
+            final frame = materialFrame;
+            if (frame != null) {
+              return _buildMaterialProfile(
+                captured!,
+                frame,
+                (policy) => captured = captured!.resolved(policy),
+              );
+            }
+            return getProfile(
               setupState: setupState,
               patchConfig: captured!.patch,
               network: captured!.network,
               dnsOverride: captured!.overrideDns,
               ntpOverride: captured!.overrideNtp,
               safeMode: captured!.safeMode,
-            ),
-          );
+            );
+          })
+          .whenComplete(() async => materialFrame?.file.close());
     }, title: 'build profile');
     Future<bool> current() async {
       if (profile?.id != ref.read(currentProfileIdProvider) ||
@@ -1072,6 +1137,24 @@ class SetupAction extends _$SetupAction {
       }
       for (final source in sources) {
         if (!await _requests.configSourceCurrent(source)) return false;
+      }
+      final frame = materialFrame;
+      if (frame != null) {
+        try {
+          if (!await frame.scriptCurrent() ||
+              await _boundedFileDigest(
+                    await appPath.getProfilePath(
+                      captured!.profile.id.toString(),
+                    ),
+                  ) !=
+                  frame.rawSha256) {
+            return false;
+          }
+        } on FileSystemException {
+          return false;
+        } on PolicyDraftProblem {
+          return false;
+        }
       }
       return true;
     }
@@ -1136,6 +1219,7 @@ class SetupAction extends _$SetupAction {
               testUrl: snapshot.testUrl,
               sources: sources,
               managedPolicy: snapshot.policy?.descriptor,
+              managedMaterials: snapshot.policy?.materials,
             );
           });
           final profileId = profile?.id;

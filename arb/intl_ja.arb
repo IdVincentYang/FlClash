@@ -931,5 +931,16 @@
   "reportTruncated": "切り詰められた資料です。完全な dump ではありません",
   "reportExportSummary": "概要をエクスポート（JSON）",
   "reportExportRaw": "原文をエクスポート（ZIP）",
-  "reportRefresh": "更新"
+  "reportRefresh": "更新",
+  "policyMaterialSource": "ソース名を選択",
+  "policyMaterialNode": "ソースノードを関連付け",
+  "policyMaterialGroup": "ソースの select グループを関連付け",
+  "policyMaterialDomain": "ソースのドメイン集合を関連付け",
+  "policyMaterialIp": "ソースのアドレス集合を関連付け",
+  "policyMaterialCollections": "ソースの集合",
+  "policyMaterialLatest": "最新の素材をプレビュー用に読み込む",
+  "policyMaterialLoaded": "最新の素材を読み込みました。変更された名前を関連付け直してプレビューし、Apply で適用してください。Save は下書きのみ保存します。",
+  "policyMaterialUnavailable": "素材が利用できないか互換性がありません。ソースの関連付けを確認して再度プレビューしてください。",
+  "policyMaterialCancel": "プレビュー素材を破棄",
+  "policyMaterialBindings": "ソースの関連付け"
 }

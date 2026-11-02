@@ -12,8 +12,9 @@ ScriptEvaluator scriptEvaluator = evaluateScript;
 
 Future<Map<String, dynamic>> handleEvaluate(
   String scriptContent,
-  Map<String, dynamic> config,
-) async {
+  Map<String, dynamic> config, {
+  int? maxBytes,
+}) async {
   if (config['proxy-providers'] == null) {
     config['proxy-providers'] = {};
   }
@@ -25,6 +26,10 @@ Future<Map<String, dynamic>> handleEvaluate(
     );
   } catch (e) {
     throw MessageException(e.toString());
+  }
+  if (maxBytes != null &&
+      (result.length > maxBytes || utf8.encode(result).length > maxBytes)) {
+    throw const MessageException('script material exceeds byte budget');
   }
   final decoded = json.decode(result);
   if (decoded is! Map<String, dynamic>) {

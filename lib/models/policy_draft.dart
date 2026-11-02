@@ -64,7 +64,9 @@ final class PolicyDraftDocument {
             'labels',
             'migration',
           }) ||
-          value['draftVersion'] != 1 ||
+          !{1, 2}.contains(value['draftVersion']) ||
+          value['policy'] is! Map ||
+          value['policy']['schemaVersion'] != value['draftVersion'] ||
           !_knownPolicy(value['policy']) ||
           (value['labels'] != null &&
               (value['labels'] is! Map ||
@@ -83,6 +85,13 @@ final class PolicyDraftDocument {
   }
 
   bool get isReadOnly => _content == null;
+
+  void useMaterialSource(int profileId, String identity) {
+    _content!['draftVersion'] = 2;
+    policy['schemaVersion'] = 2;
+    policy['materialSource'] = {'profileId': profileId, 'identity': identity};
+    policy.putIfAbsent('collections', () => <String, dynamic>{});
+  }
 
   Map<String, dynamic> get policy => _content!['policy'];
 
@@ -118,6 +127,7 @@ final class PolicyDraftDocument {
       value == null || _knownObject(value, fields);
 
   static bool _knownPolicy(Object? value) {
+    final material = value is Map && value['schemaVersion'] == 2;
     if (!_knownObject(value, {
           'schemaVersion',
           'domainRules',
@@ -129,8 +139,10 @@ final class PolicyDraftDocument {
           'proxies',
           'groups',
           'listeners',
+          if (material) 'materialSource',
+          if (material) 'collections',
         }) ||
-        (value as Map)['schemaVersion'] != 1) {
+        !{1, 2}.contains((value as Map)['schemaVersion'])) {
       return false;
     }
     final policy = value as Map<String, dynamic>;
@@ -176,14 +188,28 @@ final class PolicyDraftDocument {
 
     const service = {'protocol', 'address', 'port'};
     final groups = policy['groups'];
+    if (material &&
+        (!_knownObject(policy['materialSource'], {'profileId', 'identity'}) ||
+            policy['materialSource']['profileId'] is! int ||
+            policy['materialSource']['identity'] is! String ||
+            policy['collections'] is! Map<String, dynamic> ||
+            !(policy['collections'] as Map).values.every(
+              (v) =>
+                  _knownObject(v, {'source', 'kind'}) &&
+                  text(v['source']) &&
+                  text(v['kind']),
+            ))) {
+      return false;
+    }
     return list('domainRules', {
           'id',
           'type',
           'value',
           'target',
           'dnsService',
+          if (material) 'collection',
         }) &&
-        list('ipRules', {'id', 'cidr', 'target'}) &&
+        list('ipRules', {'id', 'cidr', 'target', if (material) 'collection'}) &&
         route(policy['domainDefault']) &&
         target(policy['ipDefault']) &&
         objects('dnsServices', service) &&
@@ -199,6 +225,7 @@ final class PolicyDraftDocument {
           'udp',
           'username',
           'password',
+          if (material) 'source',
         }) &&
         (policy['proxies'] == null ||
             (policy['proxies'] as Map).values.every(
@@ -211,7 +238,11 @@ final class PolicyDraftDocument {
         (groups == null ||
             (groups is Map<String, dynamic> &&
                 groups.values.every(
-                  (v) => v is List && v.every((m) => m is String),
+                  (v) =>
+                      v is List && v.every((m) => m is String) ||
+                      material &&
+                          _knownObject(v, {'source'}) &&
+                          text(v['source']),
                 )));
   }
 }

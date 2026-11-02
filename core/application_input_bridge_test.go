@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"testing"
 
+	"github.com/metacubex/mihomo/component/auth"
 	"github.com/metacubex/mihomo/component/requestscope"
 	C "github.com/metacubex/mihomo/constant"
 )
@@ -79,6 +81,35 @@ func TestApplicationInputBridge(t *testing.T) {
 			}
 			C.SetHomeDir(home)
 			result = fixture.policy
+		case "allowRefreshTarget":
+			var target string
+			if err := json.Unmarshal(call.Arguments, &target); err != nil || fixture == nil {
+				t.Fatal("invalid local target", err)
+			}
+			host, _, err := net.SplitHostPort(target)
+			if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
+				t.Fatal("fixture target must be loopback")
+			}
+			for _, proxy := range fixture.proxies {
+				proxy.mu.Lock()
+				proxy.allowed[target] = true
+				proxy.mu.Unlock()
+			}
+			result = map[string]any{"ok": true}
+		case "materialAuth":
+			if fixture == nil {
+				t.Fatal("material fixture unavailable")
+			}
+			var users []auth.AuthUser
+			if err := json.Unmarshal(call.Arguments, &users); err != nil || len(users) != 2 {
+				t.Fatal("invalid synthetic credentials", err)
+			}
+			for index, user := range users {
+				fixture.proxies[index].mu.Lock()
+				fixture.proxies[index].auth = auth.NewAuthenticator([]auth.AuthUser{user})
+				fixture.proxies[index].mu.Unlock()
+			}
+			result = map[string]any{"ok": true}
 		case "probe":
 			var name string
 			if err := json.Unmarshal(call.Arguments, &name); err != nil || fixture == nil {

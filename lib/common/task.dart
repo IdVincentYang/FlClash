@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/policy_selection.dart';
+import 'package:fl_clash/common/managed_material.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
@@ -119,6 +120,13 @@ Future<({String yaml, String md5})> makeRealProfileTask(
 Future<({String yaml, String md5})> _makeRealProfileTask(
   MakeRealProfileState data,
 ) async {
+  if (data.policySelection != null) {
+    final yaml = await _encodeYaml(managedFinalProfile(data));
+    if (utf8.encode(yaml).length > managedMaterialMaxBytes) {
+      throw const FormatException('policy.materialBudget');
+    }
+    return (yaml: yaml, md5: yaml.toMd5());
+  }
   final rawConfig = Map.from(data.rawConfig);
   final realPatchConfig = data.realPatchConfig;
   final profilesPath = data.profilesPath;

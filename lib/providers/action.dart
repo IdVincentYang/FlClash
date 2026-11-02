@@ -10,6 +10,8 @@ import 'package:fl_clash/common/system_dns.dart';
 import 'package:fl_clash/common/policy_migration.dart';
 import 'package:fl_clash/common/policy_draft.dart';
 import 'package:fl_clash/common/policy_selection.dart';
+import 'package:fl_clash/common/managed_material.dart';
+import 'package:crypto/crypto.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -30,6 +32,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 part 'actions/common.dart';
 part 'actions/setup.dart';
+part 'actions/policy_material.dart';
 part 'actions/backup.dart';
 part 'actions/policy_draft.dart';
 part 'actions/policy_selection.dart';

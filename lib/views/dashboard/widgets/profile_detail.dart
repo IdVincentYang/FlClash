@@ -148,11 +148,14 @@ class _ProfileDetailSheetState extends ConsumerState<ProfileDetailSheet> {
     final observation = ref.watch(configStateProvider);
     final applied = observation.fact;
     final selection = ref.watch(policySelectionProvider(profile.id)).value;
+    final materialAdopted =
+        ref.watch(managedMaterialAdoptedProvider(profile.id)).value == true;
     String selectedPolicyStatus() {
       if (selection == null) return appLocalizations.policyOriginalStatus;
       try {
         final selected = SelectedPolicy.decode(selection.rawContent);
-        return selected.digest == applied.policySha256 &&
+        return (!selected.usesMaterials || materialAdopted) &&
+                selected.digest == applied.policySha256 &&
                 applied.profileId == profile.id
             ? appLocalizations.policySelectedStatus
             : appLocalizations.policySelectionPending;

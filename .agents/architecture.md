@@ -100,6 +100,22 @@ subscription's value cannot survive into the generated profile, `follow` leaves 
 is installed (`core/lib.go` `installHooks`, vendored `dialer.go`), so `NetworkListView` in `lib/views/config/network.dart`
 shows the mode picker and text field only on desktop.
 
+## Managed Profile Materials
+
+The task branch implements the
+[managed material contract](../docs/features/security/managed_updates_design.md);
+implementation review is pending. Pure expansion lives in
+`lib/common/managed_material.dart`.
+`lib/providers/actions/policy_material.dart` owns transient candidate capture
+and qualification. Versioned templates resolve frozen profile material,
+script bytes and allowed overwrites through the existing strict compiler.
+Request source tickets and ConfigInput/T01 remain the acceptance authority;
+ServiceState remains the running-intent owner.
+Material parsing, scripts and network I/O stay outside Dart mutation waits.
+A material digest is provenance, not a new runtime grant or proof that a saved
+revision has been applied. The guide separates Save, preview, Sync and actual
+adoption; no persistent pending-material authority is introduced.
+
 ## Lifecycle Ownership And Convergence
 
 ### Shared Flutter Layer

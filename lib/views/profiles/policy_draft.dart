@@ -5,6 +5,8 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/policy_draft.dart';
 import 'package:fl_clash/common/policy_migration.dart';
 import 'package:fl_clash/common/policy_selection.dart';
+import 'package:fl_clash/common/managed_material.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
@@ -28,11 +30,13 @@ class PolicyDraftView extends ConsumerStatefulWidget {
 
 class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
   PolicyDraftDocument? _draft;
+  PolicyMaterialCandidate? _material;
   String? _storedRaw;
   String? _storedEncoding;
   String? _problemLocation;
   ProfilePolicySelection? _selected;
   bool _previewed = false;
+  bool _loadingMaterial = false;
   bool _busy = true;
   bool _leaving = false;
   bool _allowPop = false;
@@ -51,8 +55,13 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     unawaited(_load());
   }
 
+  bool _ownsOperation(int operation) => mounted && operation == _operation;
+
   Future<void> _load() async {
     final operation = ++_operation;
+    await _material?.close();
+    if (!mounted || !_ownsOperation(operation)) return;
+    _material = null;
     setState(() => _busy = true);
     try {
       final row = await _action.load(widget.profile.id);
@@ -72,7 +81,9 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
         _previewed = false;
       });
     } catch (_) {
-      if (mounted) _notify(context.appLocalizations.policyDraftLoadFailed);
+      if (mounted && _ownsOperation(operation)) {
+        _notify(context.appLocalizations.policyDraftLoadFailed);
+      }
     } finally {
       if (mounted && operation == _operation) setState(() => _busy = false);
     }
@@ -131,6 +142,195 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     }
   }
 
+  @override
+  void dispose() {
+    _operation++;
+    unawaited(_material?.close());
+    super.dispose();
+  }
+
+  Future<PolicyMaterialCandidate> _ensureMaterial(
+    int operation, {
+    bool latest = false,
+  }) async {
+    final old = _material;
+    if (!latest && old != null) {
+      final current = await old.current();
+      if (!_ownsOperation(operation)) {
+        throw const PolicyDraftProblem('materialSource');
+      }
+      if (current) return old;
+    }
+    await old?.close();
+    if (!_ownsOperation(operation)) {
+      throw const PolicyDraftProblem('materialSource');
+    }
+    _material = null;
+    final candidate = await ref
+        .read(setupActionProvider.notifier)
+        .capturePolicyMaterial(
+          widget.profile.id,
+          latest: latest,
+          onCreated: (candidate) {
+            if (_ownsOperation(operation)) {
+              _material = candidate;
+            } else {
+              unawaited(candidate.close());
+            }
+          },
+        );
+    if (!_ownsOperation(operation)) {
+      await candidate.close();
+      throw const PolicyDraftProblem('materialSource');
+    }
+    _material = candidate;
+    return candidate;
+  }
+
+  void _discardMaterial() {
+    _operation++;
+    unawaited(_material?.close());
+    _material = null;
+    if (mounted) {
+      setState(() {
+        _previewed = false;
+        if (_loadingMaterial) {
+          _busy = false;
+          _loadingMaterial = false;
+        }
+      });
+    }
+  }
+
+  Future<void> _loadLatestMaterial() async {
+    if (_busy) return;
+    final operation = ++_operation;
+    setState(() {
+      _busy = true;
+      _loadingMaterial = true;
+    });
+    try {
+      await _ensureMaterial(operation, latest: true);
+      if (!mounted || !_ownsOperation(operation)) return;
+      setState(() => _previewed = false);
+      _notify(context.appLocalizations.policyMaterialLoaded);
+    } catch (_) {
+      if (mounted && _ownsOperation(operation)) {
+        _notify(context.appLocalizations.policyMaterialUnavailable);
+      }
+    } finally {
+      if (_ownsOperation(operation)) {
+        setState(() {
+          _loadingMaterial = false;
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _sourcesMenu() async {
+    if (_busy || _draft == null || _draft!.isReadOnly) return;
+    final operation = _operation;
+    final l = context.appLocalizations;
+    final choices = <String, String>{
+      'proxies': l.policyMaterialNode,
+      'groups': l.policyMaterialGroup,
+      'domain': l.policyMaterialDomain,
+      'ip': l.policyMaterialIp,
+      if (widget.profile.type == ProfileType.url)
+        'latest': l.policyMaterialLatest,
+    };
+    final choice = await dialogs.showCommonDialog<String>(
+      context: context,
+      child: CommonDialog(
+        title: l.policyMaterialBindings,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in choices.entries)
+              ListTile(
+                title: Text(entry.value),
+                onTap: () => Navigator.of(context).pop(entry.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || !_ownsOperation(operation) || choice == null) return;
+    if (choice == 'latest') {
+      await _loadLatestMaterial();
+    } else {
+      await _bindSource(choice);
+    }
+  }
+
+  Future<void> _bindSource(String kind, {String? id}) async {
+    if (_busy || _draft == null || _draft!.isReadOnly) return;
+    final operation = ++_operation;
+    setState(() {
+      _busy = true;
+      _loadingMaterial = true;
+    });
+    try {
+      final candidate = await _ensureMaterial(operation);
+      final sources = (await candidate.sourceNames())[kind] ?? [];
+      if (!mounted || !_ownsOperation(operation)) return;
+      final l = context.appLocalizations;
+      final name = await dialogs.showCommonDialog<String>(
+        context: context,
+        child: CommonDialog(
+          title: l.policyMaterialSource,
+          child: SizedBox(
+            width: 360,
+            height: 360,
+            child: sources.isEmpty
+                ? Text(l.policyMaterialUnavailable)
+                : ListView.builder(
+                    itemCount: sources.length,
+                    itemBuilder: (context, index) => ListTile(
+                      title: Text(sources[index]),
+                      onTap: () => Navigator.of(context).pop(sources[index]),
+                    ),
+                  ),
+          ),
+        ),
+      );
+      if (name == null ||
+          !await candidate.current() ||
+          !_ownsOperation(operation)) {
+        return;
+      }
+      final resourceId = id ?? 'resource$uniqueId';
+      final category = kind == 'domain' || kind == 'ip' ? 'collections' : kind;
+      setState(() {
+        _busy = false;
+        _loadingMaterial = false;
+      });
+      _change(() {
+        _draft!.useMaterialSource(widget.profile.id, candidate.identity);
+        _draft!.policy[category] = {
+          ..._draft!.resources(category),
+          resourceId: {
+            'source': name,
+            if (category == 'collections') 'kind': kind,
+          },
+        };
+        _draft!.setLabel(resourceId, name);
+      });
+    } catch (_) {
+      if (mounted && _ownsOperation(operation)) {
+        _notify(context.appLocalizations.policyMaterialUnavailable);
+      }
+    } finally {
+      if (_ownsOperation(operation)) {
+        setState(() {
+          _busy = false;
+          _loadingMaterial = false;
+        });
+      }
+    }
+  }
+
   Future<void> _reload() async {
     if (_busy) return;
     if (_dirty &&
@@ -145,7 +345,12 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     if (_dirty || _storedRaw == null) {
       if (!await _save()) return;
     }
-    if (!mounted || _previewSnapshot() == null) return;
+    if (!mounted) return;
+    if (isMaterialTemplate(_draft!.policy)) {
+      if (await _previewSnapshot() == null || !mounted) return;
+    } else if (_staticPreviewSnapshot() == null) {
+      return;
+    }
     final l = context.appLocalizations;
     final expected = _selected;
     final draftRaw = _storedRaw!;
@@ -204,6 +409,7 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
             expected: expected,
             draftRaw: draftRaw,
             selectionRaw: raw,
+            material: isMaterialTemplate(draft.policy) ? _material : null,
           );
       if (!mounted) return;
       if (result == PolicyDraftWriteResult.saved) {
@@ -312,7 +518,7 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     }
   }
 
-  PolicyDraftPreview? _previewSnapshot() {
+  PolicyDraftPreview? _staticPreviewSnapshot() {
     try {
       final preview = previewPolicyDraft(_draft!);
       setState(() => _previewed = true);
@@ -324,10 +530,43 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     }
   }
 
+  Future<PolicyDraftPreview?> _previewSnapshot() async {
+    if (!isMaterialTemplate(_draft!.policy)) return _staticPreviewSnapshot();
+    final original = _draft!;
+    final raw = original.encode();
+    final frozen = PolicyDraftDocument.decode(raw);
+    final operation = ++_operation;
+    setState(() => _previewed = false);
+    bool owned() =>
+        _ownsOperation(operation) &&
+        identical(_draft, original) &&
+        original.encode() == raw;
+    try {
+      final candidate = await _ensureMaterial(operation);
+      final preview = await candidate.preview(frozen);
+      if (!mounted ||
+          !owned() ||
+          !identical(candidate, _material) ||
+          !candidate.qualifies(original)) {
+        return null;
+      }
+      setState(() => _previewed = true);
+      return preview;
+    } catch (error) {
+      if (!mounted || !owned()) return null;
+      final location = error is PolicyDraftProblem
+          ? error.location
+          : 'material';
+      setState(() => _problemLocation = location);
+      _notify(context.appLocalizations.policyDraftIncomplete(location));
+      return null;
+    }
+  }
+
   Future<void> _preview() async {
     if (_busy || _draft == null) return;
-    final snapshot = _previewSnapshot();
-    if (snapshot == null) return;
+    final snapshot = await _previewSnapshot();
+    if (snapshot == null || !mounted) return;
     final l = context.appLocalizations;
     await BaseNavigator.push(
       context,
@@ -342,9 +581,9 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
 
   Future<void> _copyFull() async {
     if (_busy || _draft == null) return;
-    final snapshot = _previewSnapshot();
-    if (snapshot == null ||
-        !await _confirm(context.appLocalizations.policyDraftCopyFullConfirm)) {
+    final snapshot = await _previewSnapshot();
+    if (snapshot == null || !mounted) return;
+    if (!await _confirm(context.appLocalizations.policyDraftCopyFullConfirm)) {
       return;
     }
     if (!mounted) return;
@@ -357,6 +596,7 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
   }
 
   Future<void> _leave() async {
+    if (_loadingMaterial) _discardMaterial();
     if (_busy || _leaving) return;
     _leaving = true;
     try {
@@ -462,6 +702,16 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
     String title, [
     String? id,
   ]) async {
+    if (id != null) {
+      final current = _draft!.resources(category)[id];
+      if (current is Map && current.containsKey('source')) {
+        await _bindSource(
+          category == 'collections' ? current['kind'] as String : category,
+          id: id,
+        );
+        return;
+      }
+    }
     final resourceId = id ?? 'resource$uniqueId';
     final kind = switch (category) {
       'proxies' => PolicyDraftFormKind.proxy,
@@ -506,6 +756,7 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
         'proxies',
         'groups',
         'dnsServices',
+        'collections',
       ].any((c) => _draft!.resources(c).containsKey(id))) {
         _draft!.removeLabel(id);
       }
@@ -530,12 +781,12 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
         ListTile(
           key: ValueKey('draft-$field-$i'),
           title: Text(
-            '${i + 1}. ${row['value'] ?? row['cidr'] ?? l.policyDraftUnset}',
+            '${i + 1}. ${row['collection'] is String ? _draft!.label(row['collection']) : row['value'] ?? row['cidr'] ?? l.policyDraftUnset}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            '${row['type'] ?? 'CIDR'} · ${_targetText(row['target'])}',
+            '${row['collection'] != null ? l.policyMaterialCollections : row['type'] ?? 'CIDR'} · ${_targetText(row['target'])}',
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -582,7 +833,12 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
   }
 
   List<Widget> _resources(String category, String title) => [
-    _section(title, () => _editResource(category, title)),
+    _section(
+      title,
+      () => category == 'collections'
+          ? _bindSource('domain')
+          : _editResource(category, title),
+    ),
     for (final id in _draft!.resources(category).keys)
       ListTile(
         title: Text(
@@ -692,6 +948,17 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
           ),
         ],
         menuItems: [
+          if (_material != null || _loadingMaterial)
+            CommonPopupMenuItem(
+              label: l.policyMaterialCancel,
+              glyph: AppGlyphs.close,
+              onPressed: _busy && !_loadingMaterial ? null : _discardMaterial,
+            ),
+          CommonPopupMenuItem(
+            label: l.policyMaterialBindings,
+            glyph: AppGlyphs.importFile,
+            onPressed: editable ? _sourcesMenu : null,
+          ),
           CommonPopupMenuItem(
             label: l.policyActualPreview,
             glyph: AppGlyphs.eye,
@@ -800,6 +1067,8 @@ class _PolicyDraftViewState extends ConsumerState<PolicyDraftView> {
                   ..._rows('ipRules', l.policyDraftIpRules),
                   ..._resources('proxies', l.policyDraftNodes),
                   ..._resources('groups', l.policyDraftGroups),
+                  if (isMaterialTemplate(_draft!.policy))
+                    ..._resources('collections', l.policyMaterialCollections),
                   ..._resources('dnsServices', l.policyDraftDnsServices),
                   ListTile(
                     title: Text(l.policyDraftBootstrap),

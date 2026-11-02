@@ -61,6 +61,20 @@ void main() {
     );
   });
 
+  test('material output budget rejects before JSON decoding', () async {
+    answerWith('x' * 100);
+    await expectLater(
+      handleEvaluate('main', {}, maxBytes: 10),
+      throwsA(
+        isA<MessageException>().having(
+          (e) => e.message,
+          'budget',
+          contains('byte budget'),
+        ),
+      ),
+    );
+  });
+
   test('rejects a result that is not a configuration object', () async {
     answerWith(json.encode([1, 2, 3]));
 

@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/managed_material.dart';
+import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -18,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' show sqlite3;
 
 import '../helpers/test_policy_drafts.dart';
+import '../helpers/test_managed_materials.dart';
 import '../helpers/failing_preferences.dart';
 import '../helpers/test_config_state.dart';
 
@@ -103,6 +106,62 @@ void main() {
       return true;
     }, policyDraftsConfirmed: confirmed);
     return path;
+  }
+
+  for (final strategy in RestoreStrategy.values) {
+    test(
+      'v2 ZIP onlyProfiles restore under $strategy preserves explicit identity and rejects rebinding',
+      () async {
+        final source = await newDb();
+        final draft = materialDraft();
+        final raw = draft.encode();
+        await seed(source, raw);
+        final selection = selectPolicyDraft(draft);
+        await source.profilePolicySelectionsDao.compareAndWrite(
+          1,
+          expected: null,
+          selection: ProfilePolicySelection(
+            profileId: 1,
+            rawContent: selection,
+          ),
+        );
+        final zip = await archive(action(container()));
+        final target = await newDb();
+        final c = container();
+        c
+            .read(appSettingProvider.notifier)
+            .update((s) => s.copyWith(restoreStrategy: strategy));
+        expect(
+          await action(c).restore(RestoreOption.onlyProfiles, (_) async => zip),
+          true,
+        );
+        expect(
+          (await target.profilePolicyDraftsDao.query().get()).single.rawContent,
+          raw,
+        );
+        final restored =
+            (await target.profilePolicySelectionsDao.query().get()).single;
+        expect(restored.rawContent, selection);
+        final row = (await target.profilesDao.query().get()).single;
+        final actualIdentity = profileMaterialIdentity(
+          profileId: row.id,
+          type: row.type.name,
+          url: row.url,
+          overwrite: row.overwriteType.name,
+          scriptId: row.scriptId,
+        );
+        expect(
+          () => SelectedPolicy.decode(restored.rawContent).resolve(
+            material: testMaterial(),
+            identity: actualIdentity,
+            profileId: row.id,
+            rawSha256: materialDigest('restored'),
+          ),
+          throwsFormatException,
+        );
+        expect(PolicyDraftDocument.decode(raw).isReadOnly, false);
+      },
+    );
   }
 
   test(

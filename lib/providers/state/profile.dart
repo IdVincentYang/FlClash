@@ -114,3 +114,52 @@ Map<String, int> profileProviders(Ref ref) {
   final profiles = ref.watch(profilesProvider);
   return {for (final profile in profiles) profile.realLabel: profile.id};
 }
+
+@riverpod
+Future<bool> managedMaterialAdopted(Ref ref, int profileId) async {
+  final fact = ref.watch(configStateProvider).fact;
+  final profile = ref.watch(profileProvider(profileId));
+  final selection = ref.watch(policySelectionProvider(profileId)).value;
+  if (profile == null ||
+      selection == null ||
+      fact.profileId != profileId ||
+      !fact.replayEligible) {
+    return false;
+  }
+  try {
+    final selected = SelectedPolicy.decode(selection.rawContent);
+    if (!selected.usesMaterials || selected.digest != fact.policySha256) {
+      return false;
+    }
+    final receipt = await ConfigInput.acceptedMaterials(
+      home: await appPath.homeDirPath,
+      accepted: fact,
+      readFact: ref.read(coreHandlerProvider).getConfigState,
+    );
+    if (receipt == null ||
+        receipt['originSha256'] !=
+            profileMaterialIdentity(
+              profileId: profile.id,
+              type: profile.type.name,
+              url: profile.url,
+              overwrite: profile.overwriteType.name,
+              scriptId: profile.scriptId,
+            )) {
+      return false;
+    }
+    final bytes = <int>[];
+    await for (final chunk in File(
+      await appPath.getProfilePath(profileId.toString()),
+    ).openRead()) {
+      if (bytes.length + chunk.length > managedMaterialMaxBytes) return false;
+      bytes.addAll(chunk);
+    }
+    return receipt['rawSha256'] == sha256.convert(bytes).toString() &&
+        ConfigInput.sameAcceptedInput(
+          fact,
+          await ref.read(coreHandlerProvider).getConfigState(),
+        );
+  } catch (_) {
+    return false;
+  }
+}

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:code_forge/code_forge.dart';
@@ -9,6 +10,7 @@ import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/manager/status_manager.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -25,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_app.dart';
 import '../helpers/test_policy_drafts.dart';
+import '../helpers/test_managed_materials.dart';
 import '../plugins/code_forge/support.dart';
 
 class _Core extends Mock implements CoreHandlerInterface {}
@@ -212,6 +215,93 @@ void main() {
     expect(setup.autoApplyCalls, 0);
     verifyZeroInteractions(core);
   }
+
+  testWidgets(
+    'source select group binding is explicit, persisted as v2, and leaves manual nodes intact',
+    (tester) async {
+      addTearDown(() => tester.runAsync(() => dataMutations.run(() async {})));
+      Future<void> sourceReady(String name) async {
+        for (var i = 0; i < 60 && find.text(name).evaluate().isEmpty; i++) {
+          await settle(tester, 1);
+        }
+        expect(find.text(name), findsOneWidget);
+      }
+
+      Future<void> idle() async {
+        for (
+          var i = 0;
+          i < 60 &&
+              tester
+                  .widget<CommonScaffold>(find.byType(CommonScaffold))
+                  .isLoading;
+          i++
+        ) {
+          await settle(tester, 1);
+        }
+        expect(
+          tester.widget<CommonScaffold>(find.byType(CommonScaffold)).isLoading,
+          false,
+        );
+      }
+
+      await seed(completePolicyDraft());
+      await tester.runAsync(() async {
+        final path = File(await appPath.getProfilePath('1'));
+        await path.parent.create(recursive: true);
+        await path.writeAsString(jsonEncode(testMaterial()));
+      });
+      when(
+        () => core.getConfigState(),
+      ).thenAnswer((_) async => const ConfigFact());
+      when(() => core.getConfig(any())).thenAnswer((_) async => testMaterial());
+      await pump(tester);
+      await click(tester, find.byTooltip('More'));
+      await click(tester, find.text('Source bindings'));
+      await click(tester, find.text('Bind source select group'));
+      await sourceReady('source-select');
+      await click(tester, find.text('source-select'));
+      await idle();
+      await click(tester, find.byType(CommonFloatingActionButton));
+      final draft = PolicyDraftDocument.decode((await stored())!);
+      expect(draft.isReadOnly, false);
+      expect(draft.policy['schemaVersion'], 2);
+      expect(draft.policy['materialSource']['profileId'], 1);
+      expect(
+        draft.policy['groups'].values.whereType<Map>().single['source'],
+        'source-select',
+      );
+      expect(draft.policy['proxies']['nodeA']['address'], '127.0.0.1');
+      expect(await db.profilePolicySelectionsDao.query().get(), isEmpty);
+      await click(tester, find.byTooltip('More'));
+      await click(tester, find.text('Source bindings'));
+      await click(tester, find.text('Bind source domain collection'));
+      await sourceReady('source-domains');
+      await click(tester, find.text('source-domains'));
+      await idle();
+      await click(tester, find.byTooltip('Add Domain rules'));
+      await choose(
+        tester,
+        find.byKey(const ValueKey('draft-collection')),
+        'source-domains',
+      );
+      await choose(
+        tester,
+        find.byKey(const ValueKey('draft-target')),
+        'REJECT',
+      );
+      await confirmForm(tester);
+      await click(tester, find.byType(CommonFloatingActionButton));
+      final updated = PolicyDraftDocument.decode((await stored())!);
+      final collectionId = updated.rows('domainRules').last['collection'];
+      expect(
+        updated.resources('collections')[collectionId]['source'],
+        'source-domains',
+      );
+      expect(updated.rows('domainRules').last.containsKey('type'), false);
+      expect(find.textContaining('source-domains'), findsWidgets);
+      await tester.runAsync(() => dataMutations.run(() async {}));
+    },
+  );
 
   testWidgets(
     'real profile menu opens an independent draft route without selecting or applying',
@@ -881,7 +971,13 @@ void main() {
       await click(tester, find.text('Proxy group: a'));
       await click(tester, find.text('Confirm').last);
       await settle(tester, 12);
-      final selected = await db.profilePolicySelectionsDao.query(1).getSingle();
+      final selected = (await tester.runAsync(
+        () => db.profilePolicySelectionsDao
+            .query(1)
+            .watchSingleOrNull()
+            .firstWhere((row) => row != null)
+            .timeout(const Duration(seconds: 5)),
+      ))!;
       expect(selected.rawContent, contains('maintenanceProxyTarget'));
       expect(container.read(currentProfileIdProvider), 1);
       expect(container.read(initProvider), isFalse);

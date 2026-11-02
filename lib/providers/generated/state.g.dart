@@ -3917,3 +3917,74 @@ final class ProfileProvidersProvider
 }
 
 String _$profileProvidersHash() => r'3e4b1f794192772bf37f599c1c42b3810cba71a0';
+
+@ProviderFor(managedMaterialAdopted)
+final managedMaterialAdoptedProvider = ManagedMaterialAdoptedFamily._();
+
+final class ManagedMaterialAdoptedProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
+    with $FutureModifier<bool>, $FutureProvider<bool> {
+  ManagedMaterialAdoptedProvider._({
+    required ManagedMaterialAdoptedFamily super.from,
+    required int super.argument,
+  }) : super(
+         retry: null,
+         name: r'managedMaterialAdoptedProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$managedMaterialAdoptedHash();
+
+  @override
+  String toString() {
+    return r'managedMaterialAdoptedProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<bool> create(Ref ref) {
+    final argument = this.argument as int;
+    return managedMaterialAdopted(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ManagedMaterialAdoptedProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$managedMaterialAdoptedHash() =>
+    r'a231ba1db173892bc54c3ee03bb89506a2124e55';
+
+final class ManagedMaterialAdoptedFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<bool>, int> {
+  ManagedMaterialAdoptedFamily._()
+    : super(
+        retry: null,
+        name: r'managedMaterialAdoptedProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ManagedMaterialAdoptedProvider call(int profileId) =>
+      ManagedMaterialAdoptedProvider._(argument: profileId, from: this);
+
+  @override
+  String toString() => r'managedMaterialAdoptedProvider';
+}

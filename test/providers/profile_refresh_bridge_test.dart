@@ -6,6 +6,11 @@ import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/config_input.dart';
 import 'package:fl_clash/common/policy_selection.dart';
+import 'package:fl_clash/common/managed_material.dart';
+import 'package:fl_clash/common/policy_draft.dart';
+import 'package:crypto/crypto.dart';
+import 'package:yaml_writer/yaml_writer.dart';
+import 'package:yaml/yaml.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/core/method.dart';
@@ -26,6 +31,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/policy_core_bridge.dart';
+import '../plugins/code_forge/support.dart' show initEditorNative;
 import '../helpers/boot_fixture.dart';
 import '../helpers/test_profiles.dart';
 
@@ -52,6 +58,15 @@ class _RecoverySetup extends SetupAction {
     outcomes.add(result);
     return result;
   }
+}
+
+class _Selection extends PolicySelectionAction {
+  _Selection(this.client);
+  final Request client;
+  @override
+  bool get supportsManaged => true;
+  @override
+  Request get requestClient => client;
 }
 
 class _Shared extends Fake implements SharedState {}
@@ -127,6 +142,7 @@ class _BridgeCore extends CoreHandlerInterface {
   Completer<void>? projectionEntered, projectionGate;
   Completer<void>? readEntered, readGate;
   String? nativeAfterActivation;
+  Map<String, dynamic> Function(Map<String, dynamic>)? materialReadOverride;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   @override
@@ -195,6 +211,12 @@ class _BridgeCore extends CoreHandlerInterface {
     }
     if (response['error'] != null) {
       throw StateError('Synthetic Core request failed');
+    }
+    if (method == CoreMethod.getConfig && materialReadOverride != null) {
+      return materialReadOverride!(
+            Map<String, dynamic>.from(response['value'] as Map),
+          )
+          as T?;
     }
     return (response.containsKey('value') ? response['value'] : response) as T?;
   }
@@ -310,6 +332,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         profilesActionProvider.overrideWith(() => _Profiles(client)),
+        policySelectionActionProvider.overrideWith(() => _Selection(client)),
         setupActionProvider.overrideWith(() => _RecoverySetup(native, client)),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesProvider.overrideWith(() => _StoredProfiles(client)),
@@ -1136,6 +1159,831 @@ void main() {
       expect(core.calls, contains(CoreMethod.failConfigBuild));
     },
     skip: executable == null,
+  );
+
+  Future<
+    ({
+      Profile profile,
+      PolicyDraftDocument draft,
+      Map<String, dynamic> a,
+      Map<String, dynamic> b,
+    })
+  >
+  materialService() async {
+    final policy = Map<String, dynamic>.from(
+      await bridge.call('refreshFixture'),
+    );
+    await bridge.call('materialAuth', [
+      {'User': 'a', 'Pass': 'pass-a'},
+      {'User': 'b', 'Pass': 'pass-b'},
+    ]);
+    await existingService();
+    final row = profile(1);
+    final draft = PolicyDraftDocument.decode(
+      jsonEncode({'draftVersion': 1, 'policy': policy}),
+    );
+    final nodes = draft.resources('proxies');
+    Map<String, dynamic> source(String name, String id, String user) => {
+      'name': name,
+      'type': 'socks5',
+      'server': nodes[id]['address'],
+      'port': nodes[id]['port'],
+      'udp': false,
+      'username': user,
+      'password': 'pass-$user',
+    };
+    final a = <String, dynamic>{
+      'proxies': [source('hop', 'nodeA', 'a')],
+      'proxy-groups': [
+        {
+          'name': 'pool',
+          'type': 'select',
+          'proxies': ['hop'],
+        },
+      ],
+      'rule-providers': {
+        'domains': {
+          'type': 'inline',
+          'behavior': 'classical',
+          'payload': ['DOMAIN-SUFFIX,example.test'],
+        },
+      },
+    };
+    final b = <String, dynamic>{
+      'proxies': [source('hop', 'nodeB', 'b'), source('next', 'nodeB', 'b')],
+      'proxy-groups': [
+        {
+          'name': 'pool',
+          'type': 'select',
+          'proxies': ['next'],
+        },
+      ],
+      'rule-providers': {
+        'domains': {
+          'type': 'inline',
+          'behavior': 'classical',
+          'payload': ['DOMAIN-SUFFIX,example.test'],
+        },
+      },
+    };
+    nodes['nodeB']['username'] = 'b';
+    nodes['nodeB']['password'] = 'pass-b';
+    draft.useMaterialSource(
+      1,
+      profileMaterialIdentity(
+        profileId: 1,
+        type: row.type.name,
+        url: row.url,
+        overwrite: row.overwriteType.name,
+        scriptId: row.scriptId,
+      ),
+    );
+    draft.policy['proxies']['nodeA'] = {'source': 'hop'};
+    draft.policy['groups']['a'] = {'source': 'pool'};
+    draft.policy['collections'] = {
+      'domains': {'source': 'domains', 'kind': 'domain'},
+    };
+    draft.policy['domainRules'][0] = {
+      'id': 'wide',
+      'collection': 'domains',
+      'target': {'kind': 'proxy', 'group': 'a'},
+      'dnsService': 'dnsA',
+    };
+    await File(
+      await appPath.getProfilePath('1'),
+    ).writeAsString(YamlWriter().write(a));
+    await store.profilePolicyDraftsDao.compareAndWrite(
+      1,
+      expectedRaw: null,
+      rawContent: draft.encode(),
+    );
+    await store.profilePolicySelectionsDao.compareAndWrite(
+      1,
+      expected: null,
+      selection: ProfilePolicySelection(
+        profileId: 1,
+        rawContent: selectPolicyDraft(
+          draft,
+          maintenanceProxyTarget: {'kind': 'proxy', 'id': 'nodeA'},
+        ),
+      ),
+    );
+    expect(await setup.applyProfile(force: true), true);
+    expect((await bridge.call('probe', 'before.example.test'))['body'], 'A');
+    return (profile: row, draft: draft, a: a, b: b);
+  }
+
+  final materialSkip =
+      executable == null ||
+      Platform.environment['FLCLASH_MANAGED_PROFILE_COMPILER'] == null;
+  test(
+    'v2 actual refresh A to B preserves template and changes authenticated business and DNS receivers',
+    () async {
+      final f = await materialService();
+      final before = await core.getConfigState();
+      final aProbe = await bridge.call('probe', 'a.example.test');
+      responses['/1'] = YamlWriter().write(f.b);
+      final result = await profiles.updateProfile(f.profile);
+      expect(result.materialSaved, true);
+      final after = await core.getConfigState();
+      expect(after.policySha256, before.policySha256);
+      expect(after.inputId, isNot(before.inputId));
+      final bProbe = await bridge.call('probe', 'b.example.test');
+      expect(bProbe['body'], 'B');
+      expect(bProbe['dnsFailed'], false);
+      expect(
+        (bProbe['proxyCounts'] as List)[0],
+        (aProbe['proxyCounts'] as List)[0],
+      );
+      expect(
+        (bProbe['proxyCounts'] as List)[1],
+        greaterThan((aProbe['proxyCounts'] as List)[1] as num),
+      );
+      expect(
+        (bProbe['dnsCounts'] as List)[0],
+        greaterThan((aProbe['dnsCounts'] as List)[0] as num),
+      );
+      final receipt = await ConfigInput.acceptedMaterials(
+        home: root.path,
+        accepted: after,
+        readFact: core.getConfigState,
+      );
+      expect(receipt, isNotNull);
+      expect(
+        receipt!['rawSha256'],
+        sha256
+            .convert(
+              await File(await appPath.getProfilePath('1')).readAsBytes(),
+            )
+            .toString(),
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 bad refresh preserves saved bytes date and eligible authenticated A',
+    () async {
+      final f = await materialService();
+      final before = await core.getConfigState();
+      final path = await appPath.getProfilePath('1');
+      final bytes = await File(path).readAsBytes();
+      f.b['proxy-groups'][0]['proxies'] = ['gone'];
+      responses['/1'] = YamlWriter().write(f.b);
+      await expectLater(
+        profiles.updateProfile(f.profile),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(await File(path).readAsBytes(), bytes);
+      expect(
+        (await store.profilesDao.query().get()).first.lastUpdateDate,
+        isNull,
+      );
+      expect((await core.getConfigState()).inputId, before.inputId);
+      expect((await core.getConfigState()).replayEligible, true);
+      expect(
+        (await bridge.call('probe', 'retained.example.test'))['body'],
+        'A',
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 latest preview Save and discard do not adopt B; explicit Apply adopts exact B',
+    () async {
+      final f = await materialService();
+      responses['/1'] = YamlWriter().write(f.b);
+      final path = await appPath.getProfilePath('1');
+      final bytes = await File(path).readAsBytes();
+      final before = await core.getConfigState();
+      final candidate = await setup.capturePolicyMaterial(
+        1,
+        latest: true,
+        client: client,
+      );
+      final preview = await candidate.preview(f.draft);
+      expect(preview.maskedYaml, isNot(contains('pass-b')));
+      expect(await File(path).readAsBytes(), bytes);
+      expect((await core.getConfigState()).inputId, before.inputId);
+      await candidate.close();
+      expect(await File(path).readAsBytes(), bytes);
+      final next = await setup.capturePolicyMaterial(
+        1,
+        latest: true,
+        client: client,
+      );
+      await next.preview(f.draft);
+      container.read(initProvider.notifier).value = true;
+      final selection = await store.profilePolicySelectionsDao
+          .query(1)
+          .getSingle();
+      expect(
+        await container
+            .read(policySelectionActionProvider.notifier)
+            .selectConfirmed(
+              1,
+              expected: selection,
+              draftRaw: f.draft.encode(),
+              selectionRaw: selection.rawContent,
+              material: next,
+            ),
+        PolicyDraftWriteResult.saved,
+      );
+      await next.close();
+      expect(await File(path).readAsBytes(), isNot(bytes));
+      expect(
+        (await store.profilesDao.query().get()).first.lastUpdateDate,
+        isNotNull,
+      );
+      expect((await bridge.call('probe', 'adopted.example.test'))['body'], 'B');
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 latest preview draft conflict compensates the exact old file without changing date',
+    () async {
+      final f = await materialService();
+      responses['/1'] = YamlWriter().write(f.b);
+      final path = await appPath.getProfilePath('1');
+      final old = await File(path).readAsBytes();
+      final candidate = await setup.capturePolicyMaterial(
+        1,
+        latest: true,
+        client: client,
+      );
+      await candidate.preview(f.draft);
+      final selected = await store.profilePolicySelectionsDao
+          .query(1)
+          .getSingle();
+      await store.profilePolicyDraftsDao.compareAndWrite(
+        1,
+        expectedRaw: f.draft.encode(),
+        rawContent: 'a newer draft',
+      );
+      expect(
+        await container
+            .read(policySelectionActionProvider.notifier)
+            .selectConfirmed(
+              1,
+              expected: selected,
+              draftRaw: f.draft.encode(),
+              selectionRaw: selected.rawContent,
+              material: candidate,
+            ),
+        PolicyDraftWriteResult.conflict,
+      );
+      await candidate.close();
+      expect(await File(path).readAsBytes(), old);
+      expect(
+        (await store.profilesDao.query().get()).first.lastUpdateDate,
+        isNull,
+      );
+      expect(
+        (await bridge.call('probe', 'conflict.example.test'))['body'],
+        'A',
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 preview cancellation and a newer preview cannot write source or selection',
+    () async {
+      await materialService();
+      final path = await appPath.getProfilePath('1');
+      final old = await File(path).readAsBytes();
+      final hold = holds['/1'] = Completer<void>();
+      PolicyMaterialCandidate? pending;
+      final load = setup.capturePolicyMaterial(
+        1,
+        latest: true,
+        client: client,
+        onCreated: (candidate) => pending = candidate,
+      );
+      final failed = expectLater(load, throwsA(isA<RequestUnavailable>()));
+      await until(() async => received.contains('/1'));
+      await pending!.close();
+      hold.complete();
+      await failed;
+      holds.remove('/1');
+      final first = await setup.capturePolicyMaterial(
+        1,
+        latest: true,
+        client: client,
+      );
+      final second = await setup.capturePolicyMaterial(
+        1,
+        latest: true,
+        client: client,
+      );
+      expect(await first.current(), false);
+      await first.close();
+      await second.close();
+      expect(await File(path).readAsBytes(), old);
+      expect(
+        (await store.profilesDao.query().get()).first.lastUpdateDate,
+        isNull,
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 source and script identity changes stay repairable and never silently rebind',
+    () async {
+      final f = await materialService();
+      for (final changed in [
+        f.profile.copyWith(url: '${f.profile.url}?changed'),
+        f.profile.copyWith(overwriteType: OverwriteType.custom),
+        f.profile.copyWith(overwriteType: OverwriteType.script, scriptId: 777),
+      ]) {
+        await store.profilesDao.putAll([changed.toCompanion()]);
+        PolicyMaterialCandidate? candidate;
+        try {
+          candidate = await setup.capturePolicyMaterial(1, client: client);
+          await expectLater(
+            candidate.preview(f.draft),
+            throwsA(isA<PolicyDraftProblem>()),
+          );
+        } on PolicyDraftProblem catch (error) {
+          expect(error.location, 'materialSource');
+        } finally {
+          await candidate?.close();
+        }
+      }
+      expect(PolicyDraftDocument.decode(f.draft.encode()).isReadOnly, false);
+      expect(
+        (await store.profilePolicySelectionsDao.query(1).getSingle())
+            .rawContent,
+        selectPolicyDraft(
+          f.draft,
+          maintenanceProxyTarget: {'kind': 'proxy', 'id': 'nodeA'},
+        ),
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 preflight parse releases mutation and a changed qualification prevents source commit',
+    () async {
+      final f = await materialService();
+      responses['/1'] = YamlWriter().write(f.b);
+      final path = await appPath.getProfilePath('1');
+      final old = await File(path).readAsBytes();
+      final entered = core.readEntered = Completer<void>();
+      final gate = core.readGate = Completer<void>();
+      final update = profiles.updateProfile(f.profile);
+      final failed = expectLater(update, throwsA(isA<RequestUnavailable>()));
+      await entered.future;
+      await client.mutate(() => client.invalidate('application-config'));
+      gate.complete();
+      await failed;
+      expect(await File(path).readAsBytes(), old);
+      expect(
+        (await store.profilesDao.query().get()).first.lastUpdateDate,
+        isNull,
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 committed material is freshly parsed and rejected final closure never reactivates A',
+    () async {
+      final f = await materialService();
+      responses['/1'] = YamlWriter().write(f.b);
+      final before = await core.getConfigState();
+      var reads = 0;
+      core.materialReadOverride = (value) {
+        if (++reads > 1) value['proxies'] = <dynamic>[];
+        return value;
+      };
+      final result = await profiles.updateProfile(f.profile);
+      expect(result.materialSaved, true);
+      expect(reads, greaterThanOrEqualTo(2));
+      expect(result.application, isNot(ProfileApplicationOutcome.activated));
+      final after = await core.getConfigState();
+      expect(after.replayEligible, false);
+      expect(after.businessActive, false);
+      expect(after.inputId, before.inputId);
+    },
+    skip: materialSkip,
+  );
+
+  for (final route in [RequestMode.auto, RequestMode.proxy]) {
+    test(
+      'v2 $route refresh uses the existing request route and adopts actual B',
+      () async {
+        final f = await materialService();
+        await bridge.call('allowRefreshTarget', '127.0.0.1:${server.port}');
+        final changed = f.profile.copyWith(
+          requestMode: route,
+          requestProxy: route == RequestMode.proxy
+              ? 'fc-managed-proxy-nodeA'
+              : null,
+        );
+        await put([changed], files: false);
+        expect(await setup.applyProfile(force: true), true);
+        responses['/1'] = YamlWriter().write(f.b);
+        final result = await profiles.updateProfile(changed);
+        expect(result.materialSaved, true);
+        expect((await bridge.call('probe', 'route.example.test'))['body'], 'B');
+        expect(received.where((path) => path == '/1').length, 1);
+      },
+      skip: materialSkip,
+    );
+  }
+
+  test(
+    'v2 automatic refresh adopts B without a new selection confirmation',
+    () async {
+      final f = await materialService();
+      responses['/1'] = YamlWriter().write(f.b);
+      final before = await core.getConfigState();
+      final automatic = f.profile.copyWith(autoUpdate: true);
+      await put([automatic], files: false);
+      await profiles.autoUpdateProfiles();
+      await until(
+        () async =>
+            (await store.profilesDao.query().get()).first.lastUpdateDate !=
+            null,
+      );
+      await until(() async {
+        final fact = await core.getConfigState();
+        return fact.businessActive && fact.inputId != before.inputId;
+      });
+      expect(
+        (await bridge.call('probe', 'automatic.example.test'))['body'],
+        'B',
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 a blocked unknown selection can be repaired through a qualified new preview',
+    () async {
+      final f = await materialService();
+      final selected = await store.profilePolicySelectionsDao
+          .query(1)
+          .getSingle();
+      const unknown = ProfilePolicySelection(
+        profileId: 1,
+        rawContent: '{"selectionVersion":99}',
+      );
+      await store.profilePolicySelectionsDao.compareAndWrite(
+        1,
+        expected: selected,
+        selection: unknown,
+      );
+      final candidate = await setup.capturePolicyMaterial(1, client: client);
+      await candidate.preview(f.draft);
+      expect(
+        await container
+            .read(policySelectionActionProvider.notifier)
+            .selectConfirmed(
+              1,
+              expected: unknown,
+              draftRaw: f.draft.encode(),
+              selectionRaw: selected.rawContent,
+              material: candidate,
+            ),
+        PolicyDraftWriteResult.saved,
+      );
+      await candidate.close();
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 script bytes are frozen, its material is consumed, and changed bytes invalidate preview',
+    () async {
+      final f = await materialService();
+      final script = Script(
+        id: 9,
+        label: 'local synthetic',
+        lastUpdateTime: DateTime(2026),
+      );
+      await store.scriptsDao.setAll([script]);
+      await initEditorNative();
+      final scriptBody = 'function main(config) { return ${jsonEncode(f.b)}; }';
+      await script.save(scriptBody);
+      final row = f.profile.copyWith(
+        overwriteType: OverwriteType.script,
+        scriptId: script.id,
+      );
+      await put([row], files: false);
+      f.draft.useMaterialSource(
+        1,
+        profileMaterialIdentity(
+          profileId: 1,
+          type: row.type.name,
+          url: row.url,
+          overwrite: row.overwriteType.name,
+          scriptId: row.scriptId,
+        ),
+      );
+      final old = await store.profilePolicySelectionsDao.query(1).getSingle();
+      await store.profilePolicySelectionsDao.compareAndWrite(
+        1,
+        expected: old,
+        selection: ProfilePolicySelection(
+          profileId: 1,
+          rawContent: selectPolicyDraft(f.draft),
+        ),
+      );
+      final evaluator = scriptEvaluator;
+      addTearDown(() => scriptEvaluator = evaluator);
+      final scripts = <String>[];
+      scriptEvaluator =
+          ({required String script, required String config}) async {
+            scripts.add(script);
+            return evaluator(script: script, config: config);
+          };
+      expect(await setup.applyProfile(force: true), true);
+      expect((await bridge.call('probe', 'script.example.test'))['body'], 'B');
+      expect(scripts, isNotEmpty);
+      expect(scripts.toSet(), {scriptBody});
+      final candidate = await setup.capturePolicyMaterial(1, client: client);
+      await File(await script.path).writeAsString('new-synthetic-script');
+      expect(await candidate.current(), false);
+      await expectLater(
+        candidate.preview(f.draft),
+        throwsA(isA<PolicyDraftProblem>()),
+      );
+      await candidate.close();
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 custom select group overwrite is used by preflight and final material expansion',
+    () async {
+      final f = await materialService();
+      final row = f.profile.copyWith(overwriteType: OverwriteType.custom);
+      await put([row], files: false);
+      await store.batch(
+        (batch) => batch.insertAll(store.proxyGroups, [
+          const ProxyGroup(
+            id: 19,
+            profileId: 1,
+            name: 'pool',
+            type: GroupType.Selector,
+            proxies: ['hop'],
+          ).toCompanion(),
+        ]),
+      );
+      f.draft.useMaterialSource(
+        1,
+        profileMaterialIdentity(
+          profileId: 1,
+          type: row.type.name,
+          url: row.url,
+          overwrite: row.overwriteType.name,
+          scriptId: row.scriptId,
+        ),
+      );
+      final old = await store.profilePolicySelectionsDao.query(1).getSingle();
+      await store.profilePolicySelectionsDao.compareAndWrite(
+        1,
+        expected: old,
+        selection: ProfilePolicySelection(
+          profileId: 1,
+          rawContent: selectPolicyDraft(f.draft),
+        ),
+      );
+      expect(await setup.applyProfile(force: true), true);
+      responses['/1'] = YamlWriter().write(f.b);
+      expect((await profiles.updateProfile(row)).materialSaved, true);
+      expect(
+        (await bridge.call('probe', 'overwrite.example.test'))['body'],
+        'B',
+      );
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'v2 changed domain and address collections reach the actual ordered DNS and IP consumers',
+    () async {
+      final f = await materialService();
+      f.a['rule-providers']['addresses'] = {
+        'type': 'inline',
+        'behavior': 'ipcidr',
+        'payload': ['203.0.113.0/24'],
+      };
+      f.b['rule-providers']['addresses'] = {
+        'type': 'inline',
+        'behavior': 'ipcidr',
+        'payload': ['192.0.2.0/24'],
+      };
+      f.b['rule-providers']['domains']['payload'] = [
+        'DOMAIN-SUFFIX,example.test',
+        'DOMAIN-SUFFIX,added.test',
+      ];
+      f.draft.policy['collections']['addresses'] = {
+        'source': 'addresses',
+        'kind': 'ip',
+      };
+      f.draft.policy['ipRules'][0] = {
+        'id': 'collection-ip',
+        'collection': 'addresses',
+        'target': {'kind': 'proxy', 'group': 'a'},
+      };
+      await File(
+        await appPath.getProfilePath('1'),
+      ).writeAsString(YamlWriter().write(f.a));
+      final old = await store.profilePolicySelectionsDao.query(1).getSingle();
+      await store.profilePolicySelectionsDao.compareAndWrite(
+        1,
+        expected: old,
+        selection: ProfilePolicySelection(
+          profileId: 1,
+          rawContent: selectPolicyDraft(f.draft),
+        ),
+      );
+      expect(await setup.applyProfile(force: true), true);
+      final domainA = await bridge.call('probe', 'before.added.test');
+      expect(domainA['body'], 'B');
+      expect(domainA['dnsFailed'], false);
+      expect((domainA['dnsCounts'] as List)[1], greaterThan(0));
+      expect(
+        (await bridge.call('probe', '192.0.2.123'))['businessFailed'],
+        true,
+      );
+      final before = await bridge.call('probe', 'final-before.added.test');
+      responses['/1'] = YamlWriter().write(f.b);
+      expect((await profiles.updateProfile(f.profile)).materialSaved, true);
+      final domainB = await bridge.call('probe', 'after.added.test');
+      expect(domainB['body'], 'B');
+      expect(domainB['dnsFailed'], false);
+      expect(
+        (domainB['dnsCounts'] as List)[0],
+        greaterThan((before['dnsCounts'] as List)[0] as num),
+      );
+      expect(
+        (domainB['dnsCounts'] as List)[1],
+        (before['dnsCounts'] as List)[1],
+      );
+      expect((await bridge.call('probe', '192.0.2.123'))['body'], 'B');
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'I1 changed selection validates reset picks while unchanged refresh remains strict',
+    () async {
+      final f = await materialService();
+      final initialRaw = f.draft.encode();
+      f.draft.policy['groups']['b'] = ['nodeA'];
+      await store.profilePolicyDraftsDao.compareAndWrite(
+        1,
+        expectedRaw: initialRaw,
+        rawContent: f.draft.encode(),
+      );
+      final selected = await store.profilePolicySelectionsDao
+          .query(1)
+          .getSingle();
+      final oldRaw = selectPolicyDraft(f.draft);
+      await store.profilePolicySelectionsDao.compareAndWrite(
+        1,
+        expected: selected,
+        selection: ProfilePolicySelection(profileId: 1, rawContent: oldRaw),
+      );
+      final row = f.profile.copyWith(
+        selectedMap: {
+          'fc-managed-group-b': 'fc-managed-proxy-nodeA',
+          'legacy-group': 'legacy-node',
+        },
+      );
+      await put([row], files: false);
+      expect(await setup.applyProfile(force: true), true);
+      expect((await bridge.call('probe', 'manual.other.test'))['body'], 'A');
+      final next = PolicyDraftDocument.decode(f.draft.encode());
+      next.policy['groups']['b'] = ['nodeB'];
+      await store.profilePolicyDraftsDao.compareAndWrite(
+        1,
+        expectedRaw: f.draft.encode(),
+        rawContent: next.encode(),
+      );
+      final candidate = await setup.capturePolicyMaterial(1, client: client);
+      await candidate.preview(next);
+      container.read(initProvider.notifier).value = true;
+      final oldSelection = await store.profilePolicySelectionsDao
+          .query(1)
+          .getSingle();
+      final nextRaw = selectPolicyDraft(next);
+      expect(
+        await container
+            .read(policySelectionActionProvider.notifier)
+            .selectConfirmed(
+              1,
+              expected: oldSelection,
+              draftRaw: next.encode(),
+              selectionRaw: nextRaw,
+              material: candidate,
+            ),
+        PolicyDraftWriteResult.saved,
+      );
+      await candidate.close();
+      final saved = (await store.profilesDao.query().get()).first;
+      expect(saved.selectedMap.containsKey('fc-managed-group-b'), false);
+      expect(saved.selectedMap['legacy-group'], 'legacy-node');
+      expect(
+        (await bridge.call('probe', 'new-manual.other.test'))['body'],
+        'B',
+      );
+      final path = await appPath.getProfilePath('1');
+      final bytes = await File(path).readAsBytes();
+      await put([
+        saved.copyWith(
+          selectedMap: {'fc-managed-group-b': 'fc-managed-proxy-nodeA'},
+        ),
+      ], files: false);
+      responses['/1'] = YamlWriter().write(f.b);
+      await expectLater(
+        profiles.updateProfile(f.profile),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(await File(path).readAsBytes(), bytes);
+      final resolved = SelectedPolicy.decode(nextRaw).resolve(
+        material: f.a,
+        identity: profileMaterialIdentity(
+          profileId: 1,
+          type: row.type.name,
+          url: row.url,
+          overwrite: row.overwriteType.name,
+          scriptId: row.scriptId,
+        ),
+        profileId: 1,
+        rawSha256: materialDigest(f.a),
+      );
+      await put([
+        saved.copyWith(
+          selectedMap: {
+            'fc-managed-group-b': 'fc-managed-proxy-nodeB',
+            'fc-managed-group-a':
+                'fc-managed-proxy-${resolved.policy.groups['a']!.first}',
+          },
+        ),
+      ], files: false);
+      expect((await profiles.updateProfile(f.profile)).materialSaved, true);
+      expect((await bridge.call('probe', 'dynamic.example.test'))['body'], 'B');
+    },
+    skip: materialSkip,
+  );
+
+  test(
+    'I3 final qualification wait cannot attach an old preview to a mutated draft',
+    () async {
+      final f = await materialService();
+      final candidate = await setup.capturePolicyMaterial(1, client: client);
+      final original = PolicyDraftDocument.decode(f.draft.encode());
+      final oldPreview = await candidate.preview(f.draft);
+      expect(
+        (loadYaml(oldPreview.maskedYaml)['dns']['nameserver'] as List).first,
+        startsWith('tcp://'),
+      );
+      final entered = Completer<void>(), release = Completer<void>();
+      addTearDown(() {
+        if (!release.isCompleted) release.complete();
+      });
+      var inspections = 0;
+      when(() => native.requestControl(any())).thenAnswer((invocation) async {
+        final command = Map<String, Object?>.from(
+          invocation.positionalArguments.first as Map,
+        );
+        if (command['action'] == 'inspect' &&
+            command['key'] == 'profile:1' &&
+            ++inspections == 2) {
+          entered.complete();
+          await release.future;
+        }
+        return bridge.call('control', command);
+      });
+      final pending = candidate.preview(f.draft);
+      final rejected = expectLater(pending, throwsA(isA<PolicyDraftProblem>()));
+      await entered.future;
+      f.draft.policy['domainDefault'] = {
+        'target': {'kind': 'reject'},
+      };
+      release.complete();
+      await rejected;
+      expect(candidate.qualifies(f.draft), false);
+      expect(candidate.qualifies(original), false);
+      final fresh = await candidate.preview(f.draft);
+      expect(
+        (loadYaml(fresh.maskedYaml)['dns']['nameserver'] as List).first,
+        'rcode://refused',
+      );
+      expect(candidate.qualifies(f.draft), true);
+      expect(candidate.qualifies(original), false);
+      await candidate.close();
+    },
+    skip: materialSkip,
   );
 
   for (final registered in [false, true]) {

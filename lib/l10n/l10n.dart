@@ -7992,6 +7992,116 @@ class AppLocalizations {
   String get reportRefresh {
     return Intl.message('Refresh', name: 'reportRefresh', desc: '', args: []);
   }
+
+  /// `Choose an exact source name`
+  String get policyMaterialSource {
+    return Intl.message(
+      'Choose an exact source name',
+      name: 'policyMaterialSource',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Bind source node`
+  String get policyMaterialNode {
+    return Intl.message(
+      'Bind source node',
+      name: 'policyMaterialNode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Bind source select group`
+  String get policyMaterialGroup {
+    return Intl.message(
+      'Bind source select group',
+      name: 'policyMaterialGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Bind source domain collection`
+  String get policyMaterialDomain {
+    return Intl.message(
+      'Bind source domain collection',
+      name: 'policyMaterialDomain',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Bind source address collection`
+  String get policyMaterialIp {
+    return Intl.message(
+      'Bind source address collection',
+      name: 'policyMaterialIp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source collections`
+  String get policyMaterialCollections {
+    return Intl.message(
+      'Source collections',
+      name: 'policyMaterialCollections',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Load latest material for preview`
+  String get policyMaterialLatest {
+    return Intl.message(
+      'Load latest material for preview',
+      name: 'policyMaterialLatest',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Latest material loaded. Rebind changed names, preview, then Apply to adopt it. Save only stores the draft.`
+  String get policyMaterialLoaded {
+    return Intl.message(
+      'Latest material loaded. Rebind changed names, preview, then Apply to adopt it. Save only stores the draft.',
+      name: 'policyMaterialLoaded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Material is unavailable or incompatible. Check the source binding and preview again.`
+  String get policyMaterialUnavailable {
+    return Intl.message(
+      'Material is unavailable or incompatible. Check the source binding and preview again.',
+      name: 'policyMaterialUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Discard preview material`
+  String get policyMaterialCancel {
+    return Intl.message(
+      'Discard preview material',
+      name: 'policyMaterialCancel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source bindings`
+  String get policyMaterialBindings {
+    return Intl.message(
+      'Source bindings',
+      name: 'policyMaterialBindings',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

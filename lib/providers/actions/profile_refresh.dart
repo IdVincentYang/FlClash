@@ -309,6 +309,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
 
   Future<void> _runRefreshMaterial(_ProfileRefreshJob job) async {
     RequestFile? staged;
+    PolicyMaterialCandidate? preflight;
     var result = const ProfileRefreshResult(
       application: ProfileApplicationOutcome.superseded,
     );
@@ -352,6 +353,13 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       if (validation.isNotEmpty) {
         throw const RequestUnavailable('profile_invalid');
       }
+      preflight = await ref
+          .read(setupActionProvider.notifier)
+          .preflightPolicyMaterial(
+            profile.id,
+            staged.staged.path,
+            requestClient,
+          );
       final incoming = staged;
       final target = await appPath.getProfilePath(profile.id.toString());
       job.committing = true;
@@ -361,6 +369,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
               session,
               materialSource,
             )) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        if (preflight != null && !await preflight.current()) {
           throw const RequestUnavailable('request_cancelled');
         }
         final setup = ref.read(setupActionProvider.notifier);
@@ -470,6 +481,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       if (!job.registration.isCompleted) job.registration.complete();
       job.session?.close();
       try {
+        await preflight?.close();
         await staged?.close();
       } catch (_) {
         result = ProfileRefreshResult(

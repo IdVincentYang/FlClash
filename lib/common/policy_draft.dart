@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:fl_clash/common/managed_profile.dart';
+import 'package:fl_clash/common/managed_material.dart';
 import 'package:fl_clash/common/policy_migration.dart';
 import 'package:fl_clash/models/managed_policy.dart';
 import 'package:fl_clash/models/policy_draft.dart';
@@ -36,7 +37,15 @@ ManagedPolicy _draftPolicy(PolicyDraftDocument draft) {
 
 String? policyDraftInputProblem(PolicyDraftDocument draft) {
   try {
-    _draftPolicy(draft);
+    if (draft.isReadOnly) throw const PolicyDraftProblem('draftVersion');
+    if (policyMigrationIssues(draft.migration).isNotEmpty) {
+      throw const PolicyDraftProblem('migration');
+    }
+    if (isMaterialTemplate(draft.policy)) {
+      validateMaterialTemplate(draft.policy);
+    } else {
+      _draftPolicy(draft);
+    }
     return null;
   } on PolicyDraftProblem catch (problem) {
     return problem.location;
@@ -47,9 +56,19 @@ String? policyDraftInputProblem(PolicyDraftDocument draft) {
   }
 }
 
-PolicyDraftPreview previewPolicyDraft(PolicyDraftDocument draft) {
+PolicyDraftPreview previewPolicyDraft(
+  PolicyDraftDocument draft, {
+  MaterialPolicy? material,
+}) {
   try {
-    final full = compileManagedProfile(_draftPolicy(draft));
+    if (draft.isReadOnly) throw const PolicyDraftProblem('draftVersion');
+    if (policyMigrationIssues(draft.migration).isNotEmpty) {
+      throw const PolicyDraftProblem('migration');
+    }
+    if (isMaterialTemplate(draft.policy) && material?.receipt == null) {
+      throw const PolicyDraftProblem('material');
+    }
+    final full = compileManagedProfile(material?.policy ?? _draftPolicy(draft));
     final masked =
         jsonDecode(jsonEncode(loadYaml(full))) as Map<String, dynamic>;
     for (final proxy in masked['proxies'] as List) {
@@ -103,6 +122,9 @@ List<String> policyDraftResourceReferences(
     if (category == 'dnsServices' && value['dnsService'] == id) {
       locations.add('$path.dnsService');
     }
+    if (category == 'collections' && value['collection'] == id) {
+      locations.add('$path.collection');
+    }
     final target = value['target'];
     if (category == 'groups' && target is Map && target['group'] == id) {
       locations.add('$path.target');
@@ -118,7 +140,9 @@ List<String> policyDraftResourceReferences(
   route({'target': draft.policy['ipDefault']}, 'ipDefault');
   if (category == 'proxies') {
     for (final (index, members) in draft.resources('groups').values.indexed) {
-      if ((members as List).contains(id)) locations.add('groups[$index]');
+      if (members is List && members.contains(id)) {
+        locations.add('groups[$index]');
+      }
     }
   }
   return locations;

@@ -1295,6 +1295,39 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
       "Профиль использует управляемую политику. Измените маршрутизацию и DNS в черновике и явно запросите применение.",
     ),
+    "policyMaterialBindings": MessageLookupByLibrary.simpleMessage(
+      "Привязки источника",
+    ),
+    "policyMaterialCancel": MessageLookupByLibrary.simpleMessage(
+      "Удалить данные предпросмотра",
+    ),
+    "policyMaterialCollections": MessageLookupByLibrary.simpleMessage(
+      "Наборы источника",
+    ),
+    "policyMaterialDomain": MessageLookupByLibrary.simpleMessage(
+      "Связать набор доменов источника",
+    ),
+    "policyMaterialGroup": MessageLookupByLibrary.simpleMessage(
+      "Связать группу select источника",
+    ),
+    "policyMaterialIp": MessageLookupByLibrary.simpleMessage(
+      "Связать набор адресов источника",
+    ),
+    "policyMaterialLatest": MessageLookupByLibrary.simpleMessage(
+      "Загрузить свежие данные для просмотра",
+    ),
+    "policyMaterialLoaded": MessageLookupByLibrary.simpleMessage(
+      "Свежие данные загружены. Обновите изменённые имена, проверьте и нажмите Apply. Save сохраняет только черновик.",
+    ),
+    "policyMaterialNode": MessageLookupByLibrary.simpleMessage(
+      "Связать узел источника",
+    ),
+    "policyMaterialSource": MessageLookupByLibrary.simpleMessage(
+      "Выберите точное имя источника",
+    ),
+    "policyMaterialUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Данные недоступны или несовместимы. Проверьте привязку источника и повторите просмотр.",
+    ),
     "policyOriginal": MessageLookupByLibrary.simpleMessage(
       "Использовать исходный профиль",
     ),

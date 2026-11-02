@@ -179,6 +179,36 @@ class _PolicyDraftFormState extends State<PolicyDraftForm> {
     );
   }
 
+  Widget _collection(String kind) {
+    final collections = widget.document.policy['collections'];
+    if (collections is! Map) return const SizedBox.shrink();
+    final choices = <String, String>{
+      '': context.appLocalizations.rule,
+      for (final entry in collections.entries)
+        if (entry.value is Map && entry.value['kind'] == kind)
+          entry.key as String: widget.document.label(entry.key as String),
+    };
+    final selected = _value['collection'] as String? ?? '';
+    return DropdownButtonFormField<String>(
+      key: const ValueKey('draft-collection'),
+      initialValue: choices.containsKey(selected) ? selected : '',
+      decoration: InputDecoration(
+        labelText: context.appLocalizations.policyMaterialCollections,
+      ),
+      items: [
+        for (final entry in choices.entries)
+          DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+      ],
+      onChanged: (value) => setState(() {
+        if (value == null || value.isEmpty) {
+          _value.remove('collection');
+        } else {
+          _value['collection'] = value;
+        }
+      }),
+    );
+  }
+
   void _confirm() {
     final label = _controllers['_label']?.text ?? '';
     for (final entry in _controllers.entries) {
@@ -187,6 +217,13 @@ class _PolicyDraftFormState extends State<PolicyDraftForm> {
       _value[entry.key] = ['port', 'mixedPort', 'dnsPort'].contains(entry.key)
           ? int.tryParse(text) ?? text
           : text;
+    }
+    if (_value['collection'] != null) {
+      _value.remove('type');
+      _value.remove('value');
+      _value.remove('cidr');
+    } else {
+      _value.remove('collection');
     }
     if (widget.kind == PolicyDraftFormKind.proxy) {
       _value['type'] = 'socks5';
@@ -209,16 +246,23 @@ class _PolicyDraftFormState extends State<PolicyDraftForm> {
     if (widget.resourceId != null) fields.add(_text('_label', l.name));
     switch (widget.kind) {
       case PolicyDraftFormKind.domain:
+        fields.add(_collection('domain'));
         fields.addAll([
-          _choice('type', l.rule, {
-            'DOMAIN': 'DOMAIN',
-            'DOMAIN-SUFFIX': 'DOMAIN-SUFFIX',
-          }),
-          _text('value', l.domain),
+          if (_value['collection'] == null) ...[
+            _choice('type', l.rule, {
+              'DOMAIN': 'DOMAIN',
+              'DOMAIN-SUFFIX': 'DOMAIN-SUFFIX',
+            }),
+            _text('value', l.domain),
+          ],
           _target(true),
         ]);
       case PolicyDraftFormKind.ip:
-        fields.addAll([_text('cidr', 'CIDR'), _target(false)]);
+        fields.add(_collection('ip'));
+        fields.addAll([
+          if (_value['collection'] == null) _text('cidr', 'CIDR'),
+          _target(false),
+        ]);
       case PolicyDraftFormKind.domainDefault:
         fields.addAll([Text(l.policyDraftDirectWarning), _target(true)]);
       case PolicyDraftFormKind.ipDefault:

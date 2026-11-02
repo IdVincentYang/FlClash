@@ -931,5 +931,16 @@
   "reportTruncated": "材料已截断，不是完整 dump",
   "reportExportSummary": "导出摘要（JSON）",
   "reportExportRaw": "导出原始报告（ZIP）",
-  "reportRefresh": "刷新"
+  "reportRefresh": "刷新",
+  "policyMaterialSource": "选择准确的来源名称",
+  "policyMaterialNode": "绑定来源节点",
+  "policyMaterialGroup": "绑定来源 select 组",
+  "policyMaterialDomain": "绑定来源域名集合",
+  "policyMaterialIp": "绑定来源地址集合",
+  "policyMaterialCollections": "来源集合",
+  "policyMaterialLatest": "加载最新材料供预览",
+  "policyMaterialLoaded": "最新材料已加载。重新绑定变化的名称并预览后，点击 Apply 才会采用。Save 仅保存草稿。",
+  "policyMaterialUnavailable": "材料不可用或不兼容。请检查来源绑定并重新预览。",
+  "policyMaterialCancel": "丢弃预览材料",
+  "policyMaterialBindings": "来源绑定"
 }

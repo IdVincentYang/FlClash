@@ -917,6 +917,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
       "此 Profile 使用受管策略。请在策略草稿中修改分流和 DNS，再明确请求应用。",
     ),
+    "policyMaterialBindings": MessageLookupByLibrary.simpleMessage("来源绑定"),
+    "policyMaterialCancel": MessageLookupByLibrary.simpleMessage("丢弃预览材料"),
+    "policyMaterialCollections": MessageLookupByLibrary.simpleMessage("来源集合"),
+    "policyMaterialDomain": MessageLookupByLibrary.simpleMessage("绑定来源域名集合"),
+    "policyMaterialGroup": MessageLookupByLibrary.simpleMessage(
+      "绑定来源 select 组",
+    ),
+    "policyMaterialIp": MessageLookupByLibrary.simpleMessage("绑定来源地址集合"),
+    "policyMaterialLatest": MessageLookupByLibrary.simpleMessage("加载最新材料供预览"),
+    "policyMaterialLoaded": MessageLookupByLibrary.simpleMessage(
+      "最新材料已加载。重新绑定变化的名称并预览后，点击 Apply 才会采用。Save 仅保存草稿。",
+    ),
+    "policyMaterialNode": MessageLookupByLibrary.simpleMessage("绑定来源节点"),
+    "policyMaterialSource": MessageLookupByLibrary.simpleMessage("选择准确的来源名称"),
+    "policyMaterialUnavailable": MessageLookupByLibrary.simpleMessage(
+      "材料不可用或不兼容。请检查来源绑定并重新预览。",
+    ),
     "policyOriginal": MessageLookupByLibrary.simpleMessage("改用原 Profile"),
     "policyOriginalConfirm": MessageLookupByLibrary.simpleMessage(
       "退出受管分流，改用原 Profile 的规则、DNS 和覆写？这可能改变流量出口。",

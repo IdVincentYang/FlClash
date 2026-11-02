@@ -91,7 +91,7 @@ final class SetupActionProvider extends $NotifierProvider<SetupAction, void> {
   }
 }
 
-String _$setupActionHash() => r'7c47c78334f67d8e3ee99a3367c551146ae8bab5';
+String _$setupActionHash() => r'b8d1ddd2b9aa642669d98cc645ce56d7e20a4525';
 
 abstract class _$SetupAction extends $Notifier<void> {
   void build();
@@ -247,7 +247,7 @@ final class PolicySelectionActionProvider
 }
 
 String _$policySelectionActionHash() =>
-    r'9a5406068a2ee2a7d4589e86743f086b67bbcee5';
+    r'5279b534aa2933d1c19c33f95ee1ed262943a568';
 
 abstract class _$PolicySelectionAction extends $Notifier<void> {
   void build();

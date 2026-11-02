@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -26,6 +27,7 @@ import (
 )
 
 type ConfigManifest struct {
+	ManagedMaterials  *ManagedMaterialsReceipt   `json:"managedMaterials,omitempty"`
 	Version           int                        `json:"version"`
 	YAMLSHA256        string                     `json:"yamlSha256"`
 	ProfileID         *int64                     `json:"profileId"`
@@ -35,6 +37,27 @@ type ConfigManifest struct {
 	TestURL           string                     `json:"testUrl"`
 	AcceptedOverrides map[string]json.RawMessage `json:"acceptedOverrides"`
 	ManagedPolicy     *ManagedPolicyDescriptor   `json:"managedPolicy,omitempty"`
+}
+
+type ManagedMaterialsReceipt struct {
+	Version        int    `json:"version"`
+	ProfileID      *int64 `json:"profileId"`
+	OriginSHA256   string `json:"originSha256"`
+	RawSHA256      string `json:"rawSha256"`
+	MaterialSHA256 string `json:"materialSha256"`
+	BindingsSHA256 string `json:"bindingsSha256"`
+}
+
+func (receipt *ManagedMaterialsReceipt) UnmarshalJSON(data []byte) error {
+	type value ManagedMaterialsReceipt
+	var decoded value
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&decoded); err != nil {
+		return err
+	}
+	*receipt = ManagedMaterialsReceipt(decoded)
+	return nil
 }
 
 type ConfigSourceTicket struct {
@@ -227,6 +250,12 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 	}
 	if manifest.Version != 1 || !validInputID(manifest.YAMLSHA256) || len(manifest.Dependencies) == 0 {
 		return manifest, nil, nil, "", errors.New("invalid input manifest")
+	}
+	if receipt := manifest.ManagedMaterials; receipt != nil {
+		if manifest.ManagedPolicy == nil || receipt.Version != 1 || receipt.ProfileID == nil || *receipt.ProfileID < 0 || manifest.ProfileID == nil || *receipt.ProfileID != *manifest.ProfileID ||
+			!validInputID(receipt.OriginSHA256) || !validInputID(receipt.RawSHA256) || !validInputID(receipt.MaterialSHA256) || !validInputID(receipt.BindingsSHA256) {
+			return manifest, nil, nil, "", errors.New("invalid managed material receipt")
+		}
 	}
 	data, err = os.ReadFile(filepath.Join(inputDirectory(home), manifest.YAMLSHA256+".yaml"))
 	if err != nil {

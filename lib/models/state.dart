@@ -359,6 +359,7 @@ abstract class MakeRealProfileState with _$MakeRealProfileState {
     String? matchTarget,
     @Default(false) bool safeMode,
     ProfilePolicySelection? policySelection,
+    Map<String, dynamic>? resolvedManagedPolicy,
   }) = _MakeRealProfileState;
 }
 

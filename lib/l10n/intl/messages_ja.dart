@@ -1016,6 +1016,27 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
       "このプロファイルは管理対象ポリシーを使用します。下書きでルーティングと DNS を編集し、適用を要求してください。",
     ),
+    "policyMaterialBindings": MessageLookupByLibrary.simpleMessage("ソースの関連付け"),
+    "policyMaterialCancel": MessageLookupByLibrary.simpleMessage("プレビュー素材を破棄"),
+    "policyMaterialCollections": MessageLookupByLibrary.simpleMessage("ソースの集合"),
+    "policyMaterialDomain": MessageLookupByLibrary.simpleMessage(
+      "ソースのドメイン集合を関連付け",
+    ),
+    "policyMaterialGroup": MessageLookupByLibrary.simpleMessage(
+      "ソースの select グループを関連付け",
+    ),
+    "policyMaterialIp": MessageLookupByLibrary.simpleMessage("ソースのアドレス集合を関連付け"),
+    "policyMaterialLatest": MessageLookupByLibrary.simpleMessage(
+      "最新の素材をプレビュー用に読み込む",
+    ),
+    "policyMaterialLoaded": MessageLookupByLibrary.simpleMessage(
+      "最新の素材を読み込みました。変更された名前を関連付け直してプレビューし、Apply で適用してください。Save は下書きのみ保存します。",
+    ),
+    "policyMaterialNode": MessageLookupByLibrary.simpleMessage("ソースノードを関連付け"),
+    "policyMaterialSource": MessageLookupByLibrary.simpleMessage("ソース名を選択"),
+    "policyMaterialUnavailable": MessageLookupByLibrary.simpleMessage(
+      "素材が利用できないか互換性がありません。ソースの関連付けを確認して再度プレビューしてください。",
+    ),
     "policyOriginal": MessageLookupByLibrary.simpleMessage("元のプロファイルを使用"),
     "policyOriginalConfirm": MessageLookupByLibrary.simpleMessage(
       "管理対象のルーティングを終了し、元のルール、DNS、上書きを使用しますか？通信経路が変わる可能性があります。",

@@ -931,5 +931,16 @@
   "reportTruncated": "Truncated material; not a complete dump",
   "reportExportSummary": "Export summary (JSON)",
   "reportExportRaw": "Export raw report (ZIP)",
-  "reportRefresh": "Refresh"
+  "reportRefresh": "Refresh",
+  "policyMaterialSource": "Choose an exact source name",
+  "policyMaterialNode": "Bind source node",
+  "policyMaterialGroup": "Bind source select group",
+  "policyMaterialDomain": "Bind source domain collection",
+  "policyMaterialIp": "Bind source address collection",
+  "policyMaterialCollections": "Source collections",
+  "policyMaterialLatest": "Load latest material for preview",
+  "policyMaterialLoaded": "Latest material loaded. Rebind changed names, preview, then Apply to adopt it. Save only stores the draft.",
+  "policyMaterialUnavailable": "Material is unavailable or incompatible. Check the source binding and preview again.",
+  "policyMaterialCancel": "Discard preview material",
+  "policyMaterialBindings": "Source bindings"
 }

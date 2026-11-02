@@ -1232,6 +1232,39 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyManagedEditRequired": MessageLookupByLibrary.simpleMessage(
       "This profile uses a managed policy. Edit routing and DNS in the policy draft, then explicitly request application.",
     ),
+    "policyMaterialBindings": MessageLookupByLibrary.simpleMessage(
+      "Source bindings",
+    ),
+    "policyMaterialCancel": MessageLookupByLibrary.simpleMessage(
+      "Discard preview material",
+    ),
+    "policyMaterialCollections": MessageLookupByLibrary.simpleMessage(
+      "Source collections",
+    ),
+    "policyMaterialDomain": MessageLookupByLibrary.simpleMessage(
+      "Bind source domain collection",
+    ),
+    "policyMaterialGroup": MessageLookupByLibrary.simpleMessage(
+      "Bind source select group",
+    ),
+    "policyMaterialIp": MessageLookupByLibrary.simpleMessage(
+      "Bind source address collection",
+    ),
+    "policyMaterialLatest": MessageLookupByLibrary.simpleMessage(
+      "Load latest material for preview",
+    ),
+    "policyMaterialLoaded": MessageLookupByLibrary.simpleMessage(
+      "Latest material loaded. Rebind changed names, preview, then Apply to adopt it. Save only stores the draft.",
+    ),
+    "policyMaterialNode": MessageLookupByLibrary.simpleMessage(
+      "Bind source node",
+    ),
+    "policyMaterialSource": MessageLookupByLibrary.simpleMessage(
+      "Choose an exact source name",
+    ),
+    "policyMaterialUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Material is unavailable or incompatible. Check the source binding and preview again.",
+    ),
     "policyOriginal": MessageLookupByLibrary.simpleMessage(
       "Use original profile",
     ),

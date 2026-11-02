@@ -1,5 +1,10 @@
 part of '../action.dart';
 
+Map<String, String> _withoutManagedPicks(Map<String, String> values) => {
+  for (final entry in values.entries)
+    if (!entry.key.startsWith('fc-managed-group-')) entry.key: entry.value,
+};
+
 @Riverpod(keepAlive: true)
 class PolicySelectionAction extends _$PolicySelectionAction {
   bool get supportsManaged => system.isAndroid;
@@ -18,13 +23,40 @@ class PolicySelectionAction extends _$PolicySelectionAction {
     required ProfilePolicySelection? expected,
     required String? draftRaw,
     required String? selectionRaw,
+    PolicyMaterialCandidate? material,
   }) async {
+    final next = selectionRaw == null
+        ? null
+        : ProfilePolicySelection(
+            profileId: profileId,
+            rawContent: selectionRaw,
+          );
+    final resetPicks = next != null && !next.sameValue(expected);
     if (selectionRaw != null) {
       if (!supportsManaged) {
         throw const RequestUnavailable('managed_policy_android_required');
       }
       if (draftRaw == null) throw const PolicyDraftProblem('draft');
-      SelectedPolicy.decode(selectionRaw);
+      final selected = SelectedPolicy.decode(selectionRaw);
+      if (selected.usesMaterials) {
+        final draft = PolicyDraftDocument.decode(draftRaw);
+        if (material == null ||
+            material.profileId != profileId ||
+            !material.qualifies(draft) ||
+            !await material.current()) {
+          throw const PolicyDraftProblem('materialSource');
+        }
+        await ref
+            .read(setupActionProvider.notifier)
+            ._buildMaterialProfile(
+              material._inputsWithSelection(
+                selectionRaw,
+                resetPicks: resetPicks,
+              ),
+              material._frame,
+              (_) {},
+            );
+      }
       final envelope = jsonDecode(selectionRaw) as Map<String, dynamic>;
       final target = envelope['maintenanceProxyTarget'];
       final expectedRaw = selectPolicyDraft(
@@ -38,59 +70,92 @@ class PolicySelectionAction extends _$PolicySelectionAction {
       }
     }
     ConfigFailureObservation? failure;
+    var invalidated = false;
     final setup = ref.read(setupActionProvider.notifier);
     late final PolicyDraftWriteResult result;
     try {
-      result = await requestClient.mutate(
-        () => database.transaction(() async {
-          final draft = await database.profilePolicyDraftsDao
-              .query(profileId)
-              .getSingleOrNull();
-          if (selectionRaw != null && draft?.rawContent != draftRaw) {
-            return PolicyDraftWriteResult.conflict;
-          }
-          final next = selectionRaw == null
-              ? null
-              : ProfilePolicySelection(
-                  profileId: profileId,
-                  rawContent: selectionRaw,
-                );
-          final result = await database.profilePolicySelectionsDao
-              .compareAndWrite(
-                profileId,
-                expected: expected,
-                selection: next,
-                beforeWrite: () async {
+      Future<PolicyDraftWriteResult> commit() async {
+        if (material != null && !await material.current()) {
+          return PolicyDraftWriteResult.conflict;
+        }
+        Future<PolicyDraftWriteResult> persist() =>
+            database.transaction(() async {
+              final draft = await database.profilePolicyDraftsDao
+                  .query(profileId)
+                  .getSingleOrNull();
+              if (selectionRaw != null && draft?.rawContent != draftRaw) {
+                return PolicyDraftWriteResult.conflict;
+              }
+              final result = await database.profilePolicySelectionsDao
+                  .compareAndWrite(
+                    profileId,
+                    expected: expected,
+                    selection: next,
+                    beforeWrite: () async {
+                      failure = await setup.captureConfigFailure(requestClient);
+                      await requestClient.invalidate('profile:$profileId');
+                      invalidated = true;
+                    },
+                  );
+              if (result == PolicyDraftWriteResult.saved && resetPicks) {
+                final profile = (await database.profilesDao.query().get())
+                    .getProfile(profileId)!;
+                await database.profilesDao.putAll([
+                  profile
+                      .copyWith(
+                        selectedMap: _withoutManagedPicks(profile.selectedMap),
+                      )
+                      .toCompanion(),
+                ]);
+              }
+              if (result == PolicyDraftWriteResult.saved &&
+                  material?.latest == true) {
+                if (!invalidated) {
                   failure = await setup.captureConfigFailure(requestClient);
                   await requestClient.invalidate('profile:$profileId');
-                },
-              );
-          if (result == PolicyDraftWriteResult.saved &&
-              selectionRaw != null &&
-              !(next?.sameValue(expected) ?? false)) {
-            final profile = (await database.profilesDao.query().get())
-                .getProfile(profileId)!;
-            await database.profilesDao.putAll([
-              profile
-                  .copyWith(
-                    selectedMap: {
-                      for (final item in profile.selectedMap.entries)
-                        if (!item.key.startsWith('fc-managed-group-'))
-                          item.key: item.value,
-                    },
-                  )
-                  .toCompanion(),
-            ]);
-          }
-          return result;
-        }),
-      );
+                  invalidated = true;
+                }
+                await ref
+                    .read(profilesProvider.notifier)
+                    .persistRefresh(
+                      material!._inputs.profile.copyWith(
+                        subscriptionInfo: material._subscription,
+                        lastUpdateDate: DateTime.now(),
+                      ),
+                      importing: false,
+                    );
+              }
+              return result;
+            });
+        if (material?.latest == true) {
+          return material!._frame.file.replace(
+            await appPath.getProfilePath(profileId.toString()),
+            () async {
+              final written = await persist();
+              if (written != PolicyDraftWriteResult.saved) {
+                throw const _MaterialSelectionConflict();
+              }
+              return written;
+            },
+          );
+        }
+        return persist();
+      }
+
+      result = material?._session == null
+          ? await requestClient.mutate(commit)
+          : await material!._session!.commit(commit);
+    } on _MaterialSelectionConflict {
+      return PolicyDraftWriteResult.conflict;
     } catch (_) {
       final observation = failure;
       if (observation != null) await setup.finishConfigFailure(observation);
       throw const RequestUnavailable('policy_selection_write_failed');
     }
     if (result == PolicyDraftWriteResult.saved) {
+      if (material?.latest == true) {
+        await ref.read(profilesProvider.notifier).publishRefresh();
+      }
       if (ref.read(currentProfileIdProvider) != profileId &&
           selectionRaw != null) {
         await chooseProfile(profileId, confirmLeave: () async => true);
@@ -146,4 +211,8 @@ class PolicySelectionAction extends _$PolicySelectionAction {
 
   bool _same(ProfilePolicySelection? left, ProfilePolicySelection? right) =>
       left == null ? right == null : left.sameValue(right);
+}
+
+class _MaterialSelectionConflict implements Exception {
+  const _MaterialSelectionConflict();
 }

@@ -189,7 +189,11 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 40));
     await store.close();
     await for (final entry in root.list()) {
-      await entry.delete(recursive: true);
+      try {
+        await entry.delete(recursive: true);
+      } on PathNotFoundException {
+        continue;
+      }
     }
   });
 
