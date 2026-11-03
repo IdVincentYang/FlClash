@@ -118,6 +118,13 @@ adoption; no persistent pending-material authority is introduced.
 
 ## Lifecycle Ownership And Convergence
 
+For `no_zerotier` builds: moving staged Apply outside configMu also requires the same resource admission
+boundary for Go Shutdown, initClash and prepareConfig's direct initializeCore call. Logical Stop and Android service
+unbind do not prove global cleanup or process exit. Pending cleanup must fence new initialization until the owned
+Apply/provider work has exited and real shutdown has succeeded; the contract is maintained in
+[the business data design](../docs/features/security/business_data_design.md#全局生命周期与就地重建).
+ServiceState remains the Android intent authority. Host verification and an ARM64 build are complete; device installation has not been tested.
+
 ### Shared Flutter Layer
 
 `CoreController.start()`, `restart()`, `stop()`, and `close()` are the only shared lifecycle facade. `close()` is terminal;
@@ -757,6 +764,12 @@ A new host integration, anything that changes the OS's routes, proxy, DNS, login
 that asks the OS for a permission, a global shortcut or a registration, must consult the flag at its owner in the same way and get a test that overrides `safeModeProvider`.
 
 ## Build System
+
+Android builds append `no_zerotier` to the configured base tags. Go build, dependency listing and cache fingerprints
+share the same target-specific effective tags; other platforms keep configured tags. The hook tracks the precise
+build_config.yaml file, including its absence, without making the entire repository a Gradle input.
+Current behavior and compatibility limits belong to
+[the business data contract](../docs/features/security/business_data_design.md); older APKs do not acquire this protection.
 
 `setup.dart` is the release build orchestrator: it writes `env.json` (`APP_ENV`), activates `flutter_distributor` from
 the `chen08209/flutter_distributor` fork pinned to a `v<version>-flclash.<n>` tag (cut a new tag there and bump

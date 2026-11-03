@@ -137,6 +137,7 @@ type preparedConfig struct {
 	mixed      *listener.MixedBinding
 	dns        *configDNSBinding
 	scope      *requestscope.BusinessScope
+	stage      *providerStage
 	sources    map[string]uint64
 	dataset    uint64
 	eligible   bool
@@ -194,6 +195,11 @@ func registerConfigOperation(sequence uint64, request ConfigInputRequest) Config
 			break
 		}
 		if latestConfig.CompareAndSwap(previous, op) {
+			if providerStageEnabled {
+				appRequests.mu.Lock()
+				appRequests.changedLocked()
+				appRequests.mu.Unlock()
+			}
 			break
 		}
 	}
@@ -297,7 +303,7 @@ func decodeConfigDocument(data []byte) (*config.RawConfig, string, error) {
 func configResult(status string, receipt ConfigReceipt, err error) ConfigApplyResult {
 	result := ConfigApplyResult{Status: status, Receipt: receipt, Fact: configFact}
 	if err != nil {
-		result.Message = err.Error()
+		result.Message = capabilityError(err).Error()
 	}
 	return result
 }
@@ -321,6 +327,9 @@ func lockConfigInputRead() (string, error) {
 }
 
 func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
+	if coreLifecycleUnavailable(receipt.Token) {
+		return ConfigApplyResult{Status: "blocked", Receipt: receipt, Message: errCoreLifecycleUnavailable.Error()}
+	}
 	op, err := currentConfigOperation(receipt)
 	if err != nil {
 		return ConfigApplyResult{Status: "superseded", Receipt: receipt, Message: err.Error()}
@@ -384,8 +393,30 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 		selectMu.Unlock()
 		return configResult("superseded", receipt, errConfigSuperseded)
 	}
+	if coreLifecycleUnavailable(receipt.Token) {
+		checkpointMu.Unlock()
+		selectMu.Unlock()
+		return configResult("blocked", receipt, errCoreLifecycleUnavailable)
+	}
+	if providerStageEnabled && pendingConfig != nil && pendingConfig.stage != nil {
+		pendingConfig.stage.retire()
+	}
 	if op.request.Init != nil && !isInit.Load() {
+		if providerStageEnabled && stageBusyForInit() {
+			checkpointMu.Unlock()
+			selectMu.Unlock()
+			return configResult("blocked", receipt, errCoreLifecycleUnavailable)
+		}
 		initializeCore(op.request.Init)
+	}
+	if providerStageEnabled {
+		stagedCore.Lock()
+		if lifecycleUnavailableLocked(receipt.Token) {
+			stagedCore.Unlock()
+			checkpointMu.Unlock()
+			selectMu.Unlock()
+			return configResult("blocked", receipt, errCoreLifecycleUnavailable)
+		}
 	}
 	owner, cleanups := appRequests.nextConfigOwner()
 	appRequests.mu.Lock()
@@ -406,6 +437,9 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	}
 	checkpointMu.Unlock()
 	selectMu.Unlock()
+	if providerStageEnabled {
+		stagedCore.Unlock()
+	}
 	finishRequestCleanup(cleanups)
 	revokeBusiness()
 	isRunning.Store(false)
@@ -413,7 +447,9 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	tunnel.OnSuspend()
 	stopBusinessListeners()
 	if currentConfig != nil {
-		currentConfig.CloseProviders()
+		if !providerStageEnabled {
+			currentConfig.CloseProviders()
+		}
 		currentConfig = nil
 	}
 	activeBusiness.Store(p.scope)
@@ -464,17 +500,40 @@ func supersededConfigResult(receipt ConfigReceipt, err error) ConfigApplyResult 
 }
 
 func installConfig(receipt ConfigReceipt) ConfigApplyResult {
+	if providerStageEnabled {
+		return installGuardedConfig(receipt)
+	}
 	configMu.Lock()
 	defer configMu.Unlock()
+	p, result := prepareInstallLocked(receipt)
+	if result != nil {
+		return *result
+	}
+	cfg := p.cfg
+	dnsListen := cfg.DNS.Listen
+	cfg.DNS.Listen = ""
+	hub.ApplyConfigStaged(cfg)
+	cfg.DNS.Listen = dnsListen
+	return finishInstallLocked(p)
+}
+
+func installFailure(p *preparedConfig, err error) *ConfigApplyResult {
+	result := blockConfigLocked(p, capabilityError(err))
+	return &result
+}
+
+func prepareInstallLocked(receipt ConfigReceipt) (*preparedConfig, *ConfigApplyResult) {
 	p, err := pendingForReceipt(receipt)
 	if err != nil {
-		return supersededConfigResult(receipt, err)
+		result := supersededConfigResult(receipt, err)
+		return nil, &result
 	}
 	if p.cfg != nil {
-		return configResult("installed", receipt, nil)
+		result := configResult("installed", receipt, nil)
+		return nil, &result
 	}
 	if err = p.mixed.Validate(); err != nil {
-		return blockConfigLocked(p, err)
+		return nil, installFailure(p, err)
 	}
 	cfg, err := config.ParseRawConfig(p.raw)
 	if err != nil {
@@ -482,44 +541,54 @@ func installConfig(receipt ConfigReceipt) ConfigApplyResult {
 		recoverable := appRequests.bootstrap != nil && appRequests.bootstrap.Owner.ID == p.receipt.Owner
 		appRequests.mu.Unlock()
 		if recoverable {
-			return configResult("bootstrapRequired", p.receipt, err)
+			result := configResult("bootstrapRequired", p.receipt, err)
+			return nil, &result
 		}
-		return blockConfigLocked(p, err)
+		return nil, installFailure(p, err)
 	}
 	p.cfg = cfg
 	if cfg.NTP.WriteToSystem && !systemTimeWritable {
 		cfg.NTP.WriteToSystem = false
 	}
 	if cfg.General.MixedPort != p.coreParams.MixedPort || (len(cfg.Users) != 0) != p.coreParams.AuthenticationRequired {
-		return blockConfigLocked(p, errors.New("service parameters differ from prepared input"))
+		return nil, installFailure(p, errors.New("service parameters differ from prepared input"))
 	}
 	if _, err = pendingForReceipt(receipt); err != nil {
-		return blockConfigLocked(p, err)
+		return nil, installFailure(p, err)
 	}
 	setTestURL(p.manifest.TestURL)
 	if p.op.request.Active && cfg.DNS.Enable {
 		p.dns, err = prepareConfigDNS(cfg.DNS.Listen, cfg.DNS.ListenRoutingMark, p.scope)
 		if err != nil {
-			return blockConfigLocked(p, err)
+			return nil, installFailure(p, err)
 		}
 		ordinaryDNS.Store(p.dns)
 	}
-	dnsListen := cfg.DNS.Listen
-	cfg.DNS.Listen = ""
-	hub.ApplyConfigStaged(cfg)
-	cfg.DNS.Listen = dnsListen
-	if err = p.dns.start(p.scope, resolver.DefaultService); err != nil {
+	return p, nil
+}
+
+func finishInstallLocked(p *preparedConfig) ConfigApplyResult {
+	cfg := p.cfg
+	if err := p.dns.start(p.scope, resolver.DefaultService); err != nil {
 		return blockConfigLocked(p, err)
 	}
 	patchSelectGroup(p.manifest.SelectedMap)
 	bumpRouteEpoch()
-	if _, err = pendingForReceipt(receipt); err != nil {
+	if _, err := pendingForReceipt(p.receipt); err != nil {
 		return blockConfigLocked(p, err)
 	}
 	if p.op.request.Active {
-		if err = updateListenersChecked(cfg, tunnel.BindBusiness(p.scope), p.mixed); err != nil {
+		if err := updateListenersChecked(cfg, tunnel.BindBusiness(p.scope), p.mixed); err != nil {
 			return blockConfigLocked(p, err)
 		}
+	}
+	if providerStageEnabled {
+		stagedCore.Lock()
+		if lifecycleUnavailableLocked(0) {
+			stagedCore.Unlock()
+			return blockConfigLocked(p, errCoreLifecycleUnavailable)
+		}
+		defer stagedCore.Unlock()
 	}
 	checkpointMu.Lock()
 	currentConfig = cfg
@@ -527,7 +596,7 @@ func installConfig(receipt ConfigReceipt) ConfigApplyResult {
 	configFact.BusinessActive = false
 	configFact.Version = configFactSequence.Add(1)
 	checkpointMu.Unlock()
-	return configResult("installed", receipt, nil)
+	return configResult("installed", p.receipt, nil)
 }
 
 func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
@@ -537,6 +606,9 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 	if err != nil {
 		return supersededConfigResult(receipt, err)
 	}
+	if !stageReady(p) {
+		return configResult("rejected", receipt, errors.New("Provider initialization is incomplete"))
+	}
 	if p.cfg == nil || configFact.Phase != "installed" {
 		return blockConfigLocked(p, errors.New("configuration is not installed"))
 	}
@@ -545,6 +617,13 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 	}
 	if err = p.dns.validate(); err != nil {
 		return blockConfigLocked(p, err)
+	}
+	if providerStageEnabled {
+		stagedCore.Lock()
+		if lifecycleUnavailableLocked(0) {
+			stagedCore.Unlock()
+			return configResult("rejected", receipt, errCoreLifecycleUnavailable)
+		}
 	}
 	checkpointMu.Lock()
 	appRequests.mu.Lock()
@@ -565,6 +644,9 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 	appRequests.mu.Unlock()
 	if !valid {
 		checkpointMu.Unlock()
+		if providerStageEnabled {
+			stagedCore.Unlock()
+		}
 		return blockConfigLocked(p, errConfigSuperseded)
 	}
 	appliedConfig = p
@@ -574,17 +656,27 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 	status := "installedInactive"
 	if p.op.request.Active {
 		isRunning.Store(true)
-		p.scope.Activate()
+		if activated := p.scope.Activate(); providerStageEnabled && !activated {
+			checkpointMu.Unlock()
+			stagedCore.Unlock()
+			return blockConfigLocked(p, errConfigSuperseded)
+		}
 		tunnel.OnRunning()
 		status = "activated"
 	} else {
 		isRunning.Store(false)
 		tunnel.OnSuspend()
 	}
+	if providerStageEnabled {
+		stagedCore.Unlock()
+	}
 	err = publishCheckpointLocked(p)
 	checkpointMu.Unlock()
 	if err != nil {
 		return blockConfigLocked(p, fmt.Errorf("persist accepted configuration: %w", err))
+	}
+	if coreLifecycleUnavailable(0) {
+		return blockConfigLocked(p, errCoreLifecycleUnavailable)
 	}
 	reconcileGeoUpdater()
 	queueInputCollection()
@@ -593,6 +685,9 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 }
 
 func businessAllowed(p *preparedConfig) bool {
+	if coreLifecycleUnavailable(0) {
+		return false
+	}
 	appRequests.mu.Lock()
 	defer appRequests.mu.Unlock()
 	if p.scope != activeBusiness.Load() || appRequests.owner.ID != p.receipt.Owner || appRequests.phase != "ready" || !isRunning.Load() {
@@ -634,12 +729,15 @@ func blockConfigLocked(p *preparedConfig, err error) ConfigApplyResult {
 	if pendingConfig != p {
 		return configResult("superseded", p.receipt, errConfigSuperseded)
 	}
+	if providerStageEnabled && p.stage != nil {
+		p.stage.retire()
+	}
 	p.scope.Close()
 	preparedConfigGate.CompareAndSwap(p, nil)
 	tunnel.OnSuspend()
 	isRunning.Store(false)
 	stopBusinessListeners()
-	if p.cfg != nil {
+	if p.cfg != nil && (!providerStageEnabled || p.stage == nil) {
 		p.cfg.CloseProviders()
 	}
 	p.cfg, p.raw, p.bytes = nil, nil, nil

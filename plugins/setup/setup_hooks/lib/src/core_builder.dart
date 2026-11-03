@@ -87,10 +87,11 @@ final class CoreBuilder implements Builder {
         wrappedTrace: stackTrace,
       );
     }
-    output.dependencies.addAll([
+    output.dependencies.addAll({
+      Uri.file(p.join(repositoryRoot(input), 'build_config.yaml')),
       for (final path in report.inputs) Uri.file(path),
       for (final path in report.outputDirectories) Uri.directory(path),
-    ]);
+    });
   }
 
   BuildRequest? requestFor(BuildInput input) {

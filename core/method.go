@@ -22,6 +22,7 @@ var methodCallSeq atomic.Uint64
 // transport has to deliver calls in the order the host sent them.
 func dispatchMethodCall(call *MethodCall, response MethodResponse) {
 	call.seq = methodCallSeq.Add(1)
+	noteCoreLifecycleArrival(call)
 	if call.Method == registerConfigInputMethod {
 		registerConfigInput(call, response)
 		return
@@ -172,19 +173,49 @@ func withoutArguments(handle func(response MethodResponse)) methodHandler {
 
 var methodHandlers = map[CoreMethod]methodHandler{
 	registerConfigInputMethod: registerConfigInput,
-	initClashMethod: withArguments(func(params *InitParams, response MethodResponse) {
-		response.success(handleInitClash(params))
-	}),
+	initClashMethod: func(call *MethodCall, response MethodResponse) {
+		var params InitParams
+		if !decodeMethodArguments(call, response, &params) {
+			return
+		}
+		if providerStageEnabled && (coreLifecycleUnavailable(call.seq) || stageBusyForInit()) {
+			response.failure("core_lifecycle_unavailable", errCoreLifecycleUnavailable.Error(), nil)
+			return
+		}
+		initialized := false
+		if providerStageEnabled {
+			initialized = guardedInitClash(&params, call.seq)
+		} else {
+			initialized = handleInitClash(&params)
+		}
+		if !initialized && providerStageEnabled && (coreLifecycleUnavailable(0) || stageBusyForInit()) {
+			response.failure("core_lifecycle_unavailable", errCoreLifecycleUnavailable.Error(), nil)
+			return
+		}
+		response.success(initialized)
+	},
 	getIsInitMethod: withoutArguments(func(response MethodResponse) {
+		if coreLifecycleUnavailable(0) {
+			response.failure("core_lifecycle_unavailable", errCoreLifecycleUnavailable.Error(), nil)
+			return
+		}
 		response.success(handleGetIsInit())
 	}),
 	forceGcMethod: withoutArguments(func(response MethodResponse) {
 		handleForceGC()
 		response.success(true)
 	}),
-	shutdownMethod: withoutArguments(func(response MethodResponse) {
+	shutdownMethod: func(call *MethodCall, response MethodResponse) {
+		if providerStageEnabled {
+			if !shutdownGuardedCore(call.seq) {
+				response.failure("core_lifecycle_unavailable", errCoreLifecycleUnavailable.Error(), nil)
+				return
+			}
+			response.success(true)
+			return
+		}
 		response.success(handleShutdown())
-	}),
+	},
 	validateConfigMethod: withArguments(func(path *string, response MethodResponse) {
 		response.success(handleValidateConfig(*path))
 	}),

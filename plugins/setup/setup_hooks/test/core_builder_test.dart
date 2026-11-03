@@ -209,6 +209,7 @@ void main() {
 
         expect(seen?.target, Target.linuxAmd64);
         expect(BuildOutput(output.json).dependencies, [
+          Uri.file(p.join(repository.path, 'build_config.yaml')),
           Uri.file(goFile),
           Uri.directory(coreDir),
         ]);

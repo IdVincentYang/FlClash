@@ -62,10 +62,10 @@ func TestAppRequestInspectionCompletesWithMatcherAndQueuedInstall(t *testing.T) 
 	configTestEnvironment(t)
 	C.SetHomeDir(t.TempDir())
 	isInit.Store(true)
-	input := writeKeptTestInput(t, "mixed-port: 0\nmode: rule\nrules: [\"MATCH,REJECT\"]\n")
-	first := applyTestInput(t, input)
 	r := appRequests
 	r.publish(AppRequestState{ProcessEpoch: "inspection-lock", Revision: 1, IntentRunning: true, Phase: "started", Reason: "userStart", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback", ProtectPhase: "none"})
+	input := writeKeptTestInput(t, "mixed-port: 0\nmode: rule\nrules: [\"MATCH,REJECT\"]\n")
+	first := applyTestInput(t, input)
 	r.mu.Lock()
 	r.client, r.clientReady = "inspection-lock-client", true
 	r.mu.Unlock()

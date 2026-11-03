@@ -4,6 +4,8 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+import 'target.dart';
+
 final _log = Logger('options');
 
 class BuildConfig {
@@ -26,6 +28,14 @@ class BuildConfig {
   final String outputDir;
   final String helperDir;
   final String helperName;
+
+  String tagsFor(Target target) {
+    if (target.goos != 'android') return tags;
+    return {
+      ...tags.split(RegExp(r'[,\s]+')).where((tag) => tag.isNotEmpty),
+      'no_zerotier',
+    }.join(',');
+  }
 
   static const _defaults = BuildConfig(
     tags: 'with_gvisor',

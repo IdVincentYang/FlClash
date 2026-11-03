@@ -137,7 +137,7 @@ class GoBuilder {
   List<String> _buildArguments(Target target, {String? outFile}) => [
     'build',
     '-ldflags=${_ldflags(target)}',
-    '-tags=${config.tags}',
+    '-tags=${config.tagsFor(target)}',
     if (target.isLib) '-buildmode=c-shared',
     if (outFile != null) ...['-o', outFile],
   ];
@@ -186,7 +186,9 @@ class GoBuilder {
     final goEnv = jsonDecode((goEnvResult.stdout as String).trim());
     builder.addValue('go_env', goEnv);
 
-    final inputs = _resolveGoInputs(env);
+    final inputs = _resolveGoInputs(target, env);
+    final configuration = p.join(rootDir, 'build_config.yaml');
+    if (File(configuration).existsSync()) inputs.add(configuration);
     final goWork = (goEnv as Map<String, dynamic>)['GOWORK'];
     if (goWork is String && goWork.isNotEmpty && goWork != 'off') {
       inputs.add(goWork);
@@ -209,12 +211,12 @@ class GoBuilder {
     return builder.finishWithInputs();
   }
 
-  Set<String> _resolveGoInputs(Map<String, String> environment) {
+  Set<String> _resolveGoInputs(Target target, Map<String, String> environment) {
     const template =
         r'''{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CgoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CXXFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .MFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .HFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .FFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SwigFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SwigCXXFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SysoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .EmbedFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{with .Module}}{{if .GoMod}}{{.GoMod}}{{"\n"}}{{end}}{{end}}''';
     final result = runCommand(
       'go',
-      ['list', '-deps', '-tags=${config.tags}', '-f', template, '.'],
+      ['list', '-deps', '-tags=${config.tagsFor(target)}', '-f', template, '.'],
       workingDirectory: _corePath,
       environment: environment,
     );

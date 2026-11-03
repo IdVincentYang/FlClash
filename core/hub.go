@@ -51,6 +51,9 @@ var (
 )
 
 func handleInitClash(params *InitParams) bool {
+	if providerStageEnabled {
+		return guardedInitClash(params, 0)
+	}
 	configMu.Lock()
 	defer configMu.Unlock()
 	if isInit.Load() {
@@ -77,18 +80,25 @@ func stopListenerReceived(sequence uint64) bool {
 	if op := latestConfig.Load(); sequence != 0 && op != nil && op.token > sequence {
 		return true
 	}
+	if providerStageEnabled && pendingConfig != nil && pendingConfig.stage != nil {
+		pendingConfig.stage.retire()
+	}
 	revokeBusiness()
 	preparedConfigGate.Store(nil)
 	isRunning.Store(false)
 	tunnel.OnSuspend()
-	stopBusinessListeners()
+	if !guardedPhysicalShutdown() {
+		stopBusinessListeners()
+	}
 	checkpointMu.Lock()
 	configFact.BusinessActive = false
 	configFact.Phase = "retired"
 	configFact.Version = configFactSequence.Add(1)
 	checkpointMu.Unlock()
 	sendMessage(Message{Type: ConfigStateMessage, Data: configFact})
-	resolver.ResetConnection()
+	if !guardedPhysicalShutdown() {
+		resolver.ResetConnection()
+	}
 	return true
 }
 
@@ -106,6 +116,9 @@ func handleForceGC() {
 }
 
 func handleShutdown() bool {
+	if providerStageEnabled {
+		return shutdownGuardedCore(0)
+	}
 	requestscope.Phase(appRequests.currentOwner(), "retired")
 	appRequests.closePrivate()
 	handleStopLog()
@@ -113,16 +126,20 @@ func handleShutdown() bool {
 
 	configMu.Lock()
 	isRunning.Store(false)
-	stopBusinessListeners()
-	updater.StopGeoUpdater()
-	coreNtp.ReCreateNTPService("", 0, "", nil, false)
-	executor.Shutdown()
+	closeGlobalCoreResources()
 	currentConfig = nil
 	isInit.Store(false)
 	configMu.Unlock()
 
 	handleForceGC()
 	return true
+}
+
+func closeGlobalCoreResources() {
+	stopBusinessListeners()
+	updater.StopGeoUpdater()
+	coreNtp.ReCreateNTPService("", 0, "", nil, false)
+	executor.Shutdown()
 }
 
 func handleValidateConfig(path string) string {
@@ -723,7 +740,7 @@ func providerRequestFailureReason(err error) string {
 func providerMethodError(code, providerName string, err error) *MethodError {
 	return &MethodError{
 		Code:    code,
-		Message: err.Error(),
+		Message: capabilityError(err).Error(),
 		Details: map[string]any{"providerName": providerName},
 	}
 }

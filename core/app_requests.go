@@ -569,7 +569,7 @@ func (l *appRequestLease) routeCurrentLocked() bool {
 	providers := tunnel.ProvidersSnapshot()
 	for name, version := range l.routeProviders {
 		pd := l.routeProviderRefs[name]
-		if pd.VehicleType() != P.Compatible && providers[name] != pd {
+		if pd.VehicleType() != P.Compatible && underlyingProvider(providers[name]) != underlyingProvider(pd) {
 			return false
 		}
 		if pd.Version() != version {
@@ -884,8 +884,14 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			r.clientReady = false
 		case "invalidate":
 			r.sources[params.Key]++
+			if providerStageEnabled {
+				r.changedLocked()
+			}
 		case "invalidateDataset":
 			r.dataset++
+			if providerStageEnabled {
+				r.changedLocked()
+			}
 			r.phase = "retired"
 			if scope := activeBusiness.Load(); scope != nil {
 				cancel := scope.Invalidate()

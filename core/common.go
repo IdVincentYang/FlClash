@@ -95,7 +95,7 @@ func lookupExternalProvider(name string) (cp.Provider, bool) {
 }
 
 func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
-	switch typed := p.(type) {
+	switch typed := underlyingProvider(p).(type) {
 	case *provider.ProxySetProvider:
 		return &ExternalProvider{
 			Name:             typed.Name(),
@@ -121,7 +121,7 @@ func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
 }
 
 func sideUpdateExternalProvider(p cp.Provider, data []byte) error {
-	switch typed := p.(type) {
+	switch typed := underlyingProvider(p).(type) {
 	case *provider.ProxySetProvider:
 		_, _, err := typed.SideUpdate(data)
 		return err
