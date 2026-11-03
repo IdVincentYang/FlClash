@@ -21,3 +21,5 @@
 [R1 未解决风险](deferred_security_items.md#l2-t02-r1-共享-ip-与域名身份)；
 [受管材料更新](managed_updates_design.md)（见[使用指南](managed_updates_guide.md)）；
 [服务与接管范围](android_service_design.md)及[操作指南](android_service_guide.md)。
+
+现有 Loops 过完一轮后再细化的新增需求：[网络活动与规则管理](../network_activity/network_activity_plan.md)。
