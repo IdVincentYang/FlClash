@@ -88,7 +88,7 @@ GRADLE
 
 ## 构建 ARM64 APK
 
-L2-T04 增量已完成本机验证和 ARM64 构建，实现评审已通过，交付收尾中，未作设备安装验证。Android Core 禁用 ZeroTier。
+Android Core 禁用 ZeroTier；该增量已完成本机验证和 ARM64 构建，未作设备安装验证。
 由 Native Assets 的 GoBuilder 按 Android Target 保留基础 tags 并追加 `no_zerotier`，
 build、依赖 list 和缓存 fingerprint 使用同一 effective tags；其它平台不跟随追加。
 此决定使实际解析到 ZeroTier 节点的配置不再受支持；显式 provider 过滤仍按原语义执行。
@@ -96,7 +96,7 @@ provider 初始化完成不能以 Apply 返回判断；等待全部必要 Initia
 不能静默回退 DIRECT；有效 cache 仍可离线成功。取消后旧工作未退出时不允许新 Core 应用抢先进入。
 同一进入契约覆盖 Go Shutdown／Init：关闭未确认完成时不得就地重新初始化；解绑服务不证明 Go 全局关闭或进程退出。
 实际规则与兼容边界见[业务数据说明](../features/security/business_data_design.md)，
-实际制品及本机验证见[结果](../features/security/loop2/l2_t04_result.md#android-禁用增量的实际验证)；旧 APK 不能据此当作已禁用。
+实际制品及本机验证见[任务定稿入口](../features/security/loop2/loop2_tasks.md#l2-t04-业务数据处理与额外传输审查)；旧 APK 不能据此当作已禁用。
 
 示例使用本机常见 SDK 与工具路径；工具安装位置不同时调整 PATH 和 SDK 路径。Rust 版本读取仓库配置，实际编译器目录优先于 Homebrew，避免 Cargo 调用没有 Android 标准库的另一份 rustc。
 

@@ -29,7 +29,7 @@
 | L2-T01 | [最终配置与应用失败时的业务出口](#l2-t01-最终配置与应用失败时的业务出口) | 已完成的 L1-T03；本地配置可独立验证 | 已完成，已合入并推送个人 fork |
 | L2-T02 | [DNS 接收方、出口与失败回退](#l2-t02-dns-接收方出口与失败回退) | L2-T01 的最终配置和失败契约 | 05调查与说明已交付；整项安全未通过 |
 | L2-T03 | [服务状态过渡与业务接管范围](#l2-t03-服务状态过渡与业务接管范围) | L2-T01；沿用 ServiceState 权威 | 已交付并核实远端 security/android |
-| L2-T04 | [业务数据处理与额外传输审查](l2_t04_plan.md) | L2-T01；按实际路径接收 L2-T02/L2-T03 结果 | implementation_v1 已通过；本地合入／M 交付收尾中 |
+| L2-T04 | [业务数据处理与额外传输审查](#l2-t04-业务数据处理与额外传输审查) | L2-T01；按实际路径接收 L2-T02/L2-T03 结果 | 审查与 Android 禁用已合入；设备与未审协议边界保留 |
 | L2-T05 | [来源信任与配置内容接受](#l2-t05-来源信任与配置内容接受) | L2-T01；联网身份/跳转结论接 Loop 1 实际交付 | 待设计，未实施 |
 
 ## L2-T01 最终配置与应用失败时的业务出口
@@ -102,11 +102,21 @@ git show "$delivery_revision:$records_directory/l2_t03_result.md"
 
 ## L2-T04 业务数据处理与额外传输审查
 
-- 归属与阶段：M1 / D-02；[Task Plan](l2_t04_plan.md) design_v1 已通过，按用户授权连续审查、验证和必要窄修正后交实现评审。
-  本项是业务数据审查，不是暂缓的 L1-T04 或已交付的 L2-T02-04；不启动其它任务。
-- 当前发现：[实际结果](l2_t04_result.md)记录本机普通／受管流量与应用消费者验证；
-  ZeroTier 条件 payload 副本已获纯内存补证，用户已决定 Android 禁用；design_android_v1 的异步初始化时序被退回，
-  v2 的 R1／Q2 已在设计层通过，v3 已获 M1 通过，父包装层增量已完成本机自验与 ARM64 构建，implementation_v1 已通过实现评审，进入本地合入与 M 交付收尾；整项未结束。
+归属为 M1 / D-02；design_android_v3 与 implementation_v1 均通过评审，交付 `69e2ed2` 已合入 `security/android`。
+当前业务数据处理、逐协议覆盖与保存边界由[长期说明](../business_data_design.md)维护，构建与缓存规则见[构建指南](../../../development/android_build_guide.md)。
+普通／受管 DIRECT／SOCKS5 的本机收件和应用消费已验证；用户确认禁用 ZeroTier 后，Android 构建采用既有拒绝工厂，
+必要 provider 初始化失败／未完成时不能安装激活。实际 ARM64 制品不链接 zerotier-go；未做设备／TUN／JNI／overlay 运行验收。
+R1 DNS 身份风险、失败日志导出的临时 metadata 文件和未审协议／依赖仍保留，不宣称全包安全；不启动其它任务。
+
+任务 Plan/Result 定稿已从下列交付历史实际取回核对，当前副本按收尾规范删除；共享活动任务与长期契约保留。
+
+```bash
+delivery_revision=69e2ed2827a73a674b6735c2f89a8ef80d734537
+records_directory=docs/features/security/loop2
+git show "$delivery_revision:$records_directory/l2_t04_plan.md"
+git show "$delivery_revision:$records_directory/l2_t04_result.md"
+```
+
 - 目标与价值：沿 TUN/本机代理到出站的生产路径核实业务数据仅用于接受的协议、路由、统计和诊断用途。
 - 风险与方向：即使出口正确，内容仍可能被插件、镜像、日志或额外接收方复制。按实际调用与数据边界审查核心、已启用插件和统计入口；发现问题后再给出必要修改，
   不把名称匹配或没有观察到请求当作全局安全证明。

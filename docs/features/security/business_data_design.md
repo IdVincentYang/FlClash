@@ -1,6 +1,6 @@
 # Android 业务数据处理与覆盖边界
 
-**L2-T04 实现评审已通过，交付收尾中；Android 禁用增量已实施并完成本机验证与 ARM64 构建，未做设备安装验证。** 本文维护业务正文、连接 metadata、统计和日志的当前处理说明及覆盖边界。
+**Android 构建禁用 ZeroTier；该增量已完成本机验证与 ARM64 构建，未做设备安装验证。** 本文维护业务正文、连接 metadata、统计和日志的当前处理说明及覆盖边界。
 共用链已做源码审查和本机 DIRECT／SOCKS5 合成验证；其它 adapter 主要为入口及选定分支走读。
 这些证据不等于 Android TUN 实测或整个安装包的安全结论，不据“没有观察到”排除其它路径。
 正常用途的判定依据是[共同安全目标](security_requirements.md)，联网功能入口见[用途清单](android_network_inventory.md)。
@@ -125,7 +125,7 @@ ConfigInput／T01、ServiceState、Request 的现有所有权保持不变。
 
 是否包含明文取决于该 frame 承载的业务协议；TLS ciphertext 与明文 HTTP／UDP 不能混为一谈。
 用户已决定在 Android 版禁用该出站支持，不接受 controller 镜像能力作为本轮出口；
-增量已按 M1 通过的设计在父包装层实施，实际验证与制品绑定见[本项结果](loop2/l2_t04_result.md#android-禁用增量的实际验证)；实现评审已通过，交付收尾中，不沿用 R1 的记录许可结案。
+禁用由父包装层的构建与初始化边界实施，实际验证与制品绑定可从[任务定稿](loop2/loop2_tasks.md#l2-t04-业务数据处理与额外传输审查)取回；不沿用 R1 的记录许可结案。
 仅删除本地 YAML trace 字段不足以排除 controller 的 network trace／TEE。
 采用现有 `no_zerotier` tag，使新 Android Core 使用拒绝工厂；实际解析到该节点的候选不再可用。
 基础 tags 与其它平台保持原行为；普通节点、provider、动态材料、旧缓存仍须经过真实接受边界，

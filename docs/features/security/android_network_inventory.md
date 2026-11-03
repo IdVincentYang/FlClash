@@ -190,7 +190,7 @@ Core dialer 与 Android socket gate
 L2-T02-05 的调查／说明已交付，R1 未解决、DNS 安全未通过。
 业务正文、metadata、日志与保存的处理边界由[业务数据说明](business_data_design.md)维护；
 该说明已通过 L2-T04 实现评审，不代表全部协议或 Android 设备验证已完成。
-Android 构建禁用 ZeroTier 的父包装层增量已完成本机验证与 ARM64 构建，实现评审已通过，交付收尾中；旧制品不因此改变。
+Android 构建禁用 ZeroTier 的父包装层增量已完成本机验证与 ARM64 构建；旧制品不因此改变。
 
 DNS 接收方由实际配置的 default/proxy/direct nameserver、policy、fallback、系统/网络 DNS 等决定；
 UDP/TCP DNS 可明文，DoH/DoT/DoQ、DHCP/system 和代理解析按各自实现，TLS/重试/缓存不是 RequestSession
