@@ -1,7 +1,7 @@
 # L2-T02 子任务：同源分流与 DNS 配置
 
 本清单细化 [M1 总体设计](l2_t02_plan.md)，父任务见 [Loop 2 任务](loop2_tasks.md#l2-t02-dns-接收方出口与失败回退)。
-01–04 与 L2-T03 已交付并核实远端 `security/android`；05 研究/说明已通过评审，整个 L2-T02 未完成。
+01–04 与 L2-T03 已交付并核实远端 `security/android`；05 研究/说明已本地交付，DNS 安全验收未通过，整个 L2-T02 未完成。
 04 的设计和 implementation_v2 均经 M1 评审通过；交付定稿的历史入口见本项记录。
 
 M 为 M1，01–05 的 D 为 D-02；联系入口和授权边界沿用 [Loop 2 协作约定](loop2_tasks.md#协作授权与交付)。
@@ -15,7 +15,7 @@ M 为 M1，01–05 的 D 为 D-02；联系入口和授权边界沿用 [Loop 2 �
 | L2-T02-02 | [Profile 策略编辑、持久化与迁移](l2_t02_02_plan.md) | 01 的严格策略契约 | 已交付并累计推送 |
 | L2-T02-03 | [最终合成、受管应用与恢复](l2_t02_03_plan.md) | 01、02；L2-T01 | design_v2 通过；已交付并累计推送 |
 | L2-T02-04 | [订阅、集合与资产更新](../managed_updates_design.md) | 03 的受管应用边界 | 已交付并核实远端 |
-| L2-T02-05 | [整项验收与能力说明](l2_t02_05_plan.md) | 01–04、L2-T03 实际结果 | 研究/说明交付定稿；安全未通过 |
+| L2-T02-05 | [整项验收与能力说明](#l2-t02-05-整项验收与能力说明) | 01–04、L2-T03 实际结果 | 调查与说明已交付；安全未通过 |
 
 这是一个拆解层级，按可核验成果划分。后续项只确定目标、依赖及出口，接手时再细化；不因下游未实施而阻塞首项的独立本地出口。
 
@@ -75,8 +75,8 @@ git show "$delivery_revision:$records_directory/l2_t02_04_result.md"
 
 ## L2-T02-05 整项验收与能力说明
 
-- 设计：[Task Plan](l2_t02_05_plan.md) design_v4 与 implementation_v1 均已通过；研究/说明交付定稿。
-- 当前事实：[Result](l2_t02_05_result.md)绑定宿主真实 Core 的共享 IP A→B收件、有限生命周期实验和独立核实。
+- 交付：design_v4 与 implementation_v1 均已通过，调查与能力说明已合入本地 `security/android`。
+- 实证：宿主真实 Core 的共享 IP A→B收件、有限生命周期实验和独立核实已保存于交付历史及本地冻结证据。
   R1 未解决、DNS安全验收未通过；AVD/UDP/DIRECT/REJECT 等未运行，不扩大结论。
 - 本轮出口：用户于2026-11-03决定继续不改核心，无可行窄应用方案时记录并跟踪上游。
   完成研究/说明两道评审、正常本地交付及M远端收尾后，05按“调查与说明已交付，DNS安全验收未通过”结束，
@@ -87,6 +87,16 @@ git show "$delivery_revision:$records_directory/l2_t02_04_result.md"
 - 未完成的需求：原[M1完整验证矩阵](l2_t02_plan.md#11-未来验证与完成判据)仍是整项安全验收方向，
   不以本轮调查完成替代。旧查询/缓存/远端解析/物理网络边界保持，设备/系统接管与L2-T03对齐。
   Geo等扩展仍在原落点，不由05自动接做；本项不改Core/gitlink/carrier、不启动其它任务。
+
+任务 Plan/Result 定稿已从下列目标分支历史实际取回并逐字节核对，当前副本按收尾规范删除。
+长期风险、操作指南及仍有活动事项的共享任务记录继续保留；远端交付由 M1 按贡献指南核实。
+
+```bash
+delivery_revision=d0a9b1e80a14f7020d95cfb6179734c31c2460f5
+records_directory=docs/features/security/loop2
+git show "$delivery_revision:$records_directory/l2_t02_05_plan.md"
+git show "$delivery_revision:$records_directory/l2_t02_05_result.md"
+```
 
 ## 本地交付与同步
 
