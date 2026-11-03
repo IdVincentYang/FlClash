@@ -69,6 +69,8 @@ HTTP/HTTPS 均被下载器接受，普通跳转与证书设置按共同边界；
 version 2 受管模板的同源材料先在本地展开/预检；不增加对远程 provider 或 Geo 的独立下载。
 页面 Load latest material for preview 使用同一 Request 路由，只暂存候选；显式采用前不替换正式材料。
 支持与限制见[材料更新契约](managed_updates_design.md)。
+完整受管使用路径见[使用指南](managed_profile_guide.md)；配置级同源生成不等于原域名身份可靠，
+未解决缺陷及后续复验统一见[R1 长期记录](deferred_security_items.md#l2-t02-r1-共享-ip-与域名身份)。
 网络失败自动间隔为 1/2/4/8/16/20 分钟，资格拒绝等待相关状态变化，取消不计作网络失败；这些重试状态不持久化。
 
 ## 脚本下载与执行

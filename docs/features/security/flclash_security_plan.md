@@ -17,5 +17,7 @@
 其它平台待定。
 
 当前能力契约：[IP 查询设计](ip_lookup_design.md)（触发、接收方、数据及失败边界）；
+[受管使用指南](managed_profile_guide.md)及
+[R1 未解决风险](deferred_security_items.md#l2-t02-r1-共享-ip-与域名身份)；
 [受管材料更新](managed_updates_design.md)（见[使用指南](managed_updates_guide.md)）；
 [服务与接管范围](android_service_design.md)及[操作指南](android_service_guide.md)。

@@ -3,6 +3,8 @@
 Profile 显式绑定的材料经冻结、校验和展开后，由同一严格编译器生成业务/DNS 配置，
 使用步骤及本地合成夹具见[更新指南](managed_updates_guide.md)。
 Request、来源票据、ConfigInput/T01 与 ServiceState 分别保留下载、来源、实际采用与运行意图权威。
+本契约的配置级同源生成不保证 Core 恢复的原域名身份；当前未解决缺陷及跟踪见
+[R1 长期记录](deferred_security_items.md#l2-t02-r1-共享-ip-与域名身份)。
 
 ## 模板与支持上限
 

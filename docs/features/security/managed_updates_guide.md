@@ -3,6 +3,9 @@
 本指南说明如何明确绑定订阅材料，以及如何区分保存、预览和实际采用。
 本地合成验证覆盖支持材料的更新、失败保护及预览并发；实际设备、物理网络和真实订阅兼容尚未验证。
 支持上限和失败语义以[材料更新契约](managed_updates_design.md)为准。
+完整受管使用路径见[受管使用指南](managed_profile_guide.md)。
+未解决的共享 IP 身份缺陷统一见[R1 长期记录](deferred_security_items.md#l2-t02-r1-共享-ip-与域名身份)，
+既有材料更新/采用结果不等于 TUN 原域名身份保证。
 产品界面名称以下列 English 文案为准。
 
 ## 绑定与更新
@@ -18,7 +21,7 @@
 4. Generated draft preview 检查展开后的脱敏配置。Save 只保存草稿；Save and request application
    会选择维护目标、显示采用确认，再保存选择并请求应用。它不启动已停止的服务。
 5. 常规 Sync 和合资格自动刷新会先预检候选，成功后保存材料并重新构建。
-   Profile detail 的实际状态与 Actual applied configuration 用于核对采用；模板文本相同或 Sync 成功
+   Profile detail 的实际状态与 Actual accepted configuration 用于核对采用；模板文本相同或 Sync 成功
    不能单独证明新节点生效。页面核对实际 input 的材料摘要与当前保存文件，而非只比较模板摘要。
 
 来源须为 UTF-8 YAML/JSON 对象；本项不处理加密封装、远程 provider、Geo 或其它节点协议。
@@ -45,7 +48,9 @@ Save 仍只保存草稿。Discard preview material、离页或较新加载使旧
 [受管消费者夹具](../../../core/managed_profile_test.go)。夹具不读取用户配置，也不连接外部测试目标。
 
 在仓库根构建编译器，再启动夹具；`FLCLASH_MANAGED_UPDATE_AVD=1` 使材料地址为 Android Emulator 的主机别名
-10.0.2.2。宿主本地消费者省略该变量，使用 127.0.0.1。D 不执行下述设备命令。
+10.0.2.2。宿主本地消费者省略该变量，使用 127.0.0.1。
+下述设备操作须由用户执行，或在明确授权的独立专用 AVD 中执行；不操作已有用户设备或 global ADB。
+该手动夹具分别发业务与 DNS，不能证明共享 IP 的原域名身份；真实 mapping 反例及复现见 R1 长期记录。
 
 ```bash
 dart compile exe tool/compile_managed_profile.dart -o build/managed_profile_compiler
