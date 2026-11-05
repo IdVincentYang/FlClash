@@ -25,6 +25,7 @@ func TestApplicationInputBridge(t *testing.T) {
 	isInit.Store(true)
 	var fixture *managedFixture
 	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Buffer(make([]byte, 4096), 128<<20)
 	for scanner.Scan() {
 		var call struct {
 			ID        int             `json:"id"`
@@ -36,13 +37,54 @@ func TestApplicationInputBridge(t *testing.T) {
 		}
 		var result any
 		switch call.Method {
+		case "sourceFrontendState":
+			var snapshot struct {
+				Client  string          `json:"client"`
+				Dataset uint64          `json:"dataset"`
+				State   AppRequestState `json:"state"`
+			}
+			if err := json.Unmarshal(call.Arguments, &snapshot); err != nil || snapshot.Client == "" || snapshot.State.ProcessEpoch == "" {
+				t.Fatal("invalid controlled JVM source frontend snapshot", err)
+			}
+			configMu.Lock()
+			appRequests.publish(snapshot.State)
+			appRequests.mu.Lock()
+			appRequests.client, appRequests.clientReady, appRequests.dataset = snapshot.Client, true, snapshot.Dataset
+			appRequests.mu.Unlock()
+			configMu.Unlock()
+			result = map[string]bool{"ok": true}
+		case "sourceState":
+			if err := os.Setenv("FLCLASH_SOURCE_TEST_CHILD", t.Name()); err != nil {
+				t.Fatal(err)
+			}
+			requestscope.BeginHook, requestscope.ResourceHook = appRequests.begin, appRequests.lockResource
+			requestscope.ProxyHook = appRequests.bindProxy
+			appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback", ProtectPhase: "none"})
+			result = map[string]any{"ok": true}
+		case "source":
+			frames := captureFrames(t, func() {
+				handleMethodCall(&MethodCall{ID: "source-bridge", Method: sourceAcceptanceMethod, Arguments: call.Arguments}, newMethodResponse("source-bridge", nil))
+			})
+			for _, frame := range frames {
+				var envelope struct {
+					ID string `json:"id"`
+				}
+				if json.Unmarshal(frame, &envelope) == nil && envelope.ID == "source-bridge" {
+					result = json.RawMessage(frame)
+					break
+				}
+			}
+			if result == nil {
+				t.Fatal("source RPC did not produce its real response")
+			}
 		case "refreshState":
 			requestscope.ProxyHook = appRequests.bindProxy
 			appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
 			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback"})
 			result = map[string]any{"ok": true}
 		case "refreshRunning":
-			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 2, IntentRevision: 2, IntentRunning: true, Phase: "started", Reason: "none", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback"})
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 2, IntentRevision: 2, IntentRunning: true, Phase: "started", Reason: "none", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback", ProtectPhase: "none"})
 			result = map[string]any{"ok": true}
 		case "refreshRead":
 			var name string

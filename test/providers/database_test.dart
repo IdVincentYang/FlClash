@@ -2,15 +2,23 @@ import 'dart:async';
 
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/feature.dart';
+import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/core/interface.dart';
 // `Profiles`, `Scripts` and `ProxyGroups` name both a drift table and a
 // notifier, so the schema side is imported behind a prefix.
 import 'package:fl_clash/database/database.dart' as db;
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+import '../helpers/test_source_acceptance.dart';
+
+class _Core extends Mock implements CoreHandlerInterface {}
 
 /// Every notifier in `lib/providers/database.dart` writes optimistically: the
 /// in-memory state is mutated first and the row is persisted afterwards through
@@ -33,7 +41,13 @@ void main() {
   setUp(() async {
     testDatabase = db.Database(NativeDatabase.memory());
     db.database = testDatabase;
-    container = ProviderContainer();
+    final core = _Core();
+    stubAcceptedSourceFixtures(core);
+    container = ProviderContainer(
+      overrides: [
+        coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+      ],
+    );
   });
 
   tearDown(() async {

@@ -27,10 +27,19 @@ class RequestUnavailable implements Exception {
       currentAppLocalizations.profileDownloadTooLarge,
     'profile_download_failed' => currentAppLocalizations.profileDownloadFailed,
     'profile_invalid' => currentAppLocalizations.profileInvalidBody,
+    'source_review_required' => currentAppLocalizations.sourceReviewRequired,
+    'source_storage_full' => currentAppLocalizations.sourceStorageFull,
+    'source_permissions_unavailable' =>
+      currentAppLocalizations.sourcePermissionsUnavailable,
+    'source_routing_excluded' => currentAppLocalizations.sourceRoutingExcluded,
+    'source_recovery_unavailable' =>
+      currentAppLocalizations.sourceRecoveryUnavailable,
     'profile_refresh_failed' ||
     'profile_publish_failed' ||
     'profile_cleanup_failed' => currentAppLocalizations.profileRefreshFailed,
     'request_partial_commit' => currentAppLocalizations.requestPartialCommit,
+    'request_restart_required' =>
+      currentAppLocalizations.requestRestartRequired,
     'profile_saved_recovery_required' =>
       currentAppLocalizations.profileSavedRecoveryRequired,
     'managed_maintenance_target_required' =>
@@ -157,7 +166,7 @@ class RequestSession {
           }
         }
         _granted = true;
-        return owner._runReceipt(id, () => run(action));
+        return owner._runReceipt(id, () => run(action), client: client);
       });
 
   void close() {
@@ -178,9 +187,10 @@ class RequestSession {
 }
 
 class _LocalReceipt {
-  _LocalReceipt(this.owner, this.id);
+  _LocalReceipt(this.owner, this.id, this.client);
   final Request owner;
   final String? id;
+  final String? client;
   bool active = true;
   bool applicationInputsInvalidated = false;
 }
@@ -222,7 +232,26 @@ class Request with ServiceListener {
       _receipt?.applicationInputsInvalidated == true;
 
   bool get hasNativeClient => _isAndroid && _client != null;
+  bool get requiresSourceAcceptance => _isAndroid;
   bool get isAttached => _container != null;
+
+  Future<bool> materialRecoveryRequired() async {
+    if (!_isAndroid) return false;
+    partialCommit =
+        partialCommit ||
+        await File(
+          '${await appPath.homeDirPath}/request-recovery-required',
+        ).exists();
+    return partialCommit;
+  }
+
+  void acceptMaterialRecovery() {
+    _datasetRevision++;
+    for (final session in List.of(_sessions)) {
+      session.close();
+    }
+    partialCommit = false;
+  }
 
   Future<Map<String, Object?>?> captureNativeRunState() async {
     await _attachment;
@@ -230,23 +259,31 @@ class Request with ServiceListener {
     return Map.unmodifiable(await _service!.getRequestState());
   }
 
-  Future<T> _runReceipt<T>(String? id, Future<T> Function() action) async {
-    File? marker;
-    final receipt = _LocalReceipt(this, id);
+  String? get activeReceiptId => _receipt?.id;
+
+  void _checkReceiptClient() {
+    final client = _receipt?.client;
+    if (_isAndroid && client != null && client != _client) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+  }
+
+  Future<T> _runReceipt<T>(
+    String? id,
+    Future<T> Function() action, {
+    String? client,
+  }) async {
+    final receipt = _LocalReceipt(this, id, client ?? _client);
     try {
       return await runZoned(() async {
         try {
-          marker = _isAndroid && id != null
-              ? File('${await appPath.homeDirPath}/request-recovery-required')
-              : null;
-          if (marker != null && !partialCommit) {
-            final staged = File('${marker!.path}.pending');
-            try {
-              await staged.writeAsString('pending local commit', flush: true);
-              await staged.rename(marker!.path);
-            } finally {
-              await staged.safeDelete();
-            }
+          if (_isAndroid && id != null) {
+            final result = await _control({
+              'action': 'beginCommit',
+              'id': id,
+              'client': receipt.client,
+            });
+            if (result['recovery'] == true) partialCommit = true;
           }
           return await action();
         } finally {
@@ -255,7 +292,7 @@ class Request with ServiceListener {
               await _control({
                 'action': 'complete',
                 'id': id,
-                'client': _client,
+                'client': receipt.client,
               });
             } catch (_) {
               try {
@@ -268,7 +305,6 @@ class Request with ServiceListener {
       }, zoneValues: {_receiptKey: receipt});
     } finally {
       receipt.active = false;
-      if (!partialCommit) await marker?.safeDelete();
     }
   }
 
@@ -278,16 +314,43 @@ class Request with ServiceListener {
   }
 
   Future<void> markRecoveryRequired() async {
+    _checkReceiptClient();
     partialCommit = true;
-    await File(
-      '${await appPath.homeDirPath}/request-recovery-required',
-    ).writeAsString('recovery required', flush: true);
+    final client = _receipt?.client ?? _client;
+    if (_isAndroid && client != null) {
+      await _control({
+        'action': 'markRecovery',
+        'id': _receipt?.id,
+        'client': client,
+      });
+    } else {
+      final marker = File(
+        '${await appPath.homeDirPath}/request-recovery-required',
+      );
+      if (!await marker.exists()) {
+        await marker.writeAsString('recovery required', flush: true);
+      }
+    }
   }
 
   Future<void> clearPartialCommit() async {
-    await File(
-      '${await appPath.homeDirPath}/request-recovery-required',
-    ).safeDelete();
+    _checkReceiptClient();
+    if (_isAndroid && _client != null) {
+      if (!partialCommit) return;
+      final receipt = _receipt?.id;
+      if (receipt == null) {
+        throw const RequestUnavailable('request_commit_recovery_required');
+      }
+      await _control({
+        'action': 'clearRecovery',
+        'id': receipt,
+        'client': _receipt?.client ?? _client,
+      });
+    } else {
+      await File(
+        '${await appPath.homeDirPath}/request-recovery-required',
+      ).safeDelete();
+    }
     partialCommit = false;
   }
 
@@ -393,9 +456,30 @@ class Request with ServiceListener {
   Future<T> localCommit<T>(Future<T> Function() action) async {
     await _attachment;
     if (!_isAndroid || _client == null) return _runReceipt(null, action);
-    final result = await _commitControl({'action': 'lock', 'client': _client});
-    return _runReceipt(result['id'] as String, action);
+    final client = _client;
+    final result = await _commitControl({'action': 'lock', 'client': client});
+    return _runReceipt(result['id'] as String, action, client: client);
   }
+
+  Future<T> approvedLocalCommit<T>({
+    required Future<String> Function() grant,
+    required Future<T> Function() action,
+  }) => dataMutations.run(() async {
+    final client = _client;
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (true) {
+      try {
+        final id = await grant();
+        return await _runReceipt(id, action, client: client);
+      } on RequestUnavailable catch (error) {
+        if (error.code != 'request_commit_busy' ||
+            DateTime.now().isAfter(deadline)) {
+          rethrow;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+    }
+  });
 
   void cancelKey(String key) {
     _cancellations[key] = (_cancellations[key] ?? 0) + 1;
@@ -405,6 +489,7 @@ class Request with ServiceListener {
   }
 
   Future<void> invalidate(String key) async {
+    _checkReceiptClient();
     cancelKey(key);
     for (final session in List.of(_sessions)) {
       if (session.key == key ||
@@ -417,12 +502,16 @@ class Request with ServiceListener {
       for (final target in ['dav:ping', 'dav:backup', 'dav:restore']) {
         await _control({
           'action': 'invalidate',
-          'client': _client,
+          'client': _receipt?.client ?? _client,
           'key': target,
         });
       }
     } else if (_isAndroid && _client != null) {
-      await _control({'action': 'invalidate', 'client': _client, 'key': key});
+      await _control({
+        'action': 'invalidate',
+        'client': _receipt?.client ?? _client,
+        'key': key,
+      });
     }
     if (key == 'application-config') {
       _receipt?.applicationInputsInvalidated = true;
@@ -430,6 +519,7 @@ class Request with ServiceListener {
   }
 
   Future<void> invalidateDataset({String? committingId}) async {
+    _checkReceiptClient();
     _datasetRevision++;
     committingId ??= _receipt?.id;
     for (final session in List.of(_sessions)) {
@@ -437,11 +527,15 @@ class Request with ServiceListener {
     }
     await _attachment;
     if (_isAndroid && _client != null) {
-      await _control({'action': 'invalidateDataset', 'client': _client});
+      await _control({
+        'action': 'invalidateDataset',
+        'client': _receipt?.client ?? _client,
+        'id': committingId,
+      });
       for (var attempt = 0; ; attempt++) {
         final result = await _control({
           'action': 'inspect',
-          'client': _client,
+          'client': _receipt?.client ?? _client,
           'id': committingId,
         });
         if (result['commits'] == 0) break;
@@ -658,6 +752,7 @@ class Request with ServiceListener {
     } else if (!(managed && mode == RequestMode.proxy) &&
         (allowBootstrap ||
             bootstrapIfUnconfigured && snapshot['hasProxy'] == false) &&
+        state['phase'] != 'started' &&
         !running &&
         !automatic) {
       final accepted = await dialogs.showMessage(
@@ -908,6 +1003,8 @@ class Request with ServiceListener {
     String? proxy,
     bool automatic = false,
     bool diagnostic = false,
+    bool allowBootstrap = false,
+    String? label,
     Future<bool> Function()? sourceIsCurrent,
     String? explicitTarget,
     required Future<T> Function(RequestSession session) action,
@@ -916,6 +1013,8 @@ class Request with ServiceListener {
       key: key,
       url: url,
       mode: mode,
+      allowBootstrap: allowBootstrap,
+      label: label,
       proxy: proxy,
       automatic: automatic,
       diagnostic: diagnostic,

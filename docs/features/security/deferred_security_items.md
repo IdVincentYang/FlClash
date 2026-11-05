@@ -8,6 +8,7 @@ L2-T02-R1 保留本轮已证实缺陷及上游跟踪。记录/暂缓不表示风
 - [T04 服务身份、认证与跳转](#t04服务身份认证与跳转)
 - [T05 日志与错误信息脱敏](#t05日志与错误信息脱敏)
 - [L2-T02-R1 共享 IP 与域名身份](#l2-t02-r1-共享-ip-与域名身份)
+- [Core 完整安装的日志级别并发](#core-完整安装的日志级别并发)
 
 ## T04：服务身份、认证与跳转
 
@@ -156,6 +157,31 @@ CGO_ENABLED=0 GOTELEMETRY=off FLCLASH_FAKEIP_LIFECYCLE=1 \
 若变化影响 TUN、UDP、DIRECT/LAN、DNS出口或维护请求，还需相应真实消费者验证。
 release notes、issue关闭、API改动、退出码或短时未收件不足以关闭本项。
 本记录不创建新 automation/任务，不授权发上游 issue/评论或上传本地证据。
+
+## Core 完整安装的日志级别并发
+
+固定Core为`6c6e3e472bb246cc55f2e8577d9eddccc2623afc`。2026-11-04在macOS ARM64宿主、Go 1.26.4的
+`TestAppRequestInspectionCompletesWithMatcherAndQueuedInstall`实际完整安装与旧TCP matcher并发中，race detector报告：
+
+- 读：`log.print`（Core `log/log.go:83`）经`Warnln`、`tunnel.handleTCPConnScoped`（`tunnel/tunnel.go:658`）。
+- 写：`log.SetLevel`（`log/log.go:79`）经`executor.applyConfig`（`hub/executor/executor.go:99`）、
+  `ApplyConfigStaged`与父`installConfig`。
+
+本次Source＋AppRequest race选集失败，日志为本机忽略目录
+`build/verification/l2-t05/go_r3_source_requests_race_wip.log`，SHA256为
+`05d7e3215caba94eab5d2d9faae71cdd64a61de218fc44f3dba49c93a2c854e4`。
+测试文件及上述Core读写实现未改，但共用`writeTestInput`夹具在本轮生成v2输入、SourceUses，
+rule trace可能参与；未在旧基线做同输入实测对照，不能据此把完整归因或产品影响断言为既有无害问题。
+当前证据只证明该完整安装并发路径出现冲突，不是所有Source字段或整个AppRequest race通过的证明。
+
+正常完整Apply／前台重载可能涉及同一日志全局量，实际Android／设备影响尚未验证，风险未解决、未被用户接受。
+这不是秘密脱敏事项，不混入L1-T05。L2-T05的普通provider局部采用、RP generation及inline热路径不调用完整
+`ApplyConfigStaged`或`SetLevel`；它们的局部证据不能扩大为前台完整安装的全部并发保护。
+本项不修改Core／gitlink／carrier，也不以强制中断全部连接回避；T05其它独立验收继续。
+
+后续同步Core、调整日志级别或完整安装／旧连接收尾机制时，复核该真实读写路径并按影响复验。
+若发现新的热路径触发同一全局写或扩大其并发范围，应作为实际回归重新处理，不能用本记录放行。
+关闭本项须有实际修正与相应消费者反例，不以日志关闭、测试skip、退出码或未再观察到冲突代替。
 
 ## 历史与接续
 

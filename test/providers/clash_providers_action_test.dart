@@ -18,6 +18,7 @@ import 'package:path/path.dart' show basenameWithoutExtension;
 import 'package:riverpod/riverpod.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/test_source_acceptance.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 
@@ -29,6 +30,7 @@ class _RecordingSetupAction extends SetupAction {
     bool silence = false,
     bool force = false,
     Future<bool> Function()? isCurrent,
+    bool allowSourceReview = true,
   }) {
     applies++;
   }
@@ -91,6 +93,7 @@ void main() {
     await testDatabase.profiles.put(standardProfile.toCompanion());
     subscriptions = {};
     final core = _MockCoreHandlerInterface();
+    stubAcceptedSourceFixtures(core);
     when(() => core.getConfig(any())).thenAnswer((invocation) async {
       final path = invocation.positionalArguments.single as String;
       return subscriptions[int.parse(basenameWithoutExtension(path))] ?? {};

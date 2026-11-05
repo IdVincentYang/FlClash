@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../standard.dart' show ProfileMatchTargetItem;
 import 'custom_proxies.dart';
 import 'groups.dart';
 import 'rules.dart';
@@ -107,6 +108,10 @@ class CustomContent extends ConsumerWidget {
             ),
           ),
         ),
+        if (request.requiresSourceAcceptance) ...[
+          SliverToBoxAdapter(child: ProfileMatchTargetItem(profileId)),
+          const SliverToBoxAdapter(child: SizedBox(height: 4)),
+        ],
         if (feature.customProxies) ...[
           SliverToBoxAdapter(
             child: MoreActionButton(

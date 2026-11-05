@@ -105,7 +105,9 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
   Future<void> deleteProfile(int id) async {
     await requestClient.mutate(() async {
       await requestClient.invalidateDataset();
-      await ref.read(profilesProvider.notifier).deletePersisted(id);
+      await ref
+          .read(profilesProvider.notifier)
+          .deletePersisted(id, client: requestClient);
       await clearEffect(id);
     });
     final currentProfileId = ref.read(currentProfileIdProvider);
@@ -119,6 +121,66 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
 
   Future<String> validateConfigWithData(String data) async {
     return _core.validateConfigWithData(data);
+  }
+
+  Future<void> manageSourcePermissions(Profile profile) async {
+    if (!requestClient.requiresSourceAcceptance) return;
+    final setup = ref.read(setupActionProvider.notifier);
+    final setupSequence = setup.reserveSetupSequence();
+    if (await requestClient.materialRecoveryRequired()) {
+      final expectedRun = await _recoverSourceMaterialCommit(
+        _core,
+        requestClient,
+      );
+      if (expectedRun != null && ref.mounted) {
+        await setup.applyProfile(
+          force: true,
+          allowBootstrap: true,
+          expectedRun: expectedRun,
+          setupSequence: setupSequence,
+        );
+      }
+      return;
+    }
+    final acceptance = _sourceAcceptance(
+      _core,
+      requestClient,
+      confirm: ref.read(sourceConfirmationProvider),
+    );
+    final source = await requestClient.captureSource('profile:${profile.id}');
+    final config = await requestClient.captureSource('application-config');
+    final permissions = [
+      ...await acceptance.permissions(source: source, kind: 'profile'),
+      ...await acceptance.permissions(
+        source: config,
+        kind: 'config',
+        entityKey: 'config:${profile.id}',
+      ),
+    ];
+    final choice = await dialogs.showCommonDialog<SourcePermissionChoice>(
+      child: SourcePermissionsDialog(
+        label: profile.realLabel,
+        permissions: permissions,
+      ),
+    );
+    if (choice == null) return;
+    if (choice.action == SourcePermissionAction.review) {
+      await _reviewProfileSource(
+        confirm: ref.read(sourceConfirmationProvider),
+        core: _core,
+        requests: requestClient,
+        profile: profile,
+        path: await appPath.getProfilePath(profile.id.toString()),
+        source: source,
+        forceReview: true,
+      );
+    } else {
+      await acceptance.withdraw(
+        choice.permission!,
+        stopUse: choice.action == SourcePermissionAction.stopUse,
+      );
+    }
+    await ref.read(configStateProvider.notifier).refresh();
   }
 
   void _watchRefreshProfiles() {
@@ -296,12 +358,25 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     Iterable<int> renameIn = const [],
   }) async {
     final staged = await RequestFile.stage(bytes);
+    SourceMaterialApproval? approval;
     try {
+      approval = await _reviewProfileMaterial(
+        confirm: ref.read(sourceConfirmationProvider),
+        core: _core,
+        requests: requestClient,
+        profile: profile,
+        path: staged.staged.path,
+        fresh: true,
+      );
       final message = await _core.validateConfig(staged.staged.path);
       if (message.isNotEmpty) throw MessageException(message);
       final path = await appPath.getProfilePath(profile.id.toString());
-      await requestClient.mutate(() async {
-        await requestClient.invalidate('profile:${profile.id}');
+      Future<void> persist() async {
+        if (approval != null) {
+          await approval.invalidate();
+        } else {
+          await requestClient.invalidate('profile:${profile.id}');
+        }
         final current = (await database.profilesDao.query().get()).getProfile(
           profile.id,
         );
@@ -315,10 +390,18 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
                   profile,
                 ).copyWith(lastUpdateDate: DateTime.now()),
                 renameIn: renameIn,
+                networkResult: approval != null,
               ),
         );
-      });
+      }
+
+      if (approval != null) {
+        await approval.commit(action: persist);
+      } else {
+        await requestClient.mutate(persist);
+      }
     } finally {
+      await approval?.release();
       await staged.close();
     }
   }

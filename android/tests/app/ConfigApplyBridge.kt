@@ -69,7 +69,7 @@ object ConfigApplyBridge {
                         scope.launch { reply(id,gson.toJson(pending.await())) }
                     }
                     "failRunIntent" -> scope.launch {
-                        val cleanup = machine.failRunIntent(arguments.asJsonObject.get("requestId").asLong, arguments.asJsonObject.get("token").asLong)
+                        val cleanup = machine.failRunIntent(arguments.asJsonObject.get("requestId").asLong, arguments.asJsonObject.get("token").asLong, unregistered = arguments.asJsonObject.get("unregistered")?.asBoolean == true)
                         reply(id,gson.toJson(cleanup))
                     }
                     "failConfigBuild" -> scope.launch {

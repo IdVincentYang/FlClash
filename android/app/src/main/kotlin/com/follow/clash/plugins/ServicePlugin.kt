@@ -67,8 +67,9 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 val args = call.arguments as? Map<*, *>
                 val id = (args?.get("requestId") as? Number)?.toLong()
                 val token = (args?.get("token") as? Number)?.toLong()
-                if (id == null || token == null) result.error("INVALID_ARGUMENT", "Missing request or configuration token", null)
-                else result.success(gson.toJson(ServiceState.failRunIntent(id, token)))
+                val unregistered = args?.get("unregistered")
+                if (id == null || token == null || unregistered != null && unregistered !is Boolean) result.error("INVALID_ARGUMENT", "Invalid request, configuration token or unregistered flag", null)
+                else result.success(gson.toJson(ServiceState.failRunIntent(id, token, unregistered == true)))
             }
             "applyConfig" -> {
                 val input = runCatching { JsonParser.parseString(call.arguments as? String).asJsonObject }.getOrNull()
@@ -180,7 +181,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun requestControl(call: MethodCall, result: MethodChannel.Result) {
         val data = call.arguments as? String ?: return result.error("INVALID_ARGUMENT", "Missing request control", null)
         val action = runCatching { JsonParser.parseString(data).asJsonObject.get("action").asString }.getOrNull()
-        if (action !in setOf("begin", "cancel", "check", "grant", "attach", "ready", "inspect", "permit", "invalidate", "invalidateDataset", "lock", "complete", "detach")) {
+        if (action !in setOf("begin", "cancel", "check", "grant", "attach", "ready", "inspect", "permit", "invalidate", "invalidateDataset", "lock", "beginCommit", "markRecovery", "clearRecovery", "complete", "detach")) {
             result.error("INVALID_ARGUMENT", "Invalid request control", null)
             return
         }

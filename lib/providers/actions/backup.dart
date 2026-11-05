@@ -181,6 +181,23 @@ class BackupAction extends _$BackupAction {
         previousSelectionIds.contains(ref.read(currentProfileIdProvider)) ||
         ref.read(configStateProvider).fact.isManaged;
     await requestClient.invalidateDataset();
+    await _sourceAcceptance(
+      ref.read(coreHandlerProvider),
+      requestClient,
+      confirm: ref.read(sourceConfirmationProvider),
+    ).reset(
+      keys: isOverride
+          ? null
+          : [
+              for (final profile in data.profiles) ...[
+                'profile:${profile.id}',
+                'config:${profile.id}',
+              ],
+              for (final script in data.scripts) 'script:${script.id}',
+              for (final provider in data.clashProviders)
+                'clash-provider:${provider.id}',
+            ],
+    );
     final previousConfig = ref.read(configProvider);
     final previousProviders = await database.clashProvidersDao.queryAll().get();
     Future<void> Function()? putBack;

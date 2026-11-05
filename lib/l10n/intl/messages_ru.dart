@@ -175,9 +175,32 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m61(label) => "«${label}» — только одно значение";
 
-  static String m62(label) => "Значение «${label}» должно быть URL";
+  static String m62(features) =>
+      "Разрешённые заявленные возможности: ${features}";
 
-  static String m63(count) =>
+  static String m63(services) => "Принятый диапазон DNS: ${services}";
+
+  static String m64(protocols) => "Разрешённые протоколы узлов: ${protocols}";
+
+  static String m65(count) => "Принятые версии: ${count}";
+
+  static String m66(features) => "Заявленные возможности: ${features}";
+
+  static String m67(target) => "Выход источника по умолчанию: ${target}";
+
+  static String m68(nodes, rules) =>
+      "Материал источника: узлов — ${nodes}, правил — ${rules}";
+
+  static String m69(services) => "Предлагаемые службы DNS: ${services}";
+
+  static String m70(protocols) => "Протоколы узлов: ${protocols}";
+
+  static String m71(targets) =>
+      "Делегированные блоки прокси-правил: ${targets}. Условия могут охватывать любой домен или IP. Фиксированная защита и выход по умолчанию сохраняются; удаления, расширяющие DIRECT, требуют проверки.";
+
+  static String m72(label) => "Значение «${label}» должно быть URL";
+
+  static String m73(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1593,6 +1616,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "requestProxyDefault": m51,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Цель прокси"),
+    "requestRestartRequired": MessageLookupByLibrary.simpleMessage(
+      "Незавершённое локальное сохранение может ещё выполняться. Откройте сведения о приложении → Остановить, затем снова откройте FlClash. Перезапуска прокси или закрытия экрана недостаточно. После открытия проверьте сохранённые данные в разрешениях источников.",
+    ),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "Выбранный маршрут запросов недоступен.",
     ),
@@ -1949,7 +1975,158 @@ class MessageLookup extends MessageLookupByLibrary {
     "socksPort": MessageLookupByLibrary.simpleMessage("Порт SOCKS"),
     "sort": MessageLookupByLibrary.simpleMessage("Сортировка"),
     "source": MessageLookupByLibrary.simpleMessage("Источник"),
+    "sourceAcceptRevision": MessageLookupByLibrary.simpleMessage(
+      "Принять эту версию",
+    ),
+    "sourceAcceptedCapabilities": m62,
+    "sourceAcceptedDns": m63,
+    "sourceAcceptedProtocols": m64,
+    "sourceAcceptedRevisions": m65,
+    "sourceAppliedNotSaved": MessageLookupByLibrary.simpleMessage(
+      "Применено; восстановление не сохранено",
+    ),
+    "sourceAppliedRevision": MessageLookupByLibrary.simpleMessage(
+      "Применённая версия",
+    ),
+    "sourceAutomaticAllowed": MessageLookupByLibrary.simpleMessage(
+      "Автоматическое обслуживание разрешено",
+    ),
+    "sourceAutomaticStopped": MessageLookupByLibrary.simpleMessage(
+      "Автоматическое обслуживание остановлено",
+    ),
+    "sourceBinaryMaterial": MessageLookupByLibrary.simpleMessage(
+      "Двоичный RuleSet: принимаются только эти точные байты. Число правил неизвестно до проверки исходным парсером.",
+    ),
+    "sourceCapabilitiesChanged": MessageLookupByLibrary.simpleMessage(
+      "Изменены возможности узлов или связи групп.",
+    ),
+    "sourceCodeChanged": MessageLookupByLibrary.simpleMessage(
+      "Код скрипта изменился.",
+    ),
+    "sourceDeclaredCapabilities": m66,
+    "sourceDefaultExit": m67,
+    "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
+      "Разрешить обслуживание в этих пределах",
+    ),
+    "sourceDnsChanged": MessageLookupByLibrary.simpleMessage(
+      "Изменены службы DNS или их политика.",
+    ),
+    "sourceEntryChanged": MessageLookupByLibrary.simpleMessage(
+      "Изменены слушатели, туннели или функции управления.",
+    ),
+    "sourceFinalUse": MessageLookupByLibrary.simpleMessage(
+      "Итоговая конфигурация",
+    ),
+    "sourceFirstUse": MessageLookupByLibrary.simpleMessage(
+      "Использование этого источника ещё не разрешено.",
+    ),
+    "sourceImplicitDirect": MessageLookupByLibrary.simpleMessage(
+      "Неявный переход на DIRECT",
+    ),
+    "sourceInspectMaterial": MessageLookupByLibrary.simpleMessage(
+      "Посмотреть исходный текст (может содержать учётные данные)",
+    ),
     "sourceIp": MessageLookupByLibrary.simpleMessage("IP источника"),
+    "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage(
+      "Локальная политика",
+    ),
+    "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
+      "Автоматически применяются лишь изменения, доказанно входящие в возможности этой версии. Остальные ожидают проверки. Текущие соединения используют прежние сокеты; лимиты ресурсов могут задержать применение.",
+    ),
+    "sourceMaterialCounts": m68,
+    "sourceNoPermissions": MessageLookupByLibrary.simpleMessage(
+      "Нет принятых разрешений источника.",
+    ),
+    "sourceNodeUse": MessageLookupByLibrary.simpleMessage(
+      "Узлы, используемые как provider",
+    ),
+    "sourceNotDeclared": MessageLookupByLibrary.simpleMessage(
+      "Не указано в источнике",
+    ),
+    "sourceNotDelegated": MessageLookupByLibrary.simpleMessage(
+      "Автоматическое обслуживание ещё не разрешено.",
+    ),
+    "sourceOwnDefaultConflict": MessageLookupByLibrary.simpleMessage(
+      "Собственные правила должны завершаться единственным правилом MATCH с выбранным выходом для несовпавшего трафика.",
+    ),
+    "sourceOwnDefaultRequired": MessageLookupByLibrary.simpleMessage(
+      "Перед применением своих правил явно выберите выход для остального трафика.",
+    ),
+    "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
+      "Отключение исключает правила, слушатели и туннели источника. Для своих правил нужно явно выбрать выход для остального трафика. Пустые правила не восстанавливают правила источника. DNS и группы разрешаются отдельно.",
+    ),
+    "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
+      "Каждое действие относится только к указанному использованию. Остановка автоматического обслуживания сохраняет принятые данные. Прекращение использования закрывает затронутые соединения и запрещает повторное применение. Разрешения других способов использования сохраняются.",
+    ),
+    "sourcePermissions": MessageLookupByLibrary.simpleMessage(
+      "Разрешения источника",
+    ),
+    "sourcePermissionsUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Разрешения источников недоступны. Дождитесь готовности Core и повторите попытку.",
+    ),
+    "sourceProfileUse": MessageLookupByLibrary.simpleMessage(
+      "Содержимое Profile",
+    ),
+    "sourceProposedDns": m69,
+    "sourceProtocols": m70,
+    "sourceProviderChanged": MessageLookupByLibrary.simpleMessage(
+      "Изменён провайдер или источник его загрузки.",
+    ),
+    "sourceRecoveryDescription": MessageLookupByLibrary.simpleMessage(
+      "Проверьте сохранённые на устройстве профили, скрипты и разрешения. Передача трафика через текущую конфигурацию остановится, а незавершённые подтверждения будут отброшены. Затем проверьте источники и примените конфигурацию снова.",
+    ),
+    "sourceRecoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Проверить незавершённое сохранение",
+    ),
+    "sourceRecoveryUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Разрешение источника изменено, но checkpoint восстановления обновить не удалось. Восстановление после перезапуска недоступно.",
+    ),
+    "sourceRematchDenied": MessageLookupByLibrary.simpleMessage(
+      "Узлы REMATCH нельзя использовать, пока маршрутизация источника исключена.",
+    ),
+    "sourceReviewRequired": MessageLookupByLibrary.simpleMessage(
+      "Изменения источника необходимо проверить перед использованием.",
+    ),
+    "sourceReviewScope": MessageLookupByLibrary.simpleMessage(
+      "Принимайте только источники, которым доверяете выбор узлов и возможностей этой версии. Принятие материала и его применение — разные действия.",
+    ),
+    "sourceReviewTitle": MessageLookupByLibrary.simpleMessage(
+      "Проверка источника",
+    ),
+    "sourceRoutingChanged": MessageLookupByLibrary.simpleMessage(
+      "Изменены маршруты, фиксированная защита или выход по умолчанию.",
+    ),
+    "sourceRoutingExcluded": MessageLookupByLibrary.simpleMessage(
+      "Содержимое включает исключённые возможности маршрутизации. Удалите их или явно измените выбор маршрутизации источника.",
+    ),
+    "sourceRuleDelegation": m71,
+    "sourceRuleOrigin": MessageLookupByLibrary.simpleMessage(
+      "Источник правила",
+    ),
+    "sourceRuleSetUse": MessageLookupByLibrary.simpleMessage(
+      "Содержимое RuleSet",
+    ),
+    "sourceScriptScope": MessageLookupByLibrary.simpleMessage(
+      "Код может читать конфигурацию и писать в console. До принятия он не выполняется. Результат проверяется отдельно: принятие кода не разрешает любой его результат.",
+    ),
+    "sourceScriptTitle": MessageLookupByLibrary.simpleMessage(
+      "Проверка скрипта",
+    ),
+    "sourceStopAutomatic": MessageLookupByLibrary.simpleMessage(
+      "Остановить автоматическое обслуживание",
+    ),
+    "sourceStopUse": MessageLookupByLibrary.simpleMessage(
+      "Прекратить использование этих данных",
+    ),
+    "sourceStorageFull": MessageLookupByLibrary.simpleMessage(
+      "Достигнут предел хранилища источников. Операцию не удалось завершить.",
+    ),
+    "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
+      "Есть действующее изменение, которое нельзя безопасно классифицировать.",
+    ),
+    "sourceUseRouting": MessageLookupByLibrary.simpleMessage(
+      "Использовать правила источника",
+    ),
     "specialProxy": MessageLookupByLibrary.simpleMessage("Специальный прокси"),
     "specialRules": MessageLookupByLibrary.simpleMessage("Специальные правила"),
     "speedStatistics": MessageLookupByLibrary.simpleMessage(
@@ -2051,7 +2228,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("Получить профиль по URL"),
-    "urlTip": m62,
+    "urlTip": m72,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системный hosts",
@@ -2084,7 +2261,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Также устанавливать системные часы; Android это игнорирует",
     ),
-    "yearsAgo": m63,
+    "yearsAgo": m73,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

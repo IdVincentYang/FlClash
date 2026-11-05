@@ -242,6 +242,25 @@ class TrackerInfoDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     final metadata = trackerInfo.metadata;
+    final provenance = trackerInfo.provenance;
+    String shortRevision(Object? value) {
+      final revision = value is String ? value : '';
+      return revision.length > 12 ? revision.substring(0, 12) : revision;
+    }
+
+    final origin = provenance?['origin'] as String? ?? '';
+    var sourceLabel = appLocalizations.unknown;
+    if (provenance?['known'] == true) {
+      if (origin.startsWith('profile:')) {
+        sourceLabel = (provenance?['label'] as String?) ?? origin;
+      } else if (origin.startsWith('override:')) {
+        sourceLabel = appLocalizations.override;
+      } else if (origin.startsWith('policy:')) {
+        sourceLabel = appLocalizations.sourceLocalPolicy;
+      } else {
+        sourceLabel = appLocalizations.rule;
+      }
+    }
     return ListView(
       padding: const EdgeInsets.symmetric(
         horizontal: 16,
@@ -254,6 +273,25 @@ class TrackerInfoDetailView extends StatelessWidget {
             (appLocalizations.networkType, metadata.network),
             (appLocalizations.process, trackerInfo.progressText),
             (appLocalizations.rule, _ruleText(trackerInfo)),
+            if (provenance != null) ...[
+              (appLocalizations.sourceRuleOrigin, sourceLabel),
+              (
+                appLocalizations.sourceAppliedRevision,
+                shortRevision(provenance['appliedRevision']).isEmpty
+                    ? appLocalizations.unknown
+                    : shortRevision(provenance['appliedRevision']),
+              ),
+              (
+                appLocalizations.ruleSet,
+                (provenance['ruleSets'] as List? ?? const [])
+                    .whereType<Map>()
+                    .map((set) {
+                      final name = set['name'] as String? ?? '';
+                      return '${name.isEmpty ? appLocalizations.unknown : name} @ ${shortRevision(set['revision'])}';
+                    })
+                    .join(', '),
+              ),
+            ],
             (appLocalizations.upload, trackerInfo.upload.traffic.show),
             (appLocalizations.download, trackerInfo.download.traffic.show),
           ]),

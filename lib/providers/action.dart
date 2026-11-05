@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:fl_clash/common/boot_guard.dart';
 import 'package:fl_clash/common/config_input.dart';
@@ -11,6 +12,7 @@ import 'package:fl_clash/common/policy_migration.dart';
 import 'package:fl_clash/common/policy_draft.dart';
 import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/common/managed_material.dart';
+import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/database/database.dart';
@@ -23,6 +25,7 @@ import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/actions/system_exit.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/widgets/source_review.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +35,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 part 'actions/common.dart';
 part 'actions/setup.dart';
+part 'actions/source_acceptance.dart';
 part 'actions/policy_material.dart';
 part 'actions/backup.dart';
 part 'actions/policy_draft.dart';

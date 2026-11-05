@@ -174,9 +174,31 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m61(label) => "${label} must be a single item";
 
-  static String m62(label) => "${label} must be a URL";
+  static String m62(features) => "Accepted declared capabilities: ${features}";
 
-  static String m63(count) =>
+  static String m63(services) => "Accepted DNS scope: ${services}";
+
+  static String m64(protocols) => "Accepted node protocols: ${protocols}";
+
+  static String m65(count) => "Accepted revisions: ${count}";
+
+  static String m66(features) => "Declared capabilities: ${features}";
+
+  static String m67(target) => "Source default exit: ${target}";
+
+  static String m68(nodes, rules) =>
+      "Source material: ${nodes} nodes, ${rules} rules";
+
+  static String m69(services) => "Proposed DNS services: ${services}";
+
+  static String m70(protocols) => "Node protocols: ${protocols}";
+
+  static String m71(targets) =>
+      "Delegated proxy blocks: ${targets}. Conditions may cover any domain or IP. Fixed protection rules and the default stay unchanged; deletions that might expand DIRECT still need review.";
+
+  static String m72(label) => "${label} must be a URL";
+
+  static String m73(count) =>
       "${Intl.plural(count, one: '1 year ago', other: '${count} years ago')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1524,6 +1546,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "requestProxyDefault": m51,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Proxy target"),
+    "requestRestartRequired": MessageLookupByLibrary.simpleMessage(
+      "An unfinished local save may still be running. Open App info → Force stop, then open FlClash again. Restarting the proxy service or closing the screen is not enough. Review the saved data in Source permissions after reopening.",
+    ),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "The selected request route is unavailable.",
     ),
@@ -1864,7 +1889,148 @@ class MessageLookup extends MessageLookupByLibrary {
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKS port"),
     "sort": MessageLookupByLibrary.simpleMessage("Sort"),
     "source": MessageLookupByLibrary.simpleMessage("Source"),
+    "sourceAcceptRevision": MessageLookupByLibrary.simpleMessage(
+      "Accept this revision",
+    ),
+    "sourceAcceptedCapabilities": m62,
+    "sourceAcceptedDns": m63,
+    "sourceAcceptedProtocols": m64,
+    "sourceAcceptedRevisions": m65,
+    "sourceAppliedNotSaved": MessageLookupByLibrary.simpleMessage(
+      "Applied; recovery not saved",
+    ),
+    "sourceAppliedRevision": MessageLookupByLibrary.simpleMessage(
+      "Applied revision",
+    ),
+    "sourceAutomaticAllowed": MessageLookupByLibrary.simpleMessage(
+      "Automatic maintenance allowed",
+    ),
+    "sourceAutomaticStopped": MessageLookupByLibrary.simpleMessage(
+      "Automatic maintenance stopped",
+    ),
+    "sourceBinaryMaterial": MessageLookupByLibrary.simpleMessage(
+      "Binary RuleSet: accept only these exact bytes. The rule count is unknown until the original parser validates the material.",
+    ),
+    "sourceCapabilitiesChanged": MessageLookupByLibrary.simpleMessage(
+      "Node capabilities or group bindings changed.",
+    ),
+    "sourceCodeChanged": MessageLookupByLibrary.simpleMessage(
+      "The exact script code changed.",
+    ),
+    "sourceDeclaredCapabilities": m66,
+    "sourceDefaultExit": m67,
+    "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
+      "Allow maintenance within this scope",
+    ),
+    "sourceDnsChanged": MessageLookupByLibrary.simpleMessage(
+      "DNS services or their policy changed.",
+    ),
+    "sourceEntryChanged": MessageLookupByLibrary.simpleMessage(
+      "Listener, tunnel, or control capabilities changed.",
+    ),
+    "sourceFinalUse": MessageLookupByLibrary.simpleMessage(
+      "Final configuration",
+    ),
+    "sourceFirstUse": MessageLookupByLibrary.simpleMessage(
+      "This source has not been accepted for use.",
+    ),
+    "sourceImplicitDirect": MessageLookupByLibrary.simpleMessage(
+      "Implicit DIRECT fallback",
+    ),
+    "sourceInspectMaterial": MessageLookupByLibrary.simpleMessage(
+      "Inspect source text (may contain credentials)",
+    ),
     "sourceIp": MessageLookupByLibrary.simpleMessage("Source IP"),
+    "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("Local policy"),
+    "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
+      "Only proven changes within this revision’s capabilities may update automatically. Other changes stay pending. Existing connections stay on their original sockets; resource limits can delay adoption.",
+    ),
+    "sourceMaterialCounts": m68,
+    "sourceNoPermissions": MessageLookupByLibrary.simpleMessage(
+      "No accepted source permissions.",
+    ),
+    "sourceNodeUse": MessageLookupByLibrary.simpleMessage(
+      "Nodes used as a provider",
+    ),
+    "sourceNotDeclared": MessageLookupByLibrary.simpleMessage(
+      "Not declared by this source",
+    ),
+    "sourceNotDelegated": MessageLookupByLibrary.simpleMessage(
+      "Automatic maintenance has not been delegated.",
+    ),
+    "sourceOwnDefaultConflict": MessageLookupByLibrary.simpleMessage(
+      "Your own rules must end in one MATCH rule with the unmatched-traffic target you selected.",
+    ),
+    "sourceOwnDefaultRequired": MessageLookupByLibrary.simpleMessage(
+      "Choose an explicit unmatched-traffic target for your own rules before applying.",
+    ),
+    "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
+      "Turn off to exclude source routing, listeners and tunnels. Your own rules need an explicit unmatched-traffic target; empty rules never restore source routing. DNS and node groups remain independent uses.",
+    ),
+    "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
+      "Each action applies to the displayed use. Stopping automatic maintenance keeps accepted content. Stopping use closes affected connections and disables replay; other uses keep their own permissions.",
+    ),
+    "sourcePermissions": MessageLookupByLibrary.simpleMessage(
+      "Source permissions",
+    ),
+    "sourcePermissionsUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Source permissions are unavailable. Wait for the Core to be ready and retry.",
+    ),
+    "sourceProfileUse": MessageLookupByLibrary.simpleMessage("Profile content"),
+    "sourceProposedDns": m69,
+    "sourceProtocols": m70,
+    "sourceProviderChanged": MessageLookupByLibrary.simpleMessage(
+      "A provider or its download source changed.",
+    ),
+    "sourceRecoveryDescription": MessageLookupByLibrary.simpleMessage(
+      "Check the saved profiles, scripts and permissions on this device. This will stop traffic through the current configuration and discard unfinished approvals. Review sources and apply the configuration again after the check.",
+    ),
+    "sourceRecoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Review incomplete save",
+    ),
+    "sourceRecoveryUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Source permission changed, but the recovery checkpoint could not be updated. Restart recovery is unavailable.",
+    ),
+    "sourceRematchDenied": MessageLookupByLibrary.simpleMessage(
+      "REMATCH nodes cannot be used while source routing is excluded.",
+    ),
+    "sourceReviewRequired": MessageLookupByLibrary.simpleMessage(
+      "Source changes need review before they can be used.",
+    ),
+    "sourceReviewScope": MessageLookupByLibrary.simpleMessage(
+      "Accept only sources you trust to choose the nodes and capabilities in this revision. Acceptance and actual application are separate.",
+    ),
+    "sourceReviewTitle": MessageLookupByLibrary.simpleMessage("Review source"),
+    "sourceRoutingChanged": MessageLookupByLibrary.simpleMessage(
+      "Routing, fixed protections, or the default exit changed.",
+    ),
+    "sourceRoutingExcluded": MessageLookupByLibrary.simpleMessage(
+      "This content includes routing capabilities you excluded. Remove them or explicitly change the source routing choice.",
+    ),
+    "sourceRuleDelegation": m71,
+    "sourceRuleOrigin": MessageLookupByLibrary.simpleMessage("Rule source"),
+    "sourceRuleSetUse": MessageLookupByLibrary.simpleMessage(
+      "Rule set content",
+    ),
+    "sourceScriptScope": MessageLookupByLibrary.simpleMessage(
+      "This code can read the configuration and write to console. It will not run until accepted. Its output is reviewed separately; code acceptance does not approve every output.",
+    ),
+    "sourceScriptTitle": MessageLookupByLibrary.simpleMessage("Review script"),
+    "sourceStopAutomatic": MessageLookupByLibrary.simpleMessage(
+      "Stop automatic maintenance",
+    ),
+    "sourceStopUse": MessageLookupByLibrary.simpleMessage(
+      "Stop using this content",
+    ),
+    "sourceStorageFull": MessageLookupByLibrary.simpleMessage(
+      "The source storage limit was reached. This operation could not be completed.",
+    ),
+    "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
+      "An effective change could not be classified safely.",
+    ),
+    "sourceUseRouting": MessageLookupByLibrary.simpleMessage(
+      "Use source routing rules",
+    ),
     "specialProxy": MessageLookupByLibrary.simpleMessage("Special proxy"),
     "specialRules": MessageLookupByLibrary.simpleMessage("Special rules"),
     "speedStatistics": MessageLookupByLibrary.simpleMessage("Speed statistics"),
@@ -1960,7 +2126,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "urlDesc": MessageLookupByLibrary.simpleMessage(
       "Obtain a profile from a URL",
     ),
-    "urlTip": m62,
+    "urlTip": m72,
     "useHosts": MessageLookupByLibrary.simpleMessage("Use hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("Use system hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Used traffic"),
@@ -1985,7 +2151,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Also set the system clock; Android ignores it",
     ),
-    "yearsAgo": m63,
+    "yearsAgo": m73,
     "yes": MessageLookupByLibrary.simpleMessage("Yes"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Simplified Chinese"),
   };

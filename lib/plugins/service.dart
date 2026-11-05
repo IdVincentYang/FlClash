@@ -131,10 +131,12 @@ class Service {
   Future<Map<String, Object?>> failRunIntent(
     int requestId, {
     required int token,
+    bool unregistered = false,
   }) async {
     final result = await methodChannel.invokeMethod<String>('failRunIntent', {
       'requestId': requestId,
       'token': token,
+      'unregistered': unregistered,
     });
     if (result == null) throw StateError('Service cleanup unavailable');
     return Map<String, Object?>.from(json.decode(result) as Map);

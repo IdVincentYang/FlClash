@@ -13,6 +13,34 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConfigApplyStateMachineTest {
     @Test
+    fun `unregistered start failure preserves old ready input and ends preparing`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val machine = host.createMachine(object : ServiceStateHost by host {
+            override suspend fun configPhase(method: String, receipt: com.follow.clash.models.ConfigReceipt): com.follow.clash.models.ConfigApplyResult =
+                if (method == "abortConfig") com.follow.clash.models.ConfigApplyResult("superseded", receipt = receipt, fact = host.lastConfigFact)
+                else host.configPhase(method, receipt)
+        })
+        machine.syncSharedState(host.storedSharedState)
+        val idle = machine.prepareRunIntent(false)
+        assertEquals("installedInactive", machine.applyConfig(input(idle)).await().status)
+        val retained = host.lastConfigFact
+        val token = machine.configOperationToken()
+        val start = machine.prepareRunIntent(true)
+        assertEquals("cleaned", machine.failRunIntent(start, token, unregistered = true).status)
+        assertEquals("failed", machine.getRequestState().phase)
+        assertFalse(machine.getRequestState().intentRunning)
+        assertEquals(retained, host.lastConfigFact)
+        assertEquals(0, host.startCalls)
+        val next = machine.prepareRunIntent(true)
+        assertEquals("superseded", machine.failRunIntent(start, token, unregistered = true).status)
+        assertEquals(next, machine.getRequestState().intentRevision)
+        assertEquals("activated", machine.applyConfig(input(next)).await().status)
+        assertEquals("superseded", machine.failRunIntent(next, token, unregistered = true).status)
+        assertEquals("superseded", machine.failRunIntent(next, machine.configOperationToken(), unregistered = true).status)
+        assertEquals("started", machine.getRequestState().phase)
+    }
+
+    @Test
     fun `conditional build failure retires only its own service and keeps retained input`() = runTest {
         val host = ConfigServiceTestHost(backgroundScope)
         val machine = host.createMachine()

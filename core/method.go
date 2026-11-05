@@ -172,6 +172,7 @@ func withoutArguments(handle func(response MethodResponse)) methodHandler {
 }
 
 var methodHandlers = map[CoreMethod]methodHandler{
+	sourceAcceptanceMethod:    handleSourceAcceptance,
 	registerConfigInputMethod: registerConfigInput,
 	initClashMethod: func(call *MethodCall, response MethodResponse) {
 		var params InitParams
@@ -285,7 +286,7 @@ var methodHandlers = map[CoreMethod]methodHandler{
 		})
 	}),
 	getConnectionsMethod: withoutArguments(func(response MethodResponse) {
-		response.success(handleGetConnections())
+		response.success(handleGetConnectionsData())
 	}),
 	getConnectionCountMethod: withoutArguments(func(response MethodResponse) {
 		response.success(handleGetConnectionCount())

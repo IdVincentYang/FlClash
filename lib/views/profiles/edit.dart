@@ -281,6 +281,15 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
         onEdit: _editProfileFile,
         onUpload: _uploadProfileFile,
       ),
+      if (request.requiresSourceAcceptance)
+        ListItem(
+          title: Text(appLocalizations.sourcePermissions),
+          onTap: () => globalState.safeRun(
+            () => ref
+                .read(profilesActionProvider.notifier)
+                .manageSourcePermissions(widget.profile),
+          ),
+        ),
     ];
     return FocusTraversalGroup(
       policy: PageTraversalPolicy(),

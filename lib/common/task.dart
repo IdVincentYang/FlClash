@@ -7,6 +7,7 @@ import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/common/managed_material.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
@@ -111,23 +112,50 @@ ClashConfig buildClashConfig(Map<String, dynamic> configMap) {
 Future<({String yaml, String md5})> makeRealProfileTask(
   MakeRealProfileState data,
 ) async {
-  return compute<MakeRealProfileState, ({String yaml, String md5})>(
-    _makeRealProfileTask,
-    data,
-  );
+  final result = await makeProfileCompositionTask(data);
+  return (yaml: result.yaml, md5: result.md5);
 }
 
-Future<({String yaml, String md5})> _makeRealProfileTask(
+typedef ProfileComposition = ({
+  String yaml,
+  String md5,
+  Map<String, Object?> ledger,
+});
+typedef _CompositionInput = ({
   MakeRealProfileState data,
+  Map<String, String> origins,
+});
+
+Future<ProfileComposition> makeProfileCompositionTask(
+  MakeRealProfileState data, {
+  Map<String, String> origins = const {},
+}) => compute<_CompositionInput, ProfileComposition>(_makeProfileComposition, (
+  data: data,
+  origins: origins,
+));
+
+Future<ProfileComposition> _makeProfileComposition(
+  _CompositionInput input,
 ) async {
+  final data = input.data;
   if (data.policySelection != null) {
-    final yaml = await _encodeYaml(managedFinalProfile(data));
+    final finalConfig = managedFinalProfile(data);
+    final yaml = await _encodeYaml(finalConfig);
     if (utf8.encode(yaml).length > managedMaterialMaxBytes) {
       throw const FormatException('policy.materialBudget');
     }
-    return (yaml: yaml, md5: yaml.toMd5());
+    return (
+      yaml: yaml,
+      md5: yaml.toMd5(),
+      ledger: _compositionLedger(data, input.origins, finalConfig, 0),
+    );
   }
   final rawConfig = Map.from(data.rawConfig);
+  if (data.sourceRoutingDenied) {
+    for (final key in ['rules', 'sub-rules', 'listeners', 'tunnels']) {
+      rawConfig.remove(key);
+    }
+  }
   final realPatchConfig = data.realPatchConfig;
   final profilesPath = data.profilesPath;
   final profileId = data.profileId;
@@ -301,12 +329,36 @@ Future<({String yaml, String md5})> _makeRealProfileTask(
       };
     }
   }
+  final sourceRuleCount = (rawConfig['rules'] as List?)?.length ?? 0;
   final rules = composeProfileRules(
     sourceRules: rawConfig['rules'],
     customRules: data.rules,
     addedRules: addedRules,
     matchTarget: data.matchTarget,
   );
+  if (data.sourceRoutingDenied) {
+    final target = data.matchTarget?.trim();
+    if (target == null || target.isEmpty) {
+      throw const FormatException('sourceOwnRoutingUnmatchedRequired');
+    }
+    if (const {
+      'PASS',
+      'REMATCH',
+      'COMPATIBLE',
+    }.contains(target.toUpperCase())) {
+      throw const FormatException('sourceOwnRoutingDefaultConflict');
+    }
+    final matches = [
+      for (final line in rules)
+        if (Rule.parse(line).ruleAction == RuleAction.MATCH) line,
+    ];
+    if (matches.length > 1 ||
+        matches.any((line) => Rule.parse(line).ruleTarget != target) ||
+        matches.isNotEmpty && matches.last != rules.last) {
+      throw const FormatException('sourceOwnRoutingDefaultConflict');
+    }
+    if (matches.isEmpty) rules.add('MATCH,$target');
+  }
   if (data.proxies.isNotEmpty) {
     rawConfig['proxies'] = data.proxies.map((item) => item.definition).toList();
   }
@@ -315,13 +367,108 @@ Future<({String yaml, String md5})> _makeRealProfileTask(
         .map((item) => item.definition)
         .toList();
   }
+  if (data.sourceRoutingDenied &&
+      (rawConfig['proxies'] as List? ?? const []).any(
+        (node) =>
+            node is Map && node['type']?.toString().toLowerCase() == 'rematch',
+      )) {
+    throw const FormatException('sourceOwnRoutingRematchDenied');
+  }
   rawConfig['rules'] = rules;
   final yaml = await _encodeYaml(
     data.policySelection == null
         ? Map<String, dynamic>.from(rawConfig)
         : managedFinalProfile(data),
   );
-  return (yaml: yaml, md5: yaml.toMd5());
+  return (
+    yaml: yaml,
+    md5: yaml.toMd5(),
+    ledger: _compositionLedger(data, input.origins, rawConfig, sourceRuleCount),
+  );
+}
+
+Map<String, Object?> _compositionLedger(
+  MakeRealProfileState data,
+  Map<String, String> origins,
+  Map config,
+  int sourceRuleCount,
+) {
+  String hash(Object value) =>
+      sha256.convert(utf8.encode(jsonEncode(value))).toString();
+  String rangeHash(List<String> lines) => sha256
+      .convert(
+        utf8.encode(
+          lines
+              .map((line) => sha256.convert(utf8.encode(line)).toString())
+              .join(),
+        ),
+      )
+      .toString();
+  final localRevision = hash({
+    'rules': data.rules.map((rule) => rule.rawValue).toList(),
+    'default': data.matchTarget,
+  });
+  final addedRevision = hash(
+    data.addedRules.map((rule) => rule.rawValue).toList(),
+  );
+  final policyRevision = data.policySelection == null
+      ? ''
+      : hash(data.resolvedManagedPolicy ?? config);
+  final lists = <String, Object?>{};
+  void addList(String name, Object? raw, {bool main = false}) {
+    if (raw is! List || raw.any((line) => line is! String)) return;
+    final lines = List<String>.from(raw);
+    final ranges = <Map<String, Object?>>[];
+    void add(
+      int start,
+      int end,
+      String origin,
+      String revision, [
+      List<String> candidates = const [],
+    ]) {
+      if (end <= start) return;
+      ranges.add({
+        'start': start,
+        'end': end,
+        if (origin.isNotEmpty) 'origin': origin,
+        if (revision.isNotEmpty) 'revision': revision,
+        if (candidates.isNotEmpty) 'candidates': candidates,
+        'rulesDigest': rangeHash(lines.sublist(start, end)),
+      });
+    }
+
+    if (data.policySelection != null) {
+      add(0, lines.length, 'policy:${data.profileId}', policyRevision);
+    } else if (main && data.rules.isNotEmpty) {
+      add(0, lines.length, 'override:${data.profileId}', localRevision);
+    } else {
+      final prefix = main ? data.addedRules.length.clamp(0, lines.length) : 0;
+      add(0, prefix, 'application-rules', addedRevision);
+      final sourceEnd = main
+          ? (prefix + sourceRuleCount).clamp(prefix, lines.length)
+          : lines.length;
+      final profile = origins['profileKey'] ?? '';
+      final script = origins['scriptKey'];
+      add(
+        prefix,
+        sourceEnd,
+        script == null ? profile : '',
+        script == null ? origins['profileRevision'] ?? '' : '',
+        script == null ? const [] : [if (profile.isNotEmpty) profile, script],
+      );
+      add(sourceEnd, lines.length, 'override:${data.profileId}', localRevision);
+    }
+    lists[name] = ranges;
+  }
+
+  addList('rules', config['rules'], main: true);
+  final subRules = config['sub-rules'];
+  if (subRules is Map) {
+    for (final entry in subRules.entries) {
+      addList('sub-rules:${entry.key}', entry.value);
+    }
+  }
+  return {'version': 1, 'lists': lists};
 }
 
 typedef ShakingStoreArgs = ({

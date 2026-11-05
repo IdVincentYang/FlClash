@@ -357,6 +357,7 @@ abstract class MakeRealProfileState with _$MakeRealProfileState {
     @Default({}) Map<String, dynamic> injectedProxyProviders,
     @Default({}) Map<String, dynamic> injectedRuleProviders,
     String? matchTarget,
+    @Default(false) bool sourceRoutingDenied,
     @Default(false) bool safeMode,
     ProfilePolicySelection? policySelection,
     Map<String, dynamic>? resolvedManagedPolicy,

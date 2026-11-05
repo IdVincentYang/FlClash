@@ -472,6 +472,8 @@ Map<String, dynamic> _$ProviderSubscriptionInfoToJson(
 
 _ExternalProvider _$ExternalProviderFromJson(Map<String, dynamic> json) =>
     _ExternalProvider(
+      sourceKey: json['sourceKey'] as String? ?? '',
+      sourceStatus: json['sourceStatus'] as String? ?? '',
       name: json['name'] as String,
       type: json['type'] as String,
       path: json['path'] as String?,
@@ -485,6 +487,8 @@ _ExternalProvider _$ExternalProviderFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$ExternalProviderToJson(_ExternalProvider instance) =>
     <String, dynamic>{
+      'sourceKey': instance.sourceKey,
+      'sourceStatus': instance.sourceStatus,
       'name': instance.name,
       'type': instance.type,
       'path': instance.path,

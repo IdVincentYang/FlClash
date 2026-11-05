@@ -152,10 +152,10 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         else previous.copy(reason = if (recovery) "recovery" else "initializedIdle", phase = if (recovery) "failed" else "stopped")
     }
 
-    suspend fun failRunIntent(requestId: Long, token: Long, abort: Boolean = true): ConfigCleanupResult {
+    suspend fun failRunIntent(requestId: Long, token: Long, abort: Boolean = true, unregistered: Boolean = false): ConfigCleanupResult {
         val request = preparedRequest(requestId) ?: return ConfigCleanupResult("superseded")
         val receipt = pendingConfigReceipt
-        if (abort && receipt.owner != 0L && receipt.token == token && isCurrent(request) && configToken.get() == token) {
+        if (abort && !unregistered && receipt.owner != 0L && receipt.token == token && isCurrent(request) && configToken.get() == token) {
             val result = host.configPhase("abortConfig", receipt)
             if (result.status == "superseded") return ConfigCleanupResult("superseded")
             observeConfigFact(result.fact, authoritative = true)
@@ -163,6 +163,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         return transitionLock.withLock {
             if (!isCurrent(request) || configToken.get() != token) return@withLock ConfigCleanupResult("superseded")
             val state = getRequestState()
+            if (unregistered && state.phase !in setOf("preparing", "starting")) return@withLock ConfigCleanupResult("superseded")
             val identity = RequestServiceIdentity(state.serviceId, serviceRequestId, if (state.protectPhase in setOf("starting", "ready")) state.protectGeneration else 0)
             fail(request)
             synchronized(publicationLock) { retiringService = identity }

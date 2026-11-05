@@ -8172,6 +8172,586 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Review source`
+  String get sourceReviewTitle {
+    return Intl.message(
+      'Review source',
+      name: 'sourceReviewTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review script`
+  String get sourceScriptTitle {
+    return Intl.message(
+      'Review script',
+      name: 'sourceScriptTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Accept this revision`
+  String get sourceAcceptRevision {
+    return Intl.message(
+      'Accept this revision',
+      name: 'sourceAcceptRevision',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This source has not been accepted for use.`
+  String get sourceFirstUse {
+    return Intl.message(
+      'This source has not been accepted for use.',
+      name: 'sourceFirstUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `DNS services or their policy changed.`
+  String get sourceDnsChanged {
+    return Intl.message(
+      'DNS services or their policy changed.',
+      name: 'sourceDnsChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Routing, fixed protections, or the default exit changed.`
+  String get sourceRoutingChanged {
+    return Intl.message(
+      'Routing, fixed protections, or the default exit changed.',
+      name: 'sourceRoutingChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Node capabilities or group bindings changed.`
+  String get sourceCapabilitiesChanged {
+    return Intl.message(
+      'Node capabilities or group bindings changed.',
+      name: 'sourceCapabilitiesChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `A provider or its download source changed.`
+  String get sourceProviderChanged {
+    return Intl.message(
+      'A provider or its download source changed.',
+      name: 'sourceProviderChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Listener, tunnel, or control capabilities changed.`
+  String get sourceEntryChanged {
+    return Intl.message(
+      'Listener, tunnel, or control capabilities changed.',
+      name: 'sourceEntryChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The exact script code changed.`
+  String get sourceCodeChanged {
+    return Intl.message(
+      'The exact script code changed.',
+      name: 'sourceCodeChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Automatic maintenance has not been delegated.`
+  String get sourceNotDelegated {
+    return Intl.message(
+      'Automatic maintenance has not been delegated.',
+      name: 'sourceNotDelegated',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An effective change could not be classified safely.`
+  String get sourceUnknownChanged {
+    return Intl.message(
+      'An effective change could not be classified safely.',
+      name: 'sourceUnknownChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Accept only sources you trust to choose the nodes and capabilities in this revision. Acceptance and actual application are separate.`
+  String get sourceReviewScope {
+    return Intl.message(
+      'Accept only sources you trust to choose the nodes and capabilities in this revision. Acceptance and actual application are separate.',
+      name: 'sourceReviewScope',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use source routing rules`
+  String get sourceUseRouting {
+    return Intl.message(
+      'Use source routing rules',
+      name: 'sourceUseRouting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Turn off to exclude source routing, listeners and tunnels. Your own rules need an explicit unmatched-traffic target; empty rules never restore source routing. DNS and node groups remain independent uses.`
+  String get sourceOwnRoutingHint {
+    return Intl.message(
+      'Turn off to exclude source routing, listeners and tunnels. Your own rules need an explicit unmatched-traffic target; empty rules never restore source routing. DNS and node groups remain independent uses.',
+      name: 'sourceOwnRoutingHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Allow maintenance within this scope`
+  String get sourceDelegateMaintenance {
+    return Intl.message(
+      'Allow maintenance within this scope',
+      name: 'sourceDelegateMaintenance',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only proven changes within this revision’s capabilities may update automatically. Other changes stay pending. Existing connections stay on their original sockets; resource limits can delay adoption.`
+  String get sourceMaintenanceLimits {
+    return Intl.message(
+      'Only proven changes within this revision’s capabilities may update automatically. Other changes stay pending. Existing connections stay on their original sockets; resource limits can delay adoption.',
+      name: 'sourceMaintenanceLimits',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This code can read the configuration and write to console. It will not run until accepted. Its output is reviewed separately; code acceptance does not approve every output.`
+  String get sourceScriptScope {
+    return Intl.message(
+      'This code can read the configuration and write to console. It will not run until accepted. Its output is reviewed separately; code acceptance does not approve every output.',
+      name: 'sourceScriptScope',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source changes need review before they can be used.`
+  String get sourceReviewRequired {
+    return Intl.message(
+      'Source changes need review before they can be used.',
+      name: 'sourceReviewRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose an explicit unmatched-traffic target for your own rules before applying.`
+  String get sourceOwnDefaultRequired {
+    return Intl.message(
+      'Choose an explicit unmatched-traffic target for your own rules before applying.',
+      name: 'sourceOwnDefaultRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source material: {nodes} nodes, {rules} rules`
+  String sourceMaterialCounts(Object nodes, Object rules) {
+    return Intl.message(
+      'Source material: $nodes nodes, $rules rules',
+      name: 'sourceMaterialCounts',
+      desc: '',
+      args: [nodes, rules],
+    );
+  }
+
+  /// `Node protocols: {protocols}`
+  String sourceProtocols(Object protocols) {
+    return Intl.message(
+      'Node protocols: $protocols',
+      name: 'sourceProtocols',
+      desc: '',
+      args: [protocols],
+    );
+  }
+
+  /// `Accepted node protocols: {protocols}`
+  String sourceAcceptedProtocols(Object protocols) {
+    return Intl.message(
+      'Accepted node protocols: $protocols',
+      name: 'sourceAcceptedProtocols',
+      desc: '',
+      args: [protocols],
+    );
+  }
+
+  /// `Accepted declared capabilities: {features}`
+  String sourceAcceptedCapabilities(Object features) {
+    return Intl.message(
+      'Accepted declared capabilities: $features',
+      name: 'sourceAcceptedCapabilities',
+      desc: '',
+      args: [features],
+    );
+  }
+
+  /// `Accepted DNS scope: {services}`
+  String sourceAcceptedDns(Object services) {
+    return Intl.message(
+      'Accepted DNS scope: $services',
+      name: 'sourceAcceptedDns',
+      desc: '',
+      args: [services],
+    );
+  }
+
+  /// `Proposed DNS services: {services}`
+  String sourceProposedDns(Object services) {
+    return Intl.message(
+      'Proposed DNS services: $services',
+      name: 'sourceProposedDns',
+      desc: '',
+      args: [services],
+    );
+  }
+
+  /// `Not declared by this source`
+  String get sourceNotDeclared {
+    return Intl.message(
+      'Not declared by this source',
+      name: 'sourceNotDeclared',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source default exit: {target}`
+  String sourceDefaultExit(Object target) {
+    return Intl.message(
+      'Source default exit: $target',
+      name: 'sourceDefaultExit',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `Implicit DIRECT fallback`
+  String get sourceImplicitDirect {
+    return Intl.message(
+      'Implicit DIRECT fallback',
+      name: 'sourceImplicitDirect',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Declared capabilities: {features}`
+  String sourceDeclaredCapabilities(Object features) {
+    return Intl.message(
+      'Declared capabilities: $features',
+      name: 'sourceDeclaredCapabilities',
+      desc: '',
+      args: [features],
+    );
+  }
+
+  /// `Inspect source text (may contain credentials)`
+  String get sourceInspectMaterial {
+    return Intl.message(
+      'Inspect source text (may contain credentials)',
+      name: 'sourceInspectMaterial',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delegated proxy blocks: {targets}. Conditions may cover any domain or IP. Fixed protection rules and the default stay unchanged; deletions that might expand DIRECT still need review.`
+  String sourceRuleDelegation(Object targets) {
+    return Intl.message(
+      'Delegated proxy blocks: $targets. Conditions may cover any domain or IP. Fixed protection rules and the default stay unchanged; deletions that might expand DIRECT still need review.',
+      name: 'sourceRuleDelegation',
+      desc: '',
+      args: [targets],
+    );
+  }
+
+  /// `Your own rules must end in one MATCH rule with the unmatched-traffic target you selected.`
+  String get sourceOwnDefaultConflict {
+    return Intl.message(
+      'Your own rules must end in one MATCH rule with the unmatched-traffic target you selected.',
+      name: 'sourceOwnDefaultConflict',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `REMATCH nodes cannot be used while source routing is excluded.`
+  String get sourceRematchDenied {
+    return Intl.message(
+      'REMATCH nodes cannot be used while source routing is excluded.',
+      name: 'sourceRematchDenied',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source permissions`
+  String get sourcePermissions {
+    return Intl.message(
+      'Source permissions',
+      name: 'sourcePermissions',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Each action applies to the displayed use. Stopping automatic maintenance keeps accepted content. Stopping use closes affected connections and disables replay; other uses keep their own permissions.`
+  String get sourcePermissionEffects {
+    return Intl.message(
+      'Each action applies to the displayed use. Stopping automatic maintenance keeps accepted content. Stopping use closes affected connections and disables replay; other uses keep their own permissions.',
+      name: 'sourcePermissionEffects',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No accepted source permissions.`
+  String get sourceNoPermissions {
+    return Intl.message(
+      'No accepted source permissions.',
+      name: 'sourceNoPermissions',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Profile content`
+  String get sourceProfileUse {
+    return Intl.message(
+      'Profile content',
+      name: 'sourceProfileUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Nodes used as a provider`
+  String get sourceNodeUse {
+    return Intl.message(
+      'Nodes used as a provider',
+      name: 'sourceNodeUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Rule set content`
+  String get sourceRuleSetUse {
+    return Intl.message(
+      'Rule set content',
+      name: 'sourceRuleSetUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Final configuration`
+  String get sourceFinalUse {
+    return Intl.message(
+      'Final configuration',
+      name: 'sourceFinalUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Accepted revisions: {count}`
+  String sourceAcceptedRevisions(Object count) {
+    return Intl.message(
+      'Accepted revisions: $count',
+      name: 'sourceAcceptedRevisions',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Automatic maintenance allowed`
+  String get sourceAutomaticAllowed {
+    return Intl.message(
+      'Automatic maintenance allowed',
+      name: 'sourceAutomaticAllowed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Automatic maintenance stopped`
+  String get sourceAutomaticStopped {
+    return Intl.message(
+      'Automatic maintenance stopped',
+      name: 'sourceAutomaticStopped',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Stop automatic maintenance`
+  String get sourceStopAutomatic {
+    return Intl.message(
+      'Stop automatic maintenance',
+      name: 'sourceStopAutomatic',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Stop using this content`
+  String get sourceStopUse {
+    return Intl.message(
+      'Stop using this content',
+      name: 'sourceStopUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Binary RuleSet: accept only these exact bytes. The rule count is unknown until the original parser validates the material.`
+  String get sourceBinaryMaterial {
+    return Intl.message(
+      'Binary RuleSet: accept only these exact bytes. The rule count is unknown until the original parser validates the material.',
+      name: 'sourceBinaryMaterial',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The source storage limit was reached. This operation could not be completed.`
+  String get sourceStorageFull {
+    return Intl.message(
+      'The source storage limit was reached. This operation could not be completed.',
+      name: 'sourceStorageFull',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source permissions are unavailable. Wait for the Core to be ready and retry.`
+  String get sourcePermissionsUnavailable {
+    return Intl.message(
+      'Source permissions are unavailable. Wait for the Core to be ready and retry.',
+      name: 'sourcePermissionsUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This content includes routing capabilities you excluded. Remove them or explicitly change the source routing choice.`
+  String get sourceRoutingExcluded {
+    return Intl.message(
+      'This content includes routing capabilities you excluded. Remove them or explicitly change the source routing choice.',
+      name: 'sourceRoutingExcluded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source permission changed, but the recovery checkpoint could not be updated. Restart recovery is unavailable.`
+  String get sourceRecoveryUnavailable {
+    return Intl.message(
+      'Source permission changed, but the recovery checkpoint could not be updated. Restart recovery is unavailable.',
+      name: 'sourceRecoveryUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Applied; recovery not saved`
+  String get sourceAppliedNotSaved {
+    return Intl.message(
+      'Applied; recovery not saved',
+      name: 'sourceAppliedNotSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Rule source`
+  String get sourceRuleOrigin {
+    return Intl.message(
+      'Rule source',
+      name: 'sourceRuleOrigin',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Applied revision`
+  String get sourceAppliedRevision {
+    return Intl.message(
+      'Applied revision',
+      name: 'sourceAppliedRevision',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Local policy`
+  String get sourceLocalPolicy {
+    return Intl.message(
+      'Local policy',
+      name: 'sourceLocalPolicy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review incomplete save`
+  String get sourceRecoveryTitle {
+    return Intl.message(
+      'Review incomplete save',
+      name: 'sourceRecoveryTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check the saved profiles, scripts and permissions on this device. This will stop traffic through the current configuration and discard unfinished approvals. Review sources and apply the configuration again after the check.`
+  String get sourceRecoveryDescription {
+    return Intl.message(
+      'Check the saved profiles, scripts and permissions on this device. This will stop traffic through the current configuration and discard unfinished approvals. Review sources and apply the configuration again after the check.',
+      name: 'sourceRecoveryDescription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An unfinished local save may still be running. Open App info → Force stop, then open FlClash again. Restarting the proxy service or closing the screen is not enough. Review the saved data in Source permissions after reopening.`
+  String get requestRestartRequired {
+    return Intl.message(
+      'An unfinished local save may still be running. Open App info → Force stop, then open FlClash again. Restarting the proxy service or closing the screen is not enough. Review the saved data in Source permissions after reopening.',
+      name: 'requestRestartRequired',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

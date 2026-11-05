@@ -169,6 +169,7 @@ func (p *stagedRuleProvider) RequestContext() context.Context { return p.entry.c
 func (p *stagedRuleProvider) underlyingProvider() P.Provider  { return p.RuleSetProvider }
 
 type providerStage struct {
+	prepared  *preparedConfig
 	receipt   ConfigReceipt
 	scope     *requestscope.BusinessScope
 	registry  *appRequestRegistry
@@ -197,6 +198,7 @@ func newProviderStage(p *preparedConfig) *providerStage {
 	s := &providerStage{receipt: p.receipt, scope: p.scope, registry: appRequests, ctx: ctx, cancel: cancel,
 		task: make(chan *config.Config, 1), setup: make(chan struct{}), ready: make(chan struct{}), done: make(chan struct{}), failed: make(chan struct{}), networkDone: make(chan struct{})}
 	s.stopScope = context.AfterFunc(p.scope.Context(), s.retire)
+	s.prepared = p
 	return s
 }
 
@@ -338,6 +340,7 @@ func (s *providerStage) run() {
 	}
 	if cfg != nil {
 		cfg.CloseProviders()
+		closeSourceConfigProxies(s.prepared, cfg)
 	}
 	s.stopScope()
 }

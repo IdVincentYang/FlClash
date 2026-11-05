@@ -23,6 +23,8 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:mocktail/mocktail.dart';
+import '../helpers/test_source_acceptance.dart';
 
 class _Native implements Service {
   @override
@@ -37,6 +39,8 @@ class _Native implements Service {
   var stopReason = 'userStop';
   var rejectBegin = false;
   var running = false;
+  String? nativePhase;
+  var corePhase = 'ready';
   var bridgeEligibility = false;
   var hasProxy = false;
   var valid = true;
@@ -50,7 +54,7 @@ class _Native implements Service {
     'directNetworkId': 'synthetic-network',
     'defaultNetworkKind': 'nonVpn',
     'protectPhase': 'none',
-    'phase': running ? 'started' : 'stopped',
+    'phase': nativePhase ?? (running ? 'started' : 'stopped'),
     'reason': running ? 'none' : stopReason,
   };
 
@@ -113,7 +117,7 @@ class _Native implements Service {
       'inspect' => {
         'state': snapshot,
         'owner': 1,
-        'phase': 'ready',
+        'phase': corePhase,
         'dataset': dataset,
         'sourceRevision': sources[data['key']] ?? 0,
         'commits': 0,
@@ -183,12 +187,13 @@ class _SocketProbe extends Notifier<RoutedProbeState<String, String>>
   }
 }
 
-class _ValidationCore implements CoreHandlerInterface {
+class _ValidationCore extends Mock implements CoreHandlerInterface {
+  _ValidationCore() {
+    stubAcceptedSourceFixtures(this, project: (_) async => {});
+  }
   @override
   Future<ConfigFact> getConfigState() async =>
       const ConfigFact(runtimeEpoch: 'fixture');
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   @override
   Future<String> validateConfig(String path) async => '';
   @override
@@ -505,6 +510,79 @@ void main() {
     },
   );
 
+  testWidgets('provider recovery cancellation allows a new explicit attempt', (
+    tester,
+  ) async {
+    await showApp(tester);
+    native.nativePhase = 'failed';
+    native.stopReason = 'setupFailed';
+    native.corePhase = 'unready';
+    const url = 'http://127.0.0.1/provider';
+    late Future<RequestSession> first;
+    await tester.runAsync(() async {
+      first = client.begin(
+        key: 'provider-proxy:recovery',
+        url: url,
+        label: 'A · 127.0.0.1',
+        allowBootstrap: true,
+      );
+    });
+    final cancelled = expectLater(first, throwsA(isA<RequestUnavailable>()));
+    await waitForRecovery(tester);
+    await tester.tap(find.text(AppLocalizations.current.cancel));
+    await tester.runAsync(() => cancelled);
+    expect(
+      native.calls.where((c) => ['begin', 'permit'].contains(c['action'])),
+      isEmpty,
+    );
+    expect(proxyHeaders, isEmpty);
+    native.nativePhase = 'preparing';
+    native.running = true;
+    late Future<RequestSession> retry;
+    await tester.runAsync(() async {
+      retry = client.begin(
+        key: 'provider-proxy:recovery',
+        url: url,
+        label: 'A · 127.0.0.1',
+        allowBootstrap: true,
+      );
+    });
+    await waitForRecovery(tester);
+    await tester.tap(find.text(AppLocalizations.current.confirm));
+    final session = await tester.runAsync(() => retry);
+    final permit = native.calls.singleWhere((c) => c['action'] == 'permit');
+    final begin = native.calls.singleWhere((c) => c['action'] == 'begin');
+    expect(permit['url'], url);
+    expect(begin['kind'], 'bootstrap');
+    expect(begin['proxy'], 'DIRECT');
+    session!.close();
+  });
+
+  testWidgets('native started with unready Core cannot offer recovery', (
+    tester,
+  ) async {
+    await showApp(tester);
+    native.running = true;
+    native.corePhase = 'unready';
+    native.rejectBegin = true;
+    await tester.runAsync(
+      () => expectLater(
+        client.begin(
+          key: 'provider-proxy:running',
+          url: 'http://127.0.0.1/provider',
+          allowBootstrap: true,
+        ),
+        throwsA(isA<RequestUnavailable>()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(AppLocalizations.current.requestDirectRecoveryTitle),
+      findsNothing,
+    );
+    expect(native.calls.where((c) => c['action'] == 'permit'), isEmpty);
+  });
+
   test(
     'ordinary running proxy failure never asks for a bootstrap permit',
     () async {
@@ -803,9 +881,12 @@ void main() {
           label: 'pending $change',
           url: 'http://127.0.0.1/original',
         ).copyWith(autoUpdate: false);
-        await tester.runAsync(
-          () => database.profiles.put(original.toCompanion()),
-        );
+        await tester.runAsync(() async {
+          await database.profiles.put(original.toCompanion());
+          final file = File(await appPath.getProfilePath('${original.id}'));
+          await file.parent.create(recursive: true);
+          await file.writeAsString('confirmed file');
+        });
         await edit.pumpEditProfile(
           tester,
           profile: original,
@@ -818,6 +899,14 @@ void main() {
             backupActionProvider.overrideWith(() => _ImportBackup(client)),
           ],
         );
+        final metadata = find.text('confirmed file'.length.traffic.show);
+        for (var i = 0; metadata.evaluate().isEmpty && i < 100; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        expect(metadata, findsOneWidget);
         final form = globalState.container;
         form.listen(configProvider, (_, _) {});
         await tester.enterText(

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/config_input.dart';
+import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/common/managed_material.dart';
 import 'package:fl_clash/common/policy_draft.dart';
@@ -47,6 +48,7 @@ class _RecoverySetup extends SetupAction {
     required Future<bool> Function() isCurrent,
     required ConfigFact previous,
     Future<bool> Function()? canSubmit,
+    bool allowSourceReview = true,
   }) async {
     postEntered?.complete();
     await postGate?.future;
@@ -54,6 +56,7 @@ class _RecoverySetup extends SetupAction {
       isCurrent: isCurrent,
       previous: previous,
       canSubmit: canSubmit,
+      allowSourceReview: allowSourceReview,
     );
     outcomes.add(result);
     return result;
@@ -65,6 +68,13 @@ class _Selection extends PolicySelectionAction {
   final Request client;
   @override
   bool get supportsManaged => true;
+  @override
+  Request get requestClient => client;
+}
+
+class _Backup extends BackupAction {
+  _Backup(this.client);
+  final Request client;
   @override
   Request get requestClient => client;
 }
@@ -133,10 +143,18 @@ class _Profiles extends ProfilesAction {
   }
 }
 
+class _Scripts extends ScriptsAction {
+  _Scripts(this.client);
+  final Request client;
+  @override
+  Request get requestClient => client;
+}
+
 class _BridgeCore extends CoreHandlerInterface {
   _BridgeCore(this.bridge);
   final PolicyCoreBridge bridge;
   final calls = <CoreMethod>[];
+  final sourceReviews = <Map<String, Object?>>[];
   Completer<void>? registerEntered, registerGate;
   Completer<void>? failureEntered, failureGate;
   Completer<void>? projectionEntered, projectionGate;
@@ -152,7 +170,11 @@ class _BridgeCore extends CoreHandlerInterface {
     Duration? timeout,
   }) async {
     calls.add(method);
-    if (method == CoreMethod.getConfig && readGate != null) {
+    final sourceAction = method == CoreMethod.sourceAcceptance
+        ? (arguments as Map)['action']
+        : null;
+    if ((method == CoreMethod.getConfig || sourceAction == 'project') &&
+        readGate != null) {
       final gate = readGate!;
       readGate = null;
       readEntered?.complete();
@@ -186,11 +208,14 @@ class _BridgeCore extends CoreHandlerInterface {
       CoreMethod.releaseConfigInput => 'refreshRelease',
       CoreMethod.getProxies => 'refreshGroups',
       CoreMethod.getExternalProviders => 'refreshProviders',
+      CoreMethod.sourceAcceptance => 'source',
       _ => throw UnsupportedError(method.name),
     };
     final response = await bridge.call(operation, arguments);
-    if (method == CoreMethod.activateConfig &&
-        response['status'] == 'activated' &&
+    if ((method == CoreMethod.activateConfig &&
+                response['status'] == 'activated' ||
+            sourceAction == 'adoptInline' &&
+                (response['result'] as Map?)?['status'] == 'applied') &&
         nativeAfterActivation != null) {
       final native = await bridge.call('nativeState');
       native['revision'] = (native['revision'] as num).toInt() + 1;
@@ -210,13 +235,46 @@ class _BridgeCore extends CoreHandlerInterface {
       await gate.future;
     }
     if (response['error'] != null) {
+      if (method == CoreMethod.sourceAcceptance) {
+        final error = response['error'] as Map;
+        throw CoreMethodException(
+          code: error['code'] as String,
+          message: error['message'] as String,
+          details: error['details'],
+        );
+      }
       throw StateError('Synthetic Core request failed');
+    }
+    if (method == CoreMethod.sourceAcceptance) {
+      final result = Map<String, dynamic>.from(response['result'] as Map);
+      if (sourceAction == 'review') {
+        sourceReviews.add({
+          'key': (arguments as Map)['key'],
+          'status': result['status'],
+          'reasons': result['reasons'],
+        });
+      }
+      if (sourceAction == 'project' && materialReadOverride != null) {
+        result['document'] = materialReadOverride!(
+          Map<String, dynamic>.from(result['document'] as Map),
+        );
+      }
+      return result as T;
     }
     if (method == CoreMethod.getConfig && materialReadOverride != null) {
       return materialReadOverride!(
             Map<String, dynamic>.from(response['value'] as Map),
           )
           as T?;
+    }
+    if (method == CoreMethod.prepareConfig ||
+        method == CoreMethod.installConfig ||
+        method == CoreMethod.activateConfig) {
+      sourceReviews.add({
+        'step': method.name,
+        'status': response['status'],
+        'message': response['message'],
+      });
     }
     return (response.containsKey('value') ? response['value'] : response) as T?;
   }
@@ -237,6 +295,7 @@ void main() {
   late SetupAction setup;
   late _Native native;
   final received = <String>[];
+  final confirmations = <SourceReview>[];
   final holds = <String, Completer<void>>{};
   final responses = <String, String>{};
   final controls = <Map<String, Object?>>[];
@@ -268,6 +327,7 @@ void main() {
     containerDisposed = false;
     SharedPreferences.setMockInitialValues({});
     received.clear();
+    confirmations.clear();
     holds.clear();
     responses.clear();
     controls.clear();
@@ -281,7 +341,7 @@ void main() {
         environment: {'FLCLASH_APPLICATION_INPUT_BRIDGE_HOME': root.path},
       ),
     );
-    await bridge.call('refreshState');
+    await bridge.call('sourceState');
     core = _BridgeCore(bridge);
     store = Database(NativeDatabase.memory());
     database = store;
@@ -331,7 +391,16 @@ void main() {
     client = Request.scoped(native: native, isAndroid: true);
     container = ProviderContainer(
       overrides: [
+        sourceConfirmationProvider.overrideWithValue((review) async {
+          confirmations.add(review);
+          return SourceReviewDecision(
+            automatic: review.kind != 'script',
+            routing: 'source',
+          );
+        }),
         profilesActionProvider.overrideWith(() => _Profiles(client)),
+        backupActionProvider.overrideWith(() => _Backup(client)),
+        scriptsActionProvider.overrideWith(() => _Scripts(client)),
         policySelectionActionProvider.overrideWith(() => _Selection(client)),
         setupActionProvider.overrideWith(() => _RecoverySetup(native, client)),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -397,11 +466,16 @@ void main() {
     }
   }
 
-  Future<void> until(Future<bool> Function() condition) async {
+  Future<void> until(
+    Future<bool> Function() condition, {
+    Object Function()? evidence,
+  }) async {
     final clock = Stopwatch()..start();
     while (!await condition()) {
       if (clock.elapsed > const Duration(seconds: 5)) {
-        fail('consumer did not finish');
+        fail(
+          'consumer did not finish${evidence == null ? '' : ': ${evidence()}'}',
+        );
       }
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
@@ -462,6 +536,7 @@ void main() {
           delay: wake == 'timer' ? const Duration(seconds: 2) : Duration.zero,
           notify: wake == 'timer',
         );
+        final acceptedScopes = confirmations.length;
         switch (wake) {
           case 'attach':
             await profiles.autoUpdateProfiles();
@@ -480,6 +555,7 @@ void main() {
         await until(() async => observed.outcomes.isNotEmpty);
         expect(received, ['/1']);
         expect(observed.outcomes.single, ProfileApplicationOutcome.activated);
+        expect(confirmations, hasLength(acceptedScopes));
         expect((await core.getConfigState()).businessActive, true);
         expect((await bridge.call('nativeState'))['intentRevision'], 2);
         expect(container.read(currentProfileIdProvider), 1);
@@ -599,7 +675,7 @@ void main() {
   );
 
   test(
-    'activated refresh permits its own Owner transition while preserving the run intent',
+    'activated refresh retains its Owner and native token while preserving the run intent',
     () async {
       final a = profile(1);
       await put([a]);
@@ -617,7 +693,8 @@ void main() {
       expect(result.application, ProfileApplicationOutcome.activated);
       final after = await core.getConfigState();
       expect(after.businessActive, true);
-      expect(after.owner, isNot(before.owner));
+      expect(after.owner, before.owner);
+      expect(after.token, before.token);
       expect(globalState.lastConfigMd5, isNot('before-active-refresh'));
       expect((await bridge.call('nativeState'))['intentRevision'], 2);
       expect((await bridge.call('nativeState'))['revision'], 3);
@@ -941,7 +1018,11 @@ void main() {
       gate.complete();
       expect((await first).materialSaved, true);
       final result = await second;
-      expect(result.materialSaved, true);
+      expect(
+        result.materialSaved,
+        true,
+        reason: '${result.failure} / ${core.sourceReviews}',
+      );
       expect(received, ['/1', '/new']);
       expect((await store.profilesDao.query().get()).single.url, next.url);
     },
@@ -1017,7 +1098,12 @@ void main() {
       final stale = await second;
       expect(stale.materialSaved, false);
       expect(stale.application, ProfileApplicationOutcome.superseded);
-      expect((await third).materialSaved, true);
+      final latest = await third;
+      expect(
+        latest.materialSaved,
+        true,
+        reason: '${latest.failure} / ${core.sourceReviews}',
+      );
       expect(received, ['/1', '/newest']);
       expect((await store.profilesDao.query().get()).single.url, newest.url);
     },
@@ -1139,7 +1225,166 @@ void main() {
   );
 
   test(
-    'a missing accepted manifest remains unknown and receives conditional failure handling',
+    'R3 invalid local import preserves the old file and formal permission',
+    () async {
+      final a = profile(1).copyWith(url: '');
+      await put([a]);
+      expect(await setup.applyProfile(force: true), true);
+      final before = await core.getConfigState();
+      final path = File(await appPath.getProfilePath('1'));
+      final old = await path.readAsBytes();
+      await expectLater(
+        profiles.importFile(a, utf8.encode('mixed-port: invalid-local-port\n')),
+        throwsA(isA<Exception>()),
+      );
+      expect(await path.readAsBytes(), old);
+      final after = await core.getConfigState();
+      expect(after.owner, before.owner);
+      expect(after.replayEligible, before.replayEligible);
+      expect(
+        await File('${root.path}/request-recovery-required').exists(),
+        false,
+      );
+      expect(received, isEmpty);
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'R3 local fresh import publishes only after the actual file and DB save',
+    () async {
+      final a = profile(1).copyWith(url: '');
+      await put([a]);
+      expect(await setup.applyProfile(force: true), true);
+      final source = await client.captureSource('profile:1');
+      final acceptance = SourceAcceptance(
+        core: CoreController.scoped(core),
+        requests: client,
+      );
+      final before = (await acceptance.permissions(
+        source: source,
+        kind: 'profile',
+      )).single;
+      final body = [
+        0xef,
+        0xbb,
+        0xbf,
+        ...utf8.encode('$yaml# explicit local fresh import\n'),
+      ];
+      await profiles.importFile(a, body);
+      expect(await File(await appPath.getProfilePath('1')).readAsBytes(), body);
+      final current = await client.captureSource('profile:1');
+      final after = (await acceptance.permissions(
+        source: current,
+        kind: 'profile',
+      )).single;
+      expect(after.incarnation, isNot(before.incarnation));
+      expect(
+        await File('${root.path}/request-recovery-required').exists(),
+        false,
+      );
+      expect(received, isEmpty);
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'R3 local import DB failure restores bytes and frontend recovery rebuilds the actual old source',
+    () async {
+      final a = profile(1).copyWith(url: '');
+      await put([a]);
+      expect(await setup.applyProfile(force: true), true);
+      final path = File(await appPath.getProfilePath('1'));
+      final old = await path.readAsBytes();
+      await store.customStatement(
+        "CREATE TRIGGER fail_material_profile BEFORE UPDATE ON profiles BEGIN SELECT RAISE(ABORT, 'controlled local DB failure'); END",
+      );
+      await expectLater(
+        profiles.importFile(
+          a,
+          utf8.encode('$yaml# uncommitted local material\n'),
+        ),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(await path.readAsBytes(), old);
+      expect(client.partialCommit, true);
+      expect(
+        await File('${root.path}/request-recovery-required').exists(),
+        true,
+      );
+      await store.customStatement('DROP TRIGGER fail_material_profile');
+      final acceptance = SourceAcceptance(
+        core: CoreController.scoped(core),
+        requests: client,
+      );
+      final source = await client.captureSource('application-config');
+      final actual = (await store.profilesDao.query().get()).single;
+      final snapshot = await acceptance.inspectMaterialRecovery(
+        source: source,
+        rows: [
+          {
+            'key': 'profile:${actual.id}',
+            'identity': SourceAcceptance.fingerprint({
+              'kind': 'profile',
+              'id': actual.id,
+              'url': actual.url,
+              'type': actual.type.name,
+            }),
+          },
+        ],
+      );
+      await acceptance.recoverMaterialCommit(
+        source: source,
+        snapshot: snapshot,
+      );
+      expect(client.partialCommit, false);
+      expect(await setup.applyProfile(force: true), true);
+      expect(await path.readAsBytes(), old);
+      expect(
+        await File('${root.path}/request-recovery-required').exists(),
+        false,
+      );
+      expect(received, isEmpty);
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'R3 local Script save publishes exact code and DB failure keeps the old code',
+    () async {
+      final scripts = container.read(scriptsActionProvider.notifier);
+      final script = Script(
+        id: 91,
+        label: 'local synthetic',
+        lastUpdateTime: DateTime(2026),
+      );
+      await store.scriptsDao.setAll([script]);
+      await scripts.saveScript(
+        script,
+        'function main(config) { return config; }',
+      );
+      final path = File(await script.path);
+      final old = await path.readAsBytes();
+      await store.customStatement(
+        "CREATE TRIGGER fail_material_script BEFORE UPDATE ON scripts BEGIN SELECT RAISE(ABORT, 'controlled script DB failure'); END",
+      );
+      await expectLater(
+        scripts.saveScript(script, 'function main(config) { return {}; }'),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(await path.readAsBytes(), old);
+      expect(client.partialCommit, true);
+      expect(
+        await File('${root.path}/request-recovery-required').exists(),
+        true,
+      );
+      expect(received, isEmpty);
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'a missing accepted manifest blocks new source acceptance and preserves uncommitted material',
     () async {
       final a = profile(1), b = profile(2);
       await put([a, b]);
@@ -1149,14 +1394,17 @@ void main() {
           .where((m) => m == CoreMethod.registerConfigInput)
           .length;
       await File('${root.path}/config-inputs/${before.inputId}.json').delete();
-      final result = await profiles.updateProfile(b);
-      expect(result.materialSaved, true);
-      expect(result.application, isNot(ProfileApplicationOutcome.notRequired));
+      final path = File(await appPath.getProfilePath('2'));
+      final previous = await path.readAsBytes();
+      await expectLater(
+        profiles.updateProfile(b),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(await path.readAsBytes(), previous);
       expect(
         core.calls.where((m) => m == CoreMethod.registerConfigInput).length,
         count,
       );
-      expect(core.calls, contains(CoreMethod.failConfigBuild));
     },
     skip: executable == null,
   );
@@ -1605,20 +1853,23 @@ void main() {
       final before = await core.getConfigState();
       final automatic = f.profile.copyWith(autoUpdate: true);
       await put([automatic], files: false);
+      final confirmed = confirmations.length;
       await profiles.autoUpdateProfiles();
       await until(
         () async =>
             (await store.profilesDao.query().get()).first.lastUpdateDate !=
             null,
+        evidence: () => core.sourceReviews,
       );
       await until(() async {
         final fact = await core.getConfigState();
         return fact.businessActive && fact.inputId != before.inputId;
-      });
+      }, evidence: () => core.sourceReviews);
       expect(
         (await bridge.call('probe', 'automatic.example.test'))['body'],
         'B',
       );
+      expect(confirmations, hasLength(confirmed));
     },
     skip: materialSkip,
   );
@@ -1703,7 +1954,11 @@ void main() {
             scripts.add(script);
             return evaluator(script: script, config: config);
           };
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true),
+        true,
+        reason: '${core.sourceReviews} / evaluations:${scripts.length}',
+      );
       expect((await bridge.call('probe', 'script.example.test'))['body'], 'B');
       expect(scripts, isNotEmpty);
       expect(scripts.toSet(), {scriptBody});
@@ -2044,6 +2299,105 @@ void main() {
           Platform.environment['FLCLASH_MANAGED_PROFILE_COMPILER'] == null,
     );
   }
+
+  for (final recovery in [false, true]) {
+    test(
+      'real Go backup restore clears only its ${recovery ? 'retained' : 'own'} durable barrier',
+      () async {
+        await put([profile(1)]);
+        if (recovery) await client.markRecoveryRequired();
+        final staging = Directory('${root.path}/owned-restore-staging');
+        await Directory('${staging.path}/profiles').create(recursive: true);
+        const restored = '$yaml# restored by actual backup actor\n';
+        await File('${staging.path}/profiles/1.yaml').writeAsString(restored);
+        await container
+            .read(backupActionProvider.notifier)
+            .applyRestore(
+              MigrationData(
+                profiles: [profile(1).copyWith(label: 'Restored fixture')],
+              ),
+              RestoreOption.onlyProfiles,
+              stagingDirPath: staging.path,
+            );
+        expect(
+          (await store.profilesDao.query().get()).single.label,
+          'Restored fixture',
+        );
+        expect(
+          await File(await appPath.getProfilePath('1')).readAsString(),
+          restored,
+        );
+        expect(client.partialCommit, false);
+        expect(
+          await File('${root.path}/request-recovery-required').exists(),
+          false,
+        );
+        final completed = controls.lastWhere((c) => c['action'] == 'complete');
+        if (recovery) {
+          final cleared = controls.lastWhere(
+            (c) => c['action'] == 'clearRecovery',
+          );
+          expect(cleared['id'], completed['id']);
+          expect(cleared['client'], completed['client']);
+        }
+      },
+      skip: executable == null,
+    );
+  }
+
+  test(
+    'R3.4 actual Dart late finally cannot mutate the replacement client dataset',
+    () async {
+      final entered = Completer<void>(), release = Completer<void>();
+      final work = client.localCommit(() async {
+        entered.complete();
+        await release.future;
+        await client.markPartialCommit();
+      });
+      await entered.future;
+      await bridge.call('control', {'action': 'engineDetach'});
+      final replacement = ProviderContainer();
+      addTearDown(replacement.dispose);
+      client.attach(replacement);
+      await client.ready().timeout(const Duration(seconds: 2));
+      final before = await client.captureSource('application-config');
+      await expectLater(
+        profiles.manageSourcePermissions(profile(1)),
+        throwsA(
+          isA<RequestUnavailable>().having(
+            (e) => e.code,
+            'code',
+            'request_restart_required',
+          ),
+        ),
+      );
+      expect(
+        const RequestUnavailable('request_restart_required').toString(),
+        contains('Force stop'),
+      );
+      release.complete();
+      await expectLater(
+        work,
+        throwsA(
+          isA<RequestUnavailable>().having(
+            (e) => e.code,
+            'code',
+            'request_partial_commit',
+          ),
+        ),
+      );
+      final after = await client.captureSource('application-config');
+      expect(after.client, before.client);
+      expect(after.snapshot['dataset'], before.snapshot['dataset']);
+      expect(
+        await File('${root.path}/request-recovery-required').exists(),
+        true,
+      );
+      final completion = controls.lastWhere((c) => c['action'] == 'complete');
+      expect(completion['client'], isNot(before.client));
+    },
+    skip: executable == null,
+  );
 
   for (final local in [false, true]) {
     for (final failure in ['before', 'after']) {

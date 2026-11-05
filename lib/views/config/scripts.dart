@@ -101,6 +101,13 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
           onDelete: () {
             _handleDelete(script);
           },
+          onPermissions: () {
+            unawaited(
+              globalState.safeRun(
+                () => _scriptsAction.manageSourcePermissions(script),
+              ),
+            );
+          },
         ),
         onPressed: () {
           _handleToEditor(script);
@@ -406,6 +413,7 @@ class _ScriptItemMenu extends ConsumerWidget {
     required this.onEditUrl,
     required this.onUpdate,
     required this.onDelete,
+    required this.onPermissions,
   });
 
   final Script script;
@@ -413,6 +421,7 @@ class _ScriptItemMenu extends ConsumerWidget {
   final VoidCallback onEditUrl;
   final VoidCallback onUpdate;
   final VoidCallback onDelete;
+  final VoidCallback onPermissions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -432,6 +441,12 @@ class _ScriptItemMenu extends ConsumerWidget {
                 key: const ValueKey('menu'),
                 popupBuilder: (_) => CommonPopupMenu(
                   items: [
+                    if (request.requiresSourceAcceptance)
+                      CommonPopupMenuItem(
+                        glyph: AppGlyphs.settings,
+                        label: appLocalizations.sourcePermissions,
+                        onPressed: onPermissions,
+                      ),
                     CommonPopupMenuItem(
                       glyph: AppGlyphs.edit,
                       label: appLocalizations.edit,

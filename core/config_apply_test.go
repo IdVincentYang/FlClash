@@ -106,7 +106,7 @@ func TestConfigStagedBindingCannotOpenBeforeActivation(t *testing.T) {
 	}))
 	defer provider.Close()
 	defer releaseOnce.Do(func() { close(release) })
-	input := writeTestInput(t, fmt.Sprintf("mixed-port: %d\nmode: rule\nproxy-providers:\n  local:\n    type: http\n    url: %s\n    path: ./local-provider.yaml\nproxy-groups:\n  - name: pick\n    type: select\n    use: [local]\nrules: [\"MATCH,pick\"]\n", port, provider.URL))
+	input := writeLegacyTestInput(t, fmt.Sprintf("mixed-port: %d\nmode: rule\nproxy-providers:\n  local:\n    type: http\n    url: %s\n    path: ./local-provider.yaml\nproxy-groups:\n  - name: pick\n    type: select\n    use: [local]\nrules: [\"MATCH,pick\"]\n", port, provider.URL))
 	receipt := registerConfigOperation(methodCallSeq.Add(1), ConfigInputRequest{InputID: input, Active: true})
 	p := prepareConfig(receipt)
 	if p.Status != "prepared" {
@@ -538,6 +538,10 @@ func configTestEnvironment(t *testing.T) {
 		stopBusinessListeners()
 		if currentConfig != nil {
 			currentConfig.CloseProviders()
+			closeSourceConfigProxies(pendingConfig, currentConfig)
+		}
+		if os.Getenv("FLCLASH_SOURCE_TEST_CHILD") == t.Name() {
+			return
 		}
 		pendingConfig, appliedConfig, configFact, currentConfig = previousPending, previousApplied, previousFact, previousConfig
 		latestConfig.Store(previousOperation)
@@ -551,6 +555,14 @@ func configTestEnvironment(t *testing.T) {
 }
 
 func writeTestInput(t *testing.T, yaml string, dependencies ...string) string {
+	return writeTestInputVersion(t, yaml, 2, dependencies...)
+}
+
+func writeLegacyTestInput(t *testing.T, yaml string, dependencies ...string) string {
+	return writeTestInputVersion(t, yaml, 1, dependencies...)
+}
+
+func writeTestInputVersion(t *testing.T, yaml string, version int, dependencies ...string) string {
 	t.Helper()
 	raw := []byte(yaml)
 	digest := inputHash(raw)
@@ -561,8 +573,49 @@ func writeTestInput(t *testing.T, yaml string, dependencies ...string) string {
 	if dependencies == nil {
 		dependencies = []string{"profile:7", "script:9"}
 	}
-	manifest := ConfigManifest{Version: 1, YAMLSHA256: digest, ProfileID: &id, ProfileName: "accepted", Dependencies: dependencies, SelectedMap: map[string]string{}, TestURL: "http://127.0.0.1/"}
+	for _, key := range []string{"profile:7", "application-config"} {
+		if !slices.Contains(dependencies, key) {
+			dependencies = append(slices.Clone(dependencies), key)
+		}
+	}
+	manifest := ConfigManifest{Version: 2, YAMLSHA256: digest, ProfileID: &id, ProfileName: "accepted", Dependencies: dependencies, SelectedMap: map[string]string{}, TestURL: "http://127.0.0.1/"}
+	acceptedDigest := digest
+	if _, summary, err := decodeSourceContent(raw); err == nil {
+		acceptedDigest = summary.Digest
+	}
+	for _, key := range append(slices.Clone(dependencies), "config:7") {
+		if !strings.HasPrefix(key, "config:") && !strings.HasPrefix(key, "profile:") && !strings.HasPrefix(key, "script:") && !strings.HasPrefix(key, "clash-provider:") {
+			continue
+		}
+		kind := sourcePurpose(key)
+		if strings.HasPrefix(key, "clash-provider:") {
+			kind = "provider-proxy"
+		}
+		permissions, err := readSourcePermissions(C.Path.HomeDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var revision uint64
+		if grant := permissions.Grants[key]; grant != nil {
+			revision = grant.Revision
+		}
+		var uses []SourceUse
+		useDigest := acceptedDigest
+		if kind == "config" {
+			uses = canonicalSourceUses(manifest.SourceUses)
+			useDigest = sourceCompositionDigest(acceptedDigest, uses)
+		}
+		use, err := acceptSourceRevisionUses(C.Path.HomeDir(), key, inputHash([]byte("synthetic source "+key)), useDigest, "source", "", false, revision, kind, uses)
+		if err != nil {
+			t.Fatal(err)
+		}
+		manifest.SourceUses = append(manifest.SourceUses, use)
+	}
 	bytes, _ := json.Marshal(manifest)
+	if version == 1 {
+		manifest.Version, manifest.SourceUses = 1, nil
+		bytes, _ = json.Marshal(manifest)
+	}
 	input := inputHash(bytes)
 	if err := atomicConfigFile(filepath.Join(inputDirectory(C.Path.HomeDir()), input+".json"), bytes); err != nil {
 		t.Fatal(err)

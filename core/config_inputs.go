@@ -69,6 +69,15 @@ func collectConfigInputsAt(expectedHome, releasedMarker string) error {
 	keep := make(map[string]bool)
 	activeNonces := make(map[string]bool)
 	checkpointMu.Lock()
+	pendingMaterial, pendingErr := readSourceMaterialPending(C.Path.HomeDir())
+	if pendingErr != nil {
+		checkpointMu.Unlock()
+		return pendingErr
+	}
+	if pendingMaterial != nil && !pendingMaterial.Cleared {
+		keep[pendingMaterial.ParentInput+".json"] = true
+		keep[pendingMaterial.TargetInput+".json"] = true
+	}
 	if ref, err := readCheckpointLocked(C.Path.HomeDir()); err == nil {
 		keep[ref.InputID+".json"] = true
 	}
@@ -80,6 +89,13 @@ func collectConfigInputsAt(expectedHome, releasedMarker string) error {
 		keep[p.receipt.InputID+".json"] = true
 		keep[p.manifest.YAMLSHA256+".yaml"] = true
 	}
+	for _, p := range []*preparedConfig{pendingConfig, appliedConfig} {
+		if p != nil {
+			for _, id := range p.sourceRetiredInputs {
+				keep[id+".json"] = true
+			}
+		}
+	}
 	if appliedConfig != nil && validInputID(configFact.InputID) {
 		keep[configFact.InputID+".json"] = true
 	}
@@ -90,6 +106,16 @@ func collectConfigInputsAt(expectedHome, releasedMarker string) error {
 	client, clientReady := appRequests.client, appRequests.clientReady
 	appRequests.mu.Unlock()
 	checkpointMu.Unlock()
+	stagedCore.Lock()
+	if stage := stagedCore.stage; stage != nil && stage.prepared != nil {
+		p := stage.prepared
+		keep[p.receipt.InputID+".json"] = true
+		keep[p.manifest.YAMLSHA256+".yaml"] = true
+		for _, id := range p.sourceRetiredInputs {
+			keep[id+".json"] = true
+		}
+	}
+	stagedCore.Unlock()
 	entries, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
 		return nil
@@ -150,7 +176,7 @@ func collectConfigInputsAt(expectedHome, releasedMarker string) error {
 			return err
 		}
 	}
-	return nil
+	return collectSourceMaterialsLocked(C.Path.HomeDir())
 }
 
 func init() {

@@ -93,6 +93,19 @@ mixin CoreInterface {
 }
 
 abstract class CoreHandlerInterface with CoreInterface {
+  /// Android source permission RPC. Callers select it through Request's platform
+  /// boundary; unavailable authority fails rather than granting legacy fallback.
+  Future<Map<String, dynamic>> sourceAcceptance(
+    Map<String, Object?> input,
+  ) async {
+    final result = await invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.sourceAcceptance,
+      arguments: input,
+    );
+    if (result == null) throw StateError('Source acceptance unavailable');
+    return result;
+  }
+
   Future<void> releaseConfigInput(String markerName) async {
     await invokeMethod<bool>(
       method: CoreMethod.releaseConfigInput,

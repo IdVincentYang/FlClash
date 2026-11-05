@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -193,6 +195,7 @@ class Profiles extends _$Profiles {
       for (final affected in await database.proxyGroupsDao.profileIdsUsing(
         previous.realLabel,
       )) {
+        if (networkResult && affected == profile.id) continue;
         await request.invalidate('profile:$affected');
       }
     }
@@ -230,8 +233,13 @@ class Profiles extends _$Profiles {
     );
   }
 
-  Future<void> deletePersisted(int id) async {
-    await request.invalidate('profile:$id');
+  Future<void> deletePersisted(int id, {Request? client}) async {
+    final requests = client ?? request;
+    await requests.invalidate('profile:$id');
+    await SourceAcceptance(
+      core: ref.read(coreHandlerProvider),
+      requests: requests,
+    ).reset(keys: ['profile:$id', 'config:$id']);
     await database.deleteProfile(id);
     state = state.where((item) => item.id != id).toList();
   }
@@ -347,8 +355,13 @@ class Scripts extends _$Scripts with AsyncNotifierMixin, OptimisticMixin {
     }),
   );
 
-  Future<void> deletePersisted(int id) async {
-    await request.invalidate('script:$id');
+  Future<void> deletePersisted(int id, {Request? client}) async {
+    final requests = client ?? request;
+    await requests.invalidate('script:$id');
+    await SourceAcceptance(
+      core: ref.read(coreHandlerProvider),
+      requests: requests,
+    ).reset(keys: ['script:$id']);
     await database.scripts.remove((table) => table.id.equals(id));
   }
 
@@ -442,6 +455,10 @@ class ClashProviders extends _$ClashProviders
       next,
       () => request.mutate(() async {
         await request.invalidate('clash-provider:$id');
+        await SourceAcceptance(
+          core: ref.read(coreHandlerProvider),
+          requests: request,
+        ).reset(keys: ['clash-provider:$id']);
         await database.clashProviders.remove((t) => t.id.equals(id));
       }),
     );

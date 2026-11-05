@@ -1,5 +1,8 @@
 # Android 业务数据处理与覆盖边界
 
+> L2-T05 Android实现评审通过，待本地交付及M收尾：[来源接受契约](source_acceptance_design.md)和[指南](source_acceptance_guide.md)。
+> 材料接受、未来维护与实际采用分开；新增grant／候选／ledger为有界私有元信息，不扩大业务数据用途。
+
 **Android 构建禁用 ZeroTier；该增量已完成本机验证与 ARM64 构建，未做设备安装验证。** 本文维护业务正文、连接 metadata、统计和日志的当前处理说明及覆盖边界。
 共用链已做源码审查和本机 DIRECT／SOCKS5 合成验证；其它 adapter 主要为入口及选定分支走读。
 这些证据不等于 Android TUN 实测或整个安装包的安全结论，不据“没有观察到”排除其它路径。

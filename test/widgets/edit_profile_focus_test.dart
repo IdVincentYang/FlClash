@@ -41,6 +41,7 @@ class _NoopSetupAction extends SetupAction {
     bool silence = false,
     bool force = false,
     Future<bool> Function()? isCurrent,
+    bool allowSourceReview = true,
   }) {}
 
   @override

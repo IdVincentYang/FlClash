@@ -3,17 +3,25 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mocktail/mocktail.dart';
+
+import '../helpers/test_source_acceptance.dart';
+
+class _Core extends Mock implements CoreHandlerInterface {}
 
 Profile _profile(int id, String label) => Profile(
   id: id,
@@ -52,8 +60,13 @@ void main() {
   });
 
   ProviderContainer buildContainer({Config? config}) {
+    final core = _Core();
+    stubAcceptedSourceFixtures(core);
     final container = ProviderContainer(
-      overrides: config == null ? [] : buildConfigOverrides(config),
+      overrides: [
+        if (config != null) ...buildConfigOverrides(config),
+        coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+      ],
     );
     container.listen(configProvider, (_, _) {});
     addTearDown(container.dispose);

@@ -55,12 +55,21 @@ class _Setup extends SetupAction {
         requests: Request.scoped(native: native, isAndroid: false),
       );
   int builds = 0;
+  final bootstrapChoices = <bool>[];
   Completer<void>? buildGate;
   Completer<void>? stopGate;
   final listenerTargets = <bool>[];
   @override
-  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
+  Future<bool> applyProfile({
+    bool silence = false,
+    bool force = false,
+    bool allowSourceReview = true,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
+  }) async {
     builds++;
+    bootstrapChoices.add(allowBootstrap);
     await buildGate?.future;
     return true;
   }
@@ -145,6 +154,22 @@ void main() {
 
   setUp(configure);
   tearDown(() => container.dispose());
+
+  for (final entry in ['ui', 'tile', 'initialize', 'prepared', 'paused']) {
+    test('only a fresh UI intent carries provider recovery: $entry', () async {
+      await setup.setRunning(
+        true,
+        initialize: entry == 'initialize',
+        preparedRequestId: entry == 'prepared' ? 99 : null,
+        source: entry == 'tile' ? 'tile' : 'ui',
+        paused: entry == 'paused',
+      );
+      expect(
+        setup.bootstrapChoices,
+        entry == 'paused' ? isEmpty : [entry == 'ui'],
+      );
+    });
+  }
 
   test(
     'a late pause response cannot recreate intent after manual Stop',

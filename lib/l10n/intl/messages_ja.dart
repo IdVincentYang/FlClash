@@ -154,9 +154,30 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m61(label) => "${label}は1項目のみ指定できます";
 
-  static String m62(label) => "${label}はURLである必要があります";
+  static String m62(features) => "承認済みの宣言された機能：${features}";
 
-  static String m63(count) => "${count} 年前";
+  static String m63(services) => "承認済みDNSの範囲：${services}";
+
+  static String m64(protocols) => "承認済みのノードプロトコル：${protocols}";
+
+  static String m65(count) => "承認済みバージョン数：${count}";
+
+  static String m66(features) => "宣言された機能：${features}";
+
+  static String m67(target) => "ソースの既定の出口：${target}";
+
+  static String m68(nodes, rules) => "ソース材料：ノード ${nodes} 件、規則 ${rules} 件";
+
+  static String m69(services) => "提案されたDNSサービス：${services}";
+
+  static String m70(protocols) => "ノードのプロトコル：${protocols}";
+
+  static String m71(targets) =>
+      "委任するプロキシ規則ブロック：${targets}。条件は任意のドメインまたはIPを対象にできます。固定保護と既定の出口は変えず、DIRECTを拡大し得る削除は確認が必要です。";
+
+  static String m72(label) => "${label}はURLである必要があります";
+
+  static String m73(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -1252,6 +1273,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "requestProxyDefault": m51,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("プロキシの接続先"),
+    "requestRestartRequired": MessageLookupByLibrary.simpleMessage(
+      "未完了のローカル保存が実行中の可能性があります。アプリ情報 → 強制停止を選び、FlClashを開き直してください。プロキシサービスの再起動や画面を閉じるだけでは解決しません。開き直した後、ソースの権限で保存済みデータを確認してください。",
+    ),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "選択した通信経路は現在利用できません。",
     ),
@@ -1524,7 +1548,122 @@ class MessageLookup extends MessageLookupByLibrary {
     "socksPort": MessageLookupByLibrary.simpleMessage("SOCKSポート"),
     "sort": MessageLookupByLibrary.simpleMessage("並べ替え"),
     "source": MessageLookupByLibrary.simpleMessage("ソース"),
+    "sourceAcceptRevision": MessageLookupByLibrary.simpleMessage("この版を承認"),
+    "sourceAcceptedCapabilities": m62,
+    "sourceAcceptedDns": m63,
+    "sourceAcceptedProtocols": m64,
+    "sourceAcceptedRevisions": m65,
+    "sourceAppliedNotSaved": MessageLookupByLibrary.simpleMessage(
+      "適用済み・復元情報は未保存",
+    ),
+    "sourceAppliedRevision": MessageLookupByLibrary.simpleMessage("適用リビジョン"),
+    "sourceAutomaticAllowed": MessageLookupByLibrary.simpleMessage("自動保守を許可"),
+    "sourceAutomaticStopped": MessageLookupByLibrary.simpleMessage("自動保守を停止済み"),
+    "sourceBinaryMaterial": MessageLookupByLibrary.simpleMessage(
+      "バイナリRuleSet：この正確なバイト列のみを承認します。元のパーサーが検証するまでルール数は不明です。",
+    ),
+    "sourceCapabilitiesChanged": MessageLookupByLibrary.simpleMessage(
+      "ノードの機能またはグループの参照が変更されました。",
+    ),
+    "sourceCodeChanged": MessageLookupByLibrary.simpleMessage(
+      "スクリプトのコードが変更されました。",
+    ),
+    "sourceDeclaredCapabilities": m66,
+    "sourceDefaultExit": m67,
+    "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
+      "この範囲での保守を許可",
+    ),
+    "sourceDnsChanged": MessageLookupByLibrary.simpleMessage(
+      "DNSサービスまたはポリシーが変更されました。",
+    ),
+    "sourceEntryChanged": MessageLookupByLibrary.simpleMessage(
+      "リスナー、トンネル、または制御機能が変更されました。",
+    ),
+    "sourceFinalUse": MessageLookupByLibrary.simpleMessage("最終設定"),
+    "sourceFirstUse": MessageLookupByLibrary.simpleMessage(
+      "このソースはまだ使用を承認されていません。",
+    ),
+    "sourceImplicitDirect": MessageLookupByLibrary.simpleMessage(
+      "暗黙のDIRECTフォールバック",
+    ),
+    "sourceInspectMaterial": MessageLookupByLibrary.simpleMessage(
+      "ソース原文を確認（認証情報を含む場合があります）",
+    ),
     "sourceIp": MessageLookupByLibrary.simpleMessage("送信元IP"),
+    "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("ローカルポリシー"),
+    "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
+      "この版の機能範囲内と確認できる変更だけを自動更新します。他の変更は確認待ちになります。既存接続は元のソケットを使い続け、資源の上限により適用が遅れる場合があります。",
+    ),
+    "sourceMaterialCounts": m68,
+    "sourceNoPermissions": MessageLookupByLibrary.simpleMessage(
+      "承認済みのソース権限はありません。",
+    ),
+    "sourceNodeUse": MessageLookupByLibrary.simpleMessage("providerとして使うノード"),
+    "sourceNotDeclared": MessageLookupByLibrary.simpleMessage("このソースでは未指定"),
+    "sourceNotDelegated": MessageLookupByLibrary.simpleMessage(
+      "自動保守はまだ委任されていません。",
+    ),
+    "sourceOwnDefaultConflict": MessageLookupByLibrary.simpleMessage(
+      "独自ルールの末尾には、選択した未一致時の出口を使うMATCHルールを1つだけ指定してください。",
+    ),
+    "sourceOwnDefaultRequired": MessageLookupByLibrary.simpleMessage(
+      "独自規則を適用する前に、未一致通信の出口を明示してください。",
+    ),
+    "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
+      "オフにするとソースの規則、リスナー、トンネルを除外します。独自規則には未一致通信の出口を明示する必要があります。空の規則でソース規則は復元されません。DNSとグループは別々に承認します。",
+    ),
+    "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
+      "操作は表示された用途だけに適用されます。自動保守の停止は承認済みの内容を保持します。使用の停止は影響する接続を閉じ、再適用を無効にします。他の用途の権限は維持されます。",
+    ),
+    "sourcePermissions": MessageLookupByLibrary.simpleMessage("ソースの権限"),
+    "sourcePermissionsUnavailable": MessageLookupByLibrary.simpleMessage(
+      "ソース権限を利用できません。Coreの準備が整ってから再試行してください。",
+    ),
+    "sourceProfileUse": MessageLookupByLibrary.simpleMessage("Profileの設定内容"),
+    "sourceProposedDns": m69,
+    "sourceProtocols": m70,
+    "sourceProviderChanged": MessageLookupByLibrary.simpleMessage(
+      "プロバイダーまたは取得元が変更されました。",
+    ),
+    "sourceRecoveryDescription": MessageLookupByLibrary.simpleMessage(
+      "この端末に保存されたプロファイル、スクリプト、権限を確認します。現在の設定による通信を停止し、未完了の承認を破棄します。確認後にソースを再確認して設定を適用してください。",
+    ),
+    "sourceRecoveryTitle": MessageLookupByLibrary.simpleMessage("未完了の保存を確認"),
+    "sourceRecoveryUnavailable": MessageLookupByLibrary.simpleMessage(
+      "ソース権限は変更されましたが、復元checkpointを更新できませんでした。再起動時の復元は利用できません。",
+    ),
+    "sourceRematchDenied": MessageLookupByLibrary.simpleMessage(
+      "ソースのルーティングを除外している間は、REMATCHノードを使用できません。",
+    ),
+    "sourceReviewRequired": MessageLookupByLibrary.simpleMessage(
+      "ソースの変更を使用するには確認が必要です。",
+    ),
+    "sourceReviewScope": MessageLookupByLibrary.simpleMessage(
+      "この版のノードと機能を選択する権限を信頼できるソースだけを承認してください。材料の承認と実際の適用は別の操作です。",
+    ),
+    "sourceReviewTitle": MessageLookupByLibrary.simpleMessage("ソースを確認"),
+    "sourceRoutingChanged": MessageLookupByLibrary.simpleMessage(
+      "ルーティング、固定保護、または既定の出口が変更されました。",
+    ),
+    "sourceRoutingExcluded": MessageLookupByLibrary.simpleMessage(
+      "この内容には除外したルーティング機能が含まれます。削除するか、ソースのルーティング設定を明示的に変更してください。",
+    ),
+    "sourceRuleDelegation": m71,
+    "sourceRuleOrigin": MessageLookupByLibrary.simpleMessage("ルールの出所"),
+    "sourceRuleSetUse": MessageLookupByLibrary.simpleMessage("RuleSetの内容"),
+    "sourceScriptScope": MessageLookupByLibrary.simpleMessage(
+      "このコードは設定を読み、consoleに出力できます。承認前には実行せず、出力も別に確認します。コードの承認はすべての出力の承認ではありません。",
+    ),
+    "sourceScriptTitle": MessageLookupByLibrary.simpleMessage("スクリプトを確認"),
+    "sourceStopAutomatic": MessageLookupByLibrary.simpleMessage("自動保守を停止"),
+    "sourceStopUse": MessageLookupByLibrary.simpleMessage("この内容の使用を停止"),
+    "sourceStorageFull": MessageLookupByLibrary.simpleMessage(
+      "ソース保存容量の上限に達したため、操作を完了できませんでした。",
+    ),
+    "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
+      "安全に分類できない有効な変更があります。",
+    ),
+    "sourceUseRouting": MessageLookupByLibrary.simpleMessage("ソースのルーティング規則を使用"),
     "specialProxy": MessageLookupByLibrary.simpleMessage("特殊プロキシ"),
     "specialRules": MessageLookupByLibrary.simpleMessage("特殊ルール"),
     "speedStatistics": MessageLookupByLibrary.simpleMessage("速度統計"),
@@ -1602,7 +1741,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("アップロード"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("URLからプロファイルを取得します"),
-    "urlTip": m62,
+    "urlTip": m72,
     "useHosts": MessageLookupByLibrary.simpleMessage("Hostsを使用"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("システムのHostsを使用"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("使用済みトラフィック"),
@@ -1623,7 +1762,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "システムクロックも設定します。Androidでは無視されます",
     ),
-    "yearsAgo": m63,
+    "yearsAgo": m73,
     "yes": MessageLookupByLibrary.simpleMessage("はい"),
     "zhCN": MessageLookupByLibrary.simpleMessage("簡体字中国語"),
   };

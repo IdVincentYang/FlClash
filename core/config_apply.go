@@ -27,6 +27,9 @@ import (
 )
 
 type ConfigManifest struct {
+	RuleLedger        *SourceRuleLedger          `json:"ruleLedger,omitempty"`
+	ProviderMaterials []SourceProviderMaterial   `json:"providerMaterials,omitempty"`
+	SourceUses        []SourceUse                `json:"sourceUses,omitempty"`
 	ManagedMaterials  *ManagedMaterialsReceipt   `json:"managedMaterials,omitempty"`
 	Version           int                        `json:"version"`
 	YAMLSHA256        string                     `json:"yamlSha256"`
@@ -93,6 +96,7 @@ type ServiceCoreParams struct {
 }
 
 type ConfigFact struct {
+	MaterialPending  bool   `json:"materialPending,omitempty"`
 	RuntimeEpoch     string `json:"runtimeEpoch"`
 	Version          uint64 `json:"version"`
 	Token            uint64 `json:"token"`
@@ -127,20 +131,31 @@ type configOperation struct {
 	reading atomic.Bool
 }
 type preparedConfig struct {
-	op         *configOperation
-	manifest   ConfigManifest
-	bytes      []byte
-	raw        *config.RawConfig
-	cfg        *config.Config
-	receipt    ConfigReceipt
-	coreParams ServiceCoreParams
-	mixed      *listener.MixedBinding
-	dns        *configDNSBinding
-	scope      *requestscope.BusinessScope
-	stage      *providerStage
-	sources    map[string]uint64
-	dataset    uint64
-	eligible   bool
+	inputVersion        int
+	sourceClose         sync.Once
+	sourceTrace         atomic.Pointer[sourceTraceState]
+	sourceSerial        sync.Mutex
+	sourceProviders     map[string]*sourceProviderRuntime
+	sourcePrepared      bool
+	sourceRecovery      *sourceMaterialPending
+	sourceRetiredCount  int
+	sourceRetiredBytes  int
+	sourceInlineRetired []sourceInlineGeneration
+	sourceRetiredInputs []string
+	op                  *configOperation
+	manifest            ConfigManifest
+	bytes               []byte
+	raw                 *config.RawConfig
+	cfg                 *config.Config
+	receipt             ConfigReceipt
+	coreParams          ServiceCoreParams
+	mixed               *listener.MixedBinding
+	dns                 *configDNSBinding
+	scope               *requestscope.BusinessScope
+	stage               *providerStage
+	sources             map[string]uint64
+	dataset             uint64
+	eligible            bool
 }
 
 var (
@@ -254,7 +269,7 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 	if err = json.Unmarshal(data, &manifest); err != nil {
 		return manifest, nil, nil, "", err
 	}
-	if manifest.Version != 1 || !validInputID(manifest.YAMLSHA256) || len(manifest.Dependencies) == 0 {
+	if manifest.Version != 1 && manifest.Version != 2 || features.Android && manifest.Version != 2 || !validInputID(manifest.YAMLSHA256) || len(manifest.Dependencies) == 0 {
 		return manifest, nil, nil, "", errors.New("invalid input manifest")
 	}
 	if receipt := manifest.ManagedMaterials; receipt != nil {
@@ -270,8 +285,16 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 	if inputHash(data) != manifest.YAMLSHA256 {
 		return manifest, nil, nil, "", errors.New("input YAML digest mismatch")
 	}
+	if manifest.Version == 2 {
+		if err = validateInputSourceUses(home, manifest, data); err != nil {
+			return manifest, nil, nil, "", err
+		}
+	}
 	raw, parsedSHA, err := decodeConfigDocument(data)
 	if err != nil {
+		return manifest, nil, nil, "", err
+	}
+	if err := validateSourceRuleLedger(manifest, raw.Rule, raw.SubRules); err != nil {
 		return manifest, nil, nil, "", err
 	}
 
@@ -279,6 +302,9 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 		return manifest, nil, nil, "", err
 	}
 	if err = validateManagedInput(manifest, raw); err != nil {
+		return manifest, nil, nil, "", err
+	}
+	if err = validateSourceProviderMaterials(home, manifest, raw); err != nil {
 		return manifest, nil, nil, "", err
 	}
 	return manifest, slices.Clone(data), raw, parsedSHA, nil
@@ -335,12 +361,18 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 		return ConfigApplyResult{Status: "superseded", Receipt: receipt, Message: err.Error()}
 	}
 	defer op.reading.Store(false)
+	if err := requestWriterError(); err != nil {
+		return configResult("rejected", receipt, err)
+	}
 	readID, err := lockConfigInputRead()
 	if err != nil {
 		return ConfigApplyResult{Status: "rejected", Receipt: receipt, Message: err.Error()}
 	}
 	defer configMu.Unlock()
 	defer appRequests.endDataRead(readID)
+	if err := requestWriterError(); err != nil {
+		return configResult("rejected", receipt, err)
+	}
 
 	op, err = currentConfigOperation(receipt)
 	if err != nil {
@@ -425,7 +457,9 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	receipt.Owner = owner.ID
 	p := &preparedConfig{op: op, manifest: manifest, bytes: bytes, raw: raw, receipt: receipt, sources: sources, dataset: dataset, eligible: true}
 	p.scope = requestscope.NewBusinessScope(receipt.Token, func() bool { return businessAllowed(p) })
+	p.inputVersion = manifest.Version
 	p.coreParams = ServiceCoreParams{MixedPort: raw.MixedPort, LocalReachable: !raw.AllowLan || raw.BindAddress == "*" || raw.BindAddress == "0.0.0.0" || raw.BindAddress == "127.0.0.1" || raw.BindAddress == "", AuthenticationRequired: len(config.ParseAuthentication(raw.Authentication)) != 0}
+	previousPrepared := pendingConfig
 	pendingConfig = p
 	appliedConfig = nil
 	configFact = ConfigFact{RuntimeEpoch: configRuntimeEpoch, Version: configFactSequence.Add(1), Token: receipt.Token, Owner: owner.ID, InputID: receipt.InputID, YAMLSHA256: manifest.YAMLSHA256, ParsedSHA256: parsedSHA, ProfileID: manifest.ProfileID, ProfileName: manifest.ProfileName, Phase: "parsing", ReplayEligible: true}
@@ -449,6 +483,7 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	if currentConfig != nil {
 		if !providerStageEnabled {
 			currentConfig.CloseProviders()
+			closeSourceConfigProxies(previousPrepared, currentConfig)
 		}
 		currentConfig = nil
 	}
@@ -486,6 +521,9 @@ func pendingForReceipt(receipt ConfigReceipt) (*preparedConfig, error) {
 	appRequests.mu.Unlock()
 	if !valid {
 		return nil, errConfigSuperseded
+	}
+	if err := checkSourceUses(C.Path.HomeDir(), p.manifest.SourceUses); err != nil {
+		return nil, err
 	}
 	return p, nil
 }
@@ -535,6 +573,27 @@ func prepareInstallLocked(receipt ConfigReceipt) (*preparedConfig, *ConfigApplyR
 	if err = p.mixed.Validate(); err != nil {
 		return nil, installFailure(p, err)
 	}
+	if !p.sourcePrepared {
+		if err := prepareSourceProviders(p); err != nil {
+			return nil, installFailure(p, err)
+		}
+		p.sourcePrepared = true
+	}
+	recordSourceRawFactories(p.raw)
+	for _, source := range p.sourceProviders {
+		if source.plan.Kind != "provider-proxy" {
+			continue
+		}
+		body, err := readSourceObject(C.Path.HomeDir(), source.material.MaterialHash, sourceCandidateMax)
+		if err != nil {
+			return nil, installFailure(p, err)
+		}
+		document, err := sourceProviderProxyDocument(body, source.plan.Mapping)
+		if err != nil {
+			return nil, installFailure(p, err)
+		}
+		recordSourceNodeFactories(document)
+	}
 	cfg, err := config.ParseRawConfig(p.raw)
 	if err != nil {
 		appRequests.mu.Lock()
@@ -547,6 +606,11 @@ func prepareInstallLocked(receipt ConfigReceipt) (*preparedConfig, *ConfigApplyR
 		return nil, installFailure(p, err)
 	}
 	p.cfg = cfg
+	recordSourceDNSReaders(cfg.DNS)
+	if err := installSourceProviders(p); err != nil {
+		return nil, installFailure(p, err)
+	}
+	installSourceRuleTracing(p)
 	if cfg.NTP.WriteToSystem && !systemTimeWritable {
 		cfg.NTP.WriteToSystem = false
 	}
@@ -671,6 +735,7 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 		stagedCore.Unlock()
 	}
 	err = publishCheckpointLocked(p)
+	publishSourceTraceState(p, configFact.InputID, false)
 	checkpointMu.Unlock()
 	if err != nil {
 		return blockConfigLocked(p, fmt.Errorf("persist accepted configuration: %w", err))
@@ -679,6 +744,9 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 		return blockConfigLocked(p, errCoreLifecycleUnavailable)
 	}
 	reconcileGeoUpdater()
+	for _, provider := range p.sourceProviders {
+		provider.start()
+	}
 	queueInputCollection()
 	sendMessage(Message{Type: ConfigStateMessage, Data: configFact})
 	return configResult(status, receipt, nil)
@@ -739,6 +807,7 @@ func blockConfigLocked(p *preparedConfig, err error) ConfigApplyResult {
 	stopBusinessListeners()
 	if p.cfg != nil && (!providerStageEnabled || p.stage == nil) {
 		p.cfg.CloseProviders()
+		closeSourceConfigProxies(p, p.cfg)
 	}
 	p.cfg, p.raw, p.bytes = nil, nil, nil
 	p.eligible = false

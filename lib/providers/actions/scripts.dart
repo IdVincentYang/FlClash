@@ -8,22 +8,91 @@ class ScriptsAction extends _$ScriptsAction {
   @override
   void build() {}
 
+  Future<void> manageSourcePermissions(Script script) async {
+    if (!requestClient.requiresSourceAcceptance) return;
+    final setup = ref.read(setupActionProvider.notifier);
+    final setupSequence = setup.reserveSetupSequence();
+    final core = ref.read(coreHandlerProvider);
+    if (await requestClient.materialRecoveryRequired()) {
+      final expectedRun = await _recoverSourceMaterialCommit(
+        core,
+        requestClient,
+      );
+      if (expectedRun != null && ref.mounted) {
+        await setup.applyProfile(
+          force: true,
+          allowBootstrap: true,
+          expectedRun: expectedRun,
+          setupSequence: setupSequence,
+        );
+      }
+      return;
+    }
+    final acceptance = _sourceAcceptance(
+      core,
+      requestClient,
+      confirm: ref.read(sourceConfirmationProvider),
+    );
+    final source = await requestClient.captureSource('script:${script.id}');
+    final permissions = await acceptance.permissions(
+      source: source,
+      kind: 'script',
+    );
+    final choice = await dialogs.showCommonDialog<SourcePermissionChoice>(
+      child: SourcePermissionsDialog(
+        label: script.label,
+        permissions: permissions,
+      ),
+    );
+    if (choice == null) return;
+    if (choice.action == SourcePermissionAction.review) {
+      await _reviewScriptSource(
+        confirm: ref.read(sourceConfirmationProvider),
+        core: core,
+        requests: requestClient,
+        script: script,
+        source: source,
+        body: await _sourceBody(await script.path),
+        forceReview: true,
+      );
+    } else {
+      await acceptance.withdraw(
+        choice.permission!,
+        stopUse: choice.action == SourcePermissionAction.stopUse,
+      );
+    }
+    await ref.read(configStateProvider.notifier).refresh();
+  }
+
   Future<void> putScript(Script script) async {
     await ref.read(scriptsProvider.notifier).put(script);
     _applyIfInUse(script.id);
   }
 
   Future<void> deleteScript(int id) => requestClient.mutate(() async {
-    await ref.read(scriptsProvider.notifier).deletePersisted(id);
+    await ref
+        .read(scriptsProvider.notifier)
+        .deletePersisted(id, client: requestClient);
     await File(await appPath.getScriptPath(id.toString())).safeDelete();
   });
 
   Future<void> saveScript(Script script, String content) async {
+    final approval = await _reviewScriptMaterial(
+      confirm: ref.read(sourceConfirmationProvider),
+      core: ref.read(coreHandlerProvider),
+      requests: requestClient,
+      script: script,
+      body: content,
+    );
     final staged = await RequestFile.stage(utf8.encode(content));
     try {
       final path = await script.path;
-      await requestClient.mutate(() async {
-        await requestClient.invalidate('script:${script.id}');
+      Future<void> persist() async {
+        if (approval != null) {
+          await approval.invalidate();
+        } else {
+          await requestClient.invalidate('script:${script.id}');
+        }
         final current =
             (await database.scriptsDao.query().get()).get(script.id) ?? script;
         await staged.replace(
@@ -35,11 +104,19 @@ class ScriptsAction extends _$ScriptsAction {
                   label: script.label,
                   lastUpdateTime: DateTime.now(),
                 ),
+                networkResult: approval != null,
               ),
         );
-      });
+      }
+
+      if (approval != null) {
+        await approval.commit(action: persist);
+      } else {
+        await requestClient.mutate(persist);
+      }
       _applyIfInUse(script.id);
     } finally {
+      await approval?.release();
       await staged.close();
     }
   }
@@ -49,6 +126,7 @@ class ScriptsAction extends _$ScriptsAction {
     final operation = updatingKeys.start(script.updatingKey);
     RequestSession? session;
     RequestFile? staged;
+    SourceMaterialApproval? approval;
     try {
       if (sourceEdit) {
         await requestClient.mutate(() async {
@@ -90,9 +168,22 @@ class ScriptsAction extends _$ScriptsAction {
         () => requestClient.getTextResponseForUrl(script.url!),
       );
       staged = await RequestFile.stage(utf8.encode(response.data ?? ''));
+      approval = await _reviewScriptMaterial(
+        confirm: ref.read(sourceConfirmationProvider),
+        core: ref.read(coreHandlerProvider),
+        requests: requestClient,
+        script: script,
+        body: response.data ?? '',
+        session: session,
+      );
       final incoming = staged;
       final path = await script.path;
-      await session.commit(() async {
+      Future<void> persist() async {
+        if (approval != null) {
+          await approval.invalidate();
+        } else {
+          await requestClient.invalidate('script:${script.id}');
+        }
         final current =
             (await database.scriptsDao.query().get()).get(script.id) ?? script;
         await incoming.replace(
@@ -104,14 +195,20 @@ class ScriptsAction extends _$ScriptsAction {
                 networkResult: true,
               ),
         );
-        await requestClient.invalidate('script:${script.id}');
-      });
+      }
+
+      if (approval != null) {
+        await approval.commit(session: session, action: persist);
+      } else {
+        await session.commit(persist);
+      }
       final completed = session;
       _applyIfInUse(
         script.id,
         isCurrent: () => completed.lifecycleCurrent(sourceInvalidated: true),
       );
     } finally {
+      await approval?.release();
       session?.close();
       await staged?.close();
       updatingKeys.stop(script.updatingKey, operation);

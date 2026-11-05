@@ -12,8 +12,6 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -107,9 +105,17 @@ type appRequestLease struct {
 }
 
 type appRequestReceipt struct {
-	registry   *appRequestRegistry
-	id, client string
-	once       sync.Once
+	registry           *appRequestRegistry
+	id, client         string
+	once               sync.Once
+	spec               *requestscope.Spec
+	material           *sourceMaterialCommit
+	markerHash         string
+	recoveryHash       string
+	failed             bool
+	datasetInvalidated bool
+	begun              bool
+	retired            bool
 }
 
 func (receipt *appRequestReceipt) Complete() {
@@ -117,6 +123,10 @@ func (receipt *appRequestReceipt) Complete() {
 		r := receipt.registry
 		r.mu.Lock()
 		delete(r.commits, receipt.id)
+		if receipt.retired {
+			receipt.retired = false
+			unknownRequestWriters.Add(-1)
+		}
 		r.changedLocked()
 		r.mu.Unlock()
 	})
@@ -272,6 +282,9 @@ func (r *appRequestRegistry) setPhase(owner requestscope.Owner, phase string) {
 }
 
 func (r *appRequestRegistry) allowedLocked(spec requestscope.Spec) bool {
+	if requestWriterError() != nil {
+		return false
+	}
 	if r.configToken != 0 && r.phase != "ready" && spec.Owner == r.owner {
 		if latest := latestConfig.Load(); latest == nil || latest.token != r.configToken {
 			return false
@@ -291,6 +304,9 @@ func (r *appRequestRegistry) allowedLocked(spec requestscope.Spec) bool {
 		if !r.state.IntentRunning || r.state.Paused || r.state.Phase != "started" {
 			return spec.Trigger == "manual" && (r.state.Reason == "initializedIdle" || r.state.Reason == "userStop" || r.state.Reason == "excludedSsid")
 		}
+	}
+	if r.phase == "parsing" && sourcePreparationAllowedLocked(r, spec) {
+		return true
 	}
 	if spec.Owner.ID == 0 || spec.Owner != r.owner || r.phase != "inner" && r.phase != "ready" {
 		return false
@@ -691,11 +707,16 @@ func (l *appRequestLease) GrantCommit() (requestscope.Receipt, error) {
 	if !l.validLocked() || l.granted {
 		return nil, requestscope.ErrCancelled
 	}
-	if l.spec.Client != "" && len(l.registry.dataReaders) != 0 {
+	if err := requestWriterError(); err != nil {
+		return nil, err
+	}
+	if l.spec.Client != "" && (len(l.registry.dataReaders) != 0 || l.registry.frontendCommitCountLocked() >= frontendCommitLimit) {
 		return nil, errRequestCommitBusy
 	}
 	l.granted = true
 	receipt := &appRequestReceipt{registry: l.registry, id: l.id, client: l.spec.Client}
+	spec := l.spec
+	receipt.spec = &spec
 	l.registry.commits[l.id] = receipt
 	return receipt, nil
 }
@@ -808,7 +829,11 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		}
 		return registerConfigOperation(methodCallSeq.Add(1), *params.ConfigInput)
 	}
-	if params.Action == "attach" || params.Action == "invalidate" || params.Action == "invalidateDataset" {
+	if params.Action == "attach" || params.Action == "engineDetach" || params.Action == "detach" {
+		configMu.Lock()
+		defer configMu.Unlock()
+	}
+	if params.Action == "invalidate" || params.Action == "invalidateDataset" {
 		checkpointMu.Lock()
 		defer checkpointMu.Unlock()
 	}
@@ -816,6 +841,12 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 	failure := func(code string) any { return map[string]string{"error": code} }
 
 	switch params.Action {
+	case "beginCommit":
+		return beginRequestCommitMarker(r, params)
+	case "markRecovery":
+		return markRequestCommitRecovery(r, params)
+	case "clearRecovery":
+		return clearRestoredRequestRecovery(r, params)
 	case "publish":
 		return map[string]any{"applied": r.publishPrepared(params.State)}
 	case "block":
@@ -830,7 +861,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 	case "readData":
 		id, err := beginRequestDataRead()
 		if err != nil {
-			return failure("request_commit_busy")
+			return failure(err.Error())
 		}
 		return map[string]string{"id": id}
 	case "endRead":
@@ -862,11 +893,24 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			lease.Close()
 		}
 		return map[string]any{"client": client}
+	case "detach":
+		r.mu.Lock()
+		valid := params.Client != "" && params.Client == r.client
+		r.mu.Unlock()
+		if !valid {
+			return failure("request_cancelled")
+		}
+		r.detachFrontend()
+		return map[string]bool{"ok": true}
 	case "inspect":
 		return r.inspect(params)
-	case "ready", "invalidate", "invalidateDataset", "detach", "permit":
+	case "ready", "invalidate", "invalidateDataset", "permit":
 		r.mu.Lock()
 		if params.Client == "" || params.Client != r.client {
+			r.mu.Unlock()
+			return failure("request_cancelled")
+		}
+		if receipt := r.commits[params.ID]; receipt != nil && receipt.retired {
 			r.mu.Unlock()
 			return failure("request_cancelled")
 		}
@@ -874,7 +918,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		switch params.Action {
 		case "ready":
 			for _, receipt := range r.commits {
-				if receipt.client != "" && receipt.client != params.Client {
+				if receipt.client != "" && receipt.client != params.Client && !receipt.retired {
 					r.mu.Unlock()
 					return map[string]bool{"ready": false}
 				}
@@ -889,6 +933,9 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			}
 		case "invalidateDataset":
 			r.dataset++
+			if receipt := r.commits[params.ID]; receipt != nil && receipt.client == params.Client {
+				receipt.datasetInvalidated = true
+			}
 			if providerStageEnabled {
 				r.changedLocked()
 			}
@@ -898,6 +945,10 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 				r.pendingCleanups = append(r.pendingCleanups, func() { cancel(); safeGoDetached("retire dataset business", func() { retireOwnedBusiness(scope) }) })
 			}
 		case "permit":
+			if err := requestWriterError(); err != nil {
+				r.mu.Unlock()
+				return failure(err.Error())
+			}
 			if !r.clientReady || params.ExpectedState == nil || params.ExpectedState.Epoch != r.state.ProcessEpoch || params.ExpectedState.Revision != r.state.Revision || params.Dataset != r.dataset || params.SourceRevision != r.sources[params.Key] || params.URL == "" || len(r.permits) >= 32 {
 				r.mu.Unlock()
 				return failure("request_cancelled")
@@ -1010,12 +1061,16 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			r.mu.Unlock()
 			return failure("request_cancelled")
 		}
-		if len(r.dataReaders) != 0 {
+		if err := requestWriterError(); err != nil {
+			r.mu.Unlock()
+			return failure(err.Error())
+		}
+		if len(r.dataReaders) != 0 || r.frontendCommitCountLocked() >= frontendCommitLimit {
 			r.mu.Unlock()
 			return failure("request_commit_busy")
 		}
 		for _, receipt := range r.commits {
-			if receipt.client != "" && receipt.client != params.Client {
+			if receipt.client != "" && receipt.client != params.Client && !receipt.retired {
 				r.mu.Unlock()
 				return failure("request_commit_recovery_required")
 			}
@@ -1025,14 +1080,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		return map[string]string{"id": id}
 
 	case "complete":
-		r.mu.Lock()
-		receipt := r.commits[params.ID]
-		r.mu.Unlock()
-		if receipt == nil || receipt.client != params.Client {
-			return failure("request_cancelled")
-		}
-		receipt.Complete()
-		return map[string]bool{"ok": true}
+		return completeRequestCommit(r, params)
 	case "cancel", "grant", "check":
 		r.mu.Lock()
 		lease := r.leases[params.ID]
@@ -1046,8 +1094,8 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		}
 		if params.Action == "grant" {
 			_, err := lease.GrantCommit()
-			if errors.Is(err, errRequestCommitBusy) {
-				return failure("request_commit_busy")
+			if errors.Is(err, errRequestCommitBusy) || errors.Is(err, errRequestWriterUnknown) {
+				return failure(err.Error())
 			}
 			return map[string]bool{"ok": err == nil}
 		}
@@ -1125,8 +1173,22 @@ func (d appRequestDialer) ListenPacket(ctx context.Context, network, address str
 		return nil, err
 	}
 	var chosen C.Dialer = dialer.NewDialer()
+	metadata := &C.Metadata{NetWork: C.UDP, Type: C.INNER, DstIP: rAddr.Addr(), DstPort: rAddr.Port()}
 	if l.spec.Proxy != "" && l.spec.Proxy != "DIRECT" {
-		chosen = proxydialer.NewByName(l.spec.Proxy, tunnel.Tunnel)
+		proxy := lookupProxy(l.spec.Proxy)
+		if proxy == nil {
+			return nil, requestscope.ErrBlocked
+		}
+		selected, err := l.SelectProxy(proxy, metadata)
+		if err != nil {
+			return nil, err
+		}
+		chosen = proxydialer.New(selected, true)
+	} else if l.spec.Mode == "proxy" {
+		return nil, requestscope.ErrBlocked
+	}
+	if err := l.BeforeDial(metadata); err != nil {
+		return nil, err
 	}
 	conn, err := chosen.ListenPacket(ctx, network, address, rAddr)
 	if err != nil {
@@ -1346,14 +1408,21 @@ func directRequestAvailable(state AppRequestState) bool {
 }
 
 func (r *appRequestRegistry) waitFrontendCommits(ctx context.Context) error {
+	if err := requestWriterError(); err != nil {
+		return err
+	}
 	if requestscope.BeginHook == nil {
 		return nil
 	}
 	for {
 		r.mu.Lock()
+		if err := requestWriterError(); err != nil {
+			r.mu.Unlock()
+			return err
+		}
 		busy := false
 		for _, receipt := range r.commits {
-			if receipt.client != "" {
+			if receipt.client != "" && !receipt.retired {
 				busy = true
 				break
 			}
@@ -1388,9 +1457,13 @@ func (r *appRequestRegistry) beginDataRead(ctx context.Context) (string, error) 
 	}
 	for {
 		r.mu.Lock()
+		if err := requestWriterError(); err != nil {
+			r.mu.Unlock()
+			return "", err
+		}
 		busy := false
 		for _, receipt := range r.commits {
-			if receipt.client != "" {
+			if receipt.client != "" && !receipt.retired {
 				busy = true
 				break
 			}
@@ -1421,17 +1494,28 @@ func (r *appRequestRegistry) endDataRead(id string) {
 }
 
 func beginRequestDataRead() (string, error) {
+	return beginRequestDataReadAt(appRequests, C.Path.HomeDir())
+}
+
+func beginRequestDataReadAt(registry *appRequestRegistry, home string) (string, error) {
+	if err := requestWriterError(); err != nil {
+		return "", err
+	}
 	if requestscope.BeginHook == nil {
 		return "", nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	id, err := appRequests.beginDataRead(ctx)
+	id, err := registry.beginDataRead(ctx)
 	if err != nil {
 		return "", err
 	}
-	if _, err := os.Stat(filepath.Join(C.Path.HomeDir(), "request-recovery-required")); err == nil {
-		appRequests.endDataRead(id)
+	marker, err := readRequestRecoveryMarker(home)
+	if err != nil || marker != nil {
+		registry.endDataRead(id)
+		if err != nil {
+			return "", err
+		}
 		return "", requestscope.ErrBlocked
 	}
 	return id, nil
@@ -1460,13 +1544,7 @@ func (r *appRequestRegistry) ownerActive(owner requestscope.Owner) bool {
 func (r *appRequestRegistry) detachFrontend() {
 	r.mu.Lock()
 	r.clientReady = false
-	uncertain := false
-	for _, receipt := range r.commits {
-		if receipt.client != "" {
-			uncertain = true
-			break
-		}
-	}
+	uncertain := r.retireFrontendCommitsLocked()
 	var cleanups []func()
 	var leases []*appRequestLease
 	if uncertain {
@@ -1480,6 +1558,10 @@ func (r *appRequestRegistry) detachFrontend() {
 		}
 	}
 	r.mu.Unlock()
+	r.discardDetachedSourceReviews()
+	if uncertain {
+		r.retireFrontendQualification()
+	}
 	finishRequestCleanup(cleanups)
 	for _, lease := range leases {
 		lease.Close()

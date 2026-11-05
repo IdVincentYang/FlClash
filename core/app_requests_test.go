@@ -387,3 +387,43 @@ func TestAppRequestBootstrapPermitIsSingleUseAndVersionBound(t *testing.T) {
 		t.Fatal("native revocation retained the bootstrap permit")
 	}
 }
+
+func TestAppRequestProviderRecoveryPermitKeepsExactURLAndLatestState(t *testing.T) {
+	for _, phase := range []string{"failed", "preparing"} {
+		t.Run(phase, func(t *testing.T) {
+			r, _ := appRequestFixture(t)
+			client := r.control(appRequestControl{Action: "attach"}).(map[string]any)["client"].(string)
+			r.control(appRequestControl{Action: "ready", Client: client})
+			state := r.state
+			state.Phase, state.Reason, state.IntentRunning = phase, "setupFailed", phase == "preparing"
+			state.Revision++
+			r.publish(state)
+			params := appRequestControl{Action: "permit", Client: client, Dataset: r.dataset, Key: "provider-proxy:recovery", URL: "http://127.0.0.1:1234/nodes?revision=1", ExpectedState: &requestscope.StateVersion{Epoch: state.ProcessEpoch, Revision: state.Revision}}
+			permit, ok := r.control(params).(map[string]string)
+			if !ok || permit["permit"] == "" {
+				t.Fatal(permit)
+			}
+			params.Action, params.Kind, params.Trigger, params.Mode, params.Proxy, params.Permit = "begin", "bootstrap", "manual", "direct", "DIRECT", permit["permit"]
+			wrong := params
+			wrong.URL = "http://127.0.0.1:1234/nodes?revision=2"
+			if result, ok := r.control(wrong).(map[string]string); !ok || result["error"] == "" {
+				t.Fatal("permit changed complete URL", result)
+			}
+			params.Action = "permit"
+			params.Permit = ""
+			permit = r.control(params).(map[string]string)
+			params.Action, params.Permit = "begin", permit["permit"]
+			created, ok := r.control(params).(map[string]any)
+			if !ok || created["id"] == nil {
+				t.Fatal("explicit recovery did not acquire one real lease", created)
+			}
+			lease := r.leases[created["id"].(string)]
+			state.IntentRunning, state.Phase, state.Reason = false, "stopped", "userStop"
+			state.Revision++
+			r.publish(state)
+			if lease.Check() == nil {
+				t.Fatal("new Stop retained recovery network authority")
+			}
+		})
+	}
+}

@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../helpers/test_source_acceptance.dart';
 
 class _Core extends Mock implements CoreHandlerInterface {}
 
@@ -48,6 +49,10 @@ class _SnapshotSetup extends SetupAction {
     bool? dnsOverride,
     bool? ntpOverride,
     bool? safeMode,
+    void Function(Map<String, Object?>)? onSourceUse,
+    void Function(Map<String, Object?>)? onRuleLedger,
+    bool allowSourceReview = true,
+    Future<bool> Function()? isCurrent,
   }) async {
     captured = setupState;
     return (yaml: 'mode: rule\nrules: ["MATCH,REJECT"]\n', md5: 'snapshot');
@@ -237,6 +242,7 @@ void main() {
     () async {
       container.dispose();
       final core = _Core();
+      stubAcceptedSourceFixtures(core);
       final setup = _SnapshotSetup();
       when(
         () => core.getConfigState(),

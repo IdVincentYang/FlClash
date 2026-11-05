@@ -14,7 +14,7 @@ void main() {
     root = await Directory.systemTemp.createTemp('accepted-dependencies-');
     final bytes = utf8.encode(
       jsonEncode({
-        'version': 1,
+        'version': 2,
         'profileId': 1,
         'dependencies': ['profile:1', 'profile:2'],
       }),
@@ -44,6 +44,40 @@ void main() {
 
   test('reads exact accepted manifest dependencies', () async {
     expect(await read(), {'profile:1', 'profile:2'});
+  });
+  test('writes source permissions with the version 2 manifest', () async {
+    final uses = [
+      <String, Object?>{
+        'key': 'config:1',
+        'kind': 'config',
+        'incarnation': 'a' * 48,
+        'epoch': 1,
+        'purposeEpoch': 1,
+        'digest': 'b' * 64,
+      },
+    ];
+    final input = await ConfigInput.write(
+      home: root.path,
+      yaml: 'rules: [MATCH,REJECT]',
+      runtimeEpoch: 'fixture',
+      profileId: 1,
+      profileName: 'accepted',
+      selectedMap: {},
+      testUrl: '',
+      sources: [],
+      sourceUses: uses,
+      version: 2,
+    );
+    final manifest =
+        jsonDecode(
+              await File(
+                '${root.path}/config-inputs/${input.id}.json',
+              ).readAsString(),
+            )
+            as Map;
+    expect(manifest['version'], 2);
+    expect(manifest['sourceUses'], uses);
+    await input.releaseMarker();
   });
   test(
     'missing, hash-mismatched and oversized manifests are unknown, not empty',
@@ -98,17 +132,17 @@ void main() {
     () async {
       for (final manifest in [
         {
-          'version': 2,
+          'version': 3,
           'profileId': 1,
           'dependencies': ['profile:1'],
         },
         {
-          'version': 1,
+          'version': 2,
           'profileId': 2,
           'dependencies': ['profile:1'],
         },
         {
-          'version': 1,
+          'version': 2,
           'profileId': 1,
           'dependencies': [1],
         },

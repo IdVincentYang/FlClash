@@ -260,9 +260,28 @@ class ProxiesAction extends _$ProxiesAction {
               .start(provider.updatingKey, scope: UpdatingScope.core)
         : null;
     try {
-      final message = await _core.updateExternalProvider(
-        providerName: provider.name,
-      );
+      String message;
+      try {
+        message = await _core.updateExternalProvider(
+          providerName: provider.name,
+        );
+      } on CoreMethodException catch (error) {
+        if (!request.requiresSourceAcceptance ||
+            provider.sourceKey.isEmpty ||
+            error.code != 'source_review_required') {
+          rethrow;
+        }
+        await _sourceAcceptance(
+          _core,
+          request,
+          confirm: ref.read(sourceConfirmationProvider),
+        ).applyProvider(
+          key: provider.sourceKey,
+          name: provider.name,
+          kind: provider.type == 'Rule' ? 'provider-rule' : 'provider-proxy',
+        );
+        message = '';
+      }
       if (message.isNotEmpty) return message;
       ref
           .read(providersProvider.notifier)
@@ -304,6 +323,61 @@ class ProxiesAction extends _$ProxiesAction {
             .stop(provider.updatingKey, operation);
       }
     }
+  }
+
+  Future<void> sideLoadSourceProvider(
+    ExternalProvider provider,
+    List<int> body,
+  ) async {
+    await _sourceAcceptance(
+      _core,
+      request,
+      confirm: ref.read(sourceConfirmationProvider),
+    ).applyProvider(
+      key: provider.sourceKey,
+      name: provider.name,
+      kind: provider.type == 'Rule' ? 'provider-rule' : 'provider-proxy',
+      body: body,
+    );
+    ref
+        .read(providersProvider.notifier)
+        .setProvider(await _core.getExternalProvider(provider.name));
+  }
+
+  Future<void> manageProviderSource(ExternalProvider provider) async {
+    if (!request.requiresSourceAcceptance || provider.sourceKey.isEmpty) return;
+    final acceptance = _sourceAcceptance(
+      _core,
+      request,
+      confirm: ref.read(sourceConfirmationProvider),
+    );
+    final source = await request.captureSource(provider.sourceKey);
+    final permissions = await acceptance.permissions(
+      source: source,
+      kind: provider.type == 'Rule' ? 'provider-rule' : 'provider-proxy',
+    );
+    if (permissions.isEmpty) return;
+    final choice = await dialogs.showCommonDialog<SourcePermissionChoice>(
+      child: SourcePermissionsDialog(
+        label: provider.name,
+        permissions: permissions,
+      ),
+    );
+    if (choice == null) return;
+    if (choice.action == SourcePermissionAction.review) {
+      await acceptance.applyProvider(
+        key: provider.sourceKey,
+        name: provider.name,
+        kind: provider.type == 'Rule' ? 'provider-rule' : 'provider-proxy',
+        forceReview: true,
+      );
+    } else {
+      await acceptance.withdraw(
+        choice.permission!,
+        stopUse: choice.action == SourcePermissionAction.stopUse,
+      );
+    }
+    await ref.read(configStateProvider.notifier).refresh();
   }
 
   Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) {

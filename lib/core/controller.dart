@@ -102,6 +102,9 @@ class CoreController {
 
   Future<ConfigFact> getConfigState() => _interface.getConfigState();
 
+  Future<Map<String, dynamic>> sourceAcceptance(Map<String, Object?> input) =>
+      _interface.sourceAcceptance(input);
+
   Future<void> releaseConfigInput(String markerName) =>
       _interface.releaseConfigInput(markerName);
 

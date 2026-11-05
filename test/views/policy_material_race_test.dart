@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/common/managed_material.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
@@ -48,6 +49,7 @@ class _Setup extends SetupAction {
     void Function(PolicyMaterialCandidate)? onCreated,
     String? incomingPath,
     Request? client,
+    SourceMaterialApproval? approval,
   }) async {
     final index = latest && controlledLoads ? loads++ : null;
     final candidate = await super.capturePolicyMaterial(

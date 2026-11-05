@@ -149,9 +149,30 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m61(label) => "${label}只能是一项";
 
-  static String m62(label) => "${label}必须为URL";
+  static String m62(features) => "已接受的声明能力：${features}";
 
-  static String m63(count) => "${count} 年前";
+  static String m63(services) => "已接受的 DNS 范围：${services}";
+
+  static String m64(protocols) => "已接受的节点协议：${protocols}";
+
+  static String m65(count) => "已接受版本数：${count}";
+
+  static String m66(features) => "声明的能力：${features}";
+
+  static String m67(target) => "来源默认出口：${target}";
+
+  static String m68(nodes, rules) => "来源材料：${nodes} 个节点，${rules} 条规则";
+
+  static String m69(services) => "拟用 DNS 服务：${services}";
+
+  static String m70(protocols) => "节点协议：${protocols}";
+
+  static String m71(targets) =>
+      "委托的代理规则块：${targets}。条件可覆盖任意域名或 IP；固定保护与默认出口保持不变，可能扩大 DIRECT 的删除仍需审查。";
+
+  static String m72(label) => "${label}必须为URL";
+
+  static String m73(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -1127,6 +1148,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "requestProxyDefault": m51,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("代理目标"),
+    "requestRestartRequired": MessageLookupByLibrary.simpleMessage(
+      "未完成的本地保存可能仍在运行。请打开应用信息 → 强行停止，再重新打开 FlClash。仅重启代理服务或关闭界面无法解决。重新打开后，请在来源权限中核对已保存的数据。",
+    ),
     "requestRouteUnavailable": MessageLookupByLibrary.simpleMessage(
       "所选请求出口当前不可用。",
     ),
@@ -1371,7 +1395,110 @@ class MessageLookup extends MessageLookupByLibrary {
     "socksPort": MessageLookupByLibrary.simpleMessage("Socks端口"),
     "sort": MessageLookupByLibrary.simpleMessage("排序"),
     "source": MessageLookupByLibrary.simpleMessage("来源"),
+    "sourceAcceptRevision": MessageLookupByLibrary.simpleMessage("接受此版本"),
+    "sourceAcceptedCapabilities": m62,
+    "sourceAcceptedDns": m63,
+    "sourceAcceptedProtocols": m64,
+    "sourceAcceptedRevisions": m65,
+    "sourceAppliedNotSaved": MessageLookupByLibrary.simpleMessage("已应用，恢复尚未保存"),
+    "sourceAppliedRevision": MessageLookupByLibrary.simpleMessage("采用版本"),
+    "sourceAutomaticAllowed": MessageLookupByLibrary.simpleMessage("允许自动维护"),
+    "sourceAutomaticStopped": MessageLookupByLibrary.simpleMessage("已停止自动维护"),
+    "sourceBinaryMaterial": MessageLookupByLibrary.simpleMessage(
+      "二进制 RuleSet：只接受这些精确字节。原解析器验证材料前，规则数量未知。",
+    ),
+    "sourceCapabilitiesChanged": MessageLookupByLibrary.simpleMessage(
+      "节点能力或节点组绑定发生变化。",
+    ),
+    "sourceCodeChanged": MessageLookupByLibrary.simpleMessage("脚本的精确代码发生变化。"),
+    "sourceDeclaredCapabilities": m66,
+    "sourceDefaultExit": m67,
+    "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
+      "允许在此范围内维护",
+    ),
+    "sourceDnsChanged": MessageLookupByLibrary.simpleMessage("DNS 服务或其策略发生变化。"),
+    "sourceEntryChanged": MessageLookupByLibrary.simpleMessage(
+      "监听、隧道或控制能力发生变化。",
+    ),
+    "sourceFinalUse": MessageLookupByLibrary.simpleMessage("最终配置"),
+    "sourceFirstUse": MessageLookupByLibrary.simpleMessage("此来源尚未获准使用。"),
+    "sourceImplicitDirect": MessageLookupByLibrary.simpleMessage(
+      "隐式 DIRECT 回退",
+    ),
+    "sourceInspectMaterial": MessageLookupByLibrary.simpleMessage(
+      "查看来源原文（可能包含凭据）",
+    ),
     "sourceIp": MessageLookupByLibrary.simpleMessage("源IP"),
+    "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("本地策略"),
+    "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
+      "仅已证明处于此版本能力范围内的变化可自动更新，其它变化保持待确认。已有连接继续使用原 socket；资源预算可能延后采用。",
+    ),
+    "sourceMaterialCounts": m68,
+    "sourceNoPermissions": MessageLookupByLibrary.simpleMessage("尚无已接受的来源权限。"),
+    "sourceNodeUse": MessageLookupByLibrary.simpleMessage("作为 provider 使用的节点"),
+    "sourceNotDeclared": MessageLookupByLibrary.simpleMessage("此来源未声明"),
+    "sourceNotDelegated": MessageLookupByLibrary.simpleMessage("尚未委托自动维护。"),
+    "sourceOwnDefaultConflict": MessageLookupByLibrary.simpleMessage(
+      "自有规则必须以唯一一条 MATCH 规则结束，并使用你选择的未命中出口。",
+    ),
+    "sourceOwnDefaultRequired": MessageLookupByLibrary.simpleMessage(
+      "应用自有规则前，请明确选择未匹配流量的出口。",
+    ),
+    "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
+      "关闭后排除来源分流、监听和隧道。自有规则必须明确未匹配流量的出口；清空规则不会恢复来源分流。DNS 和节点组分别授权。",
+    ),
+    "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
+      "每项操作仅影响所列用途。停止自动维护会保留已接受内容；停止使用会关闭受影响连接并取消重放资格。其他用途保留各自权限。",
+    ),
+    "sourcePermissions": MessageLookupByLibrary.simpleMessage("来源权限"),
+    "sourcePermissionsUnavailable": MessageLookupByLibrary.simpleMessage(
+      "来源权限暂不可用，请等待 Core 就绪后重试。",
+    ),
+    "sourceProfileUse": MessageLookupByLibrary.simpleMessage("Profile 配置内容"),
+    "sourceProposedDns": m69,
+    "sourceProtocols": m70,
+    "sourceProviderChanged": MessageLookupByLibrary.simpleMessage(
+      "Provider 或其下载来源发生变化。",
+    ),
+    "sourceRecoveryDescription": MessageLookupByLibrary.simpleMessage(
+      "核对本机已保存的配置、脚本和权限。核对将停止当前配置的流量处理，并丢弃未完成的确认。之后请重新审查来源并应用配置。",
+    ),
+    "sourceRecoveryTitle": MessageLookupByLibrary.simpleMessage("核对未完成的保存"),
+    "sourceRecoveryUnavailable": MessageLookupByLibrary.simpleMessage(
+      "来源权限已更改，但恢复 checkpoint 未能更新，重启恢复不可用。",
+    ),
+    "sourceRematchDenied": MessageLookupByLibrary.simpleMessage(
+      "排除来源路由时，不能使用 REMATCH 节点。",
+    ),
+    "sourceReviewRequired": MessageLookupByLibrary.simpleMessage(
+      "来源变化需要审查后才能使用。",
+    ),
+    "sourceReviewScope": MessageLookupByLibrary.simpleMessage(
+      "仅接受你信任其选择节点和此版本能力的来源。接受材料与实际应用是不同步骤。",
+    ),
+    "sourceReviewTitle": MessageLookupByLibrary.simpleMessage("审查来源"),
+    "sourceRoutingChanged": MessageLookupByLibrary.simpleMessage(
+      "分流、固定保护或默认出口发生变化。",
+    ),
+    "sourceRoutingExcluded": MessageLookupByLibrary.simpleMessage(
+      "此内容包含已排除的路由能力。请移除这些能力，或明确更改来源路由选择。",
+    ),
+    "sourceRuleDelegation": m71,
+    "sourceRuleOrigin": MessageLookupByLibrary.simpleMessage("规则来源"),
+    "sourceRuleSetUse": MessageLookupByLibrary.simpleMessage("RuleSet 内容"),
+    "sourceScriptScope": MessageLookupByLibrary.simpleMessage(
+      "此代码可读取配置并写入 console。接受前不会执行，输出另行审查；接受代码不等于接受其任意输出。",
+    ),
+    "sourceScriptTitle": MessageLookupByLibrary.simpleMessage("审查脚本"),
+    "sourceStopAutomatic": MessageLookupByLibrary.simpleMessage("停止自动维护"),
+    "sourceStopUse": MessageLookupByLibrary.simpleMessage("停止使用此内容"),
+    "sourceStorageFull": MessageLookupByLibrary.simpleMessage(
+      "已达到来源存储上限，本次操作未完成。",
+    ),
+    "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
+      "存在无法安全分类的有效变化。",
+    ),
+    "sourceUseRouting": MessageLookupByLibrary.simpleMessage("使用来源分流规则"),
     "specialProxy": MessageLookupByLibrary.simpleMessage("特殊代理"),
     "specialRules": MessageLookupByLibrary.simpleMessage("特殊规则"),
     "speedStatistics": MessageLookupByLibrary.simpleMessage("网速统计"),
@@ -1445,7 +1572,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("上传"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("通过URL获取配置文件"),
-    "urlTip": m62,
+    "urlTip": m72,
     "useHosts": MessageLookupByLibrary.simpleMessage("使用Hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("使用系统Hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("已用流量"),
@@ -1466,7 +1593,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "同时设置系统时钟，Android上不生效",
     ),
-    "yearsAgo": m63,
+    "yearsAgo": m73,
     "yes": MessageLookupByLibrary.simpleMessage("是"),
     "zhCN": MessageLookupByLibrary.simpleMessage("中文简体"),
   };

@@ -1,5 +1,8 @@
 # Managed Profile 更新与验收指南
 
+> L2-T05 Android实现评审通过，待本地交付及M收尾：[来源接受契约](source_acceptance_design.md)和[指南](source_acceptance_guide.md)。
+> 材料接受、未来维护与实际采用分开；新增grant／候选／ledger为有界私有元信息，不扩大业务数据用途。
+
 本指南说明如何明确绑定订阅材料，以及如何区分保存、预览和实际采用。
 本地合成验证覆盖支持材料的更新、失败保护及预览并发；实际设备、物理网络和真实订阅兼容尚未验证。
 支持上限和失败语义以[材料更新契约](managed_updates_design.md)为准。

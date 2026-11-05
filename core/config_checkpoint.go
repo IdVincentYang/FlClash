@@ -22,6 +22,8 @@ type configCheckpoint struct {
 
 var writeConfigManifest = atomicConfigFile
 
+const invalidatedConfigCheckpoint = `{"version":1,"inputId":""}`
+
 func atomicConfigFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
@@ -54,11 +56,14 @@ func atomicConfigFile(path string, data []byte) error {
 }
 
 func markConfigRecoveryRequired(home string) error {
-	return atomicConfigFile(filepath.Join(home, "request-recovery-required"), []byte("configuration checkpoint commit incomplete\n"))
+	return ensureRequestRecoveryMarker(home)
 }
 
 func readCheckpointLocked(home string) (configCheckpoint, error) {
 	var ref configCheckpoint
+	if err := pendingSourceMaterialBlocksReplay(home); err != nil {
+		return ref, err
+	}
 	if _, err := os.Stat(filepath.Join(home, "request-recovery-required")); !os.IsNotExist(err) {
 		return ref, errors.New("configuration recovery requires Flutter")
 	}
@@ -109,6 +114,9 @@ func publishCheckpointLocked(p *preparedConfig) error {
 	if !p.eligible {
 		return errors.New("input was revoked for replay")
 	}
+	if err := checkSourceUses(C.Path.HomeDir(), p.manifest.SourceUses); err != nil {
+		return err
+	}
 	appRequests.mu.Lock()
 	valid := appliedConfig == p && configFact.Owner == p.receipt.Owner && configFact.Phase == "ready"
 	for key, version := range p.sources {
@@ -127,8 +135,19 @@ func publishCheckpointLocked(p *preparedConfig) error {
 	err = atomicConfigFile(filepath.Join(inputDirectory(C.Path.HomeDir()), "checkpoint.json"), data)
 	if err != nil {
 		_ = markConfigRecoveryRequired(C.Path.HomeDir())
+		return err
 	}
-	return err
+	pending, pendingErr := readSourceMaterialPending(C.Path.HomeDir())
+	if pendingErr != nil {
+		return pendingErr
+	}
+	if pending != nil && !pending.Cleared {
+		if p.sourceRecovery != nil || pending.RuntimeEpoch == configRuntimeEpoch && pending.Owner.ID == p.receipt.Owner && pending.Token == p.receipt.Token {
+			return errSourceReview
+		}
+		return clearSourceMaterialPending(C.Path.HomeDir(), *pending)
+	}
+	return nil
 }
 
 func invalidateConfigCheckpointLocked(key string, dataset bool) error {
@@ -154,7 +173,7 @@ func invalidateConfigCheckpointLocked(key string, dataset bool) error {
 		return nil
 	}
 
-	err = atomicConfigFile(filepath.Join(inputDirectory(home), "checkpoint.json"), []byte(`{"version":1,"inputId":""}`))
+	err = atomicConfigFile(filepath.Join(inputDirectory(home), "checkpoint.json"), []byte(invalidatedConfigCheckpoint))
 	if err != nil {
 		_ = markConfigRecoveryRequired(home)
 	}
@@ -340,6 +359,9 @@ func publishCheckpointCandidate(candidate *checkpointCandidate) error {
 	candidate.published = true
 	p.manifest = candidate.manifest
 	configFact.InputID = candidate.id
+	if trace := p.sourceTrace.Load(); trace != nil && !trace.busy {
+		publishSourceTraceState(p, candidate.id, false)
+	}
 	configFact.Version = configFactSequence.Add(1)
 	configFact.ReplayEligible = p.eligible
 	if p.eligible {

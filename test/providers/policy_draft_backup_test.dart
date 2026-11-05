@@ -29,7 +29,14 @@ class _NoPublishSetup extends SetupAction {
   @override
   void build() {}
   @override
-  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
+  Future<bool> applyProfile({
+    bool silence = false,
+    bool force = false,
+    bool allowSourceReview = true,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
+  }) async {
     applies++;
     return true;
   }

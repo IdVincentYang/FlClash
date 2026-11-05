@@ -59,9 +59,19 @@ void main() {
         call.positionalArguments.first as Map,
       );
       calls.add(data);
+      final marker = File('${root.path}/request-recovery-required');
+      if (data['action'] == 'beginCommit' || data['action'] == 'markRecovery') {
+        if (!await marker.exists()) {
+          await marker.writeAsString(
+            'synthetic native-owned barrier',
+            flush: true,
+          );
+        }
+      }
       if (data['action'] == 'complete') {
         if (ack == 'before') throw StateError('synthetic ack failure');
         granted = false;
+        if (await marker.exists()) await marker.delete();
         if (ack == 'after') throw StateError('synthetic ack loss');
       }
       if (data['action'] == 'grant' || data['action'] == 'lock') granted = true;

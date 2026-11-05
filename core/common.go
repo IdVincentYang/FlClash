@@ -95,6 +95,9 @@ func lookupExternalProvider(name string) (cp.Provider, bool) {
 }
 
 func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
+	if wrapped, ok := p.(interface{ sourceExternalProvider() *ExternalProvider }); ok {
+		return wrapped.sourceExternalProvider(), nil
+	}
 	switch typed := underlyingProvider(p).(type) {
 	case *provider.ProxySetProvider:
 		return &ExternalProvider{
@@ -121,6 +124,9 @@ func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
 }
 
 func sideUpdateExternalProvider(p cp.Provider, data []byte) error {
+	if wrapped, ok := p.(interface{ sourceSideUpdate([]byte) error }); ok {
+		return wrapped.sourceSideUpdate(data)
+	}
 	switch typed := underlyingProvider(p).(type) {
 	case *provider.ProxySetProvider:
 		_, _, err := typed.SideUpdate(data)
@@ -443,6 +449,9 @@ func loadConfig(path string) (*config.Config, error) {
 	raw, _, err := decodeConfigDocument(buf)
 	if err != nil {
 		return nil, err
+	}
+	if features.Android {
+		recordSourceReaderRisk("unqualified-legacy-factory-history")
 	}
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {

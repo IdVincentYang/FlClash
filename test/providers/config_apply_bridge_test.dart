@@ -5,6 +5,7 @@ import 'dart:ui' show Locale;
 
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/lib.dart';
 import 'package:drift/native.dart';
@@ -22,6 +23,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/policy_core_bridge.dart';
 
 class _Bridge {
   _Bridge(this.process) {
@@ -61,11 +63,16 @@ class _Bridge {
 
 class _BridgeSetup extends SetupAction {
   _BridgeSetup(Service native, Request requests)
-    : super.scoped(isAndroid: true, native: native, requests: requests);
+    : requests = requests,
+      super.scoped(isAndroid: true, native: native, requests: requests);
+
+  final Request requests;
 
   Completer<void>? buildGate;
   Completer<void>? buildEntered;
+  Future<bool> Function()? heldCurrent;
   int builds = 0;
+  String? providerURL;
 
   @override
   void resetCoreTraffic() {}
@@ -81,15 +88,48 @@ class _BridgeSetup extends SetupAction {
     bool? dnsOverride,
     bool? ntpOverride,
     bool? safeMode,
+    void Function(Map<String, Object?>)? onSourceUse,
+    void Function(Map<String, Object?>)? onRuleLedger,
+    bool allowSourceReview = true,
+    Future<bool> Function()? isCurrent,
   }) async {
     final gate = buildGate;
     buildGate = null;
     if (gate != null) {
+      heldCurrent = isCurrent;
       buildEntered?.complete();
       await gate.future;
     }
     final yaml =
-        '# build ${++builds}\nmixed-port: 7890\nmode: rule\nrules: ["MATCH,DIRECT"]\n';
+        '# build ${++builds}\nmixed-port: 7890\nmode: rule\nrules: ["MATCH,DIRECT"]\n'
+        '${providerURL == null ? '' : 'proxy-providers:\n  queue-fixture:\n    type: http\n    url: $providerURL\n'}';
+    final profile = (await db.database.profilesDao.query().get()).getProfile(
+      setupState.profileId!,
+    )!;
+    final accepted =
+        await SourceAcceptance(
+          core: ref.read(coreHandlerProvider),
+          requests: requests,
+          confirm: (_) async =>
+              const SourceReviewDecision(automatic: true, routing: 'source'),
+        ).review(
+          source: await requests.captureSource('profile:${profile.id}'),
+          identity: SourceAcceptance.fingerprint({
+            'kind': 'profile',
+            'id': profile.id,
+            'url': profile.url,
+            'type': profile.type.name,
+          }),
+          settings: const {'consumer': 'controlled JVM lifecycle fixture'},
+          body: yaml,
+          label: profile.realLabel,
+          location: profile.url,
+          kind: 'profile',
+          automatic: !allowSourceReview,
+          isCurrent: isCurrent,
+        );
+    onSourceUse?.call(accepted.use);
+    await accepted.release();
     return (yaml: yaml, md5: md5.convert(utf8.encode(yaml)).toString());
   }
 }
@@ -110,8 +150,15 @@ class _BridgeRequests extends Request {
 class _BridgeProfiles extends ProfilesAction {
   _BridgeProfiles(this.requests);
   final Request requests;
+  final executionEvents = <bool>[];
   @override
   Request get requestClient => requests;
+  @override
+  void setupExecutionChanged(bool busy) {
+    executionEvents.add(busy);
+    super.setupExecutionChanged(busy);
+  }
+
   @override
   Future<Profile?> ensureFile(
     Profile profile, {
@@ -137,6 +184,8 @@ class _BridgeProviders extends Providers {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final classpath = Platform.environment['L2_JVM_BRIDGE_CLASSPATH'];
+  final sourceExecutable =
+      Platform.environment['FLCLASH_APPLICATION_INPUT_BRIDGE'];
   test(
     'real Dart setup waits for JVM owned cleanup and starts a new activation',
     () async {
@@ -161,6 +210,17 @@ void main() {
           .transform(utf8.decoder)
           .listen(stderr.write);
       final bridge = _Bridge(process);
+      final sourceBridge = PolicyCoreBridge(
+        await Process.start(
+          sourceExecutable!,
+          [r'-test.run=^TestApplicationInputBridge$'],
+          workingDirectory: Directory('core').absolute.path,
+          environment: {
+            'FLCLASH_APPLICATION_INPUT_BRIDGE_HOME': directory.path,
+          },
+        ),
+      );
+      await sourceBridge.call('sourceState');
       final native = Service();
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -181,7 +241,38 @@ void main() {
       Completer<void>? pauseReplyEntered;
       String? lastSubmittedInput;
       var syncFailure = false;
+      Completer<void>? identityReadEntered;
+      final observedCalls = <MethodCall>[];
       messenger.setMockMethodCallHandler(native.methodChannel, (call) async {
+        observedCalls.add(call);
+        if (call.method == 'invokeMethod') {
+          final input = jsonDecode(call.arguments as String) as Map;
+          if (input['method'] == 'sourceAcceptance') {
+            final sourceRequest = input['arguments'] as Map;
+            final snapshot =
+                jsonDecode(
+                      await bridge.call(
+                            'requestControl',
+                            jsonEncode({
+                              'action': 'inspect',
+                              'client': 'bridge',
+                              'key': sourceRequest['key'],
+                            }),
+                          )
+                          as String,
+                    )
+                    as Map;
+            await sourceBridge.call('sourceFrontendState', {
+              'client': 'bridge',
+              'dataset': snapshot['dataset'],
+              'state': snapshot['state'],
+            });
+            final envelope = await sourceBridge.call('source', sourceRequest);
+            return Uint8List.fromList(
+              utf8.encode(jsonEncode({...envelope, 'id': input['id']})),
+            );
+          }
+        }
         if (call.method == 'syncState' && syncFailure) return 'fixture failure';
         if (call.method == 'applyConfig') {
           lastSubmittedInput =
@@ -189,6 +280,10 @@ void main() {
                   as String;
         }
         final result = await bridge.call(call.method, call.arguments);
+        if (call.method == 'getRequestState' && identityReadEntered != null) {
+          identityReadEntered!.complete();
+          identityReadEntered = null;
+        }
         if ((call.method == 'preparePauseIntent' ||
                 call.method == 'getRequestState') &&
             pauseReplyGate != null) {
@@ -209,6 +304,16 @@ void main() {
       });
       final requests = _BridgeRequests(native);
       final setup = _BridgeSetup(native, requests);
+      final profiles = _BridgeProfiles(requests);
+      final admissionObservations = <Map<String, Object?>>[];
+      Future<void> recordAdmission(Map<String, Object?> value) async {
+        admissionObservations.add(value);
+        final path = Platform.environment['L2_SETUP_ADMISSION_OBSERVATION'];
+        if (path != null) {
+          await File(path).writeAsString(jsonEncode(admissionObservations));
+        }
+      }
+
       final profile = Profile.normal(label: 'Bridge source');
       final store = db.Database(NativeDatabase.memory());
       db.database = store;
@@ -216,13 +321,17 @@ void main() {
       final controller = CoreController.scoped(CoreLib.scoped(native));
       final container = ProviderContainer(
         overrides: [
+          sourceConfirmationProvider.overrideWithValue(
+            (_) async =>
+                const SourceReviewDecision(automatic: true, routing: 'source'),
+          ),
           coreHandlerProvider.overrideWithValue(controller),
           nativeRequestStateProvider.overrideWith(
             () => NativeRequestState.scoped(native),
           ),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-          profilesActionProvider.overrideWith(() => _BridgeProfiles(requests)),
+          profilesActionProvider.overrideWith(() => profiles),
           proxiesActionProvider.overrideWith(_BridgeProxies.new),
           providersProvider.overrideWith(_BridgeProviders.new),
           commonActionProvider.overrideWith(_BridgeCommon.new),
@@ -554,13 +663,10 @@ void main() {
         setup.applyProfileDebounce(force: true, isCurrent: () async => false);
         debouncer.flush(FunctionTag.applyProfile);
         beforeInputGate.complete();
-        expect(await beforeInput, isFalse);
+        expect(await beforeInput, isTrue);
         final abandonedBeforeInput = await bridge.call('snapshot') as Map;
-        expect((abandonedBeforeInput['state'] as Map)['phase'], 'failed');
-        expect(
-          (abandonedBeforeInput['state'] as Map)['intentRunning'],
-          isFalse,
-        );
+        expect((abandonedBeforeInput['state'] as Map)['phase'], 'started');
+        expect((abandonedBeforeInput['state'] as Map)['intentRunning'], isTrue);
         expect(await setup.setRunning(true), isTrue);
         for (final scenario in [
           'source-only',
@@ -633,8 +739,12 @@ void main() {
             successor = setup.applyProfile(force: true);
             queuedCheckGate!.complete();
           }
+          final originalSurvives = [
+            'invalid-queued',
+            'revoked-queued',
+          ].contains(scenario);
           if (abandoned != null) {
-            expect(await abandoned, isFalse);
+            expect(await abandoned, originalSurvives);
           } else {
             for (var i = 0; i < 100; i++) {
               final state = await bridge.call('snapshot') as Map;
@@ -646,13 +756,14 @@ void main() {
           final settled = await bridge.call('snapshot') as Map;
           expect(
             (settled['state'] as Map)['phase'],
-            successorQueued ? 'started' : 'failed',
+            successorQueued || originalSurvives ? 'started' : 'failed',
           );
           expect(
             settled['stops'],
-            (preparing['stops'] as int) + (successorQueued ? 0 : 1),
+            (preparing['stops'] as int) +
+                (successorQueued || originalSurvives ? 0 : 1),
           );
-          if (successorQueued) {
+          if (successorQueued || originalSurvives) {
             expect(
               (settled['state'] as Map)['intentRevision'],
               (preparing['state'] as Map)['intentRevision'],
@@ -665,19 +776,401 @@ void main() {
             expect(await setup.setRunning(true), isTrue);
           }
         }
+        final recoveryOrigin = Map<String, Object?>.from(
+          await native.getRequestState(),
+        );
+        expect(
+          await setup.applyProfile(
+            force: true,
+            allowBootstrap: true,
+            expectedRun: recoveryOrigin,
+          ),
+          isTrue,
+        );
+        for (final trigger in ['recovery', 'ui']) {
+          for (final replacement in ['tile', 'alwaysOn', 'stop', 'token']) {
+            await setup.setRunning(false);
+            final original = Map<String, Object?>.from(
+              await native.getRequestState(),
+            );
+            final heldMutation = Completer<void>();
+            final mutationEntered = Completer<void>();
+            final mutation = dataMutations.run(() async {
+              mutationEntered.complete();
+              await heldMutation.future;
+            });
+            await mutationEntered.future;
+            final readEntered = Completer<void>();
+            identityReadEntered = readEntered;
+            final buildsBefore = setup.builds;
+            final permissionFile = File(
+              '${directory.path}/source-acceptance/permissions.json',
+            );
+            final permissionsBefore = await permissionFile.readAsBytes();
+            var httpReceipts = 0;
+            final server = await HttpServer.bind(
+              InternetAddress.loopbackIPv4,
+              0,
+            );
+            final receiver = server.listen((r) async {
+              httpReceipts++;
+              r.response.write('proxies: []');
+              await r.response.close();
+            });
+            setup.providerURL =
+                'http://127.0.0.1:${server.port}/must-not-download';
+            final old = trigger == 'ui'
+                ? setup.setRunning(true)
+                : setup.applyProfile(
+                    force: true,
+                    allowBootstrap: true,
+                    expectedRun: original,
+                  );
+            await readEntered.future;
+            if (replacement == 'token') {
+              final nativeNow = await native.getRequestState();
+              final result =
+                  jsonDecode(
+                        await bridge.call(
+                              'applyConfig',
+                              jsonEncode({
+                                'inputId': lastSubmittedInput,
+                                'requestId': nativeNow['intentRevision'],
+                                'active': false,
+                              }),
+                            )
+                            as String,
+                      )
+                      as Map;
+              expect(result['status'], isNot('superseded'));
+            } else {
+              await bridge.call('prepareRunIntent', {
+                'running': replacement != 'stop',
+                'paused': false,
+                'source': replacement == 'stop' ? 'ui' : replacement,
+              });
+            }
+            final newer = await native.getRequestState();
+            final afterExternal = await bridge.call('snapshot') as Map;
+            final callsBeforeRelease = observedCalls.length;
+            heldMutation.complete();
+            await mutation;
+            expect(
+              await old,
+              isFalse,
+              reason: '$trigger overtaken by $replacement',
+            );
+            final late = observedCalls.skip(callsBeforeRelease).toList();
+            expect(
+              late.where(
+                (c) => [
+                  'applyConfig',
+                  'failRunIntent',
+                  'failConfigBuild',
+                  'syncState',
+                ].contains(c.method),
+              ),
+              isEmpty,
+            );
+            final controls = late
+                .where((c) => c.method == 'requestControl')
+                .map((c) => jsonDecode(c.arguments as String) as Map);
+            expect(
+              controls.where(
+                (c) => ['begin', 'permit', 'grant'].contains(c['action']),
+              ),
+              isEmpty,
+            );
+            final sourceRPCs = late
+                .where((c) => c.method == 'invokeMethod')
+                .map((c) => jsonDecode(c.arguments as String) as Map)
+                .where((c) => c['method'] == 'sourceAcceptance');
+            expect(sourceRPCs, isEmpty);
+            expect(setup.builds, buildsBefore);
+            expect(await permissionFile.readAsBytes(), permissionsBefore);
+            expect(httpReceipts, 0);
+            final settled = await native.getRequestState();
+            expect(settled['intentRevision'], newer['intentRevision']);
+            expect(settled['configToken'], newer['configToken']);
+            expect(settled['phase'], newer['phase']);
+            final afterOld = await bridge.call('snapshot') as Map;
+            expect(afterOld['starts'], afterExternal['starts']);
+            expect(afterOld['fact'], afterExternal['fact']);
+            setup.providerURL = null;
+            await receiver.cancel();
+            await server.close(force: true);
+          }
+        }
+        expect(await setup.setRunning(true), isTrue);
+        await setup.setRunning(false);
+        final staleRecoveryOrigin = await native.getRequestState();
+        setup.buildGate = Completer<void>();
+        setup.buildEntered = Completer<void>();
+        final newBuildGate = setup.buildGate!;
+        final newBuild = setup.setRunning(true);
+        await setup.buildEntered!.future;
+        final newRun = await native.getRequestState();
+        final eventOffset = profiles.executionEvents.length;
+        final callsOffset = observedCalls.length;
+        final permissionFile = File(
+          '${directory.path}/source-acceptance/permissions.json',
+        );
+        final permissionBefore = await permissionFile.readAsBytes();
+        var lateRecoveryFinished = false;
+        final lateRecovery = setup
+            .applyProfile(
+              force: true,
+              allowBootstrap: true,
+              expectedRun: staleRecoveryOrigin,
+            )
+            .whenComplete(() => lateRecoveryFinished = true);
+        final liveCurrentWhileBlocked = await setup.heldCurrent!();
+        await Future<void>.delayed(Duration.zero);
+        final rejectedBeforeRelease = lateRecoveryFinished;
+        final callsBeforeRelease = observedCalls.skip(callsOffset).toList();
+        final permissionAfterOld = await permissionFile.readAsBytes();
+        newBuildGate.complete();
+        final newerSucceeded = await newBuild;
+        final oldSucceeded = await lateRecovery;
+        final newFact = await bridge.call('snapshot') as Map;
+        final lateRecoveryCalls = observedCalls.skip(callsOffset).toList();
+        await recordAdmission({
+          'case':
+              'late stale recovery versus already executing legitimate setup',
+          'liveCurrentWhileBlocked': liveCurrentWhileBlocked,
+          'oldRejectedBeforeNewRelease': rejectedBeforeRelease,
+          'newSucceeded': newerSucceeded,
+          'oldSucceeded': oldSucceeded,
+          'newRun': newRun,
+          'after': newFact,
+          'executionEvents': profiles.executionEvents
+              .skip(eventOffset)
+              .toList(),
+          'cleanupCalls': lateRecoveryCalls
+              .where((c) => c.method == 'failRunIntent')
+              .map((c) => c.arguments)
+              .toList(),
+        });
+        expect(liveCurrentWhileBlocked, true);
+        expect(rejectedBeforeRelease, true);
+        expect(oldSucceeded, false);
+        expect(newerSucceeded, true);
+        expect(profiles.executionEvents.skip(eventOffset), [false]);
+        expect(
+          lateRecoveryCalls.where((c) => c.method == 'failRunIntent'),
+          isEmpty,
+        );
+        expect(permissionAfterOld, permissionBefore);
+        expect(
+          callsBeforeRelease.where(
+            (c) => [
+              'applyConfig',
+              'syncState',
+              'failRunIntent',
+              'invokeMethod',
+            ].contains(c.method),
+          ),
+          isEmpty,
+        );
+        final staleControls = callsBeforeRelease
+            .where((c) => c.method == 'requestControl')
+            .map((c) => jsonDecode(c.arguments as String) as Map);
+        expect(
+          staleControls.where(
+            (c) => ['begin', 'permit', 'grant'].contains(c['action']),
+          ),
+          isEmpty,
+        );
+        expect(
+          (newFact['state'] as Map)['intentRevision'],
+          newRun['intentRevision'],
+        );
+        expect((newFact['state'] as Map)['phase'], 'started');
+        expect((newFact['fact'] as Map)['businessActive'], true);
+        expect((newFact['fact'] as Map)['inputId'], lastSubmittedInput);
+
+        final sameOrigin = await native.getRequestState();
+        final originalRecoverySequence = setup.reserveSetupSequence();
+        setup.buildGate = Completer<void>();
+        setup.buildEntered = Completer<void>();
+        final sameRunGate = setup.buildGate!;
+        final sameRunNewer = setup.applyProfile(
+          force: true,
+          allowBootstrap: true,
+          expectedRun: sameOrigin,
+        );
+        await setup.buildEntered!.future;
+        final sameRunBeforeOld = await native.getRequestState();
+        final sameEventOffset = profiles.executionEvents.length;
+        final sameCallOffset = observedCalls.length;
+        var sameOldFinished = false;
+        final sameRunOld = setup
+            .applyProfile(
+              force: true,
+              allowBootstrap: true,
+              expectedRun: sameOrigin,
+              setupSequence: originalRecoverySequence,
+            )
+            .whenComplete(() => sameOldFinished = true);
+        final sameRunCurrent = await setup.heldCurrent!();
+        await Future<void>.delayed(Duration.zero);
+        final sameOldRejectedBeforeRelease = sameOldFinished;
+        final sameRunCallsBeforeRelease = observedCalls
+            .skip(sameCallOffset)
+            .toList();
+        sameRunGate.complete();
+        final sameNewSucceeded = await sameRunNewer;
+        final sameOldSucceeded = await sameRunOld;
+        final sameRunAfter = await bridge.call('snapshot') as Map;
+        await recordAdmission({
+          'case':
+              'original recovery ordering survives late dispatch even when native identity is unchanged',
+          'origin': sameOrigin,
+          'beforeOld': sameRunBeforeOld,
+          'liveCurrentWhileBlocked': sameRunCurrent,
+          'oldRejectedBeforeNewRelease': sameOldRejectedBeforeRelease,
+          'newSucceeded': sameNewSucceeded,
+          'oldSucceeded': sameOldSucceeded,
+          'executionEvents': profiles.executionEvents
+              .skip(sameEventOffset)
+              .toList(),
+          'cleanupCalls': observedCalls
+              .skip(sameCallOffset)
+              .where((c) => c.method == 'failRunIntent')
+              .map((c) => c.arguments)
+              .toList(),
+          'after': sameRunAfter,
+        });
+        for (final key in ['processEpoch', 'intentRevision', 'configToken']) {
+          expect(sameRunBeforeOld[key], sameOrigin[key]);
+        }
+        expect(sameRunCurrent, true);
+        expect(sameOldRejectedBeforeRelease, true);
+        expect(sameNewSucceeded, true);
+        expect(sameOldSucceeded, false);
+        expect(profiles.executionEvents.skip(sameEventOffset), [false]);
+        expect(
+          sameRunCallsBeforeRelease.where(
+            (c) => [
+              'invokeMethod',
+              'applyConfig',
+              'syncState',
+              'failRunIntent',
+            ].contains(c.method),
+          ),
+          isEmpty,
+        );
+        expect(
+          observedCalls
+              .skip(sameCallOffset)
+              .where((c) => c.method == 'failRunIntent'),
+          isEmpty,
+        );
+        expect((sameRunAfter['state'] as Map)['phase'], 'started');
+        expect((sameRunAfter['fact'] as Map)['businessActive'], true);
+
+        await setup.setRunning(false);
+        final oldUiRead = Completer<void>();
+        pauseReplyGate = oldUiRead;
+        pauseReplyEntered = Completer<void>();
+        final oldUi = setup.setRunning(true);
+        await pauseReplyEntered.future;
+        setup.buildGate = Completer<void>();
+        setup.buildEntered = Completer<void>();
+        final legalGate = setup.buildGate!;
+        final legalSetup = setup.applyProfile(force: true);
+        await setup.buildEntered!.future;
+        final legalRun = await native.getRequestState();
+        final uiEventOffset = profiles.executionEvents.length;
+        final uiCallOffset = observedCalls.length;
+        var uiFinished = false;
+        final oldUiDone = oldUi.whenComplete(() => uiFinished = true);
+        oldUiRead.complete();
+        final legalStillCurrent = await setup.heldCurrent!();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        final uiRejectedWhileBlocked = uiFinished;
+        legalGate.complete();
+        final legalSucceeded = await legalSetup;
+        final oldUiSucceeded = await oldUiDone;
+        final legalFact = await bridge.call('snapshot') as Map;
+        final uiCalls = observedCalls.skip(uiCallOffset).toList();
+        await recordAdmission({
+          'case':
+              'older UI identity reply resumes after newer legitimate setup entered',
+          'liveCurrentWhileBlocked': legalStillCurrent,
+          'oldRejectedBeforeNewRelease': uiRejectedWhileBlocked,
+          'newSucceeded': legalSucceeded,
+          'oldSucceeded': oldUiSucceeded,
+          'newRun': legalRun,
+          'after': legalFact,
+          'executionEvents': profiles.executionEvents
+              .skip(uiEventOffset)
+              .toList(),
+          'cleanupCalls': uiCalls
+              .where((c) => c.method == 'failRunIntent')
+              .map((c) => c.arguments)
+              .toList(),
+        });
+        expect(legalStillCurrent, true);
+        expect(uiRejectedWhileBlocked, true);
+        expect(oldUiSucceeded, false);
+        expect(legalSucceeded, true);
+        expect(profiles.executionEvents.skip(uiEventOffset), [false]);
+        expect(uiCalls.where((c) => c.method == 'failRunIntent'), isEmpty);
+        expect(
+          (legalFact['state'] as Map)['intentRevision'],
+          legalRun['intentRevision'],
+        );
+        expect((legalFact['state'] as Map)['phase'], 'started');
+        expect((legalFact['fact'] as Map)['businessActive'], true);
+
+        final currentOrigin = await native.getRequestState();
+        setup.buildGate = Completer<void>();
+        setup.buildEntered = Completer<void>();
+        final replacedGate = setup.buildGate!;
+        final replaced = setup.applyProfile(
+          force: true,
+          allowBootstrap: true,
+          expectedRun: currentOrigin,
+        );
+        await setup.buildEntered!.future;
+        final latest = setup.applyProfile(
+          force: true,
+          allowBootstrap: true,
+          expectedRun: currentOrigin,
+        );
+        final replacedStillCurrent = await setup.heldCurrent!();
+        replacedGate.complete();
+        final replacedSucceeded = await replaced;
+        final latestSucceeded = await latest;
+        final latestFact = await bridge.call('snapshot') as Map;
+        await recordAdmission({
+          'case':
+              'a later legitimate same-run setup still supersedes an older admitted setup',
+          'oldCurrent': replacedStillCurrent,
+          'oldSucceeded': replacedSucceeded,
+          'latestSucceeded': latestSucceeded,
+          'after': latestFact,
+        });
+        expect(replacedStillCurrent, false);
+        expect(replacedSucceeded, false);
+        expect(latestSucceeded, true);
+        expect((latestFact['state'] as Map)['phase'], 'started');
+        expect((latestFact['fact'] as Map)['businessActive'], true);
         expect(stderr.toString(), isEmpty);
       } finally {
         await setup.setRunning(false);
         container.dispose();
         messenger.setMockMethodCallHandler(native.methodChannel, null);
         await bridge.close();
+        await sourceBridge.close();
         await errors.cancel();
         await store.close();
         await directory.delete(recursive: true);
       }
     },
-    skip: classpath == null
-        ? 'Run with the compiled JVM bridge classpath.'
+    skip: classpath == null || sourceExecutable == null
+        ? 'Run with the compiled JVM classpath and the real Go source-acceptance bridge.'
         : false,
     timeout: const Timeout(Duration(minutes: 2)),
   );

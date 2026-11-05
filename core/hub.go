@@ -163,6 +163,12 @@ const validationNameSuffix = "\x00validate"
 func handleValidateProxies(mappings []map[string]any) []string {
 	results := make([]string, len(mappings))
 	for i, mapping := range mappings {
+		if features.Android {
+			if _, err := summarizeSourceContent(map[string]any{"proxies": []any{mapping}}); err != nil {
+				results[i] = err.Error()
+			}
+			continue
+		}
 		name, _ := mapping["name"].(string)
 		probe := mapping
 		switch mapping["type"] {
@@ -476,6 +482,14 @@ func handleGetConnections() *statistic.Snapshot {
 	return statistic.DefaultManager.Snapshot()
 }
 
+func handleGetConnectionsData() any {
+	snapshot := handleGetConnections()
+	if features.Android {
+		return sourceConnectionView(snapshot)
+	}
+	return snapshot
+}
+
 func handleGetConnectionCount() int {
 	count := 0
 	statistic.DefaultManager.Range(func(statistic.Tracker) bool {
@@ -738,6 +752,12 @@ func providerRequestFailureReason(err error) string {
 }
 
 func providerMethodError(code, providerName string, err error) *MethodError {
+	if errors.Is(err, errSourceReview) {
+		code = "source_review_required"
+	}
+	if errors.Is(err, errSourceBudget) {
+		code = "source_budget_exceeded"
+	}
 	return &MethodError{
 		Code:    code,
 		Message: capabilityError(err).Error(),
@@ -990,9 +1010,13 @@ func init() {
 	}
 	statistic.DefaultRequestNotify = func(c statistic.Tracker) {
 		notifyProbeRoute(c)
+		var data any = c
+		if features.Android {
+			data = sourceTrackerViewOf(c.Info())
+		}
 		sendMessage(Message{
 			Type: RequestMessage,
-			Data: c,
+			Data: data,
 		})
 	}
 	dns.DefaultQueryNotify = func(record dns.QueryRecord) {

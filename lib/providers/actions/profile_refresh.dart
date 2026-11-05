@@ -310,6 +310,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
   Future<void> _runRefreshMaterial(_ProfileRefreshJob job) async {
     RequestFile? staged;
     PolicyMaterialCandidate? preflight;
+    SourceMaterialApproval? approval;
     var result = const ProfileRefreshResult(
       application: ProfileApplicationOutcome.superseded,
     );
@@ -349,6 +350,36 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
         () => requestClient.downloadFileForUrl(profile.url),
       );
       staged = response.file;
+      var sourceKind = 'profile';
+      final selectedProfile = ref.read(currentProfileProvider);
+      if (selectedProfile != null &&
+          selectedProfile.id != profile.id &&
+          selectedProfile.overwriteType == OverwriteType.custom) {
+        final setup = await ref.read(
+          setupStateProvider(selectedProfile.id).future,
+        );
+        final aliases = {
+          for (final entry in setup.profileProviders.entries)
+            if (entry.value == profile.id) entry.key,
+        };
+        if (setup.proxyGroups.any(
+          (group) => group.use?.any(aliases.contains) ?? false,
+        )) {
+          sourceKind = 'provider-proxy';
+        }
+      }
+      approval = await _reviewProfileMaterial(
+        confirm: ref.read(sourceConfirmationProvider),
+        core: _core,
+        requests: requestClient,
+        profile: profile,
+        kind: sourceKind,
+        path: staged.staged.path,
+        session: session,
+        source: materialSource,
+        automatic: job.automatic,
+        isCurrent: () => _refreshRowCurrent(job),
+      );
       final validation = await _core.validateConfig(staged.staged.path);
       if (validation.isNotEmpty) {
         throw const RequestUnavailable('profile_invalid');
@@ -359,11 +390,12 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
             profile.id,
             staged.staged.path,
             requestClient,
+            approval: approval,
           );
       final incoming = staged;
       final target = await appPath.getProfilePath(profile.id.toString());
       job.committing = true;
-      await session.commit(() async {
+      Future<void> persist() async {
         if (!await _refreshRowCurrent(job) ||
             !await requestClient.materialSessionCurrent(
               session,
@@ -399,7 +431,11 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
           }
         }
         job.invalidated = true;
-        await requestClient.invalidate('profile:${profile.id}');
+        if (approval != null) {
+          await approval.invalidate();
+        } else {
+          await requestClient.invalidate('profile:${profile.id}');
+        }
         final row = (await database.profilesDao.query().get()).getProfile(
           profile.id,
         );
@@ -424,10 +460,16 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
               .persistRefresh(next, importing: job.importing),
         );
         saved = true;
-        job.savedSource = await requestClient.captureSource(
-          'profile:${profile.id}',
-        );
-      });
+      }
+
+      if (approval != null) {
+        await approval.commit(session: session, action: persist);
+      } else {
+        await session.commit(persist);
+      }
+      job.savedSource = await requestClient.captureSource(
+        'profile:${profile.id}',
+      );
       retry.failures = 0;
       result = ProfileRefreshResult(
         materialSaved: true,
@@ -481,6 +523,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       if (!job.registration.isCompleted) job.registration.complete();
       job.session?.close();
       try {
+        await approval?.release();
         await preflight?.close();
         await staged?.close();
       } catch (_) {
@@ -552,6 +595,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
             .applyRefreshedProfile(
               isCurrent: current,
               previous: observation.fact,
+              allowSourceReview: !job.automatic,
               canSubmit: job.automatic
                   ? () => _automaticRunEligible(job.profile)
                   : null,

@@ -117,6 +117,7 @@ abstract class TrackerInfo with _$TrackerInfo {
     required List<String> chains,
     required String rule,
     required String rulePayload,
+    Map<String, Object?>? provenance,
     int? downloadSpeed,
     int? uploadSpeed,
   }) = _TrackerInfo;

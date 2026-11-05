@@ -69,7 +69,7 @@ class ConfigInput {
       if (sha256.convert(bytes).toString() != accepted.inputId) return null;
       final manifest = json.decode(utf8.decode(bytes));
       if (manifest is! Map ||
-          manifest['version'] != 1 ||
+          !const {1, 2}.contains(manifest['version']) ||
           manifest['profileId'] != accepted.profileId ||
           manifest['dependencies'] is! List) {
         return null;
@@ -115,6 +115,7 @@ class ConfigInput {
       if (sha256.convert(data).toString() != accepted.inputId) return null;
       final manifest = jsonDecode(utf8.decode(data));
       if (manifest is! Map ||
+          !const {1, 2}.contains(manifest['version']) ||
           manifest['profileId'] != accepted.profileId ||
           manifest['managedMaterials'] is! Map<String, dynamic> ||
           !validManagedMaterialsReceipt(manifest['managedMaterials']) ||
@@ -138,9 +139,20 @@ class ConfigInput {
     required Map<String, String> selectedMap,
     required String testUrl,
     required List<RequestSource> sources,
+    int version = 1,
+    List<Map<String, Object?>> sourceUses = const [],
+    List<Map<String, Object?>> providerMaterials = const [],
+    Map<String, Object?>? ruleLedger,
     Map<String, Object?>? managedPolicy,
     Map<String, Object?>? managedMaterials,
   }) async {
+    if (version != 1 && version != 2 ||
+        version == 1 &&
+            (sourceUses.isNotEmpty ||
+                providerMaterials.isNotEmpty ||
+                ruleLedger != null)) {
+      throw const FormatException('invalid source input version');
+    }
     if (managedMaterials != null &&
         (managedPolicy == null ||
             !validManagedMaterialsReceipt(managedMaterials) ||
@@ -154,11 +166,15 @@ class ConfigInput {
     final yamlHash = sha256.convert(yamlBytes).toString();
     final manifest = utf8.encode(
       json.encode({
-        'version': 1,
+        'version': version,
         'yamlSha256': yamlHash,
         'profileId': profileId,
         'profileName': profileName,
         'dependencies': [for (final source in sources) source.key],
+        'sourceUses': sourceUses,
+        'ruleLedger': ?ruleLedger,
+        if (providerMaterials.isNotEmpty)
+          'providerMaterials': providerMaterials,
         'selectedMap': Map<String, String>.of(selectedMap),
         'testUrl': testUrl,
         'acceptedOverrides': <String, Object?>{},

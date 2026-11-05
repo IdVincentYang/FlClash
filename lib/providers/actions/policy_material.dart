@@ -16,15 +16,20 @@ class _ManagedMaterialFrame {
     this.script,
     this.scriptPath,
     this.scriptSha256,
+    this.profile,
+    this.approval,
   );
   final RequestFile file;
   final String rawSha256, identity;
   final String? script, scriptPath, scriptSha256;
+  final Profile profile;
+  final SourceMaterialApproval? approval;
 
   static Future<_ManagedMaterialFrame> capture(
     Profile profile,
     SetupState state, {
     String? incomingPath,
+    SourceMaterialApproval? approval,
   }) async {
     final path =
         incomingPath ?? await appPath.getProfilePath(profile.id.toString());
@@ -54,10 +59,15 @@ class _ManagedMaterialFrame {
       script,
       scriptPath,
       scriptBytes == null ? null : sha256.convert(scriptBytes).toString(),
+      profile,
+      approval,
     );
   }
 
-  Future<_ManagedMaterialFrame> incoming(String path) async {
+  Future<_ManagedMaterialFrame> incoming(
+    String path, {
+    SourceMaterialApproval? approval,
+  }) async {
     final bytes = await _readMaterialBytes(path);
     return _ManagedMaterialFrame(
       await RequestFile.stage(bytes),
@@ -66,6 +76,8 @@ class _ManagedMaterialFrame {
       script,
       scriptPath,
       scriptSha256,
+      profile,
+      approval,
     );
   }
 
@@ -76,9 +88,22 @@ class _ManagedMaterialFrame {
   Future<SelectedPolicy> resolve(
     CoreController core,
     SetupState state,
-    SelectedPolicy selected,
-  ) async {
-    final material = await read(core, state);
+    SelectedPolicy selected, {
+    required Request requests,
+    SourceConfirmation? confirm,
+    bool automatic = false,
+    Future<bool> Function()? isCurrent,
+    void Function(Map<String, Object?>)? onSourceUse,
+  }) async {
+    final material = await read(
+      core,
+      state,
+      requests: requests,
+      confirm: confirm,
+      automatic: automatic,
+      isCurrent: isCurrent,
+      onSourceUse: onSourceUse,
+    );
     return selected.resolve(
       material: material,
       identity: identity,
@@ -89,25 +114,80 @@ class _ManagedMaterialFrame {
 
   Future<Map<String, dynamic>> read(
     CoreController core,
-    SetupState state,
-  ) async {
+    SetupState state, {
+    required Request requests,
+    SourceConfirmation? confirm,
+    bool automatic = false,
+    Future<bool> Function()? isCurrent,
+    void Function(Map<String, Object?>)? onSourceUse,
+  }) async {
     validateMaterialDocument(await _readMaterialBytes(file.staged.path));
+    final sourceBody = requests.requiresSourceAcceptance
+        ? await _sourceBody(file.staged.path, preserveBom: true)
+        : null;
+    final source = await requests.captureSource('profile:${profile.id}');
+    if (approval != null && approval!.materialHash != rawSha256) {
+      throw const PolicyDraftProblem('materialSource');
+    }
+    final acceptedSource = approval == null
+        ? await _reviewProfileSource(
+            confirm: confirm,
+            core: core,
+            requests: requests,
+            profile: profile,
+            path: file.staged.path,
+            body: sourceBody,
+            source: source,
+            automatic: automatic,
+            isCurrent: isCurrent,
+          )
+        : null;
+    if (acceptedSource != null) onSourceUse?.call(acceptedSource.use);
     late Map<String, dynamic> material;
     try {
       material = boundedMaterialCopy(
-        await core.getConfigPath(file.staged.path),
+        approval != null
+            ? await approval!.project()
+            : requests.requiresSourceAcceptance
+            ? await _sourceAcceptance(core, requests, confirm: confirm).project(
+                source: source,
+                identity: _profileSourceIdentity(profile),
+                body: sourceBody!,
+              )
+            : await core.getConfigPath(file.staged.path),
       );
     } catch (_) {
       throw const PolicyDraftProblem('material');
     }
     if (script?.isNotEmpty == true) {
       try {
+        final accepted = await _reviewScriptSource(
+          confirm: confirm,
+          core: core,
+          requests: requests,
+          script: state.script!,
+          body: script!,
+          isCurrent: () async =>
+              await scriptCurrent() && (isCurrent == null || await isCurrent()),
+          automatic: automatic,
+        );
+        if (accepted != null) onSourceUse?.call(accepted.use);
+        if (isCurrent != null && !await isCurrent()) {
+          throw const RequestUnavailable('request_cancelled');
+        }
         material = boundedMaterialCopy(
-          await handleEvaluate(
-            script!,
-            material,
-            maxBytes: managedMaterialMaxBytes,
-          ),
+          requests.requiresSourceAcceptance
+              ? await handleAcceptedEvaluate(
+                  script!,
+                  material,
+                  permit: accepted?.scriptPermit,
+                  maxBytes: managedMaterialMaxBytes,
+                )
+              : await handleEvaluate(
+                  script!,
+                  material,
+                  maxBytes: managedMaterialMaxBytes,
+                ),
         );
       } catch (_) {
         throw const PolicyDraftProblem('materialScript');
@@ -138,6 +218,7 @@ class PolicyMaterialCandidate {
     this._core,
     this._originalSha256,
     this._selectionRaw,
+    this._confirmation,
   );
   final _SetupInputs _inputs;
   _ManagedMaterialFrame _frame;
@@ -146,7 +227,9 @@ class PolicyMaterialCandidate {
   final CoreController _core;
   final String _originalSha256;
   final String? _selectionRaw;
+  final SourceConfirmation _confirmation;
   RequestSession? _session;
+  SourceMaterialApproval? _approval;
   SubscriptionInfo? _subscription;
   bool _closed = false;
   ({String draftSha256, _ManagedMaterialFrame frame})? _qualified;
@@ -198,7 +281,13 @@ class PolicyMaterialCandidate {
       if (!await current() || !owned()) {
         throw const PolicyDraftProblem('materialSource');
       }
-      final material = await (_material ??= frame.read(_core, _inputs.state));
+      final material = await (_material ??= frame.read(
+        _core,
+        _inputs.state,
+        requests: _client,
+        confirm: _confirmation,
+        isCurrent: current,
+      ));
       if (!owned()) throw const PolicyDraftProblem('materialSource');
       final resolved = resolveMaterialPolicy(
         frozen.policy,
@@ -223,7 +312,13 @@ class PolicyMaterialCandidate {
   Future<Map<String, List<String>>> sourceNames() async {
     if (!await current()) throw const PolicyDraftProblem('materialSource');
     final frame = _frame;
-    final material = await (_material ??= frame.read(_core, _inputs.state));
+    final material = await (_material ??= frame.read(
+      _core,
+      _inputs.state,
+      requests: _client,
+      confirm: _confirmation,
+      isCurrent: current,
+    ));
     if (!identical(frame, _frame) || !await current()) {
       throw const PolicyDraftProblem('materialSource');
     }
@@ -285,6 +380,7 @@ class PolicyMaterialCandidate {
     if (_closed) return;
     _closed = true;
     _session?.close();
+    await _approval?.release();
     await _frame.file.close();
   }
 }
@@ -314,6 +410,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
     void Function(PolicyMaterialCandidate)? onCreated,
     String? incomingPath,
     Request? client,
+    SourceMaterialApproval? approval,
   }) async {
     final requests = client ?? _requests;
     final candidate = await requests.mutate(() async {
@@ -336,6 +433,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
         profile,
         state,
         incomingPath: incomingPath,
+        approval: approval,
       );
       try {
         final keys = <String>{
@@ -376,6 +474,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
                   await appPath.getProfilePath(profileId.toString()),
                 ),
           selected?.rawContent,
+          ref.read(sourceConfirmationProvider),
         );
       } catch (_) {
         await frame.file.close();
@@ -421,8 +520,19 @@ mixin _PolicyMaterialSetup on _$SetupAction {
         if (!await candidate.current()) {
           throw const PolicyDraftProblem('materialSource');
         }
+        final approval = await _reviewProfileMaterial(
+          core: _core,
+          requests: requests,
+          profile: profile,
+          path: response.file.staged.path,
+          session: session,
+          isCurrent: candidate.current,
+          confirm: ref.read(sourceConfirmationProvider),
+        );
+        candidate._approval = approval;
         final frame = await candidate._frame.incoming(
           response.file.staged.path,
+          approval: approval,
         );
         await candidate._frame.file.close();
         candidate._frame = frame;
@@ -445,8 +555,9 @@ mixin _PolicyMaterialSetup on _$SetupAction {
   Future<PolicyMaterialCandidate?> preflightPolicyMaterial(
     int profileId,
     String incomingPath,
-    Request client,
-  ) async {
+    Request client, {
+    SourceMaterialApproval? approval,
+  }) async {
     final selected = await database.profilePolicySelectionsDao
         .query(profileId)
         .getSingleOrNull();
@@ -458,6 +569,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
       profileId,
       incomingPath: incomingPath,
       client: client,
+      approval: approval,
     );
     try {
       await _buildMaterialProfile(candidate._inputs, candidate._frame, (_) {});
@@ -474,16 +586,25 @@ mixin _PolicyMaterialSetup on _$SetupAction {
   Future<({String yaml, String md5})> _buildMaterialProfile(
     _SetupInputs snapshot,
     _ManagedMaterialFrame frame,
-    void Function(SelectedPolicy) resolved,
-  ) async {
+    void Function(SelectedPolicy) resolved, {
+    void Function(Map<String, Object?>)? onSourceUse,
+    void Function(Map<String, Object?>)? onRuleLedger,
+    bool allowSourceReview = true,
+    Future<bool> Function()? isCurrent,
+  }) async {
     final selected = await frame.resolve(
       _core,
       snapshot.state,
       snapshot.policy!,
+      requests: _requests,
+      confirm: ref.read(sourceConfirmationProvider),
+      automatic: !allowSourceReview || !ref.read(appVisibleProvider),
+      onSourceUse: onSourceUse,
+      isCurrent: isCurrent,
     );
     selected.picks(snapshot.profile.selectedMap);
     resolved(selected);
-    return makeRealProfileTask(
+    final composition = await makeProfileCompositionTask(
       MakeRealProfileState(
         rules: const [],
         proxyGroups: const [],
@@ -505,5 +626,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
         resolvedManagedPolicy: selected.policyJson,
       ),
     );
+    onRuleLedger?.call(composition.ledger);
+    return (yaml: composition.yaml, md5: composition.md5);
   }
 }

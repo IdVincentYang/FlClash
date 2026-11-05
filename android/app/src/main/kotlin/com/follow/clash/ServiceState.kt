@@ -37,7 +37,7 @@ object ServiceState {
 
     fun initializeRequestState(expectedRevision: Long, recovery: Boolean): Boolean = machine.initializeRequestState(expectedRevision, recovery)
 
-    suspend fun failRunIntent(requestId: Long, token: Long) = machine.failRunIntent(requestId, token)
+    suspend fun failRunIntent(requestId: Long, token: Long, unregistered: Boolean = false) = machine.failRunIntent(requestId, token, unregistered = unregistered)
 
     suspend fun failConfigBuild(input: com.google.gson.JsonObject) = machine.failConfigBuild(input)
 

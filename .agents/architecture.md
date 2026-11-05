@@ -116,6 +116,46 @@ A material digest is provenance, not a new runtime grant or proof that a saved
 revision has been applied. The guide separates Save, preview, Sync and actual
 adoption; no persistent pending-material authority is introduced.
 
+## Source Acceptance (Android implementation reviewed)
+
+L2-T05's approved [source acceptance contract](../docs/features/security/source_acceptance_design.md)
+adds a parent-Go private atomic grant store, pre-parser candidate classification and sealed provider snapshots.
+Runtime delivery is Android-only. Shared Dart entry points use Request's existing platform boundary;
+other platforms retain legacy source/script/provider behavior and ConfigInput v1, without source permission UI.
+Android requires v2 and cannot fall back when permissions, hooks or owner qualification are unavailable.
+Go validates v2 receipts on every platform; controlled host fixtures do not establish Android assembly coverage.
+Dart owns composition, routing selection and review UI; its database does not duplicate the grant authority.
+Request/source tickets, ConfigInput and ServiceState keep their existing distinct ownership.
+Frontend file/DB commit receipts also own the durable request recovery marker. A detached engine cannot prove
+its writer ended: acknowledged receipts retire, while a process-lifetime veto prevents new writes or positive trust
+until their actual completion or application process exit. Registry/JNI/Service reinitialization does not clear that veto;
+ready permits the recovery explanation, and reads fail promptly. The source contract owns the detailed recovery rules.
+ConfigInput v2 carries purpose-bound SourceUse receipts and an exact final-YAML acceptance receipt
+under `config:<profileId>`, qualified by the application-config source ticket. Go checks canonical permissions
+before factory parsing; Android legacy v1 replay requires frontend review. Source entities share an incarnation but
+keep independent purpose delegations and use epochs, so node-only permission cannot grant source routing.
+Android provider adoption is implemented under design_v5; whole-task review and Android runtime acceptance are incomplete.
+Controlled host fixtures exercise stable RP generations, original Proxy SideUpdate, durable barriers and retained TCP/UDP associations.
+Ordinary Android refresh now calls the draft inline adoption RPC without registering a full input or changing native intent.
+Its first path rebuilds only the affected node/group closure, keeps old objects until scope cleanup, and defers structural or
+unproven mixed changes. Component and mock orchestration checks do not establish Android runtime acceptance.
+The approved draft uses per-provider live cache/generation updates and a durable replay barrier.
+Rule providers stay behind a stable wrapper in the initial map so DNS/sniffer readers do not race map publication.
+Private RP preparation suppresses callbacks; only the accepted public generation notifies live consumers.
+Runtime adoption and durable replay eligibility are separate when checkpoint persistence fails.
+Inline map publication additionally requires a complete safe reader-creation history in this process. DNSDialer
+ListenPacket reads the global proxy map even for an empty proxy name; checking only named DNS is insufficient.
+The draft admits empty-name UDP/TCP, DoT and H1/H2 DoH transports, checking every effective nameserver branch;
+DoQ/H3, named/interface DNS, private/unknown creators and prior unsafe in-flight readers exclude automatic inline updates.
+A conservative reason latch survives Stop/reinit/settings changes until actual process exit; it grants no permissions.
+The parent request packet path must select an owned proxy from AllProxies plus lease qualification instead of NewByName.
+Provider-only hot updates do not swap those maps and remain independently eligible.
+The Android editor performs factory-free structural node checks; actual protocol factories remain at the accepted install boundary.
+Inline publication and remaining lifecycle/collector work are incomplete; normal ConfigInput/ServiceState authority is unchanged.
+Material leases and collector pins protect current/prepared/retiring/pending/checkpoint references until actual work exits.
+Optional tracker provenance observes the original matcher and binds to the installed input; missing evidence is Unknown.
+This section describes approved work in progress, not verified production behavior.
+
 ## Lifecycle Ownership And Convergence
 
 For `no_zerotier` builds: moving staged Apply outside configMu also requires the same resource admission

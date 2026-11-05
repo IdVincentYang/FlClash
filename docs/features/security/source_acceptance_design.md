@@ -1,0 +1,248 @@
+# 来源接受与轻量追溯契约
+
+**Android 实现评审通过，待本地交付及M收尾。指定AVD验证范围与未验证限制见使用指南。**
+本文维护来源委托、候选接受及连接归属的长期契约；实施进度与证据由
+[本次任务](loop2/loop2_tasks.md#l2-t05-来源信任与配置内容接受)管理。
+使用入口见[指南](source_acceptance_guide.md)。
+
+本项运行期交付以Android为范围。非Android沿原来源／脚本／provider及ConfigInput v1路径，不启用本契约的授权／热采用能力。
+共享Dart入口依据原Request平台边界选择路径；Android不能因client未ready、缺凭据或hook未安装而降级。
+共享Go对v2始终校验真实凭据，Android拒绝v1；host组件夹具不等于Android真实registry装配和active gate证据。
+私有RP在任何有副作用构造前核真实registry／owner／lease；nil hook或只返回空lease的hook均不合资格。
+
+## 权威与接受对象
+
+来源实体具有稳定ID和incarnation，URL、材料digest、已有缓存不能自动授予权限。
+父Go包装层的单用途私有原子权限文件是SourceGrant唯一权威，Dart DB只保存Profile、Script和自有路由。
+每实体分开保存未来自动维护的revision和精确已接受内容的use epoch；manifest携带绑定，不能自称获准。
+Request／source ticket仍管下载和提交资格，ConfigInput／checkpoint管实际采用，ServiceState管运行意图。
+ConfigInput version 2绑定按用途区分的SourceUse凭据及最终配置凭据；`config:<profileId>`通过application-config来源票据限定，
+最终YAML的规范化digest必须是规范权限文件已经接受的精确内容，原Typed AcceptedOverrides仍沿已有明确本地操作契约。
+依赖材料／Script的凭据同时重核来源incarnation和实体／用途use epoch；manifest本身不授信。旧version 1自动重放需前台迁移审查。
+最终配置的精确接受记录在规范权限文件中同时绑定该次依赖凭据；重放不能通过删改manifest的依赖列表避开撤回。
+相同最终内容使用不同来源时仍重核绑定，不因内容digest相同继承另一组来源的权限。
+config用途的使用digest同时覆盖最终内容与规范化依赖凭据；同一YAML的多组已接受绑定并存，
+接受新材料不会覆盖旧绑定或提前使仍合资格的旧checkpoint失效。
+config实体identity只标识所属Profile，不把依赖列表作为实体身份；依赖增删改由config委托的Bindings比较要求重新接受，
+精确revision则由正文及依赖use digest共同限定，避免增加Script等依赖时提前撤销旧root并使本次prepare的fence自失效。
+每份最终配置必须包含主Profile的有效内容凭据，以及主Profile和application-config的提交依赖；
+最终配置审查不能代替主Profile的用途许可，也不能解除其已排除的路由能力。
+外部Profile文件导入先形成必须重新审查的候选，取消不改变旧权限；明确接受时才原子建立新incarnation，不能继承同ID／同URL的旧委托。
+备份恢复不读取或复制权限文件，写入前撤销被替换实体的委托；恢复失败回滚业务数据时不自动恢复已撤销权限。
+这不是本地防篡改或秘密存储方案；同权限本地进程的攻击不在本契约保证内。
+
+首次Import仅请求下载，使用前须Review source。新增嵌套下载接收方先确认，代码执行另按精确digest确认。
+用户可接受精确revision，或明确委托范围内维护。来源、用途、协议附加能力、DNS、默认出口、控制服务及固定保护均可见。
+不能分类的有效变化进入Review changes；同意不能解除被禁止用途或绕过原工厂拒绝。
+确认绑定材料字节、incarnation、grant revision、依赖票据、设置和脚本版本；迟到确认不能批准更新候选。
+UI确认回调由普通Provider接入，默认展示同一审查对话框；它只返回用户选择，不能生成SourceUse或绕过父Go接受。
+受控Dart／Go夹具可提供明确的合成人类选择；自动路径仍在调用回调之前拒绝需要新确认的候选。
+分类在构造出站或控制能力的parser之前；原parser只负责获准投影的真实格式和工厂校验。
+
+## 自动规则与用途投影
+
+节点维护与规则自动准则分别判断：已知纯代理组可在相同协议能力内维护TCP节点，即使这些节点不支持UDP；
+这不授予该组成为R1自动规则目标的资格。R1仍要求实际代理闭包和UDP能力成立；含DIRECT／未知成员或动态过滤的组保守处理。
+
+自动规则维护仅用于固定前缀P、获委托可变块V、单一固定终末MATCH Z的形状。
+全部固定本地决策及其引用内容属于P；V各槽位置、目标、来源和域名／IP条件范围不变。
+可自动比较的条件限正向DOMAIN／DOMAIN-SUFFIX／IP-CIDR及等价domain／ipcidr集合，使用字段拆分和包含关系，
+不新增流量matcher。逻辑组合、SUB-RULE、PASS、REMATCH、Geo、未知表达式或二进制集合变化须确认。
+复杂既有配置可继续使用并明确接受新版本，不强制重排或转为受管子集。
+
+固定代理默认下V可增删委托条件；固定DIRECT／REJECT默认下只许单调增加proxy条件：
+旧同目标参数条目须为新块有序子序列，集合保留旧规范化原子。P保护不被抢先插入。
+代理目标闭包须非空、不含DIRECT／PASS／REMATCH／空组直连，并保持TCP／UDP最低能力；不能核清则确认。
+节点和组更新也核此闭包，避免UDP支持降低导致跳过proxy规则。固定决策不能放在V后被新增条件遮蔽。
+例如删除Proxy条件后剩MATCH,DIRECT会扩大直连；固定REJECT前插Proxy会绕过保护，两者都不能自动采用。
+
+“不采用源routing”是持久用途选择；与节点、组、DNS／sniffer等分别授权。
+源rules／sub-rules在Script之前排除，最终输出以显式自有路由为准；Script不能偷偷恢复它们。
+源listener的rule／proxy、名称／端口和tunnels.proxy同属实际routing入口，不自动采用，所需入站须本地明确声明。
+应用mixed／TUN和mode仍由已有权威建立。RuleSet按用途和来源绑定；只供禁用业务路由的集合不实例化／调度，
+独立DNS用途保留的集合使用内部命名并重写已识别引用，不能被自有业务规则因同名意外采用。
+空自有规则也不恢复源规则，须明确未匹配流量的代理／DIRECT／REJECT；冲突或缺目标拒绝，不补隐式直连。
+实施复用规范grant的routing用途选择与Profile.matchTarget保存明确默认；MakeRealProfileState携带冻结的sourceRoutingDenied，
+合成再次排除source／Script恢复的路由入口，无须为同一选择再建DB授权副本或migration。
+只有实际投影排除的字段可忽略，暂时Global／Direct、未选中或未命中不算排除。
+受管材料继续走原严格编译器，权限边界不叠加另一套路由编译权威。
+
+## 候选、脚本与provider
+
+下载先进入私有候选，分类、确认和资格核对成功才到原材料提交点；接受材料不等于实际生效。
+Profile沿原age解密器及已配置密钥先解密后分类／投影，密封材料hash仍覆盖实际原始正文；UTF-8 BOM也保留在提交正文中。
+材料入口需要人类选择的候选先获得精确同意，再于耐久保存后发布正式grant；包括新identity、fresh及同identity的Routing变化。
+待提交同意没有SourceUse，不能提前撤销仍供本次下载的旧scope；运行消费者只接受唯一规范grant。
+网络材料绑定实际RequestSession及GrantCommit，本地import／save绑定显式local-material操作的专用receipt；
+普通lock不能消费材料同意。候选preflight仅纯解析／投影，不执行未正式许可Script、下载嵌套材料或调用工厂。
+父Go比较并记录实际receipt自己的唯一source失效，文件＋DB耐久保存后核真实目标hash与原grant，才正式发布并reconcile。
+跨语言写入窗口沿既有request-recovery-required保护；失败不假回滚已发布权限或真实已存材料。
+失败终止释放receipt并唤醒等待者，保留带所有权的屏障；旧cleanup不能覆盖新工作。
+前台恢复须先离线核实际材料／DB／grant与相符屏障并使旧资格失效，再走原ConfigInput校验；候选不能自动恢复成许可。
+已确认beginCommit屏障但尚未complete的前台写，在engine detach时退休为未知写者；同进程的拒绝计数只由该实际receipt的complete释放，或随整个OS进程退出自然消亡。
+registry／Core Init／Service重建、新client、超时不能清除；计数存在时禁止新网络／本地写、正向授信／发布、ConfigInput和离线恢复，即时撤回仍有效。
+ready只开放解释界面，读／等待及时返回restart-required；晚到complete只释放自己，保留耐久屏障。clearRecovery必须在与detach相同的configMu临界区内核unknown及存活、未失败／退休的ready client receipt；持registry锁核归属至相符marker删除，锁前检查不能授权排队后清理。没有写receipt的普通detach保留后台维护。
+前台receipt独立限额16，候选槽位限额32；未知写者期间拒绝新增。退休候选pin保留到实际写结束，不能因前端断开提前回收。
+Android app、JNI Core与DB isolate共享应用进程；须通过App info → Force stop后重新打开终结未知写者，关闭界面／划掉任务不构成进程退出证明。
+新进程仍须显式离线核对材料／DB／grant，不能自动提升候选。插件只显式放行已定义的前台提交动作，内部配置／publish动作仍受限。
+R3及R3.4设计已获审，生产接入与验收未完成；Stop／撤回检查不能为接续材料而放宽。
+前台完整安装仍有[日志级别并发风险](deferred_security_items.md#core-完整安装的日志级别并发)；
+局部热更新与来源接受不构成全部Core全局量的并发修复。
+新Script执行前确认来源及精确代码digest；既有QuickJS执行后的输出另做行为接受。
+拒绝代码时不执行预览；接受代码不顺带接受输出。QuickJS预算不是全面日志脱敏或来源认证。
+提交／prepare之前失败保留合资格旧输入；越过ConfigInput prepare后遵守T01失败关闭，不能承诺无损回滚。
+
+父Go材料入口拥有普通provider候选下载和调度，Core只读取按digest密封的已接受file快照。
+保留格式、过滤、override、路由和周期的语义；轮询、file watcher、UI／RPC／REST Update和SideUpdate不能直达新正文。
+Proxy候选使用Core公开的age解密、订阅转换、结构解码和OverrideExpr求值器，父层仅实现
+原parser与出站工厂耦合的过滤／override投影；分类及禁止能力检查作用于该投影结果。
+真实工厂仍运行原parser，不用文本匹配override表达式代替求值；升级原parser时须用共同夹具核对投影与实际节点。
+普通材料使用既有requestscope和声明出口；缺初始材料或无法引导显式失败／bootstrap，不能自动获得DIRECT。
+受管材料仍由Dart原编译器展开，不另建Go受管编译器。
+
+Android服务启动准备（preparing／starting）的配置构建先向父Go请求已采用provider材料，再决定是否创建网络session。
+父层仅从可验证checkpoint所指manifest取回同Profile用途、kind／name及完整声明匹配的密封正文，
+重核新config的正式SourceUse、原始Origin许可、旧manifest及实际正文摘要，并持既有material lease到消费退出。
+pending／recovery屏障、未知写者、损坏或撤权均拒绝，不从当前未保存runtime、候选、accepted列表或live cache猜许可。
+无checkpoint／同声明材料才是miss；仍沿原出口与显式bootstrap或失败，不为preparing放宽网络。
+复用正文继续经过review／bindProviders／ConfigInput；正常运行刷新及停止态材料保存后的前台重建继续原下载／本地读取流程，
+不把已正常失效的旧checkpoint当作新材料的缓存来源。
+未向Core注册的构建失败沿既有failRunIntent以abort=false结束本次捕获的intentRevision＋configToken，
+保留旧ready配置；新intent／新注册token胜过旧清理。已注册失败继续原T01 abort契约。
+该路径已接入当前Android实现；完整设备验收仍未完成。
+
+R5已实现、受控Android验证通过；I2原身份与入口准入补齐已实证并通过整项实现评审：明确离线核对成功后的前台重建，以及新建的实际UI Start，可对缺失HTTP(S)材料
+请求原一次bootstrap。先复用有资格的密封材料；仅原规范空失效引用表示无材料，不恢复checkpoint资格，
+其它损坏／撤权仍拒绝。真实native已started、paused或隐式／自动入口不获得引导，不能依赖历史source或Go未ready推导。
+对Auto／Direct逐URL显示名称及去凭据／query的origin并单独确认，Proxy不降级；现有permit一次消费，
+继续绑定来源／dataset／owner／operation及native epoch／revision，Android protect／network gate不变。
+取消不发HTTP／不安装，用户再次Start可以重试。恢复helper比较确认前后实际native intent与token，新命令胜过旧完成／引导／cleanup。
+恢复与明确Start的临时引导选项绑定发起动作原有native processEpoch／intentRevision／configToken，不能在队列执行时从较新命令重新取得。
+恢复核对返回原身份供caller继续使用；UI Start以原RunRequestScope requestId核初始身份。候选和清理延续该身份，
+自身登记后的token仅由本次receipt接续。新命令胜出则旧动作superseded，不得对新命令执行引导或失败清理。Setup调用票号与已准入generation职责分开：票号只给调用排序，不取消现有任务；
+身份／caller资格跨await验证后才同步取得generation，较旧票号不能覆盖较新的合法拥有者。Stop在同一序列上取得新generation。
+过期入口不触发取消需求或busy标记，普通当前调用仍按最后合法调用替换已有工作。恢复与fresh UI Start在触发时预留调用票号，并跨helper和native准备等待传递到同一Setup准入；票号只排序，不授予运行或来源权限，未使用／未合格票号不取消现有任务。
+file材料只沿正式root声明和安全路径受控读取，使用既有data read guard而非网络引导，返回候选仍须原来源接受。
+未知写者、未核对marker、撤权和状态变化不因本流程获得权限。R5取消／逐URL确认及实际启动已在指定AVD验证，I2新制品已补指定AVD的两恢复caller及fresh Start正对照；并发窗口反例由真实host状态机与UI-caller测试覆盖，整项实现评审已通过，待本地交付及M收尾。
+
+v2 manifest中的providerMaterials按kind与name绑定原声明摘要、密封正文摘要及用途SourceUse。
+应用注入的Profile节点集合和ClashProvider另绑定其原始实体的节点／规则用途SourceUse；
+父Go从保留的应用材料路径及规范依赖确认实体，逐项按原始正文重算摘要，不能用使用位置的委托替代原始来源许可。
+同一来源被多处引用时允许不同已接受revision并存；热采用同时检查原始用途及使用位置的委托，Stop automatic updates不允许新revision自动进入。
+最终config委托固定非派生来源的实体、用途、incarnation与use epoch；来源绑定增删改须重新接受，即使最终YAML相同。
+声明摘要同时限定所属Profile；Go重新从最终YAML计算，逐项核对规范grant的identity与正文分类摘要，
+缺失、重复、跨声明复用或未列入最终接受依赖均拒绝。原YAML保留原声明供恢复和父调度使用，
+工厂输入的副本才改为私有file路径；inline材料沿已接受配置正文，不制造远端授权。
+热采用生成同正文的新manifest，只有指定provider材料与已获准依赖更新；精确的父配置接受记录
+派生绑定这次新依赖，不扩大未来自动委托。新manifest和密封材料先写入并由pending屏障引用，
+实际发布后才改变checkpoint；旧runtime owner不能清除另一事务的屏障。
+
+## Provider热采用（已审设计，待实施验收）
+
+普通内容更新保留DIRECT和其它未变化provider连接，已有socket不迁移。热路径不register全量ConfigInput、
+不prepare／revoke业务scope、不改native configToken或service identity；不增加后台完整应用JNI。
+后台只在实际parent／run／source use仍合资格时维护，Stop、SSID pause、撤回、Shutdown、重新attach和新前台胜过未提交候选。
+
+密封正文是恢复依据，另有私有可写live cache；只有父接受入口能将获准正文交原parser并写cache。
+原HTTP／源file维护转父入口，Core watcher只接触已接受cache，恢复按密封映射重建，不从cache猜许可。
+Proxy私有cache通过原HTTP vehicle的本地优先Initial读取、interval=0，不启动Core file watcher；
+内部URL使用不支持网络请求的source-accepted scheme，cache读取失败只会失败，不回到原远端。
+这是原parser／health check初始化的适配，公开wrapper仍报告原vehicle种类，父调度保留原声明、出口和周期。
+proxy更新保留原对象，经一次原SideUpdate／Version／组缓存／健康检查替换本项列表，不Initial预检。
+旧proxy引用保守保留至实际使用退出；拟最多32份退休generation并共用128MiB正文预算，不能证明退出就保留，预算满延后新采用。
+这可能限制长期连续轮换，必须显示原因，不能靠关闭活连接腾预算或泛称所有协议旧连接无感。
+
+rule更新在初次安装时把稳定父层P.RuleProvider wrapper放入map，热更新只换其atomic不可变generation。
+Match／Strategy等各取一个局部generation，委托原实现；Strategy类型不变，全局map不因普通更新写入。
+私有RP预备采用唯一非活跃名字，先覆盖SetAfterUpdate，再SideUpdate，不Initial／watcher或公共Emit。
+首次安装仍处于既有parsing阶段时，只允许当前已校验v2输入、当前owner目录内的provider-local预备lease；
+该例外不授予provider HTTP请求或业务激活资格，不能把owner提前改成ready／inner。
+发布后锁外对公共wrapper发一次原callback；未发布候选不能提前改变同名TUN route set缓存。
+DNS／sniffer经固定wrapper，旧调用可完成旧generation；新调用读新generation，既有DNS缓存不强清。
+TUN route set影响属于入站／接管结构，不冒充仅新连接规则维护。
+
+单parent串行采用一项provider，后继按当前事实重分类，不宣称跨provider原子批次；304／有效无变化不更新live或checkpoint。
+普通Profile最终内容／绑定未变时不重建图、不计退休generation；仅source ticket更新使同一checkpoint失效时，
+复核本次接受快照后恢复其资格。其它pending或全局恢复屏障仍须按各自事务处理，不能借无变化确认清除。
+下载／分类在锁外，提交时configMu核parent／latest／scope／run／来源；不在SideUpdate外持selectMu／checkpointMu／registry锁，
+避免Fetcher和ProxyUpdateHook重入；持久化及清理沿原锁序，通知在锁外。
+运行相关grant写也进此边界；撤回先取消未来资格，成功答复前收敛已进入commit的工作，明确Stop using同时撤当前使用。
+
+改变live前先持久化owner限定pending-material恢复屏障，并pin密封正文和目标manifest。
+解析／cache写失败在live切换前保旧；确认旧cache一致并可靠清屏障才恢复旧checkpoint资格。
+live已变但checkpoint／清屏障失败，runtime fact显示实际新材料、“已应用，恢复未保存”、replayEligible=false；
+当前连接保留，冷重放禁止使用旧checkpoint。只重试这份实际事实的保存，不重跑SideUpdate或用Receipt.Fail假装回滚。
+完整checkpoint与屏障清除成功才可恢复；崩溃中间态不得把pending候选升级为采用，前台按仍获准精确材料重建。
+冷恢复用持久checkpoint／输入及pending目标识别旧事务，不因重启后的runtime owner不同忽略旧屏障；
+新owner成功后的旧事务清理亦按持久身份条件核对，不能倒写新checkpoint。
+迟到清理仅处理捕获旧事务，不覆盖新owner的checkpoint。
+
+Rule wrapper在真实Match时绑定局部generation；过渡或无法对账显示Unknown，旧tracker标签不改写。
+首版不能把SUB-RULE内部的最终选择与各自作者完整对账时，来源和内部集合归属均显示Unknown；外层规则的作者不能代替内部命中来源。
+普通Profile也按差异处理：纯材料走热路径，inline／组使用原公开parser构建受影响依赖闭包后copy-on-write UpdateProxies，
+无关对象保留；准备副作用、选择与默认语义须验证，不能仅靠公开API存在宣称通过。
+入站／VPN／DNS等结构变化明确前台采用，不按入口名一概重应用。
+首版inline热路径分别发布节点／组依赖闭包或封闭R1规则；两者同时改变、sub-rules、provider声明或其它结构改变时保旧并要求前台采用。
+纯规则热路径仍须通过同一H1读者履历、精确来源接受及R1有序条件，且没有sub-rules／rule provider；
+沿原公开ParseRule和RuleWrapper构建新列表，再单次UpdateRules发布，不重建节点。实际解析对象的UDP能力亦须满足R1目标最低要求。
+provider正文也变化时，只有节点／组不变才允许先绑定新父来源及旧材料，再逐项沿原provider热路径采用；
+各项独立保存实际事实，后项失败不能把已采用的前项标作回滚。新旧组与材料同时变化的中间态未经证明，不自动发布。
+组选择保留仍存在的实际选项；新兼容provider的初始化和既有provider的health-check登记只在发布后进行。
+
+### Inline自动资格与DNS读者（已审设计，待实施验收）
+
+UpdateProxies写锁不能保护无锁getter；除REST和outbound／NTP byName，还必须覆盖DNSDialer。
+DialContext在nil ProxyAdapter＋非空非RULES名字时读全局图；ListenPacket在nil adapter＋非RULES时读取，**名字为空也一样**。
+因此资格按实际客户端／transport判断：首版仅允许空ProxyName、nil ProxyAdapter的普通UDP／TCP、DoT，以及没有H3的DoH；
+普通UDP和截断后的TCP均走DialContext，DoT仅TCP，DoH须实际PreferH3=false、无h3=true且默认HTTP versions无H3。
+遍历main、fallback、bootstrap、policy、proxy-server／policy、direct全体解析NameServer及复用transport，不能只审主nameserver字符串。
+DoQ／DoH3会ListenPacket，排除；命名／接口fragment、RULES、DHCP、私有／未知DNS构造首版亦保守排除，不偷偷改出口。
+系统resolver的已核固定构造是空名字普通UDP，Android系统DNS更新不从地址生成ProxyName。
+
+父层自受控进程开始维护一个只用于资格的unsafe-reason latch，在可能产生未封闭读者的真实工厂／服务构造前登记，
+包括已接受但未发布／失败的准备、验证、协议私有／延迟DNS、NTP和controller。登记及inline发布以configMu串行，
+没有完整创建履历也视为unknown；未获准正文不执行工厂或改变latch。它不是source／运行权限，不从manifest授信。
+Android编辑器的即时节点校验只做无工厂的结构检查；真实协议工厂在内容接受后的安装边界验证，
+避免每次草稿校验提前构造overlay／私有DNS读者。其它平台保留既有即时校验路径。
+过去产生的unsafe／unknown读者可能仍在途，所以仅真实进程退出重建履历，Stop、reinit、改DNS或任意超时不能清除它。
+当前全safe不足以证明旧DoQ／DoH3等已退出。REST曾开放、outbound／provider override／NTP曾有byName也同样限制。
+
+父appRequestDialer.ListenPacket另须去掉无锁NewByName，沿已有AllProxies受锁快照、lease.SelectProxy和路由资格取得对象后New(selected)，
+保持原严格代理／取消语义及出口；不以丢弃请求或改DIRECT解决读者竞争。其它父层读取沿现有snapshot API。
+规则provider保持全局map固定和稳定wrapper，GroupBase使用对象Version／列表；正常业务匹配已有configMux读锁。
+
+应用默认无fragment、prefer-h3=false的DoH和空名UDP bootstrap仅就DNS条件可取得资格，其它资格仍须同时成立。
+DoQ／DoH3、命名DNS、respect-rules、DHCP、私有DNS或本进程曾创建它们时，inline图自动采用保旧并说明限制，前台明确采用另行处理。
+不强制用户改DNS／协议、不暗中全量reapply；不换map的普通provider热更新不被连带禁止。
+
+## 有界保存、撤回与恢复
+
+| 对象 | 界限与保存权威 |
+| --- | --- |
+| grant | 父Go私有原子文件，最多1024实体／4MiB，大条件契约用有界不可变引用 |
+| candidate | 每来源最多一份，最多32份，单份16MiB、合计64MiB；在途另持引用 |
+| sealed material | digest不可变，引用合计128MiB，最多128个工作lease，单约束／manifest最多4MiB |
+| provenance | manifest有界；匹配暂存2048项／60秒；tracker标签4096项，驱逐降为Unknown |
+
+current、prepared、退休未退出stage、pending、checkpoint和有效grant契约均pin，工作lease持有到真实退出。
+接受响应另带父Go生成的材料lease；它只保留确切正文，不授予用途或运行资格。
+Dart在正文已交给本地快照、实际输入marker或热采用完成后释放，取消／失败亦沿finally释放；旧client失效后其lease不可继续供候选使用。
+collector将这些lease、待审候选上下文和上述运行／恢复引用一并核对，材料引用不能用年龄或“最新两份”替代。
+collector在原读／提交屏障捕获引用，删除前重核，仅删自有hash文件；超预算拒新，不能删除活引用腾位。
+候选／代码接受标记及文件存在不能在重启后自动升级为采用。
+Stop automatic maintenance关闭未来自动委托并增revision，精确已接受内容可继续使用／重放。
+Stop using this source/capability增use epoch，同步撤受影响scope和重放，native条件清理；当前配置需另选替代输入。
+精确重放重核当前use epoch；备份不携带静默委托，外部恢复新incarnation，本机重启只重放仍获准精确输入。
+
+## 轻量连接追溯
+
+Dart在真实合成列表／sub-rules／provider绑定处产生有界ledger，随ConfigInput冻结实体、材料／Script／Override版本和位置。
+ledger按连续范围保存原始规则摘要，避免为大型列表逐行复制来源字段；Go核对范围、规则摘要及来源凭据。
+它只解释已安装内容，不授予来源权限；接受与运行资格仍从规范grant及既有scope判定。
+任意Script无法证明唯一原作者时保留候选，不能仅凭文本相同判断来源。
+父Go观察器只委托实际C.Rule.Match，绑定安装输入，暂存metadata身份及实际返回；
+tracker建立时核最终Rule／RulePayload／出口，排除PASS／REMATCH／UDP淘汰的中间结果。
+保留原wrapper的disabled、统计和Unwrap等消费者契约；无法唯一对账显示Unknown／候选。
+request event与getConnections使用同一可选DTO，现有Live connections／Recent requests详情显示匹配规则、来源、采用revision及外层RuleSet。
+providerChains是节点来源，不是规则来源；不承诺RuleSet内部子规则、完整匹配过程或HTTPS路径。
+不读取当前配置补全旧连接，不新增正文／完整URL日志或历史数据库，不影响缺证据连接的正常转发。

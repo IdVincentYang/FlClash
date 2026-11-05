@@ -15,12 +15,23 @@ enum _SetupTaskResult {
   staleInput,
 }
 
+bool _sameSetupRun(
+  Map<String, Object?> expected,
+  Map<String, Object?> current, {
+  int? token,
+}) =>
+    current['processEpoch'] == expected['processEpoch'] &&
+    current['intentRevision'] == expected['intentRevision'] &&
+    current['configToken'] == (token ?? expected['configToken']);
+
 class _RunRequest {
   final bool running;
   final bool initialize;
   final bool paused;
   final DateTime? previousStartTime;
   final Future<int?> nativeRequest;
+  final bool allowBootstrap;
+  final int? setupSequence;
 
   const _RunRequest({
     required this.running,
@@ -28,6 +39,8 @@ class _RunRequest {
     required this.paused,
     required this.previousStartTime,
     required this.nativeRequest,
+    this.allowBootstrap = false,
+    this.setupSequence,
   });
 }
 
@@ -162,6 +175,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   _RunRequest? _latestRunRequest;
   int _runOperation = 0;
   DateTime? _startTime;
+  int _setupSequence = 0;
   int _setupGeneration = 0;
 
   bool get _isRunning => _startTime != null && _startTime!.isBeforeNow;
@@ -365,11 +379,20 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     }
 
     _runOperation++;
+    final allowBootstrap =
+        _isAndroid &&
+        running &&
+        !initialize &&
+        preparedRequestId == null &&
+        source == 'ui' &&
+        !(paused ?? ref.read(suspendProvider));
     final request = _RunRequest(
       running: running,
       initialize: running && initialize,
       paused: _isAndroid && (paused ?? ref.read(suspendProvider)),
       previousStartTime: _startTime,
+      allowBootstrap: allowBootstrap,
+      setupSequence: allowBootstrap ? reserveSetupSequence() : null,
       nativeRequest: preparedRequestId != null
           ? Future.value(preparedRequestId)
           : _service?.prepareRunIntent(
@@ -385,7 +408,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   Future<bool> _queueRunRequest(_RunRequest request) {
     _latestRunRequest = request;
     if (!request.running || request.paused) {
-      _setupGeneration++;
+      _setupGeneration = ++_setupSequence;
       unawaited(
         ref.read(profilesActionProvider.notifier)._cancelExpiredDemands(),
       );
@@ -455,7 +478,11 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   Future<bool> _start(_RunRequest request) async {
     var applied = false;
     try {
-      applied = await applyProfile(force: true);
+      applied = await applyProfile(
+        force: true,
+        allowBootstrap: request.allowBootstrap,
+        setupSequence: request.setupSequence,
+      );
     } catch (_) {
       applied = false;
     }
@@ -584,13 +611,23 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   void applyProfileDebounce({
     bool silence = false,
     bool force = false,
+    bool allowSourceReview = true,
     Future<bool> Function()? isCurrent,
   }) {
     debouncer.call(FunctionTag.applyProfile, () async {
       if (isCurrent == null) {
-        await applyProfile(silence: silence, force: force);
+        await applyProfile(
+          silence: silence,
+          force: force,
+          allowSourceReview: allowSourceReview,
+        );
       } else {
-        await _runSetup(silence: silence, force: force, isCurrent: isCurrent);
+        await _runSetup(
+          silence: silence,
+          force: force,
+          isCurrent: isCurrent,
+          allowSourceReview: allowSourceReview,
+        );
       }
     });
   }
@@ -607,11 +644,27 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   }
 
   void autoApplyProfile() {
-    runAfterFrame(applyProfile);
+    runAfterFrame(() => applyProfile(allowSourceReview: false));
   }
 
-  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
-    final result = await _runSetup(force: force, silence: silence);
+  int reserveSetupSequence() => ++_setupSequence;
+
+  Future<bool> applyProfile({
+    bool silence = false,
+    bool force = false,
+    bool allowSourceReview = true,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
+  }) async {
+    final result = await _runSetup(
+      force: force,
+      silence: silence,
+      allowSourceReview: allowSourceReview,
+      allowBootstrap: allowBootstrap,
+      expectedRun: expectedRun,
+      setupSequence: setupSequence,
+    );
     return result == _SetupTaskResult.completed;
   }
 
@@ -619,12 +672,18 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     required Future<bool> Function() isCurrent,
     required ConfigFact previous,
     Future<bool> Function()? canSubmit,
+    bool allowSourceReview = true,
   }) async {
     if (!await isCurrent()) return ProfileApplicationOutcome.superseded;
     ConfigApplyResult? accepted;
     final result = await _runSetup(
       silence: true,
       force: true,
+      preferHot:
+          _requests.requiresSourceAcceptance &&
+          previous.businessActive &&
+          !previous.isManaged,
+      allowSourceReview: allowSourceReview,
       isCurrent: isCurrent,
       canSubmit: canSubmit,
       onApplied: (value) => accepted = value,
@@ -634,7 +693,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       return ProfileApplicationOutcome.superseded;
     }
     if (result == _SetupTaskResult.completed && accepted != null) {
-      return accepted!.status == 'activated'
+      return const {'activated', 'applied'}.contains(accepted!.status)
           ? ProfileApplicationOutcome.activated
           : ProfileApplicationOutcome.installedInactive;
     }
@@ -650,28 +709,67 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   Future<_SetupTaskResult> _runSetup({
     bool silence = false,
     bool force = false,
+    bool allowSourceReview = true,
+    bool preferHot = false,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
     Future<bool> Function()? isCurrent,
     void Function(ConfigApplyResult)? onApplied,
     Future<bool> Function()? canSubmit,
   }) async {
-    final generation = ++_setupGeneration;
+    final sequence = setupSequence ?? reserveSetupSequence();
+    if (sequence <= _setupGeneration) return _SetupTaskResult.superseded;
+    var triggerRun = expectedRun;
+    if (_isAndroid && allowBootstrap && triggerRun == null) {
+      final requestId = RunRequestScope.current;
+      if (requestId == null) return _SetupTaskResult.superseded;
+      final observed = await _service!.getRequestState();
+      if (observed['intentRevision'] != requestId) {
+        return _SetupTaskResult.superseded;
+      }
+      triggerRun = Map.unmodifiable(observed);
+    }
+    Future<bool> triggerCurrent() async =>
+        triggerRun == null ||
+        _sameSetupRun(triggerRun, await _service!.getRequestState());
+    if (!await triggerCurrent() ||
+        isCurrent != null && !await isCurrent() ||
+        sequence <= _setupGeneration) {
+      return _SetupTaskResult.superseded;
+    }
+    // Issuing an order ticket must not invalidate the admitted setup owner.
+    final generation = _setupGeneration = sequence;
     unawaited(
       ref.read(profilesActionProvider.notifier)._cancelExpiredDemands(),
     );
     Future<void>? deferredCleanup;
-    Future<bool> current() async =>
-        generation == _setupGeneration &&
-        (isCurrent == null || await isCurrent());
+    Future<bool> current() async {
+      if (isCurrent != null && !await isCurrent()) return false;
+      return generation == _setupGeneration;
+    }
+
     final result = await _setupScheduler.run(() async {
+      if (!await current() ||
+          !await triggerCurrent() ||
+          generation != _setupGeneration) {
+        return _SetupTaskResult.superseded;
+      }
       ref.read(profilesActionProvider.notifier).setupExecutionChanged(true);
       try {
         await dataMutations.run(() async {});
-        if (!await current()) {
+        if (!await current() ||
+            !await triggerCurrent() ||
+            generation != _setupGeneration) {
           return _SetupTaskResult.superseded;
         }
         Future<_SetupTaskResult> run({bool retryAllowed = true}) =>
             _setupConfig(
               force: force,
+              allowSourceReview: allowSourceReview,
+              preferHot: preferHot,
+              allowBootstrap: allowBootstrap,
+              expectedRun: triggerRun,
               silence: silence,
               isCurrent: current,
               isLatestSetup: () => generation == _setupGeneration,
@@ -708,6 +806,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     if (result != _SetupTaskResult.handoffToCoreRestart) {
       return result;
     }
+    if (!await triggerCurrent()) return _SetupTaskResult.superseded;
     // Release the current serial task before restartCore reapplies the profile.
     final restarted = await _restartCoreAfterAuthorization();
     return restarted ? _SetupTaskResult.completed : _SetupTaskResult.failed;
@@ -744,6 +843,10 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     bool? dnsOverride,
     bool? ntpOverride,
     bool? safeMode,
+    bool allowSourceReview = true,
+    Future<bool> Function()? isCurrent,
+    void Function(Map<String, Object?>)? onSourceUse,
+    void Function(Map<String, Object?>)? onRuleLedger,
   }) async {
     final profileId = setupState.profileId;
     if (profileId == null) return (yaml: '', md5: '');
@@ -754,7 +857,46 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     final bool overrideNtp = ntpOverride ?? ref.read<bool>(overrideNtpProvider);
     final appendSystemDns = networkSetting.appendSystemDns;
     final routeMode = networkSetting.routeMode;
-    final configMap = await _core.getConfig(profileId);
+    final profile = _requests.requiresSourceAcceptance
+        ? (await database.profilesDao.query().get()).getProfile(profileId)
+        : null;
+    if (_requests.requiresSourceAcceptance && profile == null) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+    final path = await appPath.getProfilePath(profileId.toString());
+    final sourceBody = _requests.requiresSourceAcceptance
+        ? await _sourceBody(path, preserveBom: true)
+        : null;
+    final source = await _requests.captureSource('profile:$profileId');
+    final acceptedSource = _requests.requiresSourceAcceptance
+        ? await _reviewProfileSource(
+            confirm: ref.read(sourceConfirmationProvider),
+            core: _core,
+            requests: _requests,
+            profile: profile!,
+            path: path,
+            body: sourceBody,
+            source: source,
+            automatic: !allowSourceReview || !ref.read(appVisibleProvider),
+            isCurrent: isCurrent,
+          )
+        : null;
+    final deniedRouting = acceptedSource?.routing == 'own';
+    if (acceptedSource != null) onSourceUse?.call(acceptedSource.use);
+    if (deniedRouting && setupState.matchTarget?.trim().isNotEmpty != true) {
+      throw MessageException(currentAppLocalizations.sourceOwnDefaultRequired);
+    }
+    final configMap = _requests.requiresSourceAcceptance
+        ? await _sourceAcceptance(
+            _core,
+            _requests,
+            confirm: ref.read(sourceConfirmationProvider),
+          ).project(
+            source: source,
+            identity: _profileSourceIdentity(profile!),
+            body: sourceBody!,
+          )
+        : await _core.getConfig(profileId);
     String? scriptContent;
     final List<Rule> addedRules = [];
     final List<CustomProxy> proxies = [];
@@ -773,38 +915,84 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       tun: patchConfig.tun.getRealTun(routeMode),
     );
     Map<String, dynamic> rawConfig = configMap;
+    Map<String, Object?>? scriptUse;
     if (scriptContent?.isNotEmpty == true) {
-      rawConfig = await handleEvaluate(scriptContent!, rawConfig);
+      final accepted = await _reviewScriptSource(
+        confirm: ref.read(sourceConfirmationProvider),
+        core: _core,
+        requests: _requests,
+        script: setupState.script!,
+        body: scriptContent!,
+        automatic: !allowSourceReview || !ref.read(appVisibleProvider),
+        isCurrent: isCurrent,
+      );
+      if (accepted != null) {
+        onSourceUse?.call(accepted.use);
+        scriptUse = accepted.use;
+      }
+      if (isCurrent != null && !await isCurrent()) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      rawConfig = _requests.requiresSourceAcceptance
+          ? await handleAcceptedEvaluate(
+              scriptContent,
+              rawConfig,
+              permit: accepted?.scriptPermit,
+            )
+          : await handleEvaluate(scriptContent, rawConfig);
     }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(
       setupState,
       proxyGroups: proxyGroups,
       rules: rules,
+      allowSourceReview: allowSourceReview,
+      isCurrent: isCurrent,
+      onSourceUse: onSourceUse,
     );
-    final res = makeRealProfileTask(
-      MakeRealProfileState(
-        rules: rules,
-        proxies: proxies,
-        proxyGroups: proxyGroups,
-        injectedProxyProviders: injected.proxies,
-        injectedRuleProviders: injected.rules,
-        profilesPath: directory,
-        profileId: profileId,
-        rawConfig: rawConfig,
-        realPatchConfig: realPatchConfig,
-        overrideDns: overrideDns,
-        overrideNtp: overrideNtp,
-        appendSystemDns: appendSystemDns,
-        addedRules: addedRules,
-        defaultUA: defaultUA,
-        authentication: networkSetting.authentication.credentials,
-        matchTarget: setupState.matchTarget,
-        safeMode: safeMode ?? ref.read(safeModeProvider),
-        policySelection: setupState.policySelection,
-      ),
-    );
-    return res;
+    try {
+      final composition = await makeProfileCompositionTask(
+        MakeRealProfileState(
+          rules: rules,
+          proxies: proxies,
+          proxyGroups: proxyGroups,
+          injectedProxyProviders: injected.proxies,
+          injectedRuleProviders: injected.rules,
+          profilesPath: directory,
+          profileId: profileId,
+          rawConfig: rawConfig,
+          realPatchConfig: realPatchConfig,
+          overrideDns: overrideDns,
+          overrideNtp: overrideNtp,
+          appendSystemDns: appendSystemDns,
+          addedRules: addedRules,
+          defaultUA: defaultUA,
+          authentication: networkSetting.authentication.credentials,
+          matchTarget: setupState.matchTarget,
+          sourceRoutingDenied: deniedRouting,
+          safeMode: safeMode ?? ref.read(safeModeProvider),
+          policySelection: setupState.policySelection,
+        ),
+        origins: {
+          'profileKey': 'profile:$profileId',
+          if (acceptedSource != null)
+            'profileRevision': acceptedSource.use['digest'] as String,
+          if (scriptUse != null) 'scriptKey': scriptUse['key'] as String,
+        },
+      );
+      onRuleLedger?.call(composition.ledger);
+      return (yaml: composition.yaml, md5: composition.md5);
+    } on FormatException catch (error) {
+      final l10n = currentAppLocalizations;
+      final message = switch (error.message) {
+        'sourceOwnRoutingUnmatchedRequired' => l10n.sourceOwnDefaultRequired,
+        'sourceOwnRoutingDefaultConflict' => l10n.sourceOwnDefaultConflict,
+        'sourceOwnRoutingRematchDenied' => l10n.sourceRematchDenied,
+        _ => null,
+      };
+      if (message == null) rethrow;
+      throw MessageException(message);
+    }
   }
 
   /// Only what the overwrite actually references is injected, so an app-level
@@ -814,6 +1002,9 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     SetupState setupState, {
     required List<ProxyGroup> proxyGroups,
     required List<Rule> rules,
+    required bool allowSourceReview,
+    Future<bool> Function()? isCurrent,
+    void Function(Map<String, Object?>)? onSourceUse,
   }) async {
     final usedProxyProviders = <String>{
       for (final proxyGroup in proxyGroups) ...?proxyGroup.use,
@@ -834,10 +1025,27 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       if (!usedProxyProviders.contains(entry.key)) {
         continue;
       }
-      proxies[entry.key] = {
-        'type': 'file',
-        'path': await appPath.getProfilePath(entry.value.toString()),
-      };
+      final path = await appPath.getProfilePath(entry.value.toString());
+      if (_requests.requiresSourceAcceptance) {
+        final profile = (await database.profilesDao.query().get()).getProfile(
+          entry.value,
+        );
+        if (profile == null) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        final accepted = await _reviewProfileSource(
+          core: _core,
+          requests: _requests,
+          profile: profile,
+          path: path,
+          kind: 'provider-proxy',
+          automatic: !allowSourceReview || !ref.read(appVisibleProvider),
+          confirm: ref.read(sourceConfirmationProvider),
+          isCurrent: isCurrent,
+        );
+        if (accepted != null) onSourceUse?.call(accepted.use);
+      }
+      proxies[entry.key] = {'type': 'file', 'path': path};
     }
     final ruleProviders = <String, dynamic>{};
     for (final provider in setupState.clashProviders) {
@@ -857,6 +1065,66 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
         continue;
       }
       final definition = provider.definition(await provider.path);
+      if (_requests.requiresSourceAcceptance) {
+        final key = 'clash-provider:${provider.id}';
+        final source = await _requests.captureSource(key);
+        final automatic = !allowSourceReview || !ref.read(appVisibleProvider);
+        Future<void> review(List<int> body) async {
+          final accepted =
+              await _sourceAcceptance(
+                _core,
+                _requests,
+                confirm: ref.read(sourceConfirmationProvider),
+              ).review(
+                source: source,
+                identity: _clashProviderSourceIdentity(provider),
+                settings: definition,
+                body: '',
+                binaryBody: body,
+                label: provider.label,
+                location: provider.url,
+                kind: provider.kind == ProviderKind.proxy
+                    ? 'provider-proxy'
+                    : 'provider-rule',
+                format: provider.format?.name,
+                behavior: provider.behavior?.name,
+                automatic: automatic,
+                isCurrent: isCurrent,
+              );
+          try {
+            onSourceUse?.call(accepted.use);
+          } finally {
+            await accepted.release();
+          }
+        }
+
+        final file = File(await provider.path);
+        if (await file.exists()) {
+          if (await file.length() > 16 * 1024 * 1024) {
+            throw const RequestUnavailable('profile_download_too_large');
+          }
+          await review(await file.readAsBytes());
+        } else if (provider.isRemote) {
+          await _requests.withSession(
+            key: key,
+            url: provider.url,
+            automatic: automatic,
+            sourceIsCurrent: isCurrent,
+            action: (session) async {
+              final response = await _requests.downloadFileForUrl(provider.url);
+              try {
+                final body = await response.file.staged.readAsBytes();
+                await review(body);
+                await session.commit(() => provider.saveContent(body));
+              } finally {
+                await response.file.close();
+              }
+            },
+          );
+        } else {
+          throw const RequestUnavailable('profile_invalid');
+        }
+      }
       switch (provider.kind) {
         case ProviderKind.proxy:
           proxies[provider.label] = definition;
@@ -963,6 +1231,10 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   Future<_SetupTaskResult> _setupConfig({
     bool force = false,
     bool silence = false,
+    bool allowSourceReview = true,
+    bool preferHot = false,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
     FutureOr<void> Function(Future<bool> Function())? onUpdated,
     Future<bool> Function()? isCurrent,
     void Function(ConfigApplyResult)? onApplied,
@@ -971,14 +1243,49 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     bool retryAllowed = true,
     Future<bool> Function()? canSubmit,
   }) async {
+    final hot = preferHot && _requests.requiresSourceAcceptance;
     final nativeContext = _isAndroid ? await _service!.getRequestState() : null;
+    if (isCurrent != null && !await isCurrent() ||
+        expectedRun != null &&
+            (nativeContext == null ||
+                !_sameSetupRun(expectedRun, nativeContext))) {
+      return _SetupTaskResult.superseded;
+    }
+    final canBootstrap =
+        allowBootstrap &&
+        allowSourceReview &&
+        ref.read(appVisibleProvider) &&
+        nativeContext != null &&
+        [
+          'stopped',
+          'failed',
+          'preparing',
+          'starting',
+        ].contains(nativeContext['phase']) &&
+        nativeContext['paused'] != true &&
+        ![
+          'initializedIdle',
+          'userStop',
+          'excludedSsid',
+          'exiting',
+        ].contains(nativeContext['reason']);
     final failureCore = _core;
     final observedFact = await failureCore.getConfigState();
     var registeredToken =
         (nativeContext?['configToken'] as num?)?.toInt() ?? observedFact.token;
     var managedRequested = false;
+    Future<bool> triggerCurrent() async =>
+        expectedRun == null ||
+        _sameSetupRun(
+          expectedRun,
+          await _service!.getRequestState(),
+          token: registeredToken,
+        );
+    if (!await triggerCurrent()) return _SetupTaskResult.superseded;
     Future<void> finishBuildFailure() async {
-      if (!isLatestSetup() || !managedRequested && !observedFact.isManaged) {
+      if (!await triggerCurrent() ||
+          !isLatestSetup() ||
+          !managedRequested && !observedFact.isManaged) {
         return;
       }
       await finishConfigFailure((
@@ -1003,9 +1310,11 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
         return;
       }
       await finishOrDefer(() async {
+        if (!await triggerCurrent()) return;
         final cleanup = await _service!.failRunIntent(
           (nativeContext['intentRevision'] as num).toInt(),
           token: (nativeContext['configToken'] as num?)?.toInt() ?? 0,
+          unregistered: true,
         );
         if (cleanup['status'] == 'cleanupFailed') {
           throw StateError('Owned service cleanup failed');
@@ -1015,6 +1324,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
 
     var profile = ref.read(currentProfileProvider) ?? recoverMissingProfile();
     Future<bool> materialCurrent() async {
+      if (!await triggerCurrent()) return false;
       if (isCurrent != null && !await isCurrent() ||
           profile?.id != ref.read(currentProfileIdProvider)) {
         return false;
@@ -1040,11 +1350,14 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     }
     commonPrint.log('setup ===> ${profile?.realLabel}');
     final patchConfig = ref.read(patchClashConfigProvider);
-    final shouldContinueSetup = await requestAdmin(patchConfig.tun.enable);
+    final shouldContinueSetup =
+        hot || await requestAdmin(patchConfig.tun.enable);
     if (!shouldContinueSetup) {
       return _SetupTaskResult.handoffToCoreRestart;
     }
     final sources = <RequestSource>[];
+    final sourceUses = <Map<String, Object?>>[];
+    Map<String, Object?>? ruleLedger;
     _SetupInputs? captured;
     _ManagedMaterialFrame? materialFrame;
     final realProfile = await globalState.safeRun(() async {
@@ -1055,6 +1368,9 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       }
       return _requests
           .mutate(() async {
+            if (!await materialCurrent()) {
+              throw const RequestUnavailable('request_cancelled');
+            }
             ref.invalidate(setupStateProvider(selectedProfile.id));
             final setupState = await ref.read(
               setupStateProvider(selectedProfile.id).future,
@@ -1118,8 +1434,11 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
                 setupState,
               );
             }
-            final keys = <String>{'profile:${selectedProfile.id}'};
-            if (selection != null) keys.add('application-config');
+            final keys = <String>{
+              'profile:${selectedProfile.id}',
+              if (selection != null || _requests.requiresSourceAcceptance)
+                'application-config',
+            };
             if (setupState.overwriteType == OverwriteType.standard &&
                 policy?.usesMaterials != true) {
               keys.add('global-rules');
@@ -1161,6 +1480,10 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
                 captured!,
                 frame,
                 (policy) => captured = captured!.resolved(policy),
+                onSourceUse: sourceUses.add,
+                onRuleLedger: (ledger) => ruleLedger = ledger,
+                allowSourceReview: allowSourceReview,
+                isCurrent: materialCurrent,
               );
             }
             return getProfile(
@@ -1170,11 +1493,16 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
               dnsOverride: captured!.overrideDns,
               ntpOverride: captured!.overrideNtp,
               safeMode: captured!.safeMode,
+              onSourceUse: sourceUses.add,
+              onRuleLedger: (ledger) => ruleLedger = ledger,
+              allowSourceReview: allowSourceReview,
+              isCurrent: materialCurrent,
             );
           })
           .whenComplete(() async => materialFrame?.file.close());
     }, title: 'build profile');
     Future<bool> current() async {
+      if (!await triggerCurrent()) return false;
       if (profile?.id != ref.read(currentProfileIdProvider) ||
           (isCurrent != null && !await isCurrent())) {
         return false;
@@ -1233,17 +1561,111 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     await globalState.loadingRun(
       () async {
         ConfigInput? input;
+        SourceProviderBundle? sourceBundle;
         ConfigApplyResult? recoveryPending;
         int? recoveryRequestId;
         var submittedToCore = false;
         try {
           final snapshot = captured!;
+          if (hot && snapshot.policy != null) {
+            setupFailed = true;
+            return;
+          }
           final runtimeEpoch = snapshot.fact.runtimeEpoch;
+          final acceptedUses = <Map<String, Object?>>[];
+          final providerMaterials = <Map<String, Object?>>[];
+          if (_requests.requiresSourceAcceptance) {
+            Object useIdentity(Map<String, Object?> use) => [
+              use['key'],
+              use['kind'],
+              use['incarnation'],
+              use['epoch'],
+              use['purposeEpoch'],
+            ];
+            final qualifiedUses = List<Map<String, Object?>>.of(sourceUses)
+              ..sort(
+                (a, b) => jsonEncode(
+                  useIdentity(a),
+                ).compareTo(jsonEncode(useIdentity(b))),
+              );
+            final acceptedComposition =
+                await _sourceAcceptance(
+                  _core,
+                  _requests,
+                  confirm: ref.read(sourceConfirmationProvider),
+                ).review(
+                  source: sources.firstWhere(
+                    (s) => s.key == 'application-config',
+                  ),
+                  entityKey: 'config:${snapshot.profile.id}',
+                  identity: SourceAcceptance.fingerprint({
+                    'profile': snapshot.profile.id,
+                  }),
+                  settings: {
+                    'patch': snapshot.patch.toJson(),
+                    'network': snapshot.network.toJson(),
+                    'dns': snapshot.overrideDns,
+                    'ntp': snapshot.overrideNtp,
+                    'safeMode': snapshot.safeMode,
+                    'policy': snapshot.policy?.descriptor,
+                  },
+                  body: yamlString,
+                  label: snapshot.profile.realLabel,
+                  location: snapshot.profile.url,
+                  kind: 'config',
+                  uses: qualifiedUses,
+                  automatic:
+                      !allowSourceReview || !ref.read(appVisibleProvider),
+                  isCurrent: current,
+                );
+            Future<bool> providerCurrent() async {
+              if (!await current()) return false;
+              if (!canBootstrap) return true;
+              final now = await _service!.getRequestState();
+              return now['phase'] != 'started' &&
+                  now['paused'] != true &&
+                  [
+                    'processEpoch',
+                    'intentRevision',
+                    'configToken',
+                  ].every((key) => now[key] == nativeContext[key]);
+            }
+
+            final bundle =
+                await _sourceAcceptance(
+                  _core,
+                  _requests,
+                  confirm: ref.read(sourceConfirmationProvider),
+                ).completeProviders(
+                  root: acceptedComposition,
+                  dependencies: qualifiedUses,
+                  source: sources.firstWhere(
+                    (s) => s.key == 'application-config',
+                  ),
+                  automatic:
+                      !allowSourceReview || !ref.read(appVisibleProvider),
+                  reuseAccepted:
+                      canBootstrap ||
+                      nativeContext != null &&
+                          nativeContext['intentRunning'] == true &&
+                          [
+                            'preparing',
+                            'starting',
+                          ].contains(nativeContext['phase']) &&
+                          nativeContext['paused'] != true,
+                  allowBootstrap: canBootstrap,
+                  isCurrent: providerCurrent,
+                );
+            sourceBundle = bundle;
+            sources.addAll(bundle.sources);
+            providerMaterials.addAll(bundle.materials);
+            acceptedUses.addAll([...bundle.uses, bundle.rootUse]);
+          }
           await _requests.mutate(() async {
             if (!await current() || canSubmit != null && !await canSubmit()) {
               throw const RequestUnavailable('request_cancelled');
             }
-            if (_isAndroid) {
+            if (_isAndroid && !hot) {
               globalState.lastVpnState = snapshot.vpn;
               final desired = snapshot.shared;
               if (!await preferences.saveShareState(desired)) {
@@ -1262,83 +1684,132 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
               selectedMap: snapshot.picks,
               testUrl: snapshot.testUrl,
               sources: sources,
+              sourceUses: acceptedUses,
+              providerMaterials: providerMaterials,
+              ruleLedger: _requests.requiresSourceAcceptance
+                  ? ruleLedger
+                  : null,
+              version: _requests.requiresSourceAcceptance ? 2 : 1,
               managedPolicy: snapshot.policy?.descriptor,
               managedMaterials: snapshot.policy?.materials,
             );
           });
+          await sourceBundle?.release();
           final profileId = profile?.id;
           if (profileId != null) {
             await appPath.ensureProviderDirs(profileId);
           }
-          for (var attempt = 0; ; attempt++) {
-            if (!await current() || canSubmit != null && !await canSubmit()) {
-              throw const RequestUnavailable('request_cancelled');
-            }
-            if (_isAndroid) {
-              recoveryRequestId =
-                  ((await _service!.getRequestState())['intentRevision']
-                          as num?)
-                      ?.toInt();
-            }
+          if (hot) {
             submittedToCore = true;
-            final result = await _core.applyConfigInput(
-              input!.toRequest(
-                requestId: RunRequestScope.current,
-                expectedConfig: snapshot.policy == null
-                    ? null
-                    : snapshot.fact.fence,
-                active:
-                    !snapshot.safeMode &&
-                    (_latestRunRequest?.running ?? _isRunning) &&
-                    !ref.read(suspendProvider),
-              ),
+            final result = ConfigApplyResult.fromJson(
+              await _core.sourceAcceptance({
+                'action': 'adoptInline',
+                'input': {
+                  ...input!.toRequest(
+                    active: true,
+                    expectedConfig: snapshot.fact.fence,
+                  ),
+                  'expectedRun': nativeContext,
+                },
+              }),
             );
-            registeredToken =
-                (result.receipt['token'] as num?)?.toInt() ?? registeredToken;
             ref
                 .read(configStateProvider.notifier)
                 .accept(result.fact, authoritative: true);
-            if (result.status != 'superseded' && !result.fact.businessActive) {
-              _setLocalRunning(false);
+            if (!result.succeeded) {
+              superseded = result.status == 'superseded';
+              setupFailed = !superseded;
+              return;
             }
-            if (result.succeeded) {
-              recoveryPending = null;
-              if (!await current() ||
-                  onApplied != null &&
-                      (result.fact.inputId != input!.id ||
-                          result.receipt['inputId'] != result.fact.inputId ||
-                          result.receipt['owner'] != result.fact.owner ||
-                          result.receipt['token'] != result.fact.token ||
-                          result.fact.runtimeEpoch != runtimeEpoch ||
-                          !ConfigInput.sameAcceptedInput(
-                            result.fact,
-                            await _core.getConfigState(),
-                          ))) {
+            if (!await current() ||
+                result.fact.owner != snapshot.fact.owner ||
+                result.fact.token != snapshot.fact.token ||
+                result.fact.yamlSha256 !=
+                    sha256.convert(utf8.encode(yamlString)).toString() ||
+                !ConfigInput.sameAcceptedInput(
+                  result.fact,
+                  await _core.getConfigState(),
+                )) {
+              superseded = true;
+              return;
+            }
+            accepted = result;
+          }
+          if (!hot) {
+            for (var attempt = 0; ; attempt++) {
+              if (!await current() || canSubmit != null && !await canSubmit()) {
                 throw const RequestUnavailable('request_cancelled');
               }
-              accepted = result;
-              if (_isAndroid && result.fact.businessActive) {
-                final native = await _service!.getRequestState();
-                ref
-                    .read(nativeRequestStateProvider.notifier)
-                    .onRequestState(native);
-                await _syncNativeRuntime(native);
+              if (_isAndroid) {
+                recoveryRequestId =
+                    (expectedRun?['intentRevision'] as num?)?.toInt() ??
+                    ((await _service!.getRequestState())['intentRevision']
+                            as num?)
+                        ?.toInt();
               }
-              break;
-            }
-            if (result.status == 'staleInput') {
-              staleInput = true;
-              throw const RequestUnavailable('request_cancelled');
-            }
-            if (result.status == 'superseded') {
-              superseded = true;
-              throw const RequestUnavailable('request_cancelled');
-            }
-            recoveryPending = result.status == 'bootstrapRequired'
-                ? result
-                : null;
-            if (attempt >= 4 || !await _requests.recoverMissingGeo(_core)) {
-              throw MessageException(result.message);
+              submittedToCore = true;
+              final result = await _core.applyConfigInput(
+                input!.toRequest(
+                  requestId:
+                      (expectedRun?['intentRevision'] as num?)?.toInt() ??
+                      RunRequestScope.current,
+                  expectedConfig: snapshot.policy == null
+                      ? null
+                      : snapshot.fact.fence,
+                  active:
+                      !snapshot.safeMode &&
+                      (_latestRunRequest?.running ?? _isRunning) &&
+                      !ref.read(suspendProvider),
+                ),
+              );
+              registeredToken =
+                  (result.receipt['token'] as num?)?.toInt() ?? registeredToken;
+              ref
+                  .read(configStateProvider.notifier)
+                  .accept(result.fact, authoritative: true);
+              if (result.status != 'superseded' &&
+                  !result.fact.businessActive) {
+                _setLocalRunning(false);
+              }
+              if (result.succeeded) {
+                recoveryPending = null;
+                if (!await current() ||
+                    onApplied != null &&
+                        (result.fact.inputId != input!.id ||
+                            result.receipt['inputId'] != result.fact.inputId ||
+                            result.receipt['owner'] != result.fact.owner ||
+                            result.receipt['token'] != result.fact.token ||
+                            result.fact.runtimeEpoch != runtimeEpoch ||
+                            !ConfigInput.sameAcceptedInput(
+                              result.fact,
+                              await _core.getConfigState(),
+                            ))) {
+                  throw const RequestUnavailable('request_cancelled');
+                }
+                accepted = result;
+                if (_isAndroid && result.fact.businessActive) {
+                  final native = await _service!.getRequestState();
+                  ref
+                      .read(nativeRequestStateProvider.notifier)
+                      .onRequestState(native);
+                  await _syncNativeRuntime(native);
+                }
+                break;
+              }
+              if (result.status == 'staleInput') {
+                staleInput = true;
+                throw const RequestUnavailable('request_cancelled');
+              }
+              if (result.status == 'superseded') {
+                superseded = true;
+                throw const RequestUnavailable('request_cancelled');
+              }
+              recoveryPending = result.status == 'bootstrapRequired'
+                  ? result
+                  : null;
+              if (attempt >= 4 || !await _requests.recoverMissingGeo(_core)) {
+                throw MessageException(result.message);
+              }
             }
           }
         } catch (_) {
@@ -1351,10 +1822,15 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
           if (staleInput) return;
           superseded = superseded || !await current();
           setupFailed = !superseded;
+          if (hot) {
+            await ref.read(configStateProvider.notifier).refresh();
+            return;
+          }
           final pending = recoveryPending;
           final requestId = recoveryRequestId;
           if (pending != null && requestId != null) {
             Future<void> cleanup() async {
+              if (!await triggerCurrent()) return;
               final result = await _service!.failRunIntent(
                 requestId,
                 token: pending.fact.token,
@@ -1371,6 +1847,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
           if (superseded) return;
           rethrow;
         } finally {
+          await sourceBundle?.release();
           final submitted = input;
           if (submitted != null) {
             try {

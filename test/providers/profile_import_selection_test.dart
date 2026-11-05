@@ -13,6 +13,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../helpers/test_config_state.dart';
 import '../helpers/test_policy_drafts.dart';
+import '../helpers/test_source_acceptance.dart';
 
 class _Core extends Mock implements CoreHandlerInterface {}
 
@@ -36,7 +37,14 @@ class _Setup extends SetupAction {
   }
 
   @override
-  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
+  Future<bool> applyProfile({
+    bool silence = false,
+    bool force = false,
+    bool allowSourceReview = true,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
+  }) async {
     applies++;
     return true;
   }
@@ -59,6 +67,7 @@ void main() {
       await store.profilesDao.putAll([draftTestProfile(1).toCompanion()]);
       await store.profilePolicySelectionsDao.requireSelections({1});
       final core = _Core();
+      stubAcceptedSourceFixtures(core);
       when(() => core.clearEffect(1)).thenAnswer((_) async => '');
       ProviderContainer open(int? current) {
         final container = ProviderContainer(

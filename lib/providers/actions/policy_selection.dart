@@ -93,7 +93,12 @@ class PolicySelectionAction extends _$PolicySelectionAction {
                     selection: next,
                     beforeWrite: () async {
                       failure = await setup.captureConfigFailure(requestClient);
-                      await requestClient.invalidate('profile:$profileId');
+                      if (material?.latest == true &&
+                          material?._approval != null) {
+                        await material!._approval!.invalidate();
+                      } else {
+                        await requestClient.invalidate('profile:$profileId');
+                      }
                       invalidated = true;
                     },
                   );
@@ -112,7 +117,11 @@ class PolicySelectionAction extends _$PolicySelectionAction {
                   material?.latest == true) {
                 if (!invalidated) {
                   failure = await setup.captureConfigFailure(requestClient);
-                  await requestClient.invalidate('profile:$profileId');
+                  if (material?._approval != null) {
+                    await material!._approval!.invalidate();
+                  } else {
+                    await requestClient.invalidate('profile:$profileId');
+                  }
                   invalidated = true;
                 }
                 await ref
@@ -142,7 +151,12 @@ class PolicySelectionAction extends _$PolicySelectionAction {
         return persist();
       }
 
-      result = material?._session == null
+      result = material?._approval != null
+          ? await material!._approval!.commit(
+              session: material._session,
+              action: commit,
+            )
+          : material?._session == null
           ? await requestClient.mutate(commit)
           : await material!._session!.commit(commit);
     } on _MaterialSelectionConflict {

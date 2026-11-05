@@ -86,7 +86,7 @@ func stageTestEnvironment(t *testing.T) bool {
 func stageInput(t *testing.T, port int, providers, groups string) ConfigReceipt {
 	t.Helper()
 	yaml := fmt.Sprintf("mixed-port: %d\nmode: rule\nfind-process-mode: off\ngeo-auto-update: false\nexternal-controller: ''\ndns: {enable: false}\nntp: {enable: false}\nprofile: {store-selected: false, store-fake-ip: false}\n%s\n%s\nrules: [\"MATCH,pick\"]\n", port, providers, groups)
-	input := writeTestInput(t, yaml)
+	input := writeLegacyTestInput(t, yaml)
 	registered := registerConfigOperation(methodCallSeq.Add(1), ConfigInputRequest{InputID: input, Active: true})
 	result := prepareConfig(registered)
 	if result.Status != "prepared" {

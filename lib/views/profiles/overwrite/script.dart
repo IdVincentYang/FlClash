@@ -5,6 +5,8 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'standard.dart' show ProfileMatchTargetItem;
+
 class ScriptContent extends ConsumerWidget {
   const ScriptContent({super.key});
 
@@ -65,6 +67,8 @@ class ScriptContent extends ConsumerWidget {
             ),
           ),
         ),
+        if (request.requiresSourceAcceptance)
+          SliverToBoxAdapter(child: ProfileMatchTargetItem(profileId)),
         SliverToBoxAdapter(
           child: MoreActionButton(
             label: appLocalizations.goToConfigureScript,

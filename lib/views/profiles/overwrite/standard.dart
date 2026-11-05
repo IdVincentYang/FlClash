@@ -194,7 +194,7 @@ class _StandardContentState extends ConsumerState<StandardContent> {
                 .order,
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
-          SliverToBoxAdapter(child: _MatchTargetItem(_profileId)),
+          SliverToBoxAdapter(child: ProfileMatchTargetItem(_profileId)),
           SliverToBoxAdapter(
             child: MoreActionButton(
               label: appLocalizations.controlGlobalAddedRules,
@@ -207,10 +207,10 @@ class _StandardContentState extends ConsumerState<StandardContent> {
   }
 }
 
-class _MatchTargetItem extends ConsumerWidget {
+class ProfileMatchTargetItem extends ConsumerWidget {
   final int profileId;
 
-  const _MatchTargetItem(this.profileId);
+  const ProfileMatchTargetItem(this.profileId, {super.key});
 
   Future<void> _handleSelect(BuildContext context, WidgetRef ref) async {
     final res = await showSheet<String>(

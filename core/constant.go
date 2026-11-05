@@ -121,6 +121,8 @@ type MemoryStats struct {
 }
 
 type ExternalProvider struct {
+	SourceKey        string                     `json:"sourceKey,omitempty"`
+	SourceStatus     string                     `json:"sourceStatus,omitempty"`
 	Name             string                     `json:"name"`
 	Type             string                     `json:"type"`
 	VehicleType      string                     `json:"vehicle-type"`
@@ -147,6 +149,7 @@ const (
 	forceGcMethod                  CoreMethod = "forceGc"
 	shutdownMethod                 CoreMethod = "shutdown"
 	validateConfigMethod           CoreMethod = "validateConfig"
+	sourceAcceptanceMethod         CoreMethod = "sourceAcceptance"
 	validateProxiesMethod          CoreMethod = "validateProxies"
 	updateConfigMethod             CoreMethod = "updateConfig"
 	getProxiesMethod               CoreMethod = "getProxies"

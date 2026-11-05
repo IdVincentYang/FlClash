@@ -21,6 +21,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/test_source_acceptance.dart';
 
 class _Native extends Mock implements Service {}
 
@@ -157,6 +158,7 @@ void main() {
       } catch (_) {}
     });
     core = _Core();
+    stubAcceptedSourceFixtures(core);
     when(() => core.validateConfig(any())).thenAnswer(
       (call) async =>
           await File(call.positionalArguments.first as String).readAsString() ==

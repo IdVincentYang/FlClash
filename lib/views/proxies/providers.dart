@@ -251,6 +251,14 @@ class _ProviderItemState extends ConsumerState<ProviderItem> {
       _ => null,
     };
     final chips = [
+      if (provider.sourceStatus.isNotEmpty)
+        MetaChip(
+          label: switch (provider.sourceStatus) {
+            'recovery' => context.appLocalizations.sourceAppliedNotSaved,
+            'budget' => context.appLocalizations.sourceStorageFull,
+            _ => context.appLocalizations.sourceReviewRequired,
+          },
+        ),
       if (provider.updateAt.microsecondsSinceEpoch > 0)
         MetaChip(label: provider.updateAt.getLastUpdateTimeDesc(context)),
       if (provider.count > 0 && countLabel != null) MetaChip(label: countLabel),
@@ -259,7 +267,7 @@ class _ProviderItemState extends ConsumerState<ProviderItem> {
         ? null
         : Padding(
             padding: const EdgeInsets.only(top: 4, bottom: 2),
-            child: Row(spacing: 4, children: chips),
+            child: Wrap(spacing: 4, runSpacing: 4, children: chips),
           );
   }
 
@@ -267,6 +275,20 @@ class _ProviderItemState extends ConsumerState<ProviderItem> {
     final appLocalizations = context.appLocalizations;
     final subscriptionInfo = provider.subscriptionInfo;
     return [
+      if (request.requiresSourceAcceptance && provider.sourceKey.isNotEmpty)
+        CommonPopupMenuItem(
+          glyph: AppGlyphs.lock,
+          label: appLocalizations.sourcePermissions,
+          onPressed: () {
+            unawaited(
+              globalState.safeRun(
+                () => ref
+                    .read(proxiesActionProvider.notifier)
+                    .manageProviderSource(provider),
+              ),
+            );
+          },
+        ),
       if (_file == _ProviderFile.text)
         CommonPopupMenuItem(
           glyph: AppGlyphs.edit,
@@ -390,6 +412,12 @@ Future<void> _sideLoadProvider(
   ExternalProvider provider,
   List<int> bytes,
 ) async {
+  if (request.requiresSourceAcceptance && provider.sourceKey.isNotEmpty) {
+    await ref
+        .read(proxiesActionProvider.notifier)
+        .sideLoadSourceProvider(provider, bytes);
+    return;
+  }
   final path = provider.path;
   if (path == null) return;
   final data = _decodeProviderFile(bytes);

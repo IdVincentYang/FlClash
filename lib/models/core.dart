@@ -309,6 +309,8 @@ SubscriptionInfo? subscriptionInfoFormCore(Map<String, Object?>? json) {
 @freezed
 abstract class ExternalProvider with _$ExternalProvider {
   const factory ExternalProvider({
+    @Default('') String sourceKey,
+    @Default('') String sourceStatus,
     required String name,
     required String type,
     String? path,

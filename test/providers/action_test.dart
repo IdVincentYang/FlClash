@@ -981,6 +981,7 @@ class _ApplyRecordingSetupAction extends SetupAction {
     bool silence = false,
     bool force = false,
     Future<bool> Function()? isCurrent,
+    bool allowSourceReview = true,
   }) {
     applyCount++;
   }
@@ -1020,6 +1021,10 @@ class _TestSetupAction extends SetupAction {
     bool silence = false,
     bool force = false,
     Future<void> Function()? preloadInvoke,
+    bool allowSourceReview = true,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
   }) async {
     applyProfileCount++;
     if (applyProfileCount == 1) {
@@ -1094,7 +1099,14 @@ class _RaceSetupAction extends SetupAction {
   Future<void> prepareInput() async {}
 
   @override
-  Future<bool> applyProfile({bool silence = false, bool force = false}) async {
+  Future<bool> applyProfile({
+    bool silence = false,
+    bool force = false,
+    bool allowSourceReview = true,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
+  }) async {
     final sequence = requestSequence;
     applyProfileDebounceCount++;
     await prepareInput();
@@ -1117,6 +1129,7 @@ class _RaceSetupAction extends SetupAction {
     bool silence = false,
     bool force = false,
     Future<bool> Function()? isCurrent,
+    bool allowSourceReview = true,
   }) {
     applyProfileDebounceCount++;
   }

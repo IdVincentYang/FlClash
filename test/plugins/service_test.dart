@@ -79,6 +79,22 @@ void main() {
   });
 
   group('lifecycle commands', () {
+    test(
+      'unregistered build cleanup preserves its intent and token payload',
+      () async {
+        mockChannel((_) async => '{"status":"cleaned"}');
+        expect(
+          await Service().failRunIntent(8, token: 41, unregistered: true),
+          {'status': 'cleaned'},
+        );
+        expect(calls.single.method, 'failRunIntent');
+        expect(calls.single.arguments, {
+          'requestId': 8,
+          'token': 41,
+          'unregistered': true,
+        });
+      },
+    );
     test('start and stop report the platform result', () async {
       mockChannel((call) async => call.method == 'start');
 
