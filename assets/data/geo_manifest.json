@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "publisher": "https://github.com/MetaCubeX/meta-rules-dat",
+  "release_commit": "4046bac4e064f047210ed43cd187fa32df7bace7",
+  "release_id": 434715541,
+  "published_at": "2026-11-05T02:40:43Z",
+  "evidence": {
+    "kind": "accepted-same-channel-github-snapshot",
+    "independent_signature": false,
+    "build_provenance": "unproven"
+  },
+  "history": {
+    "project_commit": "ed7868282a94ba8bd66e31f719349ba12fb16e50",
+    "original_data_release": "unknown",
+    "exact_generation_inputs": "unknown",
+    "prior_payloads": {
+      "MMDB": "7722ab3c5518a27de61f4d444528dbdf3d6067d1614b6c84c66b732fbf9021d7",
+      "ASN": "c0507cfb091f42ac525f4eb8a0051a7897f5fac72e852799e01096583566033b",
+      "GEOIP": "2dea9374371ee651b15705293ebd25076cc62948eb8fb8121d69e25db5e1add8",
+      "GEOSITE": "098b98841c252e4b0c83cfea9fae19a97b018e142070406f019f7343b9784ad5"
+    }
+  },
+  "resources": [
+    {
+      "role": "MMDB",
+      "filename": "GEOIP.metadb",
+      "asset_name": "geoip.metadb",
+      "format": "maxmind-meta-country",
+      "asset_id": 711793110,
+      "size": 8406197,
+      "sha256": "bb39cb005aa6db49ed347e49595fe82b8a104e4cf2571ff4673b1d1bf70d37e7",
+      "source_url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/4046bac4e064f047210ed43cd187fa32df7bace7/geoip.metadb"
+    },
+    {
+      "role": "ASN",
+      "filename": "ASN.mmdb",
+      "asset_name": "GeoLite2-ASN.mmdb",
+      "format": "maxmind-asn",
+      "asset_id": 711792971,
+      "size": 9000080,
+      "sha256": "3169b9ea7dad762f6837b95408dadc1173f47be33be2d83b6c90e67a57a7eb2e",
+      "source_url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/4046bac4e064f047210ed43cd187fa32df7bace7/GeoLite2-ASN.mmdb"
+    },
+    {
+      "role": "GEOIP",
+      "filename": "GEOIP.dat",
+      "asset_name": "geoip.dat",
+      "format": "v2ray-geoip",
+      "asset_id": 711793081,
+      "size": 16475153,
+      "sha256": "90b78ab861c1cdc3f871f305f9ceedfb8d6d6329e3a40295e6773e057297384c",
+      "source_url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/4046bac4e064f047210ed43cd187fa32df7bace7/geoip.dat"
+    },
+    {
+      "role": "GEOSITE",
+      "filename": "GEOSITE.dat",
+      "asset_name": "geosite.dat",
+      "format": "v2ray-geosite",
+      "asset_id": 711793171,
+      "size": 4356581,
+      "sha256": "b17c22dbe38b64631f5820d14c000ec1bb9db7636d0bf6599a166f36980e597d",
+      "source_url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/4046bac4e064f047210ed43cd187fa32df7bace7/geosite.dat"
+    }
+  ]
+}

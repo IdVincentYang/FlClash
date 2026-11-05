@@ -3,3 +3,8 @@ lib/**/generated/** -whitespace
 
 # The source carrier preserves literal diff context, including spaces before tabs.
 core/patches/l1_t03/source.patch -whitespace
+
+# Preserve Geo payload bytes; protobuf can otherwise be mistaken for text.
+assets/data/*.dat binary
+assets/data/*.metadb binary
+assets/data/*.mmdb binary

@@ -116,6 +116,16 @@ A material digest is provenance, not a new runtime grant or proof that a saved
 revision has been applied. The guide separates Save, preview, Sync and actual
 adoption; no persistent pending-material authority is introduced.
 
+## Geo Data Baseline
+
+The [Geo contract](../docs/features/security/geo_data_design.md) separates the accepted publisher snapshot,
+bundled bytes, Core-compatible path selection and loaded readers. The shared Flutter data assets use the fixed
+reference in `assets/data/geo_manifest.json`; `tool/verify_geo_assets.py` checks repository/APK bytes against that
+external repository reference, never the APK's own claims. It is offline and does not own runtime updates.
+Existing `CoreController.initGeo` still seeds only missing files. Private-cache migration, all update paths and
+loaded-version reporting remain later Loop 6 work; format locks and request receipts alone do not verify a publisher.
+Shared assets affect first seed on other platforms, while this task validates only the Android artifact.
+
 ## Source Acceptance (Android)
 
 L2-T05's approved [source acceptance contract](../docs/features/security/source_acceptance_design.md)
