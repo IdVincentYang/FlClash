@@ -1,6 +1,6 @@
 # 来源接受与轻量追溯契约
 
-**Android 实现评审通过，待本地交付及M收尾。指定AVD验证范围与未验证限制见使用指南。**
+**Android 已完成本地交付与M对账。指定AVD验证范围与未验证限制见使用指南。**
 本文维护来源委托、候选接受及连接归属的长期契约；实施进度与证据由
 [本次任务](loop2/loop2_tasks.md#l2-t05-来源信任与配置内容接受)管理。
 使用入口见[指南](source_acceptance_guide.md)。
@@ -85,7 +85,7 @@ ready只开放解释界面，读／等待及时返回restart-required；晚到co
 前台receipt独立限额16，候选槽位限额32；未知写者期间拒绝新增。退休候选pin保留到实际写结束，不能因前端断开提前回收。
 Android app、JNI Core与DB isolate共享应用进程；须通过App info → Force stop后重新打开终结未知写者，关闭界面／划掉任务不构成进程退出证明。
 新进程仍须显式离线核对材料／DB／grant，不能自动提升候选。插件只显式放行已定义的前台提交动作，内部配置／publish动作仍受限。
-R3及R3.4设计已获审，生产接入与验收未完成；Stop／撤回检查不能为接续材料而放宽。
+材料提交、未知写者与显式恢复已通过受控host及指定AVD验证；Stop／撤回检查不能为接续材料而放宽。
 前台完整安装仍有[日志级别并发风险](deferred_security_items.md#core-完整安装的日志级别并发)；
 局部热更新与来源接受不构成全部Core全局量的并发修复。
 新Script执行前确认来源及精确代码digest；既有QuickJS执行后的输出另做行为接受。
@@ -109,7 +109,7 @@ pending／recovery屏障、未知写者、损坏或撤权均拒绝，不从当�
 不把已正常失效的旧checkpoint当作新材料的缓存来源。
 未向Core注册的构建失败沿既有failRunIntent以abort=false结束本次捕获的intentRevision＋configToken，
 保留旧ready配置；新intent／新注册token胜过旧清理。已注册失败继续原T01 abort契约。
-该路径已接入当前Android实现；完整设备验收仍未完成。
+该启动与恢复路径已通过受控Android验证；未验证范围见使用指南。
 
 R5已实现、受控Android验证通过；I2原身份与入口准入补齐已实证并通过整项实现评审：明确离线核对成功后的前台重建，以及新建的实际UI Start，可对缺失HTTP(S)材料
 请求原一次bootstrap。先复用有资格的密封材料；仅原规范空失效引用表示无材料，不恢复checkpoint资格，
@@ -123,7 +123,7 @@ R5已实现、受控Android验证通过；I2原身份与入口准入补齐已实
 身份／caller资格跨await验证后才同步取得generation，较旧票号不能覆盖较新的合法拥有者。Stop在同一序列上取得新generation。
 过期入口不触发取消需求或busy标记，普通当前调用仍按最后合法调用替换已有工作。恢复与fresh UI Start在触发时预留调用票号，并跨helper和native准备等待传递到同一Setup准入；票号只排序，不授予运行或来源权限，未使用／未合格票号不取消现有任务。
 file材料只沿正式root声明和安全路径受控读取，使用既有data read guard而非网络引导，返回候选仍须原来源接受。
-未知写者、未核对marker、撤权和状态变化不因本流程获得权限。R5取消／逐URL确认及实际启动已在指定AVD验证，I2新制品已补指定AVD的两恢复caller及fresh Start正对照；并发窗口反例由真实host状态机与UI-caller测试覆盖，整项实现评审已通过，待本地交付及M收尾。
+未知写者、未核对marker、撤权和状态变化不因本流程获得权限。R5取消／逐URL确认及实际启动已在指定AVD验证，I2新制品已补指定AVD的两恢复caller及fresh Start正对照；并发窗口反例由真实host状态机与UI-caller测试覆盖，整项实现评审、本地交付及M对账已完成。
 
 v2 manifest中的providerMaterials按kind与name绑定原声明摘要、密封正文摘要及用途SourceUse。
 应用注入的Profile节点集合和ClashProvider另绑定其原始实体的节点／规则用途SourceUse；

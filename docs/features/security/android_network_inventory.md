@@ -1,8 +1,8 @@
 # Android 联网用途清单
 
-> L2-T05 Android实现评审通过，待本地交付及M收尾：[来源接受契约](source_acceptance_design.md)和[指南](source_acceptance_guide.md)。
+> L2-T05 Android已完成本地交付与M对账：[来源接受契约](source_acceptance_design.md)和[指南](source_acceptance_guide.md)。
 > 材料接受、未来维护与实际采用分开；新增grant／候选／ledger为有界私有元信息，不扩大业务数据用途。
-> H1 draft收窄inline图自动发布的实际DNS／在途读者资格，保留原DNS／出口，不限制不换map的provider热更新。
+> H1资格检查收窄inline图自动发布的实际DNS／在途读者资格，保留原DNS／出口，不限制不换map的provider热更新。
 
 本清单说明应用、Core 和系统移交分别因何联网、接收方能看到什么，以及实际保护和验证边界。
 共同判据见[安全目标](security_requirements.md#正常联网与额外暴露的判定)；接收必要请求不等于额外采集。

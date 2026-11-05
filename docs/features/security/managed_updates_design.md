@@ -1,6 +1,6 @@
 # Managed Profile 材料更新契约
 
-> L2-T05 Android实现评审通过，待本地交付及M收尾：[来源接受契约](source_acceptance_design.md)和[指南](source_acceptance_guide.md)。
+> L2-T05 Android已完成本地交付与M对账：[来源接受契约](source_acceptance_design.md)和[指南](source_acceptance_guide.md)。
 > 材料接受、未来维护与实际采用分开；新增grant／候选／ledger为有界私有元信息，不扩大业务数据用途。
 
 Profile 显式绑定的材料经冻结、校验和展开后，由同一严格编译器生成业务/DNS 配置，

@@ -30,7 +30,7 @@
 | L2-T02 | [DNS 接收方、出口与失败回退](#l2-t02-dns-接收方出口与失败回退) | L2-T01 的最终配置和失败契约 | 05调查与说明已交付；整项安全未通过 |
 | L2-T03 | [服务状态过渡与业务接管范围](#l2-t03-服务状态过渡与业务接管范围) | L2-T01；沿用 ServiceState 权威 | 已交付并核实远端 security/android |
 | L2-T04 | [业务数据处理与额外传输审查](#l2-t04-业务数据处理与额外传输审查) | L2-T01；按实际路径接收 L2-T02/L2-T03 结果 | 审查与 Android 禁用已合入；设备与未审协议边界保留 |
-| L2-T05 | [来源信任与配置内容接受、轻量追溯](l2_t05_plan.md) | L2-T01／T04；既有来源与受管材料契约 | 实现评审通过；待本地交付及M1收尾 |
+| L2-T05 | [来源信任与配置内容接受、轻量追溯](#l2-t05-来源信任与配置内容接受) | L2-T01／T04；既有来源与受管材料契约 | Android已本地交付并完成M1对账；限制保留 |
 
 ## L2-T01 最终配置与应用失败时的业务出口
 
@@ -128,9 +128,10 @@ git show "$delivery_revision:$records_directory/l2_t04_result.md"
 
 ## L2-T05 来源信任与配置内容接受
 
-归属为 M1 / D-02；[Task Plan](l2_t05_plan.md) design_v3 的未变设计结论保留；人类否决普通 provider 更新的全 scope 中断，单provider热采用／RP wrapper／恢复屏障已过设计层复审，design_v5的H1已由M1通过，沿文档基线连续实施与本地验证。
-用户已同意首次来源委托、范围内更新和高影响候选接受，并将轻量规则来源追溯纳入本项；
-独立网络活动与规则管理 UI、App 持久分流、应用／目标网站聚合及快捷建规则后置，不在本项实施。设计通过后沿连续交付授权接续。
+归属为 M1 / D-02；Android实现、本地交付及M对账已完成，当前契约见[来源接受设计](../source_acceptance_design.md)及[指南](../source_acceptance_guide.md)。
+用户已同意首次来源委托、范围内维护、高影响候选接受和轻量规则来源追溯；普通provider更新保留DIRECT及未变化连接。
+任务定稿可从[交付Plan](https://github.com/IdVincentYang/FlClash/blob/bc25dec0dcf955baec07e362f74502e867efb88e/docs/features/security/loop2/l2_t05_plan.md)及[验证记录](https://github.com/IdVincentYang/FlClash/blob/bc25dec0dcf955baec07e362f74502e867efb88e/docs/features/security/loop2/l2_t05_result.md)取回，当前副本已清理。
+独立网络活动UI、App持久分流和快捷建规则继续后置；本项完成不消除DNS R1或Core日志并发问题，也不代表整个Loop2完成。
 
 - 目标与价值：常规节点和规则更新在用户接受的来源委托范围内自动执行，高影响变化能被理解和接受/拒绝，拒绝时保留可用配置。
 - 风险与方向：订阅、provider、脚本与覆写可能改变节点、规则、DNS、资源来源或安全策略；不处理会扩大来源被攻陷后的影响。使用 L2-T01

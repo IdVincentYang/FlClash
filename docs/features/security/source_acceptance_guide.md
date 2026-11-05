@@ -1,7 +1,7 @@
 # 来源接受与连接来源指南
 
-**Android 实现评审通过，待本地交付及M收尾。以下English入口已实施，并已运行host、插件及指定Android设备验证；支持与限制见正文。**
-契约见[来源接受设计](source_acceptance_design.md)，当前覆盖以[本次验证记录](loop2/l2_t05_result.md)为准。
+**Android 已完成本地交付与M对账。以下English入口已实施，并已运行host、插件及指定Android设备验证；支持与限制见正文。**
+契约见[来源接受设计](source_acceptance_design.md)，能力边界见本指南；受测版本与实证见[交付验证记录](https://github.com/IdVincentYang/FlClash/blob/bc25dec0dcf955baec07e362f74502e867efb88e/docs/features/security/loop2/l2_t05_result.md)。
 
 这些新增入口和运行期能力仅面向Android。非Android保持原来源、脚本、provider与输入路径，
 不显示Source permissions，也不把既有运行状态标为已受此契约保护；其它平台安全能力尚未覆盖。
@@ -20,7 +20,7 @@ Accept this revision只接受这一份内容；选择范围内自动维护才允
 耐久屏障、真正未知写者、实际Force stop及显式恢复已在指定AVD验证；这些受控进程与guest loopback结果不替代真实TUN／物理网络覆盖。
 仅确认候选不能运行它，应用重启也不会把未完成候选自动提升为正式许可。材料提交和未知写者恢复已通过受控host及指定AVD验证；完整覆盖和设备限制见验证记录。
 
-普通provider内容更新局部采用并保留DIRECT和未变化provider的已有连接；host及指定AVD已验证TCP／UDP与普通前端detach，完整设备矩阵仍未完成。
+普通provider内容更新局部采用并保留DIRECT和未变化provider的已有连接；host及指定AVD已验证TCP／UDP与普通前端detach，不构成任意设备、真实TUN入站或物理网络保证。
 已有socket不会被迁移到新节点，普通删改与明确撤回当前使用的处置不同。下载成功／材料已接受也不等于已采用。
 已应用但恢复保存失败时明确显示“已应用，恢复未保存”，继续当前连接并禁止重放旧checkpoint；重试只保存已应用事实。
 活跃旧连接占用退休材料预算时可能延后后续采用，不能静默关闭连接或回收其对象。
