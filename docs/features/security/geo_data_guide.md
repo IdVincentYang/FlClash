@@ -1,6 +1,6 @@
 # Geo 固定基线核验指南
 
-L6-T01固定基线及核验工具已通过M实现评审，**待本地交付及M收尾**。接受对象与证据边界见[契约](geo_data_design.md)，
+固定随包基线及离线核验工具已交付。接受对象与证据边界见[契约](geo_data_design.md)，
 实际任务状态见[Loop 6 Tasks](loop6/loop6_tasks.md)。
 
 ## 离线核验

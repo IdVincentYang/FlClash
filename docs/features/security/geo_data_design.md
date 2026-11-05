@@ -1,6 +1,6 @@
 # Geo 数据身份与固定基线
 
-固定随包基线及离线核验已通过M实现评审，**待本地交付及M收尾**。任务状态见[Loop 6 Tasks](loop6/loop6_tasks.md)。
+固定随包基线及离线核验已交付。任务与后续更新保护的状态见[Loop 6 Tasks](loop6/loop6_tasks.md)。
 本契约区分接受的数据发布、精确文件、磁盘选择和运行reader；操作入口见[指南](geo_data_guide.md)。
 
 ## 接受对象与证据
