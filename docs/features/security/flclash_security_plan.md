@@ -9,7 +9,7 @@
 | 3 | [loop3_plan.md](loop3/loop3_plan.md) | 暂缓，未实施 | 无；与 Loop 1 对齐本地报告边界 |
 | 4 | [loop4_plan.md](loop4/loop4_plan.md) | 计划待评审，未实施 | 可先审基线；完整范围接收 Loop 5 清单 |
 | 5 | [loop5_plan.md](loop5/loop5_plan.md) | 计划待评审，未实施 | 无；按各 loop 最终修改更新清单 |
-| 6 | [loop6_plan.md](loop6/loop6_plan.md) | L6-T01／T04已交付并完成M对账；T02／T03按用户约束暂缓，全轮未完成 | T05已交付；从数据溯源开始，更新保护使用 Loop 1 |
+| 6 | [loop6_plan.md](loop6/loop6_plan.md) | 按用户2026-11-06调整范围完成；T01／T04已交付，T02／T03转[备忘](deferred_security_items.md#loop6-t02t03-geo-更新与实际采用)等待Core修复 | T05已交付；运行期剩余保护未实现，不因阶段结案升级结论 |
 | 7 | [loop7_plan.md](loop7/loop7_plan.md) | 计划待评审，未实施 | Loop 1–6 的实际交付 |
 
 共用资料入口：[Android 审计基线](android_security_baseline.md)、**[fork 与官方同步约定](../../../CONTRIBUTING.md)**、[Android 构建指南](../../development/android_build_guide.md)。

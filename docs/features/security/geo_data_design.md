@@ -52,8 +52,8 @@ MMDB与GEOIP.dat是不同mode的候选，不因两者均存在而称二者都已
 四份Flutter资源由各平台共用，新基线也影响其它平台首次seed；不复制平台资产或新增开关。
 本轮仅交付及验收Android APK；其它平台runtime／update保持原路径，不声称其构建、运行保护或消费已验证。
 
-T01仅建立随包基线及离线核验。默认更新URL、手动／自动／Core内部下载、私有缓存迁移、失败保留和实际重载由T02设计实施，
-English来源／磁盘／loaded版本可见及真实路由验收由T03补齐，不能将当前Resources的mtime视为版本。
+T01仅建立随包基线及离线核验。默认更新URL、手动／自动／Core内部下载、私有缓存迁移、失败保留和实际重载原属T02，
+English来源／磁盘／loaded版本可见及真实路由验收原属T03；两项已按用户决定移入[备忘](deferred_security_items.md#loop6-t02t03-geo-更新与实际采用)等待后续Core修复，尚未实现，不能将当前Resources的mtime视为版本。
 现有格式锁与GrantCommit约束请求资格、互斥和提交，不向父层暴露Core updater的候选bytes，不能据此声称发布校验已覆盖内部路径。
 Core／依赖源、gitlink和carrier不改；无法在父层充分覆盖时按实际消费者及缺口交M。
 DNS R1及Core完整安装日志并发仍未解决，本契约不升级其结论。

@@ -28,7 +28,7 @@ Geo options中的Auto update和Auto-update interval控制已有更新路径。
 这些入口目前不显示接受的发布身份或loaded版本，不能从成功提示、mtime变化或自定义URL推导已通过发布校验。
 
 随包数据更新只影响缺文件时的seed；已存在私有文件、兼容名及运行缓存不会自动变成新基线。
-T02／T03尚未交付，当前工具不能代替运行期更新保护、重载证明或真实路由验收。
+T02／T03已移入[备忘](deferred_security_items.md#loop6-t02t03-geo-更新与实际采用)等待后续Core修复，尚未交付；当前工具不能代替运行期更新保护、重载证明或真实路由验收。
 Android以外平台共用新随包数据，但未验证其构建或运行保护。
 
 ## Android 内置缺失 seed
