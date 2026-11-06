@@ -5267,6 +5267,56 @@ class AppLocalizations {
     );
   }
 
+  /// `Official documentation`
+  String get officialDocumentation {
+    return Intl.message(
+      'Official documentation',
+      name: 'officialDocumentation',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Maps IP addresses to country or region codes for GEOIP rules and some DNS decisions. Used when Geo data mode is disabled; in FlClash this is the country database in MaxMind DB format.`
+  String get geoResourceMmdbAbout {
+    return Intl.message(
+      'Maps IP addresses to country or region codes for GEOIP rules and some DNS decisions. Used when Geo data mode is disabled; in FlClash this is the country database in MaxMind DB format.',
+      name: 'geoResourceMmdbAbout',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Maps IP addresses to autonomous system numbers (ASNs) and network organizations, such as internet service providers or cloud networks. Used by IP-ASN and SRC-IP-ASN rules.`
+  String get geoResourceAsnAbout {
+    return Intl.message(
+      'Maps IP addresses to autonomous system numbers (ASNs) and network organizations, such as internet service providers or cloud networks. Used by IP-ASN and SRC-IP-ASN rules.',
+      name: 'geoResourceAsnAbout',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Groups IP ranges by country or region in a .dat database. Used by GEOIP rules when Geo data mode is enabled; MMDB is the alternative for the other mode.`
+  String get geoResourceGeoipAbout {
+    return Intl.message(
+      'Groups IP ranges by country or region in a .dat database. Used by GEOIP rules when Geo data mode is enabled; MMDB is the alternative for the other mode.',
+      name: 'geoResourceGeoipAbout',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Groups domain names into categories such as services or regions. Used by GEOSITE rules and supported DNS settings to match domains.`
+  String get geoResourceGeositeAbout {
+    return Intl.message(
+      'Groups domain names into categories such as services or regions. Used by GEOSITE rules and supported DNS settings to match domains.',
+      name: 'geoResourceGeositeAbout',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `{name} is already up to date`
   String geoSkipped(Object name) {
     return Intl.message(

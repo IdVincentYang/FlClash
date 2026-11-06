@@ -495,6 +495,18 @@ class MessageLookup extends MessageLookupByLibrary {
       "自动更新间隔必须大于0",
     ),
     "geoOptions": MessageLookupByLibrary.simpleMessage("Geo 选项"),
+    "geoResourceAsnAbout": MessageLookupByLibrary.simpleMessage(
+      "查询 IP 地址所属的自治系统编号（ASN）及运营组织，例如互联网运营商或云服务网络。供 IP-ASN 和 SRC-IP-ASN 规则使用。",
+    ),
+    "geoResourceGeoipAbout": MessageLookupByLibrary.simpleMessage(
+      "以 .dat 格式按国家或地区组织 IP 网段。开启 Geo 数据模式时供 GEOIP 规则使用；另一模式使用 MMDB 数据库。",
+    ),
+    "geoResourceGeositeAbout": MessageLookupByLibrary.simpleMessage(
+      "将域名按服务、地区等类别分组，供 GEOSITE 规则及支持此分类的 DNS 设置匹配域名。",
+    ),
+    "geoResourceMmdbAbout": MessageLookupByLibrary.simpleMessage(
+      "将 IP 地址映射为国家或地区代码，供 GEOIP 规则及部分 DNS 判断使用。在 Geo 数据模式关闭时使用；FlClash 中此项指 MaxMind DB 格式的国家或地区数据库。",
+    ),
     "geoResources": MessageLookupByLibrary.simpleMessage("Geo 资源"),
     "geoSkipped": m12,
     "geoUpdated": m13,
@@ -768,6 +780,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "nullProfileDesc": MessageLookupByLibrary.simpleMessage("添加一个配置文件后即可开始使用"),
     "nullTip": m34,
     "numberTip": m35,
+    "officialDocumentation": MessageLookupByLibrary.simpleMessage("官方文档"),
     "onDemand": MessageLookupByLibrary.simpleMessage("按需运行"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage("配置程序特定场景运行状态"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage("仅统计代理流量"),

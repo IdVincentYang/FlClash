@@ -668,6 +668,18 @@ class MessageLookup extends MessageLookupByLibrary {
       "The auto-update interval must be greater than 0",
     ),
     "geoOptions": MessageLookupByLibrary.simpleMessage("Geo options"),
+    "geoResourceAsnAbout": MessageLookupByLibrary.simpleMessage(
+      "Maps IP addresses to autonomous system numbers (ASNs) and network organizations, such as internet service providers or cloud networks. Used by IP-ASN and SRC-IP-ASN rules.",
+    ),
+    "geoResourceGeoipAbout": MessageLookupByLibrary.simpleMessage(
+      "Groups IP ranges by country or region in a .dat database. Used by GEOIP rules when Geo data mode is enabled; MMDB is the alternative for the other mode.",
+    ),
+    "geoResourceGeositeAbout": MessageLookupByLibrary.simpleMessage(
+      "Groups domain names into categories such as services or regions. Used by GEOSITE rules and supported DNS settings to match domains.",
+    ),
+    "geoResourceMmdbAbout": MessageLookupByLibrary.simpleMessage(
+      "Maps IP addresses to country or region codes for GEOIP rules and some DNS decisions. Used when Geo data mode is disabled; in FlClash this is the country database in MaxMind DB format.",
+    ),
     "geoResources": MessageLookupByLibrary.simpleMessage("Geo resources"),
     "geoSkipped": m12,
     "geoUpdated": m13,
@@ -1042,6 +1054,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "nullTip": m34,
     "numberTip": m35,
+    "officialDocumentation": MessageLookupByLibrary.simpleMessage(
+      "Official documentation",
+    ),
     "onDemand": MessageLookupByLibrary.simpleMessage("On demand"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "Configure the app\'s running state for specific scenarios",

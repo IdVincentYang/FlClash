@@ -24,6 +24,8 @@ JSON的`ok`为true时退出码为0，其余为1；`publisher_signature_verified=
 ## 现有English入口
 
 Resources → Geo resources当前显示MMDB、GEOIP、GEOSITE及ASN的大小和修改时间，菜单包含Sync及Edit URL。
+每项右侧三点菜单的About说明该资源的用途，并提供对应的官方文档链接；点击链接沿用External link确认后打开浏览器。
+About中的固定说明与文档链接独立于可编辑的下载URL，不触发同步或改变资源状态。
 Geo options中的Auto update和Auto-update interval控制已有更新路径。
 这些入口目前不显示接受的发布身份或loaded版本，不能从成功提示、mtime变化或自定义URL推导已通过发布校验。
 

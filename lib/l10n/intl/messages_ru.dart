@@ -698,6 +698,18 @@ class MessageLookup extends MessageLookupByLibrary {
       "Интервал автообновления должен быть больше 0",
     ),
     "geoOptions": MessageLookupByLibrary.simpleMessage("Настройки Geo"),
+    "geoResourceAsnAbout": MessageLookupByLibrary.simpleMessage(
+      "Определяет номер автономной системы (ASN) и организацию, управляющую сетью IP-адреса, например интернет-провайдера или облачную сеть. Используется правилами IP-ASN и SRC-IP-ASN.",
+    ),
+    "geoResourceGeoipAbout": MessageLookupByLibrary.simpleMessage(
+      "Группирует диапазоны IP-адресов по странам и регионам в базе формата .dat. Используется правилами GEOIP при включённом режиме геоданных; в другом режиме используется MMDB.",
+    ),
+    "geoResourceGeositeAbout": MessageLookupByLibrary.simpleMessage(
+      "Группирует доменные имена по категориям, например сервисам или регионам. Используется для сопоставления доменов в правилах GEOSITE и поддерживаемых настройках DNS.",
+    ),
+    "geoResourceMmdbAbout": MessageLookupByLibrary.simpleMessage(
+      "Сопоставляет IP-адреса с кодами стран и регионов для правил GEOIP и некоторых проверок DNS. Используется при выключенном режиме геоданных. В FlClash это база стран и регионов в формате MaxMind DB.",
+    ),
     "geoResources": MessageLookupByLibrary.simpleMessage("Ресурсы Geo"),
     "geoSkipped": m12,
     "geoUpdated": m13,
@@ -1090,6 +1102,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "nullTip": m34,
     "numberTip": m35,
+    "officialDocumentation": MessageLookupByLibrary.simpleMessage(
+      "Официальная документация",
+    ),
     "onDemand": MessageLookupByLibrary.simpleMessage("По условию"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "Настройте состояние работы приложения для определённых сценариев",

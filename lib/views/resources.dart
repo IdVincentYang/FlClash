@@ -204,6 +204,56 @@ class _GeoResourceListItemState extends ConsumerState<_GeoResourceListItem> {
     });
   }
 
+  Future<void> _showAbout() {
+    final appLocalizations = context.appLocalizations;
+    final (description, url) = switch (widget.type) {
+      GeoResource.MMDB => (
+        appLocalizations.geoResourceMmdbAbout,
+        'https://wiki.metacubex.one/en/config/general/#geo-data-mode',
+      ),
+      GeoResource.ASN => (
+        appLocalizations.geoResourceAsnAbout,
+        'https://dev.maxmind.com/geoip/docs/databases/asn/',
+      ),
+      GeoResource.GEOIP => (
+        appLocalizations.geoResourceGeoipAbout,
+        'https://wiki.metacubex.one/en/config/rules/#geoip',
+      ),
+      GeoResource.GEOSITE => (
+        appLocalizations.geoResourceGeositeAbout,
+        'https://wiki.metacubex.one/en/config/rules/#geosite',
+      ),
+    };
+    return dialogs.showCommonDialog<void>(
+      context: context,
+      child: CommonDialog(
+        title: '${widget.type.name} · ${appLocalizations.about}',
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(appLocalizations.close),
+          ),
+        ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(description),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () {
+                unawaited(dialogs.openUrl(url));
+              },
+              icon: const GlyphIcon(AppGlyphs.openExternal),
+              label: Text(appLocalizations.officialDocumentation),
+            ),
+            SelectableText(url, style: context.textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<CommonPopupMenuItem> _menuItems(BuildContext context, String url) {
     final appLocalizations = context.appLocalizations;
     return [
@@ -218,6 +268,11 @@ class _GeoResourceListItemState extends ConsumerState<_GeoResourceListItem> {
         glyph: AppGlyphs.sync,
         label: appLocalizations.sync,
         onPressed: _handleUpdateGeoDataItem,
+      ),
+      CommonPopupMenuItem(
+        glyph: AppGlyphs.info,
+        label: appLocalizations.about,
+        onPressed: _showAbout,
       ),
     ];
   }

@@ -548,6 +548,18 @@ class MessageLookup extends MessageLookupByLibrary {
       "自動更新間隔は0より大きくしてください",
     ),
     "geoOptions": MessageLookupByLibrary.simpleMessage("Geoオプション"),
+    "geoResourceAsnAbout": MessageLookupByLibrary.simpleMessage(
+      "IP アドレスに対応する自律システム番号（ASN）と、通信事業者やクラウドネットワークなどの運営組織を調べます。IP-ASN と SRC-IP-ASN ルールで使用します。",
+    ),
+    "geoResourceGeoipAbout": MessageLookupByLibrary.simpleMessage(
+      ".dat 形式で IP アドレス範囲を国・地域ごとに分類します。Geo データモードが有効な場合に GEOIP ルールで使用し、無効な場合は MMDB を使用します。",
+    ),
+    "geoResourceGeositeAbout": MessageLookupByLibrary.simpleMessage(
+      "ドメイン名をサービスや地域などのカテゴリに分類します。GEOSITE ルールと、この分類に対応する DNS 設定でドメインを照合します。",
+    ),
+    "geoResourceMmdbAbout": MessageLookupByLibrary.simpleMessage(
+      "IP アドレスから国・地域コードを調べ、GEOIP ルールや一部の DNS 判定で使用します。Geo データモードが無効のときに使われます。FlClash では MaxMind DB 形式の国・地域データベースを指します。",
+    ),
     "geoResources": MessageLookupByLibrary.simpleMessage("Geoリソース"),
     "geoSkipped": m12,
     "geoUpdated": m13,
@@ -853,6 +865,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "nullTip": m34,
     "numberTip": m35,
+    "officialDocumentation": MessageLookupByLibrary.simpleMessage("公式ドキュメント"),
     "onDemand": MessageLookupByLibrary.simpleMessage("オンデマンド"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "特定のシナリオでのアプリの実行状態を設定します",
