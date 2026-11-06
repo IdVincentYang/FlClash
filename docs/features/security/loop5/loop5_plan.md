@@ -1,6 +1,29 @@
 # Loop 5：源码对应、官方工件与 Android 构建信任
 
-本轮建立实际源码、第三方组件、构建工具、缓存和最终 APK 的对应关系，处置来源未知或被替换的执行内容。依据[共同安全目标](../security_requirements.md)，对应[审计基线](../android_security_baseline.md) A-08、A-09、A-14。当前维护阶段方向，review 确定后再拆 tasks。
+本轮建立实际源码、第三方组件、构建工具、缓存和最终 APK 的对应关系，处置来源未知或被替换的执行内容。依据[共同安全目标](../security_requirements.md)，对应[审计基线](../android_security_baseline.md) A-08、A-09、A-14。
+阶段拆解及首项设计／实现经M1通过；用户2026-11-06已授权先完成T01，本次提交为本地交付定稿，待M远端收尾。单层任务与归属由[Tasks](loop5_tasks.md)维护，精确输入对象见[首项Plan](l5_t01_plan.md#输入与已核事实)。
+
+## 本轮路径与当前边界
+
+先从实际Android ARM64 dev release APK逆向绑定装包内容和构建输入，再补来源接受依据、生成关系与构建约束，最后验证正常构建及错误输入的拒绝。
+来源可信、源码可取得、由该源码生成、行为安全和漏洞可达是不同结论；本轮向Loop4提供实际代码范围，向Loop7提供可复核的制品绑定。
+
+```mermaid
+flowchart LR
+    Source[项目与锁定依赖源码／已提交生成代码] --> Build[Go／Rust／Flutter／Gradle构建]
+    Tools[实际工具链／插件／构建脚本] --> Build
+    Build --> Package[R8／JNI merge与strip／资源打包]
+    Binary[预编译engine／SQLite／AAR JNI] --> Package
+    Data[Geo等随包数据] --> Package
+    Package --> APK[实际APK与公开签名身份]
+    APK --> Audit[Loop4实际运行代码范围]
+    APK --> Delivery[Loop7受审产物依据]
+```
+
+当前仅T01获准实施：先形成文档基线，再完成只读工具及相称验证，优先复用现有APK和记录；确有记录缺口才按获审条件补一次必要受控装配。不上线后续任务，不升级或清用户缓存，不操作设备或桌面应用。
+Core／mihomo／依赖源码／gitlink／carrier不改；未来方案涉及这些范围时，交具体对象、缺口、影响及替代给M，不从本轮目标自动取得例外。
+必要官方或项目配置来源的查询／下载仅发最少资源参数，材料留本地；不读取凭据、私钥、完整环境或真实用户材料，不上传源码、日志、APK、符号或截图。
+设计评审与实施授权分开；T01实现交评通过后按既有流程由D正常本地交付、M独立收尾及远端核实，D不push。T02–T05不从T01许可自动接续。
 
 ## 需求与正向价值
 
@@ -12,11 +35,17 @@
 
 | 风险入口 | 当前事实与待核实边界 | 不处理时可能发生什么 |
 | --- | --- | --- |
-| 下载与版本引用 | Wrapper 缺发行包摘要约束，缺 Gradle 验证元数据，CI actions 使用可移动标签 | 工具/插件/库可能换成不同内容，在构建机执行或污染 APK |
-| 实际工具与声明 | Wrapper JAR/发行包版本不同，Native Assets 实际 NDK 与 Gradle 声明不同 | 审核错误版本或不能复现；版本差异本身不能证明篡改 |
-| 随包可执行资产与信任数据 | EasyTier WASM、ZeroTier 根节点数据与锁定模块字节一致；部分生成源码关系未闭环 | 未审执行代码或信任对象进入产物，启用时可能接触非预期网络；编入不证明已经联网 |
+| 下载与版本引用 | 当前Wrapper发行包未配置期望SHA-256，未见Gradle依赖锁／验证元数据；CI actions及distributor仍有tag引用 | 工具/插件/库可能换成不同内容，在构建机执行或污染 APK |
+| 实际工具与声明 | 当前未跟踪的Wrapper JAR自报2.10，distribution指向9.8.0；JNI的CMake记录28.2 NDK，Native Assets hooks选择29.0 | 审核错误版本或不能复现；声明、现存缓存与本次执行须分别绑定，差异本身不证明篡改 |
+| 随包可执行资产与信任数据 | 当前APK含EasyTier WASM的精确模块字节，生成源码关系未闭环；Android实际tag含no_zerotier，不能沿旧A-14声称装入ZeroTier根节点数据 | 未审执行代码可能进入产物；编入不证明已启用或联网，禁用项也不能由缓存／锁文件存在推导装包 |
 | hooks、脚本与缓存 | 构建依赖脚本/缓存，本地禁上传流程仅覆盖部分任务 | 读取无关文件/密钥、上传符号/日志，或混入不对应当前源码的旧库 |
 | 签名和最终包 | 既有本机构建为 Debug 签名 release APK，正式包条件仍需绑定 | 用户安装包与受审代码/配置不同，或错误签名与产物替换无法识别 |
+
+## 已核来源事实与尚缺证据
+
+实际装包关系、构建输入类别、工具选择及unknown已迁入[来源基线](../android_build_sources.md)，不在本阶段计划维护平行明细。
+现有APK的10份native已有本地字节关系，401项／1DEX枚举和R8映射仍不等于完整输入或生成证明；已有12源路径绑定只覆盖局部改动。
+T01建立只读对账与明确缺口入口，发布认证、WASM／预编译生成、缓存／CI约束继续分属后续任务，不以来源基线完成替代全Loop验收。
 
 ## 解决思路
 
@@ -24,7 +53,8 @@
 - 补齐实际锁定版本源码和生成输入，确定 fork 相对上游的差异；重点可执行资产需要可审查的来源闭环。源码可取得、字节与模块相同、实际由该源码生成分别判断。
 - 对 Flutter/Dart/引擎、Go/Rust、JDK、SDK/NDK、Gradle/插件及 Maven 工件核对官方发布身份、精确版本与完整性。包管理器重打包单独记录来源和补丁，不能冒称与官方原始工件完全一致。
 - 固定关键引用，建立可信的摘要/签名和依赖验证基线。首次下载内容自行算出的摘要只记录身份，接受基线还需核实出处；哈希或签名也不证明行为安全。
-- 对来源未知的可执行内容优先补齐生成关系并再生成；必要时替换或明确禁用未使用能力。需要 EasyTier/ZeroTier 等用途时保留协议需求，无法满足的配置应明确失败，不能悄悄换为 DIRECT。
+  [Gradle文档](https://docs.gradle.org/current/userguide/dependency_verification.html)明确verification metadata的bootstrap信任当前取到的内容，必须另核接受依据；[Wrapper校验](https://docs.gradle.org/current/userguide/gradle_wrapper.html)也不能代替已缓存输入和bootstrap代码的核验。
+- 对来源未知的可执行内容先核发布／生成关系，再决定是否确需重建、替换或约束；不预设全面重建。Android ZeroTier沿用已交付禁用，不重新引入；EasyTier仍在实际包内，若处置需要改Core／依赖源，必须另交决定，不能悄悄换为DIRECT或将关键unknown按清单完成结案。
 - 核实实际编译器选择、缓存指纹与失效规则，检查最终库、资产、签名及调试符号的对应关系。可复现差异需要解释，不把时间戳/签名差异直接算作篡改。
 - 收窄构建环境、凭据、文件和网络权限，区分必要只读下载与上传；工具遥测、CI 权限、发布/符号上传和签名密钥分别核验。禁用若干上传任务或清理环境变量不能代替完整边界审查。
 
@@ -40,9 +70,11 @@
 ## 范围、依赖与完成方向
 
 - 来源清单可先做，随着各轮代码/依赖修改更新实际输入。Geo 发布文件的具体比对与更新归 [Loop 6](../loop6/loop6_plan.md)，本轮记录其装包关系。
+- T01独立交付实际来源基线与只读检查入口，不等待所有后续认证完成；T02／T03／T04按真实对象补获取、生成与构建约束，T05汇总正常及反例的最终产物绑定。具体依赖及出口只在[Tasks](loop5_tasks.md)维护。
 - 向 Loop 4 提供实际运行组件和源码范围，向 [Loop 7](../loop7/loop7_plan.md)提供受审构建输入、最终工件及签名/符号绑定。
 - 完成时关键执行内容有可信来源和可说明的源码关系，官方发布身份核验可复核，错误工件/版本/缓存受到约束，正常本机构建可用。
 - 缺少源码、无公开签名或不能证明历史生成关系时如实记录证据强度及处置；不能用编译成功或“官方”两个字掩盖缺口。
+- 已知关键执行内容来源缺口未处置时不宣称本轮整体通过；超出no-Core范围的部分及时交M决定，其余独立工作不受牵连。About UI已有5项原基线失败不在本轮顺手清修；DNS R1／Core日志race、Loop6延期备忘及其它未授权Loop保持原结论。
 - 按[官方同步约定](../../../../CONTRIBUTING.md)分开维护版本锁、生成输入和必要窄补丁；同步后比较依赖、构建标签、下载来源、上传路径和最终包变化。
 
-依据入口：[构建指南](../../../development/android_build_guide.md)、[Gradle 配置](../../../../android/settings.gradle.kts)、[Wrapper](../../../../android/gradle/wrapper/gradle-wrapper.properties)、[Native Assets 参数](../../../../plugins/setup/setup_hooks/lib/src/options.dart)、[构建工作流](../../../../.github/workflows/build.yaml)、[EasyTier](../../../../core/Clash.Meta/adapter/outbound/easytier.go)、[ZeroTier](../../../../core/Clash.Meta/adapter/outbound/zerotier.go)。
+依据入口：[构建指南](../../../development/android_build_guide.md)、[Gradle 配置](../../../../android/settings.gradle.kts)、[Wrapper](../../../../android/gradle/wrapper/gradle-wrapper.properties)、[Native Assets 参数](../../../../plugins/setup/setup_hooks/lib/src/options.dart)、[构建工作流](../../../../.github/workflows/build.yaml)、[EasyTier](../../../../core/Clash.Meta/adapter/outbound/easytier.go)、[ZeroTier Android拒绝分支](../../../../core/Clash.Meta/adapter/outbound/zerotier_stub.go)。

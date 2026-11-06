@@ -22,6 +22,44 @@ ARM64 release 打包流程已验证可用；设备运行、其它 ABI 和网络�
 
 Native Assets 曾选用本机 NDK 29.0.14206865，与 Gradle 声明不同。每次变更工具环境后检查 hook 日志的实际 C 编译器路径；统一版本与来源校验由 Loop 5 处理。
 
+### 构建来源只读对账
+
+实际对象、来源关系与unknown由[来源基线](../features/security/android_build_sources.md)维护，不另复制工具版本表。
+
+先只枚举一个显式APK，或用已选择的观察记录及材料进行对账；`--input`可选一个文件或一个目录，优先选必要的最小范围：
+
+```bash
+python3 tool/inspect_android_build_sources.py --apk /absolute/path/to/app.apk
+python3 tool/inspect_android_build_sources.py \
+  --apk /absolute/path/to/app.apk \
+  --record /absolute/path/to/build-record.json \
+  --abi arm64-v8a \
+  --input compiled=/absolute/path/to/libexample.so \
+  --input sources=/absolute/path/to/source-directory
+```
+
+观察记录的最小形状如下；零hash是占位，须替换成选择的参考对象／材料摘要，不能仅由待检查包自算一遍就称来源可信：
+
+```json
+{
+  "apk_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "objects": [{
+    "entry": "lib/arm64-v8a/libexample.so",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "links": [{
+      "input": "compiled",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "relation": "same_bytes"
+    }]
+  }]
+}
+```
+
+记录只能引用已选择的名称：文件选择不允许path扩成兄弟文件；目录选择可加相对path；archive可加member。选择入口自身及目录内symlink均拒绝，不因旧证据含绝对SDK／缓存路径而自行读取。
+`objects`只记录部分条目时，输出仍枚举全部APK并标未覆盖；删记录或给空集合不能产生完整覆盖。source_inputs只核所选输入身份，r8只核已选择mapping文件／class定义关系；四种links及限制见来源基线。
+工具只输出JSON、不执行构建或下载。需要保存结果时重定向到新的本地证据文件，不覆盖APK或参考输入。退出0可能仍是partial_inventory；退出1为实际绑定矛盾，退出2为非法／越界输入，均不代表发布认证或源码生成结论。
+版本／hash／工具选择变化时重新绑定实际对象；新构建不能反证旧APK来源。保留完整显式输入／记录与结果于本地忽略目录，不保存密钥或用户数据作为证据。
+
 ## 构建前准备
 
 在仓库根目录操作。

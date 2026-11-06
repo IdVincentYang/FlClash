@@ -816,6 +816,11 @@ that asks the OS for a permission, a global shortcut or a registration, must con
 
 ## Build System
 
+Android source/artifact attribution is maintained in
+[the build sources baseline](../docs/features/security/android_build_sources.md).
+Input hashes, intermediate bytes, packaged contents and runtime loading are separate facts;
+the read-only inspection baseline does not replace version locks or Core ownership.
+
 Android builds append `no_zerotier` to the configured base tags. Go build, dependency listing and cache fingerprints
 share the same target-specific effective tags; other platforms keep configured tags. The hook tracks the precise
 build_config.yaml file, including its absence, without making the entire repository a Gradle input.
