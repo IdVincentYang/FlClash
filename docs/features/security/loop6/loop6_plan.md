@@ -3,7 +3,7 @@
 本轮确认 GEOIP、GEOSITE、ASN 及相关 MMDB 是否对应接受的发布，解释历史差异，并保护正常更新及路由使用。依据[共同安全目标](../security_requirements.md)，对应[审计基线](../android_security_baseline.md) A-07。
 2026-11-06用户保持“不改Core”，将T02／T03移入[后续备忘](../deferred_security_items.md#loop6-t02t03-geo-更新与实际采用)，并决定本轮按调整后的范围完成。
 已交付的是T01固定随包基线／离线核验及T04 Android内置缺失seed核验；全入口运行期更新保护、真实热采用和正式版本界面没有因此实现。
-单层任务与交付历史由[任务清单](loop6_tasks.md)维护，不按旧连续授权恢复延期事项或启动其它Loop。
+单层[任务定稿与交付历史](https://github.com/IdVincentYang/FlClash/blob/f73b5464f73ba8cd352f93b4bd258998a8d6daf7/docs/features/security/loop6/loop6_tasks.md)保留在结案提交；当前不再有活动任务清单，不按旧连续授权恢复延期事项或启动其它Loop。
 
 ## 本轮闭环与顺序
 

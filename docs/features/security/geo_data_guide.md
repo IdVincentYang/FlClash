@@ -1,7 +1,7 @@
 # Geo 固定基线核验指南
 
 固定随包基线及离线核验工具已交付。接受对象与证据边界见[契约](geo_data_design.md)，
-实际任务状态见[Loop 6 Tasks](loop6/loop6_tasks.md)。
+实际交付及延期范围见[Loop 6结案说明](loop6/loop6_plan.md)。
 
 ## 离线核验
 
@@ -42,4 +42,4 @@ Android启动时，缺失的标准目标会自动使用[接受基线](geo_data_d
 
 手动／自动远端更新、未知缓存／兼容名、热重载／恢复与正式版本展示仍未覆盖；当前Resources时间不是发布身份或实际采用证据。
 可运行`flutter test test/core/geo_seed_test.dart test/core/controller_test.dart`验证合成home下的真实controller入口；测试平台缝不代表Android设备运行。
-交付状态及实际制品证据见[Loop6 Tasks](loop6/loop6_tasks.md)。
+交付状态及历史制品证据见[Loop6结案说明](loop6/loop6_plan.md)。
