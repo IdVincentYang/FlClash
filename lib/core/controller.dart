@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/core/interface.dart';
+import 'package:fl_clash/core/geo_seed.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/models/config_state.dart';
@@ -14,8 +15,9 @@ import 'package:path/path.dart';
 class CoreController {
   static CoreController? _instance;
   late CoreHandlerInterface _interface;
+  final ({String homePath, AssetBundle assets, bool android})? _seedFixture;
 
-  CoreController._internal() {
+  CoreController._internal() : _seedFixture = null {
     if (system.isAndroid) {
       _interface = coreLib!;
     } else {
@@ -24,12 +26,20 @@ class CoreController {
   }
 
   @visibleForTesting
-  CoreController.test(this._interface) {
+  CoreController.test(this._interface) : _seedFixture = null {
     _instance = this;
   }
 
   @visibleForTesting
-  CoreController.scoped(this._interface);
+  CoreController.scoped(this._interface) : _seedFixture = null;
+
+  @visibleForTesting
+  CoreController.forSeedTesting(
+    this._interface, {
+    required String homePath,
+    required AssetBundle assets,
+    required bool isAndroid,
+  }) : _seedFixture = (homePath: homePath, assets: assets, android: isAndroid);
 
   @visibleForTesting
   static void resetInstance() {
@@ -60,8 +70,16 @@ class CoreController {
   }
 
   static Future<void> initGeo() async {
-    final homePath = await appPath.homeDirPath;
+    await _seedGeo(await appPath.homeDirPath, rootBundle, system.isAndroid);
+  }
+
+  static Future<void> _seedGeo(
+    String homePath,
+    AssetBundle assets,
+    bool isAndroid,
+  ) async {
     const geoFileNameList = [MMDB, GEOIP, GEOSITE, ASN];
+    GeoSeedReference? reference;
     try {
       for (final geoFileName in geoFileNameList) {
         final geoFile = File(join(homePath, geoFileName));
@@ -69,10 +87,17 @@ class CoreController {
         if (isExists) {
           continue;
         }
-        final data = await rootBundle.load('assets/data/$geoFileName');
-        final List<int> bytes = data.buffer.asUint8List();
+        final data = await assets.load('assets/data/$geoFileName');
         await dataMutations.run(() async {
           if (await geoFile.exists()) return;
+          if (isAndroid) {
+            reference ??= GeoSeedReference.fromAsset(
+              await assets.load(GeoSeedReference.manifestAsset),
+            );
+          }
+          final bytes = isAndroid
+              ? reference!.verifiedBytes(geoFileName, data)
+              : data.buffer.asUint8List();
           final staged = File('${geoFile.path}.seed');
           try {
             await staged.writeAsBytes(bytes, flush: true);
@@ -92,9 +117,15 @@ class CoreController {
   }
 
   Future<bool> init(int version) async {
-    await ensureHomeDir();
-    await initGeo();
-    final homeDirPath = await appPath.homeDirPath;
+    final fixture = _seedFixture;
+    if (fixture == null) {
+      await ensureHomeDir();
+      await initGeo();
+    } else {
+      await Directory(fixture.homePath).create(recursive: true);
+      await _seedGeo(fixture.homePath, fixture.assets, fixture.android);
+    }
+    final homeDirPath = fixture?.homePath ?? await appPath.homeDirPath;
     return _interface.init(InitParams(homeDir: homeDirPath, version: version));
   }
 

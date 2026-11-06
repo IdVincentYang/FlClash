@@ -30,3 +30,16 @@ Geo options中的Auto update和Auto-update interval控制已有更新路径。
 随包数据更新只影响缺文件时的seed；已存在私有文件、兼容名及运行缓存不会自动变成新基线。
 T02／T03尚未交付，当前工具不能代替运行期更新保护、重载证明或真实路由验收。
 Android以外平台共用新随包数据，但未验证其构建或运行保护。
+
+## Android 内置缺失 seed
+
+Android启动时，缺失的标准目标会自动使用[接受基线](geo_data_design.md#android-缺失-seed-核验)核验内置manifest及对应payload，再写入私有目录；无需新开关或额外网络。
+已有文件不会被替换或因此获信，全部目标已有时不读取bundle。不要删除用户文件来体验这一功能；开发验证使用临时合成home。
+
+核验失败会在原启动错误路径报告资源／原因，并阻止本次Core init；文件I/O失败保留原系统错误。
+维护者先运行上面的离线工具核对资产与已接受来源，检查manifest与代码派生锚是否同步；不要通过改hash绕过错误。
+逐文件写入不是整体事务：后项失败时，前项合法文件可能已写入。成功仅说明对应缺失文件按接受参考写入，不证明reader已加载。
+
+手动／自动远端更新、未知缓存／兼容名、热重载／恢复与正式版本展示仍未覆盖；当前Resources时间不是发布身份或实际采用证据。
+可运行`flutter test test/core/geo_seed_test.dart test/core/controller_test.dart`验证合成home下的真实controller入口；测试平台缝不代表Android设备运行。
+交付状态及实际制品证据见[Loop6 Tasks](loop6/loop6_tasks.md)。

@@ -1,18 +1,21 @@
 # Loop 6 任务清单：Geo 数据身份、更新与使用
 
 本清单细化[阶段Plan](loop6_plan.md)，维护一个任务层级。M1负责评审与远端收尾，D-02负责获派任务的设计、实施、自验及本地交付；
-联系入口沿用[既有协作记录](../loop2/loop2_tasks.md#协作授权与交付)。L6-T01已本地交付并完成M对账，下一项为L6-T02设计；后续项不提前实施。
+联系入口沿用[既有协作记录](../loop2/loop2_tasks.md#协作授权与交付)。L6-T01已完整远端交付；用户保持原Core约束，T02及依赖T03暂缓，当前独立任务为L6-T04。
 
 | 编号 | 目标及验收出口 | 前置依赖 | 当前状态 |
 | --- | --- | --- | --- |
-| L6-T01 | [Geo数据溯源与可信基线](../geo_data_design.md)：四份随包资产的同版本来源、历史结论、固定基线和离线核验；分清APK、磁盘选择与实际加载 | T05已完整远端交付；现有Core格式／路径契约 | 已交付并完成M对账；定稿[Plan](https://github.com/IdVincentYang/FlClash/blob/364b44a19410caef5a030b7fd0330d38759347ff/docs/features/security/loop6/l6_t01_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/364b44a19410caef5a030b7fd0330d38759347ff/docs/features/security/loop6/l6_t01_result.md)保留在交付历史 |
-| L6-T02 | 全入口可信更新与恢复：seed／缺失补齐／手动／定时／Core内部路径共用接受依据，校验后提交，失败保适用旧文件并真实重载 | T01的获审基线、身份及格式结论 | 前置项已交付，待细化设计 |
-| L6-T03 | English来源版本可见与真实消费验收：界面区分候选／磁盘／已采用版本，实际规则与独立收件绑定正确数据 | T02更新／重载契约；T01基线 | 待前置项交付后细化设计 |
+| L6-T01 | [Geo数据溯源与可信基线](../geo_data_design.md)：四份随包资产的同版本来源、历史结论、固定基线和离线核验；分清APK、磁盘选择与实际加载 | T05已完整远端交付；现有Core格式／路径契约 | 已交付并核实远端7f36200；定稿[Plan](https://github.com/IdVincentYang/FlClash/blob/364b44a19410caef5a030b7fd0330d38759347ff/docs/features/security/loop6/l6_t01_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/364b44a19410caef5a030b7fd0330d38759347ff/docs/features/security/loop6/l6_t01_result.md)保留在交付历史 |
+| L6-T02 | 全入口可信更新与恢复：seed／缺失补齐／手动／定时／Core内部路径共用接受依据，校验后提交，失败保适用旧文件并真实重载 | T01的获审基线、身份及格式结论 | 技术设计已通过；用户保持Core约束，安全热采用及依赖装配暂缓，整项未完成 |
+| L6-T03 | English来源版本可见与真实消费验收：界面区分候选／磁盘／已采用版本，实际规则与独立收件绑定正确数据 | T02更新／重载契约；T01基线 | 随T02依赖暂缓，未实施 |
+| L6-T04 | [Android内置缺失seed精确核验](l6_t04_plan.md)：校验获审manifest及对应payload后沿原missing-only流程写入，失败不继续Core init | T01获审基线；现有controller／dataMutations／crypto | M设计及实现评审通过；[本地交付定稿](l6_t04_result.md)，待M独立收尾及远端核实 |
+
+T02候选设计／未交付纯构件及本地证据保留在原checkout，不在本交付树；当前导航不依赖其未提交Plan／Result。
 
 ## 验收与接续
 
 - T01只交付随包基线和可复核结论，不把现有私有文件或任意自定义来源自动记为可信，也不声称已保护全部运行入口。
 - T02覆盖来源／格式／摘要错误、并发切换、取消迟到、磁盘失败和重载失败；没有适用基线时明确失败，不删除规则或默认DIRECT。
 - T03分别核发布身份、传输完整性、分类结果和最终路由，正常DIRECT／代理规则均可用；不以分类样本证明整个数据集准确。
-- 每项设计通过后连续实施和自验，经M实现评审再正常本地提交／合入／清理；M独立收尾及普通push并核远端后接下一项。D不push。
+- 仅有效授权内的任务在设计通过后连续实施和自验，经M实现评审再正常本地提交／合入／清理；M独立收尾及普通push并核远端后接下一项。D不push。
 - 原始比对、下载和运行证据保存在忽略的`build/verification/l6-t01/`及后续对应任务目录；正式工具／基线随源，长期规则在所属契约维护，不复制平行台账。

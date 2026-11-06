@@ -44,7 +44,7 @@ Core路径解析可接受大小写变体及Country.mmdb／geoip.db等兼容名�
 离线检查应列出兼容候选、真实选择规则下的路径、缺失／冲突及与参考的对应；不能凭文件名、磁盘hash或mtime声称reader已加载。
 MMDB与GEOIP.dat是不同mode的候选，不因两者均存在而称二者都已启用。
 
-维护新基线时保留固定发布对象和原始asset到随包名的映射，核完整字节、角色、统计／代表性变化及APK对应，再提交关联manifest和资产。
+维护新基线时保留固定发布对象和原始asset到随包名的映射，核完整字节、角色、统计／代表性变化及APK对应，再提交关联manifest和资产，并同步下述Android seed派生锚。
 不能只更新本地hash后称来源已验证。Git将这些protobuf／MMDB显式视作二进制，避免文本转换改变获审字节。
 
 ## 共享影响与后续边界
@@ -57,3 +57,21 @@ English来源／磁盘／loaded版本可见及真实路由验收由T03补齐，�
 现有格式锁与GrantCommit约束请求资格、互斥和提交，不向父层暴露Core updater的候选bytes，不能据此声称发布校验已覆盖内部路径。
 Core／依赖源、gitlink和carrier不改；无法在父层充分覆盖时按实际消费者及缺口交M。
 DNS R1及Core完整安装日志并发仍未解决，本契约不升级其结论。
+
+## Android 缺失 seed 核验
+
+[CoreController](../../../lib/core/controller.dart)在`init → initGeo`的Android缺文件分支使用[GeoSeedReference](../../../lib/core/geo_seed.dart)核验内置资产，然后调用Core init。
+生产平台依据`system.isAndroid`（dart:io），Flutter target override不会开启此路径。已有目标跳过，不因此认定可信；非Android保留原seed行为。
+
+可信根是`GeoSeedReference.acceptedManifestDigest`保存的已接受manifest编译期派生SHA-256锚。
+manifest仍是精确资产信息的维护来源；[一致性测试](../../../test/core/geo_seed_test.dart)检查锚与仓库manifest一致。
+随包manifest先与锚核对，再严格检查四角色、filename／asset_name／format、正整数size和SHA-256；修改manifest及payload使其相互一致仍不能越过锚。
+基线变更必须先完成上述来源与内容接受，再同步派生锚，不能只为消除启动失败而接受新hash。
+
+有目标缺失时保留原payload预取，在原`dataMutations` guard内复核目标仍缺失后，才加载并核manifest；同次seed最多解析一次参考。
+核验只使用各`ByteData`自身offset／length，payload复制为独立字节并核size／SHA后，沿原staged／flush／rename流程写入，finally清理stage。
+全部目标已有则不读取bundle；等待guard时出现的目标也跳过，不读取其未使用的manifest或校验预取payload。
+核验错误只报告资源／原因，不包含材料正文；资产读取和文件I/O失败保留原异常。失败向上抛出，`CoreController.init`不继续调用Core init。
+
+前项合法seed可以已写入而后项失败，不保证四角色原子bundle或跨进程排他。锚不代表独立签名／整APK防篡改，磁盘seed不证明reader加载。
+全入口更新、私有缓存接受／迁移、安全热采用和版本UI仍未完成；当前任务状态与验证入口由[Loop6 Tasks](loop6/loop6_tasks.md)维护。
