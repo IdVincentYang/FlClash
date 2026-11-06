@@ -8,7 +8,7 @@
 | 2 | [loop2_plan.md](loop2/loop2_plan.md) | 进行中 | L1-T03 已完成；本地配置/业务出口可先行，联网身份边界接 Loop 1 实际交付 |
 | 3 | [loop3_plan.md](loop3/loop3_plan.md) | 暂缓，未实施 | 无；与 Loop 1 对齐本地报告边界 |
 | 4 | [loop4_plan.md](loop4/loop4_plan.md) | 计划待评审，未实施 | 可先审基线；完整范围接收 Loop 5 清单 |
-| 5 | [loop5_plan.md](loop5/loop5_plan.md) | 阶段拆解及T01设计／实现通过；T01本地交付定稿，待M远端收尾；后继未启动 | 复用已交付源码／构建／Geo证据；保持不改Core |
+| 5 | [loop5_plan.md](loop5/loop5_plan.md) | 进行中：T01已交付并完成M收尾；T02–T05待细化，尚未启动 | 复用已交付源码／构建／Geo证据；保持不改Core |
 | 6 | [loop6_plan.md](loop6/loop6_plan.md) | 按用户2026-11-06调整范围完成；T01／T04已交付，T02／T03转[备忘](deferred_security_items.md#loop6-t02t03-geo-更新与实际采用)等待Core修复 | T05已交付；运行期剩余保护未实现，不因阶段结案升级结论 |
 | 7 | [loop7_plan.md](loop7/loop7_plan.md) | 计划待评审，未实施 | Loop 1–6 的实际交付 |
 
