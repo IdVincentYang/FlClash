@@ -1,0 +1,757 @@
+[profiles.macos_arm64_android_arm64_dev]
+host = "macos-arm64"
+target = "android-arm64-dev"
+roles = [
+  "framework",
+  "dart_sdk",
+  "go",
+  "gradle",
+  "gradle_wrapper",
+  "rustup",
+  "android_platform35",
+  "android_platform36",
+  "android_platform37",
+  "android_build_tools36",
+  "android_build_tools",
+  "cmake",
+  "ndk_jni",
+  "ndk_hooks",
+  "cargo",
+  "rustc",
+  "rust_std_host",
+  "rust_std_android",
+  "flutter_patched_sdk",
+  "flutter_patched_sdk_product",
+  "sky_engine",
+  "flutter_gpu",
+  "flutter_host",
+  "font_subset",
+  "engine_stamp",
+  "android_gen_snapshot_arm_profile",
+  "jdk",
+  "android_gen_snapshot_arm64_profile",
+  "android_gen_snapshot_arm64_release",
+  "android_gen_snapshot_x64_profile",
+  "android_gen_snapshot_x64_release",
+  "android_gen_snapshot_arm_release",
+  "android_x64",
+  "android_x86",
+  "android_arm_profile",
+  "android_arm_release",
+  "android_arm64",
+  "android_arm64_release",
+  "android_x64_profile",
+  "android_arm64_profile",
+  "android_arm",
+  "sdk_gradle_wrapper",
+  "libimobiledevice",
+  "libusbmuxd",
+  "libplist",
+  "material_fonts",
+  "openssl",
+  "libimobiledeviceglue",
+  "ios_deploy",
+  "android_x64_release",
+  "gradle_launcher_unix",
+  "gradle_launcher_windows",
+  "android_platform_tools",
+  "pub_flutter_tools",
+  "pub_app",
+  "pub_distributor",
+]
+
+[artifacts.go]
+version = "1.26.4"
+selector = "workflow.GO_VERSION"
+host = "macos-arm64"
+url = "https://dl.google.com/go/go1.26.4.darwin-arm64.tar.gz"
+reference = "https://dl.google.com/go/go1.26.4.darwin-arm64.tar.gz.sha256"
+acceptance = "Publisher HTTPS SHA-256 reference; not an independent signature"
+sha256 = "b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53"
+size = 64723756
+format = "tar.gz"
+prefix = "go"
+complete_tree = true
+
+[artifacts.gradle]
+version = "9.8.0"
+selector = "gradle.distribution"
+host = "any"
+url = "https://services.gradle.org/distributions/gradle-9.8.0-all.zip"
+reference = "https://services.gradle.org/distributions/gradle-9.8.0-all.zip.sha256"
+acceptance = "Official distribution SHA-256 and independently published release-checksums page"
+sha256 = "46ac66d47f30f3dacfdf306e0b714a91a34fb94a22ba0a744b280933f47bc0cf"
+size = 264624798
+format = "zip"
+prefix = "gradle-9.8.0"
+complete_tree = true
+
+[artifacts.gradle_wrapper]
+version = "9.8.0"
+selector = "gradle.distribution"
+host = "any"
+url = "https://services.gradle.org/distributions/gradle-9.8.0-all.zip"
+reference = "https://services.gradle.org/distributions/gradle-9.8.0-wrapper.jar.sha256"
+acceptance = "Published Wrapper checksum; exact embedded resource from accepted distribution"
+sha256 = "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5"
+size = 47623
+format = "file"
+prefix = ""
+payload = "gradle-wrapper.jar"
+complete_tree = false
+
+[artifacts.framework]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://github.com/flutter/flutter.git"
+reference = "https://api.github.com/repos/flutter/flutter/git/ref/tags/3.47.4"
+acceptance = "Official HTTPS tag resolved to fixed Git commit; exported source closure verified by Git fsck and exact blob identities, not a publisher signature"
+format = "git"
+commit = "9584c6713b324636289d067944a46fd6b49df14b"
+prefix = ""
+complete_tree = false
+
+[artifacts.dart_sdk]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/dart-sdk-darwin-arm64.zip?generation=1788453530238957"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fdart-sdk-darwin-arm64.zip?generation=1788453530238957"
+acceptance = "Fixed official HTTPS engine object and immutable GCS generation, size and MD5 checked; SHA256 separately observed and pinned, no independent signature"
+sha256 = "11d22d216e5da61e77bd558797ee5e108dbc32ad07befe8500702119d9cdfd8a"
+size = 226393867
+format = "zip"
+prefix = "dart-sdk"
+complete_tree = true
+
+[artifacts.rustup]
+version = "1.29.0"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://static.rust-lang.org/rustup/archive/1.29.0/aarch64-apple-darwin/rustup-init"
+reference = "https://static.rust-lang.org/rustup/archive/1.29.0/aarch64-apple-darwin/rustup-init.sha256"
+acceptance = "Official HTTPS SHA256; complete bounded-range reconstruction matches unchanged published digest; rustup-init installed as rustup without changing bytes"
+sha256 = "aeb4105778ca1bd3c6b0e75768f581c656633cd51368fa61289b6a71696ac7e1"
+size = 11053296
+format = "file"
+prefix = ""
+payload = "rustup"
+mode = 493
+complete_tree = false
+
+[artifacts.android_platform35]
+version = "35"
+selector = "accepted_bootstrap"
+host = "any"
+url = "https://dl.google.com/android/repository/platform-35_r02.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately"
+sha256 = "0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0"
+size = 64273788
+format = "zip"
+prefix = "android-35"
+complete_tree = true
+
+[artifacts.android_platform36]
+version = "36"
+selector = "accepted_bootstrap"
+host = "any"
+url = "https://dl.google.com/android/repository/platform-36_r02.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately; required by the fixed Flutter and plugin SDK declarations"
+sha256 = "37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e"
+size = 65878410
+format = "zip"
+prefix = "android-36"
+complete_tree = true
+
+[artifacts.android_platform37]
+version = "37"
+selector = "catalog.compileSdk"
+host = "any"
+url = "https://dl.google.com/android/repository/platform-37.0_r02.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately"
+sha256 = "840b23e827f96e64aea4c89a1194aac3dc5f6bad37edb231c5c795d890330e8d"
+size = 67281901
+format = "zip"
+prefix = "android-37.0"
+complete_tree = true
+
+[artifacts.android_build_tools36]
+version = "36.0.0"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://dl.google.com/android/repository/build-tools_r36_macosx.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately; required by the fixed Flutter and plugin SDK declarations"
+sha256 = "04e7f3a72044de4926fa038fa0e251a37bba1e1c3fb8beab6f8401bfd9eb4bf3"
+size = 79121749
+format = "zip"
+prefix = "android-16"
+complete_tree = true
+
+[artifacts.android_build_tools]
+version = "37.0.0"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://dl.google.com/android/repository/build-tools_r37_macosx.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately"
+sha256 = "b5b1ac529028a49f11b596b89d9b34252e0f39388ee7dbd16ae3110f1c9c5722"
+size = 81933386
+format = "zip"
+prefix = "android-37.0"
+complete_tree = true
+
+[artifacts.cmake]
+version = "3.22.1"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://dl.google.com/android/repository/cmake-3.22.1-darwin.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately"
+sha256 = "c25d4072e70bbae1bfb0483a85c9237e4c7ceebfd67fe77bbe87d79571f0394f"
+size = 38223266
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.ndk_jni]
+version = "28.2.13676358"
+selector = "catalog.ndkVersion"
+host = "macos-arm64"
+url = "https://dl.google.com/android/repository/android-ndk-r28c-darwin.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately"
+sha256 = "0d4599e8bbf1a1668a0d51a541729b2246360f350018a2081d0b302dbb594f2a"
+size = 952495160
+format = "zip"
+prefix = "android-ndk-r28c"
+complete_tree = true
+
+[artifacts.ndk_hooks]
+version = "29.0.14206865"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://dl.google.com/android/repository/android-ndk-r29-darwin.zip"
+reference = "https://dl.google.com/android/repository/repository2-3.xml"
+acceptance = "Official HTTPS repository metadata provides SHA1 only; SHA256 observed separately"
+sha256 = "ce5e4b100ec5fe5be4eb3edcb2c02528824ff9cda3860f5304619be6c3da34d3"
+size = 1049519838
+format = "zip"
+prefix = "android-ndk-r29"
+complete_tree = true
+
+[artifacts.cargo]
+version = "1.98.1"
+selector = "rust.toolchain"
+host = "macos-arm64"
+url = "https://static.rust-lang.org/dist/2026-09-03/cargo-1.98.1-aarch64-apple-darwin.tar.xz"
+reference = "https://static.rust-lang.org/dist/2026-09-03/channel-rust-1.98.1.toml"
+acceptance = "Official dated HTTPS channel manifest SHA256"
+sha256 = "de51d4fade4f31ad8ec405261cc96bedc000d905f98980027610d6e288dbe21b"
+size = 8898152
+format = "tar.xz"
+prefix = "cargo-1.98.1-aarch64-apple-darwin/cargo"
+complete_tree = true
+
+[artifacts.rustc]
+version = "1.98.1"
+selector = "rust.toolchain"
+host = "macos-arm64"
+url = "https://static.rust-lang.org/dist/2026-09-03/rustc-1.98.1-aarch64-apple-darwin.tar.xz"
+reference = "https://static.rust-lang.org/dist/2026-09-03/channel-rust-1.98.1.toml"
+acceptance = "Official dated HTTPS channel manifest SHA256"
+sha256 = "738e3f60114b20550fcf4f8a57c9cea0544239f214709f45594ff3fde327f577"
+size = 48951152
+format = "tar.xz"
+prefix = "rustc-1.98.1-aarch64-apple-darwin/rustc"
+complete_tree = true
+
+[artifacts.rust_std_host]
+version = "1.98.1"
+selector = "rust.toolchain"
+host = "macos-arm64"
+url = "https://static.rust-lang.org/dist/2026-09-03/rust-std-1.98.1-aarch64-apple-darwin.tar.xz"
+reference = "https://static.rust-lang.org/dist/2026-09-03/channel-rust-1.98.1.toml"
+acceptance = "Official dated HTTPS channel manifest SHA256"
+sha256 = "2de831ef563ce772519a4d18ba2659f0f7428d497ef66dad24b5a35e8f8cd177"
+size = 29763340
+format = "tar.xz"
+prefix = "rust-std-1.98.1-aarch64-apple-darwin/rust-std-aarch64-apple-darwin"
+complete_tree = true
+
+[artifacts.rust_std_android]
+version = "1.98.1"
+selector = "rust.toolchain"
+host = "macos-arm64"
+url = "https://static.rust-lang.org/dist/2026-09-03/rust-std-1.98.1-aarch64-linux-android.tar.xz"
+reference = "https://static.rust-lang.org/dist/2026-09-03/channel-rust-1.98.1.toml"
+acceptance = "Official dated HTTPS channel manifest SHA256"
+sha256 = "d7c4949bb77b007bed188c9b15b8267a3222dc9b9c517f05d1899f9e885fb79e"
+size = 29448296
+format = "tar.xz"
+prefix = "rust-std-1.98.1-aarch64-linux-android/rust-std-aarch64-linux-android"
+complete_tree = true
+
+[artifacts.flutter_patched_sdk]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/flutter_patched_sdk.zip?generation=1788453318215593"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fflutter_patched_sdk.zip?generation=1788453318215593"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "5050e15fbf3be05cbad3f049b6abe6354b205550f69a6f46aed2205519f05b02"
+size = 4108244
+format = "zip"
+prefix = ""
+complete_tree = false
+
+[artifacts.flutter_patched_sdk_product]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/flutter_patched_sdk_product.zip?generation=1788452731260421"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fflutter_patched_sdk_product.zip?generation=1788452731260421"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "cd54d5c0d2d210009783a28612693fdd681addc49fa7c5de0750da02a3cf83e6"
+size = 4108251
+format = "zip"
+prefix = ""
+complete_tree = false
+
+[artifacts.sky_engine]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/sky_engine.zip?generation=1788455088166365"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fsky_engine.zip?generation=1788455088166365"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "0c7b5b0a322e578e3aa7e08c352a06c009e809d0e2bb02e1926825366a7a46a5"
+size = 1545119
+format = "zip"
+prefix = ""
+complete_tree = false
+
+[artifacts.flutter_gpu]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/flutter_gpu.zip?generation=1788455093961311"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fflutter_gpu.zip?generation=1788455093961311"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "7b46e875790f205b4624369cfef2e5e1bd3f658b6a9fc32abaeea54272198e49"
+size = 92214
+format = "zip"
+prefix = ""
+complete_tree = false
+
+[artifacts.flutter_host]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/darwin-arm64/artifacts.zip?generation=1788453518093975"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fdarwin-arm64%2Fartifacts.zip?generation=1788453518093975"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "d5d1750867be45a19ebf90021f9aa5438583de035d024557c479b7ab6be263a5"
+size = 37199993
+format = "zip"
+prefix = ""
+complete_tree = false
+
+[artifacts.font_subset]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/darwin-arm64/font-subset.zip?generation=1788453467717369"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fdarwin-arm64%2Ffont-subset.zip?generation=1788453467717369"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "b32cde566f8660242fde6ce78950e08e7bf510c3239b1d123e32ddda945580fa"
+size = 2372936
+format = "zip"
+prefix = ""
+complete_tree = false
+
+[artifacts.engine_stamp]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/engine_stamp.json?generation=1788453579836341"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fengine_stamp.json?generation=1788453579836341"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "634a56dc3312ed096f771dbcb68d1e20ff53301a5792c7866067010c663c010d"
+size = 237
+format = "file"
+prefix = ""
+complete_tree = false
+payload = "engine_stamp.json"
+
+[artifacts.android_gen_snapshot_arm_profile]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm-profile/darwin-x64.zip?generation=1788453319669994"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm-profile%2Fdarwin-x64.zip?generation=1788453319669994"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "a2c4c3d5d371220d1e99b0ed292e143db425ea3f86e5da5764e420943e7e926b"
+size = 5350042
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.jdk]
+version = "17.0.19+10"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.19%2B10/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.19_10.tar.gz"
+reference = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.19%2B10/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.19_10.tar.gz.sha256.txt"
+acceptance = "Official Adoptium HTTPS package metadata SHA256"
+sha256 = "8fa1eff40bb637a33613b2ccb8b12c70dc3661cc22cf8e784943715769a05336"
+size = 185818964
+format = "tar.gz"
+prefix = "jdk-17.0.19+10"
+complete_tree = true
+
+[artifacts.android_gen_snapshot_arm64_profile]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm64-profile/darwin-x64.zip?generation=1788453231999856"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm64-profile%2Fdarwin-x64.zip?generation=1788453231999856"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "15519550db6e606455470c3341824be96abd411fd33b927372ceee0a9ee22cf3"
+size = 5483159
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_gen_snapshot_arm64_release]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm64-release/darwin-x64.zip?generation=1788453192242601"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm64-release%2Fdarwin-x64.zip?generation=1788453192242601"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "4fdaec849fa39338c4025ffcd3947e1d26537868357b699dbe9d7b36790364d2"
+size = 4609555
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_gen_snapshot_x64_profile]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-x64-profile/darwin-x64.zip?generation=1788453240128286"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-x64-profile%2Fdarwin-x64.zip?generation=1788453240128286"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "1527ccf82f626c756ad921d2f98a74a16a393b6a85142e3cb81b6d49cb23f001"
+size = 5468087
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_gen_snapshot_x64_release]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-x64-release/darwin-x64.zip?generation=1788453301428015"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-x64-release%2Fdarwin-x64.zip?generation=1788453301428015"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "7f8a7ff07ac9430e02b706359aa51e1da7820542977fdf9d068b26c0a3f04f0a"
+size = 4592202
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_gen_snapshot_arm_release]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm-release/darwin-x64.zip?generation=1788453219364128"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm-release%2Fdarwin-x64.zip?generation=1788453219364128"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "bcd28a6e5ba26bdc04fc9312bc93548c74e53210b83f93b381ad2428faae160a"
+size = 4477943
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_x64]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-x64/artifacts.zip?generation=1788453435971559"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-x64%2Fartifacts.zip?generation=1788453435971559"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "45ce5625120d9ac6bd5a0f74beb361fb8096e2f5bb8ae10153511ad712cfea24"
+size = 119677639
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_x86]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-x86/artifacts.zip?generation=1788453330002553"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-x86%2Fartifacts.zip?generation=1788453330002553"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "0873d67f6e066f26f69d6ab26d7b115dda43da756eb4eac3553abf31ab55e554"
+size = 115053713
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_arm_profile]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm-profile/artifacts.zip?generation=1788453640373591"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm-profile%2Fartifacts.zip?generation=1788453640373591"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "7e0d86b4e7974e2b2537bd271555e35fafedbd8301ab68385898afbce695b8fc"
+size = 43633622
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_arm_release]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm-release/artifacts.zip?generation=1788453728227172"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm-release%2Fartifacts.zip?generation=1788453728227172"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "e6f458f0fdb6d3ae4549d093ff94cf7e7cdaf6063f1219c5bf82c3bbef1270ae"
+size = 40432895
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_arm64]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm64/artifacts.zip?generation=1788453536722458"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm64%2Fartifacts.zip?generation=1788453536722458"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "ea838ef3bae7f41d84fbf12e2115d78ae5024a8a71b1722ed9b61b959cec70d1"
+size = 179692542
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_arm64_release]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm64-release/artifacts.zip?generation=1788453621203807"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm64-release%2Fartifacts.zip?generation=1788453621203807"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "01f170c331a949b743ff7498d543c3841473ea884352a0cf243de340ec6c37b3"
+size = 41280303
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_x64_profile]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-x64-profile/artifacts.zip?generation=1788453637433034"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-x64-profile%2Fartifacts.zip?generation=1788453637433034"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "867e346a908ccc8df85f84a655c5a755814bead513aa19ed4566218be2750f2a"
+size = 44706923
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_arm64_profile]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm64-profile/artifacts.zip?generation=1788453832000744"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm64-profile%2Fartifacts.zip?generation=1788453832000744"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "44eef7a08b51658aa815b68892da1e1cbc484629ca6021b487d658c36e3f01c0"
+size = 44418267
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_arm]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-arm/artifacts.zip?generation=1788455022407910"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-arm%2Fartifacts.zip?generation=1788455022407910"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "1d2075a72c3088005bb1491a66c939de7edb7328442fa3482df8c7c81415cd88"
+size = 114456836
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.sdk_gradle_wrapper]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/gradle-wrapper/fd5c1f2c013565a3bea56ada6df9d2b8e96d56aa/gradle-wrapper.tgz?generation=1605580165142176"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/gradle-wrapper%2Ffd5c1f2c013565a3bea56ada6df9d2b8e96d56aa%2Fgradle-wrapper.tgz?generation=1605580165142176"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "31e9428baf1a2b2f485f1110c5899f852649b33d46a2e9b07f9d17752d50190a"
+size = 55913
+format = "tar.gz"
+prefix = ""
+complete_tree = true
+
+[artifacts.libimobiledevice]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/ios-usb-dependencies/arm64_x86_64/libimobiledevice/0bf0f9e941c85d06ce4b5909d7a61b3a4f2a6a05/libimobiledevice.zip?generation=1777589871895711"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/ios-usb-dependencies%2Farm64_x86_64%2Flibimobiledevice%2F0bf0f9e941c85d06ce4b5909d7a61b3a4f2a6a05%2Flibimobiledevice.zip?generation=1777589871895711"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "366410275af4d7f68defcb98a3997c83863f3e31c0345490ce62159f92260b47"
+size = 318370
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.libusbmuxd]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/ios-usb-dependencies/arm64_x86_64/libusbmuxd/19d6bec393c9f9b31ccb090059f59268da32e281/libusbmuxd.zip?generation=1777589869369203"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/ios-usb-dependencies%2Farm64_x86_64%2Flibusbmuxd%2F19d6bec393c9f9b31ccb090059f59268da32e281%2Flibusbmuxd.zip?generation=1777589869369203"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "0a1d11f950f8b140cbbd365768039028648018dcbe095f4eb6ba0366f3f0d605"
+size = 70226
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.libplist]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/ios-usb-dependencies/arm64_x86_64/libplist/cf5897a71ea412ea2aeb1e2f6b5ea74d4fabfd8c/libplist.zip?generation=1777589868290722"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/ios-usb-dependencies%2Farm64_x86_64%2Flibplist%2Fcf5897a71ea412ea2aeb1e2f6b5ea74d4fabfd8c%2Flibplist.zip?generation=1777589868290722"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "fd4909cfa7ea4367732fe745ff9c794ed42c9f1bd4042a1e6ec4c9bcf08e2861"
+size = 115599
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.material_fonts]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "any"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/fonts/3012db47f3130e62f7cc0beabff968a33cbec8d8/fonts.zip?generation=1662561072549705"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2Ffonts%2F3012db47f3130e62f7cc0beabff968a33cbec8d8%2Ffonts.zip?generation=1662561072549705"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "e56fa8e9bb4589fde964be3de451f3e5b251e4a1eafb1dc98d94add034dd5a86"
+size = 2306678
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.openssl]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/ios-usb-dependencies/arm64_x86_64/openssl/22dbb176deef7d9a80f5c94f57a4b518ea935f50/openssl.zip?generation=1777589870726985"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/ios-usb-dependencies%2Farm64_x86_64%2Fopenssl%2F22dbb176deef7d9a80f5c94f57a4b518ea935f50%2Fopenssl.zip?generation=1777589870726985"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "f760b25a2c72b4244bd3c1ea90e866239fa3376eff3c23fe1e70504bd4615719"
+size = 4055190
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.libimobiledeviceglue]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/ios-usb-dependencies/arm64_x86_64/libimobiledeviceglue/050ff3bf8fdab6ce53a2ddc6ae49b11b1c02a168/libimobiledeviceglue.zip?generation=1777589867183113"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/ios-usb-dependencies%2Farm64_x86_64%2Flibimobiledeviceglue%2F050ff3bf8fdab6ce53a2ddc6ae49b11b1c02a168%2Flibimobiledeviceglue.zip?generation=1777589867183113"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "04d4fdea8ca09135ab27cc638adff0ee2693e61d72901a92ef71023f2f55dba6"
+size = 80742
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.ios_deploy]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/ios-usb-dependencies/arm64_x86_64/ios-deploy/7a29ab0b6d611f2bf5de4b6f929a82a091866307/ios-deploy.zip?generation=1777589866106242"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/ios-usb-dependencies%2Farm64_x86_64%2Fios-deploy%2F7a29ab0b6d611f2bf5de4b6f929a82a091866307%2Fios-deploy.zip?generation=1777589866106242"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "bdf617ac854a8db4902ef44d780688e98ef18ffc4d06db41af02f085c328c089"
+size = 133663
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.android_x64_release]
+version = "3.47.4"
+selector = "workflow.FLUTTER_VERSION"
+host = "macos-arm64"
+url = "https://storage.googleapis.com/flutter_infra_release/flutter/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/android-x64-release/artifacts.zip?generation=1788453664920314"
+reference = "https://storage.googleapis.com/storage/v1/b/flutter_infra_release/o/flutter%2F06a2e2a110089dff50fe635cffd2a61e1b24fbcd%2Fandroid-x64-release%2Fartifacts.zip?generation=1788453664920314"
+acceptance = "Fixed official HTTPS engine/source object plus immutable GCS generation/size/MD5; SHA256 observed separately, no independent signature"
+sha256 = "d4b9a45dbed57c990bba0b276f3d5c5faf77178936c17383423b007808989dfe"
+size = 41547518
+format = "zip"
+prefix = ""
+complete_tree = true
+
+[artifacts.gradle_launcher_unix]
+version = "9.8.0"
+selector = "gradle.distribution"
+host = "any"
+url = "https://raw.githubusercontent.com/gradle/gradle/a927be5e08efe79e0b87ada06c762dde6bb9f8b8/gradlew"
+reference = "https://api.github.com/repos/gradle/gradle/git/ref/tags/v9.8.0"
+acceptance = "Official fixed release source commit HTTPS bytes; release tag and complete bytes checked; not an independent publisher signature"
+sha256 = "e01b5c97892572c82405c02b96a3382379100e7d825ce7c48883d95c26928750"
+size = 8678
+format = "file"
+prefix = ""
+payload = "gradlew"
+mode = 493
+complete_tree = false
+
+[artifacts.gradle_launcher_windows]
+version = "9.8.0"
+selector = "gradle.distribution"
+host = "any"
+url = "https://raw.githubusercontent.com/gradle/gradle/a927be5e08efe79e0b87ada06c762dde6bb9f8b8/gradlew.bat"
+reference = "https://api.github.com/repos/gradle/gradle/git/ref/tags/v9.8.0"
+acceptance = "Official fixed release source commit HTTPS bytes; release tag and complete bytes checked; not an independent publisher signature"
+sha256 = "ad2fac6060c5b929bed15d428e09483e52747d0120874346861ad4ec324af64c"
+size = 4798
+format = "file"
+prefix = ""
+payload = "gradlew.bat"
+mode = 420
+complete_tree = false
+
+[artifacts.android_platform_tools]
+version = "37.0.0"
+selector = "accepted_bootstrap"
+host = "macos-arm64"
+url = "https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip"
+reference = "https://developer.android.com/tools/releases/platform-tools"
+acceptance = "Fixed official HTTPS revision object and published release existence; complete source.properties and all selected existing payload bytes match; SHA256 observed and pinned, no publisher checksum or independent signature"
+sha256 = "094a1395683c509fd4d48667da0d8b5ef4d42b2abfcd29f2e8149e2f989357c7"
+size = 16442240
+format = "zip"
+prefix = "platform-tools"
+complete_tree = true

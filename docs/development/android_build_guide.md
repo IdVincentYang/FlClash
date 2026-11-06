@@ -14,7 +14,7 @@ ARM64 release 打包流程已验证可用；设备运行、其它 ABI 和网络�
 | Go | 1.26.4 | 发布 CI 的 GO_VERSION、[核心 go.mod](../../core/go.mod) |
 | Rust | 1.98.1，包含 aarch64-linux-android target | [rust-toolchain.toml](../../plugins/rust_api/rust/rust-toolchain.toml) |
 | JDK | 17 | [Android Gradle 配置](../../android/app/build.gradle.kts)；本机可用 java_home 选择 |
-| Android SDK / Build Tools | 主应用 Platform 37、插件需要 Platform 35；Build Tools 37.0.0 | [Android 版本目录](../../android/gradle/libs.versions.toml)及各插件配置 |
+| Android SDK / Build Tools | 主应用 Platform 37、固定Flutter及插件需要 Platform 35／36；Build Tools 36.0.0／37.0.0 | [Android 版本目录](../../android/gradle/libs.versions.toml)、固定Flutter的FlutterExtension及各插件配置 |
 | Android NDK | Gradle 声明 28.2.13676358 | Android 版本目录；Native Assets 实际编译器选择另需核对 |
 | Gradle | Wrapper 指向 9.8.0 | [gradle-wrapper.properties](../../android/gradle/wrapper/gradle-wrapper.properties) |
 
@@ -60,6 +60,64 @@ python3 tool/inspect_android_build_sources.py \
 工具只输出JSON、不执行构建或下载。需要保存结果时重定向到新的本地证据文件，不覆盖APK或参考输入。退出0可能仍是partial_inventory；退出1为实际绑定矛盾，退出2为非法／越界输入，均不代表发布认证或源码生成结论。
 版本／hash／工具选择变化时重新绑定实际对象；新构建不能反证旧APK来源。保留完整显式输入／记录与结果于本地忽略目录，不保存密钥或用户数据作为证据。
 
+### 发布工件接受与受管构建
+
+受管入口提供本节限定的工具／工件校验及构建选择。下述直接构建流程不提供同等校验保证；原T01只读对账的退出0仍可有来源缺口。
+
+受管入口的首次准备须明确选择接受归档和安装payload，核URL／host／版本／角色及摘要；SDK工具、三套pub图及新生snapshot全部在首次加载前完成核验。候选、下载成功、解压完成或lock候选都不能直接成为许可，缺材料应报告具体对象并保留旧材料，不改hash绕过失败。
+SDK准备集同时包括Platform35／36／37及Build Tools36／37；只准备主应用声明的37会遗漏固定Flutter与插件消费者。
+受管入口在这些材料缺失或不匹配时拒绝进入SDK消费者，不通过伪造license记录或现场安装未知组件补齐。
+
+受管执行只支持本机macOS ARM64到Android ARM64 dev。它在自有构建位置调用原setup／packager，使用自有配置和缓存，不读取或替换原local.properties、.dart_tool或用户全局安装；确认相关子进程退出及对象归属后才清理，退出不明保留该位置并报告失败。发布接受及责任边界见[来源契约](../features/security/android_build_sources.md#工具接受与受管构建)。
+
+入口为`tool/verify_android_inputs.py`。默认只读，单材料检查不会执行被检查的程序：
+
+```bash
+python3 tool/verify_android_inputs.py \
+  --check-material go \
+  --archive go=/absolute/path/to/go1.26.4.darwin-arm64.tar.gz \
+  --tree go=/absolute/path/to/go
+```
+
+退出0只表示这一材料对应当前接受参考，输出仍为`profile_ready=false`；默认整体检查缺材料时退出1，非法或矛盾输入退出2。
+接受锚由[android_artifacts.toml](../../tool/android_artifacts.toml)维护，输入文件不能提供另一套摘要、签名key、policy或命令。
+
+先确保需要构建的应用／依赖改动已进入当前HEAD；入口仅容许有限任务WIP，未允许的未提交改动会在目标工具启动前拒绝。
+从原仓库入口运行，不在以前生成的`source/`子目录中重复调用受管构建。
+新工作位置及其解析后的父路径只支持可打印ASCII和空格，不能含`:`、`,`、反斜杠或控制字符；
+不支持的位置在创建workspace及启动目标工具前拒绝，不自动改名或迁移宿主目录。
+
+实际装配必须明确选择材料并给一个不存在的新位置：
+
+```bash
+python3 tool/verify_android_inputs.py \
+  --build-from /absolute/path/to/android-inputs.json \
+  --workspace "$PWD/build/android-managed-001"
+```
+
+选择JSON的字段如下。路径仅选择材料，不是成功凭据；所有接受依据仍从受信仓库读取。
+
+| 字段 | 路径形状与用途 |
+| --- | --- |
+| `archives` | 每个工具role到归档／独立文件的路径；framework选择固定对象的安全bare Git仓库，必需role不能省略 |
+| `trees`（可选） | role到已缓存payload目录；仍先核对应归档，只把核同成员复制到新位置，不在原树执行或携入额外文件 |
+| `pub_archives` | 三套标准lock中每个hosted `name-version`到原始tar.gz；不填包版本或候选hash |
+| `git_repositories` | 标准lock的`URL@resolved-ref`到对应固定Git对象仓库；不继承原仓库配置或全局activation |
+| `maven_root`／`maven_files` | 显式原始数据根，以及`group/path/module/version/filename`到根内相对文件的映射；不是旧Gradle home。无原始数据复用时选择自有空目录和空映射，由native strict首次取得 |
+
+hosted／Git key由app及[两份工具lock](../../tool/android_bootstrap/)确定；未知、缺失或多余选择均拒绝。
+API37.0的标准安装元数据来自[受信模板](../../tool/android_bootstrap/android_platform37.package.xml)，不由候选SDK自行提供，也不写license接受记录。
+原setup继续编排打包，受管分支用同一已核Dart和显式package_config调用packager源码，Flutter使用`--no-pub`。
+控制器仅在新工作树生成`hook-environment.json`、本地hook编译绑定及两处标准user-defines；不要手工创建或复制这些对象来取得执行资格。
+Native Assets过滤环境后，两个项目hook通过固定同VM重入恢复当前选择；缺配置、摘要不符、错workspace／工具根或漏传user-define时失败。
+失败定位先看对应`source/.dart_tool/hooks_runner/setup`或`rust_api`下的input、stdout／stderr及output，再核本次配置；
+仓库默认空绑定保留普通入口行为，不能用环境变量或私有重入参数升级为受管验收。
+
+正常命令结束还须确认两个原builder成功的本次标准metadata及配置依赖，不能只凭APK存在或旧`profile_ready=true`判断通过。
+JSON记录实际APK路径／大小／SHA-256；`managed_android_build_completed`只覆盖这个受管profile，
+不代替完整源码生成对账或设备运行验收。失败读取新位置的`result.json`、`commands.json`及`logs/`；保留失败现场和原材料，
+不要改hash消除错误或把旧结果当执行许可。工作位置保持保留；取消或父进程返回不证明后代已退出，不能据此回收或复用目录。
+
 ## 构建前准备
 
 在仓库根目录操作。
@@ -74,7 +132,8 @@ python3 tool/inspect_android_build_sources.py \
 4. 保持 [pubspec.yaml](../../pubspec.yaml) 中 setup 与 rust_api 的 `build_assets: true`。Go hook 在编译或返回内层缓存前执行源码检查，载体和实际来源配置同时进入内外层缓存依赖。Go/Rust 由 Native Assets hooks 构建；关闭 hooks 会使产物来源不完整或复用旧库。
 5. 保持 pubspec.lock 与 Cargo.lock 的锁定版本。以下流程使用 `--enforce-lockfile`；解析失败时处理版本或缓存原因，不为绕过错误重新生成锁文件。
 
-`setup.dart` 会生成忽略的 env.json，并激活其中指定的 flutter_distributor Git 版本。依赖和工具来自项目配置的数据源；来源核验及进一步固定版本见 Loop 5。
+`setup.dart`会生成忽略的env.json。旧直接入口按项目唯一[distributor声明](../../tool/android_bootstrap/distributor.pubspec.yaml)进行global activation；
+受管分支消费已经核验的源码／配置。直接入口与其它host尚未因此获得本profile的验证结论。
 
 ### 核心源码恢复与官方同步契约
 

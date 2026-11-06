@@ -1,0 +1,12 @@
+name: flclash_android_packager
+publish_to: none
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+
+dependencies:
+  flutter_distributor:
+    git:
+      url: https://github.com/chen08209/flutter_distributor.git
+      ref: 7fea25d4c531ce6e778db14e3c47f076027a1008
+      path: packages/flutter_distributor

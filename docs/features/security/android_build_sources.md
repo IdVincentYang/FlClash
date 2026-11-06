@@ -83,10 +83,61 @@ links及source_inputs通过input名称引用调用者的选择，目录另给pat
 
 ## 工具、缓存、CI及未决项
 
+### 工具接受与受管构建
+
+此入口只覆盖macOS ARM64宿主到Android ARM64 dev release，其它host／ABI先拒绝；不能据此升级旧APK结论，action固定不代表CI工具已核。
+源码从受信仓库当前HEAD及入口明确允许的任务WIP物化；其它未提交改动拒绝，不把任意工作目录或旧受管source当作已接受输入。
+本profile的规范化工作位置（含父路径）须为可打印ASCII，允许空格，但拒绝`:`、`,`及反斜杠。
+这是PATH、Gradle路径列表及Java properties的共同序列化前提；不通过引号、改宿主路径或全局工具绕过。
+
+接受锚维护角色、host、固定官方对象及接受依据，版本仍由原配置维护。签名必须绑定接受的完整fingerprint和对象作用域；采用官方HTTPS及固定摘要／精确对象时如实说明依据，不冒称独立签名。候选自带hash、缓存sidecar、HTTP成功或HEAD结果不能自行授信。首次取件也须遵守接受的URL／host／HTTPS及固定对象；缺元信息则保留候选并失败。
+Maven配置逐工件保留独立接受的SHA-256；有可核签名时再限定完整signing fingerprint，两项同时约束该工件。
+公钥候选可从公开keyserver取得，但必须对已按官方参考接受的精确字节验证；公钥可取得或签名有效本身不建立发布者身份，
+不扩大为其它版本／工件的接受。原生解析关闭keyserver发现，公钥材料保存在项目verification keyring；该接受集合不是APK组件清单。
+
+受管入口先核工具与安装payload，再用已核SDK内置pub只取得数据；app沿原锁，flutter_tools／distributor各有唯一标准工具resolution，不另造包管理器或复制app锁。distributor最小consumer pubspec固定原Git对象，复现旧activation的runtime图，不改上游源码或引入其dev依赖。三套将加载的pub文件树、package_config及plugin map对应接受归档／tree，完成前不加载源码或snapshot。其后才在自有SDK生成本次Flutter tool snapshot；生成本身也是首次执行，不借旧SDK／global activation snapshot，不通过事后hash追授许可。
+内置pub所需的Flutter版本数据从接受的固定tag派生，完整版本文件再由已核工具正常生成；版本文件只描述已接受对象，不承担执行许可。
+
+同一次profile固定实际Dart、packager、Flutter、Java、SDK、两层NDK、CMake、Go及rustup分派。子环境从空集合构造，工具路径和项目配置优先级必须一致；未知选路／缺必需角色失败。setup继续编排原打包流程，packager改用已核Dart／显式配置及原源码入口，Flutter build使用已准备依赖图；Gradle继续用原生strict验证，不靠PATH继承或再次激活决定版本。
+JVM的`user.home`与`ANDROID_USER_HOME`也绑定自有home；只改HOME环境变量不能保证Java采用该目录。
+受管入口创建限定的JVM参数，不继承父进程注入；Gradle daemon沿同一选择启动，原用户Android配置和debug keystore不作为输入。
+Rust准备还须在自有CARGO_HOME提供指向已核rustup的标准cargo／rustc／rustdoc代理；只验证`cargo --version`不能证明cargo能启动rustc。
+代理仍经自有RUSTUP_HOME及固定toolchain分派，不用Homebrew或自动安装补齐。
+Native Assets runner过滤环境，两个项目hook不能靠FLCLASH环境变量判断受管身份。
+受管workspace通过标准user-defines传固定配置位置，并将本次workspace／配置摘要编译进本地hook；漏传、错根或配置变动失败。
+共享入口以同一已核Dart、app package_config和原hook源码重入，从空环境恢复已审选择；子hook在Go／Rust消费前再核实际角色材料。
+重入参数和配置只绑定当前选择，不能授信新材料；Rustup查询与Cargo构建都须使用本次home。
+原builder成功后输出本次配置的标准metadata及依赖，控制器核两hook真实input／output后才可判profile完成，APK存在本身不足。
+受管Cargo构建使用`--locked`，Go使用`-mod=readonly`；取得依赖不能隐式改写当前源码中的接受锁／sum后再执行新代码。
+SDK准备同时覆盖主应用Platform37、固定Flutter及已选插件要求的35／36，以及Build Tools36／37。
+缺失或替换必需材料在相应SDK消费者前失败，不把AGP安装支路作为补充接受机制；自有Gradle配置关闭SDK自动下载。
+Gradle内部验证／hash缓存不能代替字节重核。JVM启动前按接受参考核选定的原始Maven工件；只复用核同的数据，每次使用新建的自有Gradle内部状态，不复制旧验证、hash或transform缓存。原生strict和有限key验证继续约束本次解析；尚未验证的首次取件留在隔离位置。
+未复用原始Maven数据时可明确选择空集合，由新Gradle状态按原生strict配置首次取得；不得因此关闭验证或导入旧内部缓存。
+实际Gradle工作树的verification metadata及keyring须与受信仓库的对应文件核同，候选工作树不能提供另一套接受根。
+受管命令的选择JSON只列本地材料路径，不提供接受摘要、命令或成功receipt。工具锚、三套native锁和Gradle验证配置仍从当前受信仓库读取；
+正式launcher在新的独占位置准备SDK、配置和缓存，成功准备与成功APK构建分别报告，不把局部准备状态称作交付完成。
+
+构建工作位置只物化明确源快照及本项WIP，Core保持同一固定tree；不复制用户私有配置、全局pub缓存或旧可执行状态。所有可写bootstrap、HOME及缓存均为子进程自有位置；接受归档和新生输出分开，合法archive link按原结构核实际loader终点，不手改第三方内容适配。
+Flutter源码通过原生Git archive物化，在自有导出仓库的Git元数据中关闭属性转换，并全量核对固定commit的原始blob；避免将checkout或默认archive的行尾转换误认成原始字节。缓存只提供显式选定的Git对象，不导入原SDK配置、其它refs或可执行缓存；新SDK的Git元数据由自有固定对象生成，不修改第三方源码或其属性文件。
+共享SDK目录按固定Flutter源码的组件顺序合并；同名元数据仅在旧、新内容均对应接受归档时按明确映射替换，不能以解压覆盖接受未知内容。原归档与各组件物化树保留；合并后仍核整个目标payload集合。
+互不重叠的Android子树及Dart SDK直接物化到最终位置；已核Gradle树在首次JVM前移动到自有Wrapper目录并再核，
+保持原归档和精确payload，同时避免保留两份相同安装。共享目录的组件仍分别物化后合并；不回收有活跃或归属不明写入者的位置。
+API37.0还需要标准`package.xml`才能被原生SDK reader识别；该安装元数据由固定官方repository descriptor转换，
+随项目bootstrap保存，不改归档payload或SDK源码，不写license接受记录。受管准备复制获审模板后再让SDK消费者读取。
+已缓存工具树仅作只读数据：按接受归档逐成员核同，只复制这些成员到新的自有位置，再完整核输出，不携入额外文件或旧可执行状态。
+支持时使用独立inode的OS copy-on-write复制，原对象不受后续写入影响；否则复制字节。pub／Flutter snapshot等派生缓存不因此获得跨次复用许可。
+
+只有确认相关自有子进程已退出或放弃访问，并核对象归属，才可清理／恢复。取消、超时、父进程返回或下一次启动都不是退出证明；退出／归属不明就保留原始对象及自有位置、明确失败，不关闭用户进程。不新增权限receipt、平行运行状态机或审计DB。
+
+T02验证首次获取／加载及此受管入口；T03追完整生成因果，T04补跨次派生缓存、直接旁路、其它host及完整CI边界，T05才对实际新APK绑定。当前T01只读工具及其partial_inventory语义保持独立。
+
+### 现有实现及未决项
+
 实际JNI的CMake记录选择NDK28.2，Native Assets hooks选择29.0；JDK启动器／daemon、SDK/NDK/CMake及不同ABI须分别绑定，不为统一版本盲目升级。
-当前Wrapper JAR为忽略的本地输入，自报2.10，distribution指向9.8.0且未配置期望SHA；尚缺Gradle验证／锁定元数据。bootstrap代码和已缓存发行件都需要获取依据。
+T01基线中的Wrapper JAR是忽略的本地输入，自报2.10，distribution指向9.8.0且没有期望SHA。
+受管入口使用正式官方9.8.0 Wrapper、distribution摘要及原生verification配置，并在本次完整委托链核工具／pub／hook选择。
 setup cache核源码内容／target／tag／工具版本等输入，但输出命中以size／mtime为依据，不能当内容身份验证；外层hooks与各第三方缓存也需按实际消费者审查。
-本地禁upload／publish前缀任务只覆盖匹配名称，不是完整网络隔离。CI actions／distributor tags、job权限、发布gate和签名材料作用域均需核，不能执行发布来“验证来源”。
+本地禁upload／publish前缀任务只覆盖匹配名称，不是完整网络隔离。CI actions／distributor已固定commit，job权限、发布gate和签名材料作用域仍需按T04核实，不能执行发布来“验证来源”。
 
 后续落点由[Loop5 Tasks](loop5/loop5_tasks.md)维护：工具与工件认证归T02，源码／生成缺口归T03，执行／缓存／CI约束归T04，最终制品验证归T05。
 EasyTier固定公开repo的声明commit查询返回422，只说明该repo未解析，不证明其它fork不存在或篡改；此生成缺口不能只靠重写hash关闭。

@@ -821,6 +821,18 @@ Android source/artifact attribution is maintained in
 Input hashes, intermediate bytes, packaged contents and runtime loading are separate facts;
 the read-only inspection baseline does not replace version locks or Core ownership.
 
+The managed Android entry prepares accepted tool and pub
+inputs before first loading, then delegates to the existing setup/packager flow with one resolved tool profile.
+Its writable SDK, configuration and build workspace are task-owned; original private configuration and global caches
+are not its outputs. Cleanup requires observed process quiescence and object ownership, not just a finally block.
+Native Assets filters the environment. The two project hooks share a private environment bridge and a generated
+workspace/digest binding in the owned source tree; standard user-defines locate the current configuration.
+The bridge rejects missing or changed selections, reenters the original hook with the same Dart VM and app package
+configuration, and checks its actual tool materials before Go/Rust consumption. Successful builders emit standard
+metadata and dependencies that the controller checks alongside the APK; these are execution bindings, not acceptance roots.
+The source baseline above owns the contract; other hosts, direct entry bypasses and cross-run output reuse remain
+separate follow-up boundaries. The current setup behavior below is the existing unmanaged path.
+
 Android builds append `no_zerotier` to the configured base tags. Go build, dependency listing and cache fingerprints
 share the same target-specific effective tags; other platforms keep configured tags. The hook tracks the precise
 build_config.yaml file, including its absence, without making the entire repository a Gradle input.

@@ -153,6 +153,45 @@ final class CoreBuilder implements Builder {
             'install the NDK version android/gradle/libs.versions.toml names',
       );
     }
+    if (Platform.environment.containsKey('FLCLASH_ANDROID_PROFILE')) {
+      final ndk = Platform.environment['FLCLASH_ANDROID_NDK'];
+      if (Platform.environment['FLCLASH_ANDROID_PROFILE'] !=
+              'macos_arm64_android_arm64_dev' ||
+          ndk == null ||
+          !p.isAbsolute(ndk) ||
+          code.targetArchitecture != Architecture.arm64 ||
+          code.android.targetNdkApi != 24) {
+        throw BuildException('Unsupported managed Android NDK selection');
+      }
+      final llvm = p.join(ndk, 'toolchains/llvm/prebuilt/darwin-x86_64');
+      final allowedCompilers = [
+        p.join(llvm, 'bin/clang'),
+        p.join(llvm, 'bin/aarch64-linux-android24-clang'),
+      ];
+      final archiver = code.cCompiler!.archiver;
+      final linker = code.cCompiler!.linker;
+      final actualCompiler = p.normalize(p.fromUri(compiler));
+      if (!allowedCompilers.contains(actualCompiler) ||
+          p.normalize(p.fromUri(archiver)) != p.join(llvm, 'bin/llvm-ar') ||
+          p.normalize(p.fromUri(linker)) != p.join(llvm, 'bin/ld.lld') ||
+          !p.isWithin(ndk, File(actualCompiler).resolveSymbolicLinksSync()) ||
+          !p.isWithin(
+            ndk,
+            File(p.fromUri(archiver)).resolveSymbolicLinksSync(),
+          ) ||
+          !p.isWithin(
+            ndk,
+            File(p.fromUri(linker)).resolveSymbolicLinksSync(),
+          ) ||
+          !p.isWithin(
+            ndk,
+            File(p.join(llvm, 'lib/libclang.dylib')).resolveSymbolicLinksSync(),
+          )) {
+        throw BuildException(
+          'Flutter passed an unaccepted Android C toolchain',
+        );
+      }
+    }
     return AndroidToolchain(
       clangDirectory: p.dirname(p.fromUri(compiler)),
       apiLevel: code.android.targetNdkApi,

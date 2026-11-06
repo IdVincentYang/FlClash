@@ -13,6 +13,7 @@ final _log = Logger('util');
 final String? _toolSearchPath = _resolveToolSearchPath();
 
 String? _resolveToolSearchPath() {
+  if (Platform.environment.containsKey('FLCLASH_ANDROID_PROFILE')) return null;
   if (Platform.isWindows) return null;
   final entries = (Platform.environment['PATH'] ?? '').split(':');
   final home = Platform.environment['HOME'];
@@ -38,6 +39,25 @@ Map<String, String>? _withToolSearchPath(Map<String, String>? environment) {
   return {...?environment, 'PATH': path};
 }
 
+String _selectedExecutable(String executable) {
+  final profile = Platform.environment['FLCLASH_ANDROID_PROFILE'];
+  if (profile == null) return executable;
+  if (profile != 'macos_arm64_android_arm64_dev' || !Platform.isMacOS) {
+    throw BuildException('Unsupported managed Android host profile');
+  }
+  final variable = switch (executable) {
+    'go' => 'FLCLASH_ANDROID_GO',
+    'python' || 'python3' => 'FLCLASH_ANDROID_PYTHON',
+    _ => null,
+  };
+  if (variable == null) return executable;
+  final path = Platform.environment[variable];
+  if (path == null || !p.isAbsolute(path) || !File(path).existsSync()) {
+    throw BuildException('Missing managed Android tool selection: $variable');
+  }
+  return path;
+}
+
 ProcessResult runCommand(
   String executable,
   List<String> arguments, {
@@ -45,12 +65,13 @@ ProcessResult runCommand(
   Map<String, String>? environment,
   bool includeParentEnvironment = true,
 }) {
-  _log.finer('Running: $executable ${arguments.join(' ')}');
+  final command = _selectedExecutable(executable);
+  _log.finer('Running: $command ${arguments.join(' ')}');
   if (environment != null && environment.isNotEmpty) {
     _log.finer('  env: $environment');
   }
   final result = Process.runSync(
-    executable,
+    command,
     arguments,
     workingDirectory: workingDirectory,
     environment: _withToolSearchPath(environment),
@@ -64,7 +85,7 @@ ProcessResult runCommand(
   if (err.isNotEmpty) _log.finest(err);
   if (result.exitCode != 0) {
     throw CommandFailedException(
-      executable: executable,
+      executable: command,
       arguments: arguments,
       exitCode: result.exitCode,
       stdout: out,
@@ -80,9 +101,10 @@ Future<void> runCommandStream(
   String? workingDirectory,
   Map<String, String>? environment,
 }) async {
-  _log.info('exec: $executable ${arguments.join(' ')}');
+  final command = _selectedExecutable(executable);
+  _log.info('exec: $command ${arguments.join(' ')}');
   final process = await Process.start(
-    executable,
+    command,
     arguments,
     workingDirectory: workingDirectory,
     environment: _withToolSearchPath(environment),
@@ -102,7 +124,7 @@ Future<void> runCommandStream(
   final exitCode = await process.exitCode;
   if (exitCode != 0) {
     throw CommandFailedException(
-      executable: executable,
+      executable: command,
       arguments: arguments,
       exitCode: exitCode,
       stdout: '',

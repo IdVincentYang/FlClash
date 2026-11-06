@@ -113,6 +113,7 @@ ArgParser createSetupArgParser() {
 List<String> createFlutterBuildArgs({
   required String platform,
   required bool verbose,
+  bool managedAndroid = false,
 }) {
   final flutterBuildArgs = <String>[
     if (verbose) 'verbose',
@@ -120,6 +121,7 @@ List<String> createFlutterBuildArgs({
   ];
   if (platform == 'android') {
     flutterBuildArgs.add('split-per-abi');
+    if (managedAndroid) flutterBuildArgs.add('no-pub');
   }
   return flutterBuildArgs;
 }
@@ -163,12 +165,27 @@ Future<int> _package(
   String? androidArch,
   required bool verbose,
 }) async {
+  final managedAndroid =
+      platform == 'android' &&
+      Platform.environment.containsKey('FLCLASH_ANDROID_PROFILE');
+  final managedCommand = managedAndroid
+      ? managedAndroidPackageCommand(
+          rootDir: rootDir,
+          environment: Platform.environment,
+          resolvedExecutable: Platform.resolvedExecutable,
+          host: Platform.operatingSystem,
+          arch: androidArch,
+          applicationEnvironment: env,
+          targets: targets,
+        )
+      : null;
   final file = File(p.join(rootDir, 'env.json'));
   await file.writeAsString(jsonEncode(createBuildEnvironment(env)));
 
   final flutterBuildArgs = createFlutterBuildArgs(
     platform: platform,
     verbose: verbose,
+    managedAndroid: managedAndroid,
   );
   final descriptionArgs = <String>[];
   if (platform != 'android') {
@@ -178,26 +195,41 @@ Future<int> _package(
   final depExit = await _ensureDependencies(platform);
   if (depExit != 0) return depExit;
 
-  final activateResult = await Process.run('dart', [
-    'pub',
-    'global',
-    'activate',
-    '-s',
-    'git',
-    'https://github.com/chen08209/flutter_distributor.git',
-    '--git-ref',
-    'v0.6.11-flclash.2',
-    '--git-path',
-    'packages/flutter_distributor',
-  ]);
-  if (activateResult.exitCode != 0) {
-    stderr.write(activateResult.stderr);
-    return activateResult.exitCode;
+  if (!managedAndroid) {
+    final consumer =
+        loadYaml(
+              File(
+                p.join(
+                  rootDir,
+                  'tool/android_bootstrap/distributor.pubspec.yaml',
+                ),
+              ).readAsStringSync(),
+            )
+            as Map;
+    final git =
+        (consumer['dependencies'] as Map)['flutter_distributor']['git'] as Map;
+    final activateResult = await Process.run('dart', [
+      'pub',
+      'global',
+      'activate',
+      '-s',
+      'git',
+      git['url'] as String,
+      '--git-ref',
+      git['ref'] as String,
+      '--git-path',
+      git['path'] as String,
+    ]);
+    if (activateResult.exitCode != 0) {
+      stderr.write(activateResult.stderr);
+      return activateResult.exitCode;
+    }
   }
 
   final process = await Process.start(
-    'flutter_distributor',
+    managedCommand?.first ?? 'flutter_distributor',
     [
+      ...?managedCommand?.skip(1),
       'package',
       '--skip-clean',
       '--platform',
@@ -222,6 +254,102 @@ Future<int> _package(
   });
   final exitCode = await process.exitCode;
   return exitCode;
+}
+
+List<String> managedAndroidPackageCommand({
+  required String rootDir,
+  required Map<String, String> environment,
+  required String resolvedExecutable,
+  required String host,
+  required String? arch,
+  required String applicationEnvironment,
+  required String targets,
+}) {
+  if (environment['FLCLASH_ANDROID_PROFILE'] !=
+          'macos_arm64_android_arm64_dev' ||
+      host != 'macos' ||
+      arch != 'arm64' ||
+      applicationEnvironment != 'dev' ||
+      targets != 'apk') {
+    throw StateError('Unsupported managed Android build profile');
+  }
+  String selected(String name) {
+    final value = environment[name];
+    if (value == null || !p.isAbsolute(value)) {
+      throw StateError('Managed Android selection missing: $name');
+    }
+    return p.normalize(value);
+  }
+
+  final dart = selected('FLCLASH_ANDROID_DART');
+  if (File(resolvedExecutable).resolveSymbolicLinksSync() !=
+      File(dart).resolveSymbolicLinksSync()) {
+    throw StateError('Setup is running under a different Dart executable');
+  }
+  final sdk = selected('FLCLASH_ANDROID_FLUTTER_ROOT');
+  if (environment['FLUTTER_ROOT'] != sdk) {
+    throw StateError('Packager would select a different Flutter SDK');
+  }
+  final jdk = selected('JAVA_HOME');
+  final androidSdk = selected('ANDROID_HOME');
+  final ndk = selected('FLCLASH_ANDROID_NDK');
+  if (environment['ANDROID_SDK_ROOT'] != androidSdk ||
+      environment['ANDROID_NDK_HOME'] != ndk ||
+      environment['ANDROID_NDK_ROOT'] != ndk) {
+    throw StateError('Android environment changes a selected SDK or NDK');
+  }
+  final config = jsonDecode(
+    File(p.join(selected('XDG_CONFIG_HOME'), 'settings')).readAsStringSync(),
+  );
+  if (config is! Map ||
+      config['jdk-dir'] != jdk ||
+      config['android-sdk'] != androidSdk) {
+    throw StateError('Flutter settings change the selected JDK or Android SDK');
+  }
+  final properties = <String, String>{};
+  for (final line in File(
+    p.join(rootDir, 'android/local.properties'),
+  ).readAsLinesSync()) {
+    if (line.trim().isEmpty || line.trimLeft().startsWith('#')) continue;
+    final split = line.indexOf('=');
+    if (split <= 0 || properties.containsKey(line.substring(0, split))) {
+      throw StateError('Ambiguous managed Android local.properties');
+    }
+    properties[line.substring(0, split)] = line.substring(split + 1);
+  }
+  if (properties['flutter.sdk'] != sdk ||
+      properties['sdk.dir'] != androidSdk ||
+      properties['cmake.dir'] != selected('FLCLASH_ANDROID_CMAKE') ||
+      properties.keys.any(
+        (key) => key != 'flutter.sdk' && key != 'sdk.dir' && key != 'cmake.dir',
+      )) {
+    throw StateError('Android local.properties changes a selected tool root');
+  }
+  if (File(
+    p.join(rootDir, 'android/gradle/gradle-daemon-jvm.properties'),
+  ).existsSync()) {
+    throw StateError('Gradle daemon JVM criteria are outside this profile');
+  }
+  final options = loadYaml(
+    File(p.join(rootDir, 'distribute_options.yaml')).readAsStringSync(),
+  );
+  if (options is! Map ||
+      options.keys.any((key) => key != 'app_name' && key != 'output') ||
+      options['app_name'] != 'FlClash' ||
+      options['output'] != 'dist/') {
+    throw StateError('Managed packaging does not accept additional overrides');
+  }
+  final packageConfig = selected('FLCLASH_ANDROID_PACKAGER_CONFIG');
+  final entry = selected('FLCLASH_ANDROID_PACKAGER_MAIN');
+  if (!File(packageConfig).existsSync() || !File(entry).existsSync()) {
+    throw StateError('The accepted packager source graph is not prepared');
+  }
+  return [
+    resolvedExecutable,
+    '--disable-dart-dev',
+    '--packages=$packageConfig',
+    entry,
+  ];
 }
 
 String _detectArch() {
