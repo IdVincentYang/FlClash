@@ -138,7 +138,7 @@ JSON记录实际APK路径／大小／SHA-256；`managed_android_build_completed`
 
 ## 构建执行与CI发布约束
 
-以下实现已完成本机及本地合成消费者自验，完整T04待M实现评审；具体覆盖及失败见[T04 Result](../features/security/loop5/l5_t04_result.md)。上文受管构建及下文正常打包仍是入口；没有真实云端发布或其它host运行证明。
+以下T04实现已通过M完整实现评审并本地交付；具体覆盖及失败见[交付Result](https://github.com/IdVincentYang/FlClash/blob/90593590095743dd2c3ba9aa528b999bed666082/docs/features/security/loop5/l5_t04_result.md)。上文受管构建及下文正常打包仍是入口；最终新制品对账归T05，没有真实云端发布或其它host运行证明。
 缓存使用内容／精确输出校验，同root所有key串行，失败恢复旧组；不要删除未知backup或按PID／目录前缀清理别的构建。回滚或进程退出不明时保留现场，不继续装包；遗留generation阻止后续复用，使用新的自有workspace，不将其当作可清空的普通cache。
 受管Native checkpoint复用原Gradle任务的完整注册Android rules及真实defines／outputDir／实际.last_build_id，两次检查后原任务仍照常装包；未注册的build_hooks不能直接作CLI target。SDK的--build-outputs排除.dart_tool中间物，仅作诊断；必须同时核本次原SDK执行、stamp／result／depfile及两hook实际metadata／生产字节并稳定，失败不把APK或stamp存在当ready；无需清用户全局cache。
 

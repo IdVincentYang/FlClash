@@ -177,7 +177,7 @@ T02验证首次获取／加载及此受管入口；T03追完整生成因果，T0
 
 Native checkpoint获审修订复用原Gradle task的完整注册Android rules，不直接调用未注册的build_hooks；同一Action及实际.last_build_id绑定原SDK执行与当前producer字节，stamp／result／depfile及--build-outputs均不是授权receipt。后者排除.dart_tool中间物，只作诊断；SDK正常重试的每次原task execution使用独占日志／报告目录，保留前次失败，根报告仅标识最后完成的原task。
 
-本节定义T04当前实现；本机受管ARM64及本地合成／loopback消费者的实际结果见[T04 Result](loop5/l5_t04_result.md)。完整实现仍待M评审；不升级历史APK、其它平台运行或真实云端发布结论。
+本节维护已交付T04契约；本机受管ARM64及本地合成／loopback消费者的实际结果见[交付Result](https://github.com/IdVincentYang/FlClash/blob/90593590095743dd2c3ba9aa528b999bed666082/docs/features/security/loop5/l5_t04_result.md)。完整实现已获M评审通过；最终新制品对账仍归T05，不升级历史APK、其它平台运行或真实云端发布结论。
 
 - BuildCache由生产者定义必需输出及私有staging（Helper的Cargo target也归本generation，不从共享target复制待发布文件），v2记录核精确集合／路径／类型／SHA-256；旧schema为miss且保原输出。必需输入缺失失败，optional absence参与指纹，实际工具／target／flags／依赖变化失效。普通记录是完整性材料，不是历史生成证明。
 - 同canonical root共享固定outputs.lock及进程锁，从命中检查到record／回滚／backup清理均持有；buildPlatform将Go、Core摘要、Helper、manifest放在同作用域，外层失败恢复旧组。不同key共享路径同样串行；同root非重叠任务也串行，不同root独立。迟到cleanup只处理独占generation，恢复失败保backup并拒绝装包；取得锁后发现遗留generation也拒绝复用，改用新的自有workspace，不从未知中断状态追认记录；不承诺断电原子性或非协作写者／reader保护。

@@ -825,7 +825,7 @@ precedes signing/publishing jobs and secret services; artifact IDs originate fro
 GitHub metadata verifies run/repository/commit and attempt jobs. Pages executes a fixed main snapshot, never the
 upstream artifact. The [build source contract](../docs/features/security/android_build_sources.md#构建执行与发布边界)
 owns these rules, including cross-origin authorization stripping and the unverified boundaries.
-Module behavior below reflects this implementation; it does not imply completed T04 delivery.
+Module behavior below reflects the delivered T04 implementation; final Android artifact reconciliation remains in Loop 5 T05.
 
 Android source/artifact attribution is maintained in
 [the build sources baseline](../docs/features/security/android_build_sources.md).
