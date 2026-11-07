@@ -58,9 +58,10 @@ Future<({String digest, String inputDigest})?> enterManagedAndroidHook({
         'archives',
         'material_roots',
         'files',
+        'request_sha256',
       }).isNotEmpty ||
-      data.length != 8 ||
-      data['schema'] != 1 ||
+      data.length != 9 ||
+      data['schema'] != 2 ||
       data['profile'] != 'macos_arm64_android_arm64_dev' ||
       data['workspace'] != root ||
       data['source'] != '$root/source') {
@@ -81,7 +82,13 @@ Future<({String digest, String inputDigest})?> enterManagedAndroidHook({
   final nativeArguments = arguments
       .where((arg) => arg != _childArgument)
       .toList();
-  final inputDigest = _checkArguments(root, hook, nativeArguments, environment);
+  final inputDigest = _checkArguments(
+    root,
+    hook,
+    nativeArguments,
+    environment,
+    data['request_sha256'] as String,
+  );
   if (childCount > 1) throw StateError('Repeated managed hook reentry');
   if (childCount == 0) {
     final process = await Process.start(
@@ -172,6 +179,7 @@ String _checkArguments(
   String hook,
   List<String> arguments,
   Map<String, String> environment,
+  String requestDigest,
 ) {
   if (arguments.isEmpty ||
       arguments.length > 2 ||
@@ -217,7 +225,8 @@ String _checkArguments(
       compiler['ar'] != '$llvm/bin/llvm-ar' ||
       compiler['ld'] != '$llvm/bin/ld.lld' ||
       defines['base_path'] != '$root/source/pubspec.yaml' ||
-      values.length != 2 ||
+      values.length != 3 ||
+      values['flclash_android_inputs_sha256'] != requestDigest ||
       values['build_assets'] != true ||
       values['flclash_android_environment'] != '$root/hook-environment.json') {
     throw StateError(
@@ -246,3 +255,22 @@ List<Uri> managedAndroidHookDependencies(String workspace) => [
             RegExp(r'/android_[^/]+\.py$').hasMatch(entity.path)))
       entity.uri,
 ];
+
+Future<String> managedAndroidOutputIdentity(List<String> paths) async {
+  const root = androidHookWorkspace;
+  if (root == null || paths.isEmpty || paths.toSet().length != paths.length) {
+    throw StateError('Missing managed producer output set');
+  }
+  final result = <String, Object>{};
+  for (final path in [...paths]..sort()) {
+    final file = _ownedFile(root, path);
+    if (file.lengthSync() <= 0) {
+      throw StateError('Empty managed producer output');
+    }
+    result[path] = {
+      'size': file.lengthSync(),
+      'sha256': (await sha256.bind(file.openRead()).first).toString(),
+    };
+  }
+  return jsonEncode(result);
+}

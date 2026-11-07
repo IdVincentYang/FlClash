@@ -68,4 +68,18 @@ void main() {
       isNot(fingerprint(files: [input.path], target: 'android-amd64')),
     );
   });
+  test('missing required inputs fail and optional absence is explicit', () {
+    final path = '${temporaryDirectory.path}/missing';
+    expect(
+      () => fingerprint(files: [path]),
+      throwsA(isA<FileSystemException>()),
+    );
+    final absent = FingerprintBuilder(rootDir: temporaryDirectory.path)
+      ..addOptionalFile(path);
+    final first = absent.finish();
+    File(path).writeAsStringSync('present');
+    final present = FingerprintBuilder(rootDir: temporaryDirectory.path)
+      ..addOptionalFile(path);
+    expect(present.finish(), isNot(first));
+  });
 }

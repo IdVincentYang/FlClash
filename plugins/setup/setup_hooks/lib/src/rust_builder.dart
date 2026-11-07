@@ -43,13 +43,6 @@ class RustBuilder {
       'CORE_NAME': '${config.coreName}${target.executableExtension}',
     };
 
-    final srcPath = p.join(
-      _helperPath,
-      'target',
-      triple,
-      'release',
-      'helper${target.executableExtension}',
-    );
     final destDir = p.join(_outputPath, target.platformDir);
     final destPath = p.join(
       destDir,
@@ -63,22 +56,32 @@ class RustBuilder {
         args: args,
       ),
       primaryOutput: destPath,
+      outputs: [destPath],
       notice: notice,
-      build: () async {
+      build: (staging) async {
         _log.info('Building Rust helper: $target');
+        final targetDirectory = p.join(staging.work.path, 'cargo-target');
 
         await runCommandStream(
           'cargo',
-          args,
+          [...args, '--target-dir', targetDirectory],
           workingDirectory: _helperPath,
           environment: env,
         );
 
-        ensureDir(destDir);
-        copyFile(srcPath, destPath);
+        final srcPath = p.join(
+          targetDirectory,
+          triple,
+          'release',
+          'helper${target.executableExtension}',
+        );
+        if (FileSystemEntity.typeSync(srcPath, followLinks: false) !=
+            FileSystemEntityType.file) {
+          throw StateError('Expected regular Helper output');
+        }
+        File(srcPath).copySync(staging.file(destPath).path);
 
         _log.info('Built: $destPath');
-        return [destPath];
       },
     );
   }
@@ -93,6 +96,7 @@ class RustBuilder {
       ..addValue('kind', 'helper')
       ..addValue('target', {'goos': target.goos, 'goarch': target.goarch})
       ..addValue('arguments', args)
+      ..addValue('cargo_target_directory', 'private-generation')
       ..addValue('core_sha256', coreSha256)
       ..addValue('environment', _rustEnvironment())
       ..addValue('config', config.toFingerprintMap());
@@ -110,7 +114,12 @@ class RustBuilder {
       _helperPath,
       excludedDirectories: const {'target', '.git', '.idea'},
     )..addAll(harnessInputs);
-    builder.addFiles(inputs);
+    builder.addOptionalFile(p.join(rootDir, 'build_config.yaml'));
+    builder.addFiles([
+      ...inputs,
+      resolveToolExecutable('cargo'),
+      resolveToolExecutable('rustc'),
+    ]);
     return builder.finishWithInputs();
   }
 

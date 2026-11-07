@@ -171,15 +171,33 @@ API37.0还需要标准`package.xml`才能被原生SDK reader识别；该安装�
 
 只有确认相关自有子进程已退出或放弃访问，并核对象归属，才可清理／恢复。取消、超时、父进程返回或下一次启动都不是退出证明；退出／归属不明就保留原始对象及自有位置、明确失败，不关闭用户进程。不新增权限receipt、平行运行状态机或审计DB。
 
-T02验证首次获取／加载及此受管入口；T03追完整生成因果，T04补跨次派生缓存、直接旁路、其它host及完整CI边界，T05才对实际新APK绑定。当前T01只读工具及其partial_inventory语义保持独立。
+T02验证首次获取／加载及此受管入口；T03追完整生成因果，T04收紧缓存／CI角色约束并明确直接旁路与其它host未获资格的边界，T05才对实际新APK绑定。当前T01只读工具及其partial_inventory语义保持独立。
+
+### 构建执行与发布边界
+
+Native checkpoint获审修订复用原Gradle task的完整注册Android rules，不直接调用未注册的build_hooks；同一Action及实际.last_build_id绑定原SDK执行与当前producer字节，stamp／result／depfile及--build-outputs均不是授权receipt。后者排除.dart_tool中间物，只作诊断；SDK正常重试的每次原task execution使用独占日志／报告目录，保留前次失败，根报告仅标识最后完成的原task。
+
+本节定义T04当前实现；本机受管ARM64及本地合成／loopback消费者的实际结果见[T04 Result](loop5/l5_t04_result.md)。完整实现仍待M评审；不升级历史APK、其它平台运行或真实云端发布结论。
+
+- BuildCache由生产者定义必需输出及私有staging（Helper的Cargo target也归本generation，不从共享target复制待发布文件），v2记录核精确集合／路径／类型／SHA-256；旧schema为miss且保原输出。必需输入缺失失败，optional absence参与指纹，实际工具／target／flags／依赖变化失效。普通记录是完整性材料，不是历史生成证明。
+- 同canonical root共享固定outputs.lock及进程锁，从命中检查到record／回滚／backup清理均持有；buildPlatform将Go、Core摘要、Helper、manifest放在同作用域，外层失败恢复旧组。不同key共享路径同样串行；同root非重叠任务也串行，不同root独立。迟到cleanup只处理独占generation，恢复失败保backup并拒绝装包；取得锁后发现遗留generation也拒绝复用，改用新的自有workspace，不从未知中断状态追认记录；不承诺断电原子性或非协作写者／reader保护。
+- 受管Native接入从固定SDK实际Flutter Gradle task的ExecSpec action取得完整参数，在该task原action前按同一完整注册Android rules运行两次assemble checkpoint；仅定点失效自有stamp并核同buildDir。实际hook结束时记录本run产出内容，checkpoint与原task后只能对照该期望，不从后来的候选重新授信。固定SDK内部方法改变或上下文不一致须失败；已完成本机原SDK消费者，未验证其它SDK版本。
+- Native Assets沿标准user-defines感知有效输入，Go声明真实文件输出，受管入口通过固定SDK原注册Android rules依赖链中的BuildHooks核同真实请求及稳定结果；不能绑定实际上下文则停止受影响入口，不靠存在的库或自算receipt提升资格。raw继续按既有接受依据复用，不导入外来派生cache。
+- 本地setup只package，拒绝发布／shell hook配置和Gradle发布任务；保留必要依赖读取及禁遥测设置，不宣称OS网络隔离。CI编译／notes／只读gate无发布secret，签名key限签名step，各目的地凭据分开；含Telegram secret service的job必须先由无发布secret的gate准入；首次授予service凭据／写权限的job条件同时核gate的run／attempt／commit，拒绝下游重跑沿用旧eligible结果，Pages deploy同样适用。
+- 生产者受信job outputs提供固定slot的artifact ID／digest；GitHub上下文及API核repo／run／attempt／SHA／producer，candidate manifest只作数据。精确角色、普通文件、允许root及集合检查先于签名／发送；不通配接受、不得用旧attempt补缺。完整rerun保留，下游单独rerun缺同attempt前置则拒绝。
+- Release只允许canonical repo的严格push tag并核peeled commit及版本。Android正式identity的开发签名候选只供独立重签，不是发布件；versionName核源码版本，拆分APK的versionCode保留原SDK的基础build number加ABI偏移（arm=1000／arm64=2000／x86_64=4000），签名前后均核同。依据[Android完整版本语义](https://developer.android.com/reference/android/content/pm/PackageInfo#getLongVersionCode())，高32位的versionCodeMajor仅接受缺省或显式整数0，AXML属性名／资源ID须一致，非零、非整数、重复或不支持编码在取得签名凭据前拒绝。Pages独立保留main push／main手动及受信稳定release完成事件，执行main固定源码，不执行上游artifact；只读gate／build先行，deploy才取得pages／OIDC写权限。
+- 签名工具沿已接受37.0.0 raw build-tools的跨平台apksigner JAR；JVM小helper用该SDK原AXML parser读package／version、ApkVerifier API核签名及选定证书，不能用自报manifest代替APK事实。Python publisher使用标准库streaming multipart，不再安装requests／pip；容器使用前仍须接受精确digest。
+- SSH发布增量替代原cpina的浮动Alpine／apk运行链，使用GitHub-hosted runner预装原生Git／SSH及必要Git-LFS；实际路径／版本／image只作观察。helper只替换固定clone目标（tap根保.git，F-Droid仅tmp），核源及index集合，main缺失／并发变更拒绝，普通push由受控pre-push核真实old ref。私钥／known_hosts只在独占目录、固定GitHub host key、禁继承agent／全局配置／未知hooks；退出探测的PermissionError／其它OS错误标为未知并保留材料，不按仅父进程已退清理；必要LFS绑定origin及对象范围，错误配置拒绝，不能回退普通大文件。原生平台工具非macOS Android profile认证，未执行真实远端SSH／push。
+- Pages原外层固定composite内部仍调用浮动upload-artifact@v4；获审增量由项目helper制作同格式未gzip的artifact.tar，直接使用已固定upload-artifact。排除.git／.github但保留普通隐藏资源；归档只含安全相对路径的普通文件／目录，权限可读／可遍历、无主机owner／路径信息；只读gate及部署前按唯一name核受信ID，不向deploy-pages虚构artifact-id输入。
+- CI helper只构造固定GitHub API origin／repo的路径，拒绝候选URL；artifact官方302下载跨源不继承Authorization／cookie／发布token，只送签名URL所需请求。错误不输出签名URL、认证或任意响应正文。假token／localhost与静态检查不能当成真实云端证明。
 
 ### 现有实现及未决项
 
 实际JNI的CMake记录选择NDK28.2，Native Assets hooks选择29.0；JDK启动器／daemon、SDK/NDK/CMake及不同ABI须分别绑定，不为统一版本盲目升级。
 T01基线中的Wrapper JAR是忽略的本地输入，自报2.10，distribution指向9.8.0且没有期望SHA。
 受管入口使用正式官方9.8.0 Wrapper、distribution摘要及原生verification配置，并在本次完整委托链核工具／pub／hook选择。
-setup cache核源码内容／target／tag／工具版本等输入，但输出命中以size／mtime为依据，不能当内容身份验证；外层hooks与各第三方缓存也需按实际消费者审查。
-本地禁upload／publish前缀任务只覆盖匹配名称，不是完整网络隔离。CI actions／distributor已固定commit，job权限、发布gate和签名材料作用域仍需按T04核实，不能执行发布来“验证来源”。
+本次setup cache已实现v2内容与精确输出核验、跨key所有权及整组失败恢复，针对性检查通过；本机受管Native／装包及定点篡改／API变化已自验，完整实现已获M评审通过，普通记录不构成历史生成证明，第三方缓存仍须沿其真实消费者判断。
+本地禁upload／publish前缀任务只覆盖匹配名称，不是完整网络隔离。CI actions／distributor固定commit，job权限、当前cohort gate及签名材料作用域已有本地消费者／静态反例；没有真实云端job／发布执行证明。
 
 后续落点由[Loop5 Tasks](loop5/loop5_tasks.md)维护：工具与工件认证归T02，源码／生成缺口归T03，执行／缓存／CI约束归T04，最终制品验证归T05。
 EasyTier固定公开repo的声明commit查询返回422，只说明该repo未解析，不证明其它fork不存在或篡改；此生成缺口不能只靠重写hash关闭。

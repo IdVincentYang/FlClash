@@ -71,6 +71,14 @@ WIP_FILES = {
     'docs/features/security/loop5/loop5_tasks.md',
     'docs/features/security/loop5/l5_t02_plan.md',
     'docs/features/security/loop5/l5_t02_result.md',
+    'docs/features/security/loop5/l5_t04_plan.md',
+    'docs/features/security/loop5/l5_t04_result.md',
+    '.agents/commands.md', 'android/app/build.gradle.kts',
+    'tool/ci_release.py', 'tool/test_ci_release.py', 'tool/ci_android_manifest.java',
+    'tool/ci_push.py', 'tool/test_ci_push.py',
+    'tool/test_ci_android_signing.py', 'tool/test_ci_workflows.py',
+    'release_telegram.py', 'tool/test_release_telegram.py',
+
     'setup.dart', 'test/setup_test.dart', 'plugins/rust_api/hook/build.dart',
     'plugins/setup/hook/build.dart',
     'plugins/setup/setup_hooks/lib/src/core_builder.dart',
@@ -175,7 +183,9 @@ class ManagedAndroidBuild:
                 continue
             status, name = record[:2], record[3:].decode('utf-8')
             relative(name)
-            tooling = (name.startswith('tool/android_') or name.startswith('tool/test_android_')
+            tooling = (name.startswith('plugins/setup/setup_hooks/lib/')
+                       or name.startswith('plugins/setup/setup_hooks/test/')
+                       or name.startswith('tool/android_') or name.startswith('tool/test_android_')
                        or name == 'tool/verify_android_inputs.py'
                        or name == 'tool/test_verify_android_inputs.py')
             if status not in (b' M', b'??', b'M ', b'A ') or not (name in WIP_FILES or tooling):
@@ -485,13 +495,18 @@ class ManagedAndroidBuild:
 
     def build(self):
         self.snapshot_project()
-        configure_hook_pubspec(self.root)
+        self.request_digest = hashlib.sha256(json.dumps({
+            'source': self.results['source_commit'], 'core': self.results['core_commit'],
+            'wip': self.results['source_wip'], 'tools': self.policy,
+            'target': 'android-arm64', 'api': 24, 'environment': 'dev',
+        }, sort_keys=True).encode()).hexdigest()
+        configure_hook_pubspec(self.root, self.request_digest)
         self.prepare_tools()
         self.prepare_rust()
         self.prepare_pub()
         self.bootstrap_flutter()
         context, binding, digest = write_hook_context(
-            self.root, self.environment, self.selections['archives'], self.material_roots)
+            self.root, self.environment, self.selections['archives'], self.material_roots, self.request_digest)
         self.bind_generated(context, binding, self.project / 'pubspec.yaml')
         self.prepare_gradle()
         for graph in self.graphs():
@@ -503,7 +518,16 @@ class ManagedAndroidBuild:
                   self.project / 'setup.dart', 'android', '--arch', 'arm64',
                   '--env', 'dev', '--targets', 'apk'], self.project, 'android-package')
         self.check_generated()
-        self.results['managed_hooks'] = check_hook_outputs(self.root, digest)
+        self.results['managed_hooks'] = check_hook_outputs(self.root, digest, self.request_digest)
+        checkpoint = json.loads((self.root / 'native-checkpoint.json').read_text(), object_pairs_hook=unique_fields)
+        if (checkpoint.get('checkpoint_count') != 2 or checkpoint.get('original_task_completed') is not True
+                or checkpoint.get('source') != str(self.project)
+                or checkpoint.get('generated') != {k: v['generated'] for k, v in self.results['managed_hooks'].items()}):
+            raise MaterialError('Managed Native checkpoints did not bind the packaged producer outputs')
+        self.results['native_checkpoint'] = checkpoint
+        for record in self.results['managed_hooks'].values():
+            self.generated.update(record['generated'])
+        self.check_generated()
         outputs = []
         dist = self.project / 'dist'
         if dist.is_dir():
@@ -569,7 +593,7 @@ class ManagedAndroidBuild:
             'org.gradle.java.installations.auto-detect': 'false',
             'org.gradle.java.installations.auto-download': 'false',
             'org.gradle.java.installations.paths': str(self.jdk),
-            'org.gradle.daemon': 'false', 'org.gradle.workers.max': '2',
+            'org.gradle.daemon': 'false', 'org.gradle.configuration-cache': 'false', 'org.gradle.workers.max': '2',
             'org.gradle.dependency.verification': 'strict', 'org.gradle.vfs.watch': 'false',
             'kotlin.compiler.execution.strategy': 'in-process',
             'android.builder.sdkDownload': 'false',
@@ -577,16 +601,8 @@ class ManagedAndroidBuild:
         (home / 'gradle.properties').write_text(''.join(f'{k}={v}\n' for k, v in properties.items()))
         init = home / 'init.d'
         init.mkdir()
-        (init / 'disable-uploads.gradle').write_text('''gradle.taskGraph.whenReady { graph ->
-    graph.allTasks.each { task ->
-        def name = task.name.toLowerCase(java.util.Locale.ROOT)
-        if (name.startsWith('upload') || name.startsWith('publish')) {
-            task.enabled = false
-            task.onlyIf { false }
-        }
-    }
-}
-''')
+        (init / 'native-checkpoint.gradle').write_text(
+            (self.project / 'tool/android_native_checkpoint.gradle').read_text())
         for role, path in (
             ('gradle_wrapper', 'android/gradle/wrapper/gradle-wrapper.jar'),
             ('gradle_launcher_unix', 'android/gradlew'),

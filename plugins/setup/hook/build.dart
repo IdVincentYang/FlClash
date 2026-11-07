@@ -13,7 +13,14 @@ void main(List<String> args) async {
       packageRoot: input.packageRoot,
       selection: input.userDefines['flclash_android_environment'],
     );
-    await const CoreBuilder().run(input: input, output: output);
+    await CoreBuilder(
+      onBuild: (report) async {
+        if (context != null) {
+          output.metadata['flclash_android_generated_outputs'] =
+              await managedAndroidOutputIdentity(report.outputs);
+        }
+      },
+    ).run(input: input, output: output);
     if (context != null) {
       output.metadata['flclash_android_environment_sha256'] = context.digest;
       output.metadata['flclash_android_hook_input_sha256'] =

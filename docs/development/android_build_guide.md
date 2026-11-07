@@ -136,6 +136,19 @@ JSON记录实际APK路径／大小／SHA-256；`managed_android_build_completed`
 不代替完整源码生成对账或设备运行验收。失败读取新位置的`result.json`、`commands.json`及`logs/`；保留失败现场和原材料，
 不要改hash消除错误或把旧结果当执行许可。工作位置保持保留；取消或父进程返回不证明后代已退出，不能据此回收或复用目录。
 
+## 构建执行与CI发布约束
+
+以下实现已完成本机及本地合成消费者自验，完整T04待M实现评审；具体覆盖及失败见[T04 Result](../features/security/loop5/l5_t04_result.md)。上文受管构建及下文正常打包仍是入口；没有真实云端发布或其它host运行证明。
+缓存使用内容／精确输出校验，同root所有key串行，失败恢复旧组；不要删除未知backup或按PID／目录前缀清理别的构建。回滚或进程退出不明时保留现场，不继续装包；遗留generation阻止后续复用，使用新的自有workspace，不将其当作可清空的普通cache。
+受管Native checkpoint复用原Gradle任务的完整注册Android rules及真实defines／outputDir／实际.last_build_id，两次检查后原任务仍照常装包；未注册的build_hooks不能直接作CLI target。SDK的--build-outputs排除.dart_tool中间物，仅作诊断；必须同时核本次原SDK执行、stamp／result／depfile及两hook实际metadata／生产字节并稳定，失败不把APK或stamp存在当ready；无需清用户全局cache。
+
+CI增加Android pre／stable专用`--android-release-candidate`：正式package identity配开发签名，只供独立sign_android重签；不能和dev受管profile混用，候选不得手动当正式发布件。拆分APK的versionCode沿原SDK的基础值加ABI偏移（arm=1000／arm64=2000／x86_64=4000）；SDK升级时复核该原生规则。默认dev入口保持现状。
+SSH发布只在各目的地job的唯一key step进行：原生runner工具、固定GitHub host key、自有配置／目录，缺工具或未知LFS配置明确失败，不临时安装浮动工具。tap目标是clone根（保.git），F-Droid目标是clone/tmp；不是宿主/或/tmp。此处无真实远端运行证明。
+发布由同run／attempt的受信producer输出和固定artifact ID选择，错误／旧／额外产物拒绝；若只重跑下游而前置属于旧attempt，请使用rerun all jobs。不要通过改manifest、hash或关闭检查补齐。
+Pages包装沿原未gzip的artifact.tar，改项目helper加固定upload-artifact直用，避免原composite内部浮动引用；.git／.github排除，普通隐藏资源保留，文件／目录权限规范化。Pages继续允许main push及main手动；非main手动拒绝，workflow_run只接受可信稳定release并执行main快照。此增量不自动配置远端environment或触发CI。
+
+本地正常build只package，发布／shell hook配置及Gradle发布任务应明确拒绝，正常下载仍可用。任何API下载跨源跳转必须剥离认证；日志不可含签名下载URL或秘密。详细边界由[构建来源契约](../features/security/android_build_sources.md#构建执行与发布边界)维护。
+
 ## 构建前准备
 
 在仓库根目录操作。
@@ -175,21 +188,19 @@ Go 构建 hook 在编译或使用内层缓存前检查恢复内容；patch、man
 不得只改 gitlink 留下失效载体，也不通过选择 ours/theirs 丢弃保护；更新对象不授权改写共享历史或发布核心仓库。
 普通父分支推送的既有 carrier 例外与同步步骤由[贡献指南](../../CONTRIBUTING.md#l1-t03-core-source-carrier)维护。
 
-### 限定 Gradle 目录并关闭上传任务
+### 限定 Gradle 目录并拒绝发布任务
 
 本地构建禁止上传或发布。Firebase 构建上传插件已移除；仍使用本项目专用的 Gradle init script，
-在任务图生成后禁用名称以 `upload` 或 `publish` 开头的任务执行。创建或核对以下脚本：
+在任务图生成后，若包含名称以 `upload` 或 `publish` 开头的任务则明确失败。创建或核对以下脚本：
 
 ```bash
 mkdir -p .buildlog/android-build/gradle-home/init.d
-cat > .buildlog/android-build/gradle-home/init.d/disable-uploads.gradle <<'GRADLE'
+cat > .buildlog/android-build/gradle-home/init.d/refuse-publication.gradle <<'GRADLE'
 gradle.taskGraph.whenReady { graph ->
     graph.allTasks.each { task ->
         def name = task.name.toLowerCase(java.util.Locale.ROOT)
         if (name.startsWith('upload') || name.startsWith('publish')) {
-            task.enabled = false
-            task.onlyIf { false }
-            logger.quiet('Local build: disabled transfer task ' + task.path)
+            throw new GradleException('Local package refuses publication task ' + task.path)
         }
     }
 }
@@ -197,7 +208,7 @@ GRADLE
 ```
 
 使用前缀匹配；按名称包含 publish 来匹配会误停 `prepareLintJarForPublish` 等本地准备任务。
-此规则仅限制匹配名称的任务执行，任务仍可注册或进入任务图。
+此规则在执行前拒绝包含匹配名称的任务图；不会静默跳过后报告整个构建成功。
 它不提供构建脚本的网络隔离；其它名称的任务、插件及依赖下载仍可联网。
 变更构建插件时重新检查其传输行为和任务图。
 
@@ -251,7 +262,7 @@ env -i \
 
 - Flutter 输出：`build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`。
 - 项目打包输出：`dist/FlClash-<version>-android-arm64-v8a.apk`，版本取自当前项目。
-- 最终日志：`.buildlog/android-build/build.log`，构建上传任务应显示禁用，依赖下载和本地准备任务应正常完成。
+- 最终日志：`.buildlog/android-build/build.log`，发布任务进入图时应明确失败；没有这些任务时，依赖下载和本地准备任务应正常完成。
 
 可在本地检查 APK 摘要、包信息与签名：
 

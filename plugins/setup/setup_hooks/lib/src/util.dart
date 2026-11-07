@@ -58,6 +58,21 @@ String _selectedExecutable(String executable) {
   return path;
 }
 
+String resolveToolExecutable(String executable) {
+  final selected = _selectedExecutable(executable);
+  if (p.isAbsolute(selected)) return selected;
+  final search = _toolSearchPath ?? Platform.environment['PATH'] ?? '';
+  for (final directory in search.split(Platform.isWindows ? ';' : ':')) {
+    if (directory.isEmpty) continue;
+    for (final suffix
+        in Platform.isWindows ? ['', '.exe', '.bat', '.cmd'] : ['']) {
+      final path = p.join(directory, selected + suffix);
+      if (File(path).existsSync()) return p.absolute(path);
+    }
+  }
+  throw BuildException('Cannot resolve build tool: $executable');
+}
+
 ProcessResult runCommand(
   String executable,
   List<String> arguments, {

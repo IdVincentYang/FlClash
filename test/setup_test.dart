@@ -29,6 +29,80 @@ void main() {
       expect(setup.createBuildEnvironment('dev'), {'APP_ENV': 'dev'});
     });
 
+    test(
+      'release candidate is explicit and cannot mix with dev or another platform',
+      () {
+        final options = setup.createSetupArgParser().parse([
+          'android',
+          '--android-release-candidate',
+        ]);
+        expect(options['android-release-candidate'], isTrue);
+        expect(
+          setup.createBuildEnvironment('pre', androidReleaseCandidate: true),
+          {'APP_ENV': 'pre', 'ANDROID_RELEASE_CANDIDATE': 'true'},
+        );
+        for (final platform in ['android', 'macos']) {
+          expect(
+            () => setup.validateReleaseCandidate(
+              platform: platform,
+              applicationEnvironment: 'dev',
+              candidate: true,
+            ),
+            throwsStateError,
+          );
+        }
+        expect(
+          () => setup.validateReleaseCandidate(
+            platform: 'android',
+            applicationEnvironment: 'stable',
+            candidate: true,
+            managedProfile: 'dev',
+          ),
+          throwsStateError,
+        );
+        setup.validateReleaseCandidate(
+          platform: 'android',
+          applicationEnvironment: 'stable',
+          candidate: true,
+        );
+      },
+    );
+
+    test(
+      'local package rejects hooks and publisher configuration before execution',
+      () {
+        setup.validatePackageConfiguration(
+          'app_name: FlClash\noutput: dist/\n',
+        );
+        for (final option in [
+          'publishers: {}',
+          'hooks: {}',
+          'variables: {}',
+          'releases: []',
+        ]) {
+          expect(
+            () => setup.validatePackageConfiguration(
+              'app_name: FlClash\noutput: dist/\n$option\n',
+            ),
+            throwsStateError,
+          );
+        }
+      },
+    );
+
+    test('packager inherits tools but no known publication credentials', () {
+      expect(
+        setup.packageProcessEnvironment({
+          'PATH': '/tools',
+          'GITHUB_TOKEN': 'secret',
+          'TELEGRAM_API_HASH': 'secret',
+          'KEYSTORE': 'secret',
+          'ANDROID_HOME': '/sdk',
+        }),
+        {'PATH': '/tools', 'ANDROID_HOME': '/sdk'},
+      );
+    });
+
     test('omits verbose from flutter build args by default', () {
       final args = setup.createFlutterBuildArgs(
         platform: 'android',

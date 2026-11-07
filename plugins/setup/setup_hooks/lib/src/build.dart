@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 
@@ -50,11 +52,6 @@ class BuildReport {
   final List<String> inputs;
   final List<String> outputs;
   final bool rebuilt;
-
-  /// A directory dependency hashes child names, not content, so a deleted
-  /// artifact still reruns the hook without rereading the Core.
-  List<String> get outputDirectories =>
-      {for (final output in outputs) p.dirname(output)}.toList()..sort();
 }
 
 /// The Helper embeds the Core's SHA256, so the Core is built first.
@@ -67,6 +64,19 @@ Future<BuildReport> buildPlatform(BuildRequest request) async {
   final rootDir = request.rootDir;
   final config = BuildConfig.load(rootDir: rootDir);
   final cache = BuildCache(rootDir: rootDir);
+  return cache.transaction(
+    (scoped) => _buildOwned(request, config, scoped, stopwatch),
+  );
+}
+
+Future<BuildReport> _buildOwned(
+  BuildRequest request,
+  BuildConfig config,
+  BuildCache cache,
+  Stopwatch stopwatch,
+) async {
+  final rootDir = request.rootDir;
+  final target = request.target;
   final notice = BuildNotice();
   final harnessInputs = switch (request.harnessDir) {
     null => const <String>[],
@@ -100,7 +110,7 @@ Future<BuildReport> buildPlatform(BuildRequest request) async {
     target.platformDir,
     coreManifestName,
   );
-  writeCoreManifest(path: manifestPath, coreSha256: coreSha256);
+  cache.writeFile(manifestPath, '${jsonEncode({'coreSha256': coreSha256})}\n');
 
   _log.info(
     'Done in ${stopwatch.elapsed}: ${core.primaryOutput}, '

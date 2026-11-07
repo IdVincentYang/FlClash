@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -11,6 +12,22 @@ val localProperties = Properties().apply {
     if (localPropertiesFile.exists()) {
         localPropertiesFile.inputStream().use { load(it) }
     }
+}
+
+val buildDefines = mutableMapOf<String, String>()
+providers.gradleProperty("dart-defines").orNull?.split(",")?.filter { it.isNotEmpty() }?.forEach {
+    val define = String(Base64.getDecoder().decode(it), Charsets.UTF_8)
+    val split = define.indexOf('=')
+    if (split <= 0 || buildDefines.put(define.substring(0, split), define.substring(split + 1)) != null) {
+        throw GradleException("Ambiguous Android build intent")
+    }
+}
+val releaseCandidate = buildDefines["ANDROID_RELEASE_CANDIDATE"] == "true"
+if (buildDefines.containsKey("ANDROID_RELEASE_CANDIDATE") &&
+    (buildDefines["ANDROID_RELEASE_CANDIDATE"] != "true" ||
+        buildDefines["APP_ENV"] !in setOf("pre", "stable") ||
+        System.getenv("FLCLASH_ANDROID_PROFILE") != null || file("keystore.jks").exists())) {
+    throw GradleException("Release candidates require isolated Android pre/stable without a release key")
 }
 
 val releaseStoreFile = file("keystore.jks")
@@ -66,7 +83,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            if (hasReleaseSigning) {
+            if (releaseCandidate) {
+                signingConfig = signingConfigs.getByName("debug")
+            } else if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 signingConfig = signingConfigs.getByName("debug")

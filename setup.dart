@@ -53,6 +53,13 @@ Future<void> main(List<String> args) async {
   }
 
   final env = results['env'] as String;
+  final candidate = results['android-release-candidate'] as bool;
+  validateReleaseCandidate(
+    platform: platform,
+    applicationEnvironment: env,
+    candidate: candidate,
+    managedProfile: Platform.environment['FLCLASH_ANDROID_PROFILE'],
+  );
   final rootDir = Directory.current.path;
   final skipped = packagesNotBuildingAssets(
     File(p.join(rootDir, 'pubspec.yaml')).readAsStringSync(),
@@ -78,6 +85,7 @@ Future<void> main(List<String> args) async {
     rootDir,
     arch,
     androidArch: androidArch,
+    androidReleaseCandidate: candidate,
     verbose: verbose,
   );
   exit(exitCode);
@@ -103,6 +111,12 @@ ArgParser createSetupArgParser() {
       help: 'Target architecture (Android only)',
     )
     ..addFlag(
+      'android-release-candidate',
+      negatable: false,
+      help:
+          'Build a developer-signed Android pre/stable candidate for isolated CI signing',
+    )
+    ..addFlag(
       'verbose',
       abbr: 'v',
       negatable: false,
@@ -126,8 +140,62 @@ List<String> createFlutterBuildArgs({
   return flutterBuildArgs;
 }
 
-Map<String, String> createBuildEnvironment(String env) {
-  return {'APP_ENV': env};
+Map<String, String> createBuildEnvironment(
+  String env, {
+  bool androidReleaseCandidate = false,
+}) {
+  return {
+    'APP_ENV': env,
+    if (androidReleaseCandidate) 'ANDROID_RELEASE_CANDIDATE': 'true',
+  };
+}
+
+void validateReleaseCandidate({
+  required String platform,
+  required String applicationEnvironment,
+  required bool candidate,
+  String? managedProfile,
+}) {
+  if (candidate &&
+      (platform != 'android' ||
+          applicationEnvironment == 'dev' ||
+          managedProfile != null)) {
+    throw StateError(
+      'Release candidates require Android pre/stable outside the dev profile',
+    );
+  }
+}
+
+void validatePackageConfiguration(String text) {
+  final config = loadYaml(text);
+  if (config is! Map ||
+      config.length != 2 ||
+      config['app_name'] != 'FlClash' ||
+      config['output'] != 'dist/') {
+    throw StateError(
+      'Local package refuses publisher, hook or additional distributor configuration',
+    );
+  }
+}
+
+Map<String, String> packageProcessEnvironment(Map<String, String> parent) {
+  const excluded = {
+    'GH_TOKEN',
+    'GITHUB_TOKEN',
+    'ACTIONS_RUNTIME_TOKEN',
+    'KEYSTORE',
+    'KEY_ALIAS',
+    'KEY_PASSWORD',
+    'STORE_PASSWORD',
+    'SSH_DEPLOY_KEY',
+    'HOMEBREW_SSH_DEPLOY_KEY',
+  };
+  return {
+    for (final entry in parent.entries)
+      if (!excluded.contains(entry.key.toUpperCase()) &&
+          !entry.key.toUpperCase().startsWith('TELEGRAM_'))
+        entry.key: entry.value,
+  };
 }
 
 /// Packages whose build hook `pubspec.yaml` turns into a no-op.
@@ -164,7 +232,12 @@ Future<int> _package(
   String arch, {
   String? androidArch,
   required bool verbose,
+  bool androidReleaseCandidate = false,
 }) async {
+  validatePackageConfiguration(
+    File(p.join(rootDir, 'distribute_options.yaml')).readAsStringSync(),
+  );
+  final packageEnvironment = packageProcessEnvironment(Platform.environment);
   final managedAndroid =
       platform == 'android' &&
       Platform.environment.containsKey('FLCLASH_ANDROID_PROFILE');
@@ -180,7 +253,14 @@ Future<int> _package(
         )
       : null;
   final file = File(p.join(rootDir, 'env.json'));
-  await file.writeAsString(jsonEncode(createBuildEnvironment(env)));
+  await file.writeAsString(
+    jsonEncode(
+      createBuildEnvironment(
+        env,
+        androidReleaseCandidate: androidReleaseCandidate,
+      ),
+    ),
+  );
 
   final flutterBuildArgs = createFlutterBuildArgs(
     platform: platform,
@@ -208,18 +288,23 @@ Future<int> _package(
             as Map;
     final git =
         (consumer['dependencies'] as Map)['flutter_distributor']['git'] as Map;
-    final activateResult = await Process.run('dart', [
-      'pub',
-      'global',
-      'activate',
-      '-s',
-      'git',
-      git['url'] as String,
-      '--git-ref',
-      git['ref'] as String,
-      '--git-path',
-      git['path'] as String,
-    ]);
+    final activateResult = await Process.run(
+      'dart',
+      [
+        'pub',
+        'global',
+        'activate',
+        '-s',
+        'git',
+        git['url'] as String,
+        '--git-ref',
+        git['ref'] as String,
+        '--git-path',
+        git['path'] as String,
+      ],
+      environment: packageEnvironment,
+      includeParentEnvironment: false,
+    );
     if (activateResult.exitCode != 0) {
       stderr.write(activateResult.stderr);
       return activateResult.exitCode;
@@ -242,7 +327,8 @@ Future<int> _package(
         '--flutter-build-args=${flutterBuildArgs.join(',')}',
       ...descriptionArgs,
     ],
-    includeParentEnvironment: true,
+    includeParentEnvironment: false,
+    environment: packageEnvironment,
     runInShell: Platform.isWindows,
   );
 

@@ -816,6 +816,17 @@ that asks the OS for a permission, a global shortcut or a registration, must con
 
 ## Build System
 
+T04 has passed local self-verification; full implementation review and delivery are pending. BuildCache's output namespace is owned by a canonical-root
+process/file lock, independent of cache keys. A scoped transaction spans Go, Core digest, Helper and manifest;
+inner runs reuse it and retain backups until outer success. Producers declare exact staged outputs and content
+identity; cleanup cannot restore/delete live output after releasing ownership. Native output files, actual SDK
+build_hooks context and run-local generated bindings remain distinct from provenance. CI read-only qualification
+precedes signing/publishing jobs and secret services; artifact IDs originate from trusted producer outputs, while
+GitHub metadata verifies run/repository/commit and attempt jobs. Pages executes a fixed main snapshot, never the
+upstream artifact. The [build source contract](../docs/features/security/android_build_sources.md#构建执行与发布边界)
+owns these rules, including cross-origin authorization stripping and the unverified boundaries.
+Module behavior below reflects this implementation; it does not imply completed T04 delivery.
+
 Android source/artifact attribution is maintained in
 [the build sources baseline](../docs/features/security/android_build_sources.md).
 Input hashes, intermediate bytes, packaged contents and runtime loading are separate facts;
@@ -841,7 +852,9 @@ build_config.yaml file, including its absence, without making the entire reposit
 Current behavior and compatibility limits belong to
 [the business data contract](../docs/features/security/business_data_design.md); older APKs do not acquire this protection.
 
-`setup.dart` is the release build orchestrator: it writes `env.json` (`APP_ENV`), activates `flutter_distributor` from
+`setup.dart` is the release build orchestrator: it validates package-only distributor configuration, filters known
+publication credentials, writes `env.json` (`APP_ENV`, plus an explicit Android release-candidate intent when selected),
+and activates `flutter_distributor` from
 the `chen08209/flutter_distributor` fork pinned to a `v<version>-flclash.<n>` tag (cut a new tag there and bump
 `--git-ref` when the fork changes), and leaves the Core artifacts to the build hook.
 
@@ -863,10 +876,9 @@ What the hook protocol forces:
   run, so nothing in the hook branches on debug versus release. It cannot tell `flutter test` from a build either; the
   `build_assets: false` user-define in the root `pubspec.yaml` is the one switch (see `.agents/commands.md`), and
   `setup.dart` refuses to package while it is set.
-- The hook declares the files it read but the *directories* it wrote: `hooks_runner` hashes a file by content and a
-  directory by child names, so `libclash/macos/` catches a deleted artifact without MD5-ing a 55 MB Core on every
-  build. A rebuild touches those directories after the runner's cutoff, so the next build runs the hook once more and
-  setup's cache answers it; that extra run is expected.
+- The Go hook declares actual output files alongside its inputs so Native Assets can observe changed bytes.
+  A producer can modify these files after the first runner cutoff. The managed Android entry therefore requires
+  a second stable original-SDK checkpoint, then checks the same producer output identity after original packaging.
 - The runner discards hook output on success, even under `-v`, so the hook mirrors it into
   `.dart_tool/setup_build_cache/hook.log` (rotated at 512 KB), one `===` header per invocation.
 
@@ -886,19 +898,23 @@ Platform projects copy the artifacts out of `libclash/`; application code must n
   configuration is known, and a Release install never stops a registered service. The step matches the process by
   executable path rather than image name, so a Helper registered from an installed release keeps running.
 
-Setup keeps its own cache under `.dart_tool/setup_build_cache/v1/` because it builds a Go core and, on Windows and
-Linux, a Rust helper:
+Setup keeps versioned records under `.dart_tool/setup_build_cache/v2/`. A canonical-root process lock and the
+schema-independent `outputs.lock` cover all cache keys, including nonoverlapping outputs. `buildPlatform` retains
+ownership and backups across Go, Core SHA256, Helper and manifest; direct `BuildCache.run` calls own one transaction.
 
-- Go fingerprints cover the target-specific `go list -deps` inputs in `core/` and `Clash.Meta`, module files, the
-  effective build configuration, `setup_hooks` sources, target flags, the Go toolchain and the Android clang version.
-  Helper fingerprints cover its Rust sources and manifests, Cargo/Rust toolchains and flags, and the expected Core
-  SHA256.
-- A hit requires the fingerprint and every recorded output's path, size and modification state to match, and skips
-  compilation and copying.
-- Records are written only after a successful build, under per-target locks. Compilation happens in a staging
-  directory and moves into place on success, so a failed build never destroys the previous artifacts.
-- `flutter clean` removes `.dart_tool` and forces one full rebuild; deleting `.dart_tool/setup_build_cache/` does the
-  same without a clean.
+- Producers declare exact output files and wholly owned header directories before building into private staging.
+  A hit checks required input fingerprints, the expected output plan, regular file types, sizes and SHA-256, rather
+  than allowing a record to select paths. Missing required input fails; optional configuration absence is explicit.
+- Go fingerprints include native dependency inputs outside Core, configuration, target flags and selected tool
+  observations; Helper includes its sources, Cargo/Rust tools and expected Core SHA256. Managed tool authentication
+  comes from the accepted raw material checks, not version strings or these local records.
+- Input changes during production reject installation. An inner failure restores its output group; later Helper or
+  manifest failure restores all earlier installed groups and records. Backup cleanup stays inside ownership.
+  Ended producers cannot reuse staging through the API. Unknown exit or failed restoration retains evidence and
+  rejects reuse when a generation remains; use a fresh owned workspace rather than deleting those backups.
+- This protects cooperative cache writers, not power-loss atomicity or arbitrary concurrent readers. Ordinary
+  records do not establish historical generation. For an intentional rebuild after all owned writers have exited,
+  remove only v2 records when no retained generation exists; see [.agents/commands.md](commands.md).
 
 Windows helper integrity/version check:
 

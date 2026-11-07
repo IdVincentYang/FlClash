@@ -18,64 +18,175 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  tag:
-    # head_branch also names a branch push's branch, so only a tag at the built commit counts as a release.
+  pages_gate:
+    name: Pages gate
+    if: github.repository == 'chen08209/FlClash' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      commit: ${{ steps.gate.outputs.commit }}
+      attempt: ${{ steps.gate.outputs.attempt }}
+      run_id: ${{ steps.gate.outputs.run_id }}
+      checkout_sha: ${{ steps.gate.outputs.checkout_sha }}
+    steps:
+      - name: Checkout fixed main execution source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Qualify Pages event and source
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tool/ci_release.py pages-gate
+
+  pages_build:
+    name: Pages build
+    needs: pages_gate
     if: >-
-      github.repository == 'chen08209/FlClash' &&
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      startsWith(github.event.workflow_run.head_branch, 'v') &&
-      !contains(github.event.workflow_run.head_branch, '-')
+      github.repository == 'chen08209/FlClash' && github.ref == 'refs/heads/main' &&
+      needs.pages_gate.result == 'success' && needs.pages_gate.outputs.eligible == 'true' &&
+      needs.pages_gate.outputs.run_id == github.run_id && needs.pages_gate.outputs.attempt == github.run_attempt && needs.pages_gate.outputs.commit == github.sha
     runs-on: ubuntu-latest
     outputs:
-      stable: ${{ steps.lookup.outputs.stable }}
+      artifact_id: ${{ steps.artifact.outputs.artifact-id }}
+      artifact_sha256: ${{ steps.artifact.outputs.artifact-digest }}
+      artifact_name: pages-${{ github.run_id }}-${{ github.run_attempt }}
+      attempt: ${{ github.run_attempt }}
+      site_sha256: ${{ steps.pack.outputs.site_sha256 }}
     steps:
-      - name: Look up the tag
-        id: lookup
-        env:
-          NAME: ${{ github.event.workflow_run.head_branch }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-          REMOTE: ${{ github.server_url }}/${{ github.repository }}
-        run: |
-          if git ls-remote --tags "$REMOTE" "refs/tags/$NAME" "refs/tags/$NAME^{}" | grep -q "^$SHA"; then
-            echo 'stable=true' >> "$GITHUB_OUTPUT"
-          fi
-
-  deploy:
-    needs: tag
-    if: >-
-      github.repository == 'chen08209/FlClash' &&
-      !cancelled() &&
-      (github.event_name != 'workflow_run' || needs.tag.outputs.stable == 'true')
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
+      - name: Checkout accepted main snapshot
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
+        with:
+          persist-credentials: false
+          ref: ${{ needs.pages_gate.outputs.checkout_sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
       - name: Assemble site
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash tool/build_site.sh _site
-
-      - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-
-      - name: Upload
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - name: Package checked site without links or host metadata
+        id: pack
+        run: python tool/ci_release.py pack-pages --source _site --destination "$RUNNER_TEMP/artifact.tar"
+      - name: Upload producer artifact
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          path: _site
+          name: pages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/artifact.tar
+          overwrite: false
+          if-no-files-found: error
 
-      - name: Deploy
+  pages_deploy_gate:
+    name: Pages deploy gate
+    needs: [ pages_gate, pages_build ]
+    if: >-
+      github.repository == 'chen08209/FlClash' && github.ref == 'refs/heads/main' &&
+      needs.pages_gate.result == 'success' && needs.pages_gate.outputs.eligible == 'true' &&
+      needs.pages_gate.outputs.run_id == github.run_id && needs.pages_gate.outputs.attempt == github.run_attempt && needs.pages_gate.outputs.commit == github.sha &&
+      needs.pages_build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      commit: ${{ steps.gate.outputs.commit }}
+      attempt: ${{ steps.gate.outputs.attempt }}
+      run_id: ${{ steps.gate.outputs.run_id }}
+      artifact_id: ${{ steps.gate.outputs.artifact_id }}
+      artifact_name: ${{ steps.gate.outputs.artifact_name }}
+    steps:
+      - name: Checkout accepted main checker
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ needs.pages_gate.outputs.checkout_sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Verify this run's exact site artifact before deployment role
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py pages-deploy-gate --destination "$RUNNER_TEMP/pages-gate"
+
+  pages_deploy:
+    name: Pages deploy
+    needs: [ pages_gate, pages_build, pages_deploy_gate ]
+    if: >-
+      github.repository == 'chen08209/FlClash' && github.ref == 'refs/heads/main' &&
+      needs.pages_gate.result == 'success' && needs.pages_gate.outputs.eligible == 'true' &&
+      needs.pages_gate.outputs.run_id == github.run_id && needs.pages_gate.outputs.attempt == github.run_attempt && needs.pages_gate.outputs.commit == github.sha &&
+      needs.pages_deploy_gate.result == 'success' && needs.pages_deploy_gate.outputs.eligible == 'true' &&
+      needs.pages_deploy_gate.outputs.run_id == github.run_id && needs.pages_deploy_gate.outputs.attempt == github.run_attempt && needs.pages_deploy_gate.outputs.commit == github.sha
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Recheck name-to-ID binding at deployment consumer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ID: ${{ needs.pages_deploy_gate.outputs.artifact_id }}
+          EXPECTED_NAME: ${{ needs.pages_deploy_gate.outputs.artifact_name }}
+          EXPECTED_SHA256: ${{ needs.pages_build.outputs.artifact_sha256 }}
+        run: |
+          node --input-type=module <<'JS'
+          try {
+            const env=process.env;
+            const name=`pages-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
+            if (![env.GITHUB_RUN_ID,env.GITHUB_RUN_ATTEMPT,env.GITHUB_REPOSITORY_ID,env.EXPECTED_ID].every(value=>/^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value))) || !/^[0-9a-f]{64}$/.test(env.EXPECTED_SHA256)) throw Error();
+            const id=Number(env.EXPECTED_ID);
+            if (!Number.isSafeInteger(id) || id<=0 || env.EXPECTED_NAME!==name) throw Error();
+            const items=[]; let total;
+            for (let page=1;page<=100;page++) {
+              const url=`https://api.github.com/repos/chen08209/FlClash/actions/runs/${env.GITHUB_RUN_ID}/artifacts?per_page=100&page=${page}`;
+              const response=await fetch(url,{headers:{Authorization:`Bearer ${env.GH_TOKEN}`,'X-GitHub-Api-Version':'2022-11-28'},redirect:'error'});
+              if (!response.ok) throw Error();
+              const data=await response.json();
+              if (!Number.isSafeInteger(data.total_count) || data.total_count<0 || data.total_count>10000 || !Array.isArray(data.artifacts)) throw Error();
+              total??=data.total_count;
+              if (total!==data.total_count || (data.artifacts.length===0 && items.length!==total)) throw Error();
+              items.push(...data.artifacts);
+              if (items.length===total) break;
+              if (items.length>total || page===100) throw Error();
+            }
+            const selected=items.filter(item=>item.name===name);
+            if (selected.length!==1 || selected[0].id!==id || selected[0].expired!==false ||
+                selected[0].digest!==`sha256:${env.EXPECTED_SHA256}` ||
+                selected[0].workflow_run.id!==Number(env.GITHUB_RUN_ID) ||
+                selected[0].workflow_run.repository_id!==Number(env.GITHUB_REPOSITORY_ID) ||
+                selected[0].workflow_run.head_repository_id!==Number(env.GITHUB_REPOSITORY_ID) ||
+                selected[0].workflow_run.head_sha!==env.GITHUB_SHA) throw Error();
+          } catch {
+            console.error('Pages artifact identity check failed'); process.exit(1);
+          }
+          JS
+      - name: Deploy exact qualified site
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        with:
+          artifact_name: ${{ needs.pages_deploy_gate.outputs.artifact_name }}

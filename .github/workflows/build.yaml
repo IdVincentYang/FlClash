@@ -12,6 +12,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
+permissions:
+  contents: read
+
 env:
   IS_STABLE: ${{ !contains(github.ref, '-') }}
   FLUTTER_VERSION: '3.47.4'
@@ -29,6 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
           fetch-depth: 0
           submodules: false
 
@@ -48,18 +52,12 @@ jobs:
       - name: Test comment density hook
         run: bash tool/check_comment_density_test.sh
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          workspaces: plugins/rust_api/rust
-          cache-directories: .dart_tool/hooks_runner
-
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: false
 
       - name: Install dependencies
         run: flutter pub get
@@ -91,13 +89,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: false
 
       - name: Validate local Flutter packages
         run: bash tool/check_plugins.sh
@@ -127,6 +127,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
           submodules: false
 
       - name: Setup core source restoration
@@ -143,23 +144,15 @@ jobs:
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
           cache-dependency-path: core/go.sum
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          key: desktop-${{ matrix.platform }}
-          workspaces: |
-            services/helper
-            plugins/rust_api/rust
-          cache-directories: .dart_tool/hooks_runner
 
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: false
 
       - name: Install Linux build dependencies
         if: matrix.platform == 'linux'
@@ -193,6 +186,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
           submodules: false
 
       - name: Setup core source restoration
@@ -209,6 +203,7 @@ jobs:
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
           cache-dependency-path: core/go.sum
 
       - name: Validate Go core wrapper
@@ -254,13 +249,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: false
 
       - name: Install dependencies
         run: flutter pub get
@@ -279,6 +276,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+        with:
+          cache-disabled: true
 
       - name: Run Android unit tests
         working-directory: android
@@ -301,13 +300,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          workspaces: |
-            services/helper
-            plugins/rust_api/rust
+          persist-credentials: false
 
       - name: Check format
         run: |
@@ -326,11 +320,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          workspaces: services/helper
+          persist-credentials: false
 
       - name: Check format
         run: cargo fmt --manifest-path services/helper/Cargo.toml -- --check
@@ -338,145 +329,389 @@ jobs:
       - name: Run Windows service tests
         run: cargo test --manifest-path services/helper/Cargo.toml --features windows-service
 
-  build:
-    # Releases publish where the release links point: the public repository.
-    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [ dart, plugins, go, android, rust, windows-helper-test ]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - platform: android
-            os: ubuntu-latest
-          - platform: windows
-            os: Windows-2022
-            arch: amd64
-          - platform: linux
-            os: ubuntu-22.04
-            arch: amd64
-          - platform: macos
-            os: macos-15-intel
-            arch: amd64
-          - platform: macos
-            os: macos-latest
-            arch: arm64
-          - platform: windows
-            os: windows-11-arm
-            arch: arm64
-          - platform: linux
-            os: ubuntu-24.04-arm
-            arch: arm64
-
+  release_gate:
+    name: Release gate
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      run_id: ${{ steps.gate.outputs.run_id }}
+      stable: ${{ steps.gate.outputs.stable }}
+      version: ${{ steps.gate.outputs.version }}
+      commit: ${{ steps.gate.outputs.commit }}
+      attempt: ${{ steps.gate.outputs.attempt }}
     steps:
-      - name: Setup rust
-        if: startsWith(matrix.os, 'windows-11-arm')
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://win.rustup.rs/aarch64" -OutFile rustup-init.exe
-          .\rustup-init.exe -y --default-toolchain stable
-          $cargoPath = "$env:USERPROFILE\.cargo\bin"
-          Add-Content $env:GITHUB_PATH $cargoPath
-
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          submodules: false
-
-      - name: Setup core source restoration
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
+      - name: Qualify release event
+        id: gate
+        run: python tool/ci_release.py release-gate
 
+  build:
+    name: Build (${{ matrix.role }})
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha
+    needs: [ release_gate, dart, plugins, go, android, rust, windows-helper-test ]
+    runs-on: ${{ matrix.os }}
+    outputs:
+      android_candidate_id: ${{ steps.bind.outputs.android_candidate_id }}
+      android_candidate_sha256: ${{ steps.bind.outputs.android_candidate_sha256 }}
+      android_candidate_attempt: ${{ steps.bind.outputs.android_candidate_attempt }}
+      windows_amd64_id: ${{ steps.bind.outputs.windows_amd64_id }}
+      windows_amd64_sha256: ${{ steps.bind.outputs.windows_amd64_sha256 }}
+      windows_amd64_attempt: ${{ steps.bind.outputs.windows_amd64_attempt }}
+      linux_amd64_id: ${{ steps.bind.outputs.linux_amd64_id }}
+      linux_amd64_sha256: ${{ steps.bind.outputs.linux_amd64_sha256 }}
+      linux_amd64_attempt: ${{ steps.bind.outputs.linux_amd64_attempt }}
+      macos_amd64_id: ${{ steps.bind.outputs.macos_amd64_id }}
+      macos_amd64_sha256: ${{ steps.bind.outputs.macos_amd64_sha256 }}
+      macos_amd64_attempt: ${{ steps.bind.outputs.macos_amd64_attempt }}
+      macos_arm64_id: ${{ steps.bind.outputs.macos_arm64_id }}
+      macos_arm64_sha256: ${{ steps.bind.outputs.macos_arm64_sha256 }}
+      macos_arm64_attempt: ${{ steps.bind.outputs.macos_arm64_attempt }}
+      windows_arm64_id: ${{ steps.bind.outputs.windows_arm64_id }}
+      windows_arm64_sha256: ${{ steps.bind.outputs.windows_arm64_sha256 }}
+      windows_arm64_attempt: ${{ steps.bind.outputs.windows_arm64_attempt }}
+      linux_arm64_id: ${{ steps.bind.outputs.linux_arm64_id }}
+      linux_arm64_sha256: ${{ steps.bind.outputs.linux_arm64_sha256 }}
+      linux_arm64_attempt: ${{ steps.bind.outputs.linux_arm64_attempt }}
+    strategy:
+      matrix:
+        include:
+          - role: android-candidate
+            platform: android
+            os: ubuntu-latest
+          - role: windows-amd64
+            platform: windows
+            os: Windows-2022
+            arch: amd64
+          - role: linux-amd64
+            platform: linux
+            os: ubuntu-22.04
+            arch: amd64
+          - role: macos-amd64
+            platform: macos
+            os: macos-15-intel
+            arch: amd64
+          - role: macos-arm64
+            platform: macos
+            os: macos-latest
+            arch: arm64
+          - role: windows-arm64
+            platform: windows
+            os: windows-11-arm
+            arch: arm64
+          - role: linux-arm64
+            platform: linux
+            os: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
       - name: Restore exact core source
         run: |
           python tool/restore_l1_t03_core.py
           git submodule update --init --recursive
-
-      - name: Setup Android Signing
-        if: startsWith(matrix.platform,'android')
+      - name: Setup Rust on Windows ARM64
+        if: matrix.role == 'windows-arm64'
+        shell: pwsh
         run: |
-          echo "${{ secrets.KEYSTORE }}" | base64 --decode > android/app/keystore.jks
-          {
-            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
-            echo "storePassword=${{ secrets.STORE_PASSWORD }}"
-            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
-          } >> android/local.properties
-
+          $rustupVersion = python -c "import pathlib,tomllib;print(tomllib.loads(pathlib.Path('tool/android_artifacts.toml').read_text())['artifacts']['rustup']['version'])"
+          if ($rustupVersion -ne '1.29.0') { throw 'Update Windows rustup acceptance before use' }
+          $installer = Join-Path $env:RUNNER_TEMP 'rustup-init.exe'
+          Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/archive/$rustupVersion/aarch64-pc-windows-msvc/rustup-init.exe" -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3af309e6c3062aa11df0e932954f69d13b734d8a431e593812f3ecd9ff9e6ef6') { throw 'Rustup installer identity mismatch' }
+          $rustVersion = python -c "import pathlib,tomllib;print(tomllib.loads(pathlib.Path('plugins/rust_api/rust/rust-toolchain.toml').read_text())['toolchain']['channel'])"
+          if ($rustVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid Rust toolchain selection' }
+          & $installer -y --default-toolchain $rustVersion --no-modify-path
+          if ($LASTEXITCODE -ne 0) { throw 'Rustup installation failed' }
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.cargo\bin"
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: core/go.sum
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          key: ${{ matrix.platform }}-${{ matrix.arch || 'all' }}
-          workspaces: services/helper
-          cache-directories: .dart_tool/hooks_runner
-
+          cache: false
       - name: Setup Gradle
-        if: startsWith(matrix.platform,'android')
+        if: matrix.platform == 'android'
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
-
+        with:
+          cache-disabled: true
       - name: Enable git long paths (Windows)
         if: startsWith(matrix.os, 'windows')
         run: git config --global core.longpaths true
-
-      # Stable publishes no Windows or Linux arm64 archive; master makes the action
-      # clone the SDK at the pinned tag and let it fetch the host's own Dart SDK.
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: master
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
+          cache: false
       - name: Setup Xcode
-        if: startsWith(matrix.platform,'macos')
+        if: matrix.platform == 'macos'
         run: |
           sudo xcode-select -s /Applications/Xcode_26.3.app || sudo xcode-select -s /Applications/Xcode_26.2.app
           xcodebuild -version
-
       - name: Setup NDK
-        if: startsWith(matrix.platform,'android')
+        if: matrix.platform == 'android'
         uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1
         id: build-ndk
         with:
           ndk-version: ${{ env.NDK_VERSION }}
           add-to-path: true
           link-to-sdk: true
-
       - name: Get Flutter Dependency
-        run: |
-          flutter --version
-          flutter pub get
-
-      # See .agents/flutter-upgrade.md before bumping FLUTTER_VERSION.
+        run: flutter pub get --enforce-lockfile
       - name: Disable Impeller on Intel macOS
         if: matrix.platform == 'macos' && matrix.arch == 'amd64'
         run: plutil -replace FLTEnableImpeller -bool NO macos/Runner/Info.plist
-
-      - name: Setup
+      - name: Build package without release credentials
+        shell: bash
         env:
+          PLATFORM: ${{ matrix.platform }}
+          APPLICATION_ENV: ${{ needs.release_gate.outputs.stable == 'true' && 'stable' || 'pre' }}
           ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
-        run: dart setup.dart ${{ matrix.platform }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }} -v
-
-      - name: Upload
+        run: |
+          args=()
+          if [[ "$PLATFORM" == 'android' ]]; then args+=(--android-release-candidate); fi
+          dart setup.dart "$PLATFORM" --env "$APPLICATION_ENV" "${args[@]}" -v
+      - name: Prepare exact producer artifact
+        shell: bash
+        env:
+          PRODUCER_ROLE: ${{ matrix.role }}
+        run: python tool/ci_release.py pack --role "$PRODUCER_ROLE" --source dist --destination "$RUNNER_TEMP/producer-artifact"
+      - name: Upload producer artifact
+        id: artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: artifact-${{ matrix.platform }}${{ matrix.arch && format('-{0}', matrix.arch) }}
-          path: ./dist
-          overwrite: true
+          name: build-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.role }}
+          path: ${{ runner.temp }}/producer-artifact/
+          overwrite: false
+          if-no-files-found: error
+      - name: Bind this matrix slot only
+        id: bind
+        shell: bash
+        env:
+          PRODUCER_ROLE: ${{ matrix.role }}
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
+          ARTIFACT_SHA256: ${{ steps.artifact.outputs.artifact-digest }}
+        run: |
+          python - <<'PYCODE'
+          import os,re
+          role=os.environ['PRODUCER_ROLE'].replace('-', '_')
+          artifact_id=os.environ['ARTIFACT_ID']; checksum=os.environ['ARTIFACT_SHA256']
+          if not re.fullmatch('[1-9][0-9]*',artifact_id) or not re.fullmatch('[0-9a-f]{64}',checksum): raise SystemExit('Invalid producer output')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write(f"{role}_id={artifact_id}\n{role}_sha256={checksum}\n{role}_attempt={os.environ['GITHUB_RUN_ATTEMPT']}\n")
+          PYCODE
 
-  upload:
-    permissions:
-      contents: write
-    needs: [ build ]
+  notes:
+    name: Notes
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha
+    needs: release_gate
     runs-on: ubuntu-latest
+    outputs:
+      notes_id: ${{ steps.artifact.outputs.artifact-id }}
+      notes_sha256: ${{ steps.artifact.outputs.artifact-digest }}
+      notes_attempt: ${{ github.run_attempt }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: false
+      - name: Prepare notes graph
+        run: |
+          yq -i '.hooks.user_defines.setup.build_assets = false | .hooks.user_defines.rust_api.build_assets = false' pubspec.yaml
+          flutter pub get --enforce-lockfile
+      - name: Generate release notes
+        shell: bash
+        env:
+          STABLE: ${{ needs.release_gate.outputs.stable }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/notes"
+          target=()
+          if [[ "$STABLE" == 'true' ]]; then target=(--tag "$TAG"); else dart run tool/changelog.dart build --unreleased; fi
+          dart run tool/changelog.dart render release "${target[@]}" --out "$RUNNER_TEMP/notes/release.md"
+          dart run tool/changelog.dart render telegram "${target[@]}" --out "$RUNNER_TEMP/notes/telegram.md"
+          python tool/ci_release.py pack --role notes --source "$RUNNER_TEMP/notes" --destination "$RUNNER_TEMP/producer-artifact"
+      - name: Upload producer artifact
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-${{ github.run_id }}-${{ github.run_attempt }}-notes
+          path: ${{ runner.temp }}/producer-artifact/
+          overwrite: false
+          if-no-files-found: error
+
+  sign_gate:
+    name: Sign gate
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha
+    needs: [ release_gate, build ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      commit: ${{ steps.gate.outputs.commit }}
+      attempt: ${{ steps.gate.outputs.attempt }}
+      run_id: ${{ steps.gate.outputs.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Verify Android producer before signing role
+        id: gate
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py sign-gate --destination "$RUNNER_TEMP/sign-gate"
+
+  sign_android:
+    name: Sign Android
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.sign_gate.result == 'success' && needs.sign_gate.outputs.eligible == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha && needs.sign_gate.outputs.run_id == github.run_id && needs.sign_gate.outputs.attempt == github.run_attempt && needs.sign_gate.outputs.commit == github.sha
+    needs: [ release_gate, build, sign_gate ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      android_final_id: ${{ steps.artifact.outputs.artifact-id }}
+      android_final_sha256: ${{ steps.artifact.outputs.artifact-digest }}
+      android_final_attempt: ${{ github.run_attempt }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Setup Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare accepted portable SDK signer
+        run: |
+          python tool/ci_release.py prepare-signer --destination "$RUNNER_TEMP/signer"
+          mkdir "$RUNNER_TEMP/signer/classes"
+          "$JAVA_HOME/bin/javac" --release 17 -cp "$RUNNER_TEMP/signer/apksigner.jar" -d "$RUNNER_TEMP/signer/classes" tool/ci_android_manifest.java
+      - name: Consume exact Android candidate without signing secrets
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py consume --role android-candidate --destination "$RUNNER_TEMP/android-candidate"
+      - name: Verify actual APK identity without signing secrets
+        id: candidate
+        run: python tool/ci_release.py verify-android-candidate --source "$RUNNER_TEMP/android-candidate/android-candidate" --jar "$RUNNER_TEMP/signer/apksigner.jar" --classes "$RUNNER_TEMP/signer/classes"
+      - name: Sign and verify selected certificate
+        env:
+          CI_EXPECTED_ANDROID: ${{ steps.candidate.outputs.android_candidates }}
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: python tool/ci_release.py sign --source "$RUNNER_TEMP/android-candidate/android-candidate" --destination "$RUNNER_TEMP/android-final" --jar "$RUNNER_TEMP/signer/apksigner.jar" --classes "$RUNNER_TEMP/signer/classes"
+      - name: Prepare exact final artifact
+        run: python tool/ci_release.py pack --role android-final --source "$RUNNER_TEMP/android-final" --destination "$RUNNER_TEMP/producer-artifact"
+      - name: Upload producer artifact
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-${{ github.run_id }}-${{ github.run_attempt }}-android-final
+          path: ${{ runner.temp }}/producer-artifact/
+          overwrite: false
+          if-no-files-found: error
+
+  publish_gate:
+    name: Publish gate
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha
+    needs: [ release_gate, build, sign_android, notes ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      commit: ${{ steps.gate.outputs.commit }}
+      attempt: ${{ steps.gate.outputs.attempt }}
+      run_id: ${{ steps.gate.outputs.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Verify producers before any publication credential
+        id: gate
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py publish-gate --destination "$RUNNER_TEMP/publish-gate"
+
+  publish_telegram:
+    name: Publish Telegram
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.publish_gate.result == 'success' && needs.publish_gate.outputs.eligible == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha && needs.publish_gate.outputs.run_id == github.run_id && needs.publish_gate.outputs.attempt == github.run_attempt && needs.publish_gate.outputs.commit == github.sha
+    needs: [ release_gate, build, sign_android, notes, publish_gate ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
     services:
       telegram-bot-api:
-        image: aiogram/telegram-bot-api:latest
+        image: aiogram/telegram-bot-api@sha256:ffb6caba7fa957d59ea04f8556ac302dd7821a6a3cebcc0c70a274520565f9aa
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -486,119 +721,161 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
           fetch-depth: 0
-
-      - name: Download
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          path: ./dist/
-          pattern: artifact-*
-          merge-multiple: true
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          channel: stable
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Skip native build hooks
-        run: |
-          yq -i '.hooks.user_defines.setup.build_assets = false | .hooks.user_defines.rust_api.build_assets = false' pubspec.yaml
-
-      - name: Generate release notes
-        shell: bash
+          python-version: '3.12'
+      - name: Consume and verify exact release set
         env:
-          IS_STABLE: ${{ env.IS_STABLE }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          target=()
-          if [[ "$IS_STABLE" == 'true' ]]; then
-            target=(--tag "$TAG")
-          else
-            dart run tool/changelog.dart build --unreleased
-          fi
-          dart run tool/changelog.dart render release "${target[@]}" --out release.md
-          dart run tool/changelog.dart render telegram "${target[@]}" --out telegram.md
-
-      - name: Push to telegram
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py publish-gate --destination "$RUNNER_TEMP/release-artifacts"
+      - name: Send explicit Telegram subset
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TAG: ${{ github.ref_name }}
           RUN_ID: ${{ github.run_id }}
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-          python release_telegram.py
+          CI_ARTIFACT_ROOT: ${{ runner.temp }}/release-artifacts
+        run: python release_telegram.py
 
-      - name: Patch release.md
+  publish_github:
+    name: Publish GitHub
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.publish_gate.result == 'success' && needs.publish_gate.outputs.eligible == 'true' && needs.release_gate.outputs.stable == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha && needs.publish_gate.outputs.run_id == github.run_id && needs.publish_gate.outputs.attempt == github.run_attempt && needs.publish_gate.outputs.commit == github.sha
+    needs: [ release_gate, build, sign_android, notes, publish_gate ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Consume and verify exact release set
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py publish-gate --destination "$RUNNER_TEMP/release-artifacts"
+      - name: Stage explicit final files and checksums
+        id: stage
+        env:
+          RELEASE_VERSION: ${{ needs.release_gate.outputs.version }}
         run: |
-          version=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-          sed "s|VERSION|$version|g" ./.github/release_template.md >> release.md
-
-      - name: Generate sha256
-        if: ${{ env.IS_STABLE == 'true' }}
-        run: |
-          cd ./dist
-          sha256sum ./* > SHA256SUMS
-
-      - name: Release
-        if: ${{ env.IS_STABLE == 'true' }}
+          python - <<'PYCODE'
+          import hashlib,os,pathlib,shutil
+          from tool.ci_release import SLOTS,expected_names,regular_file
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'release-artifacts'; target=root.parent/'release-files'; target.mkdir()
+          files=[]
+          for role in ('android-final',*SLOTS[1:]):
+              for name in sorted(expected_names(role,os.environ['RELEASE_VERSION'])):
+                  source=regular_file(root/role/name); destination=target/name; shutil.copyfile(source,destination); files.append(destination)
+          sums=target/'SHA256SUMS'
+          with sums.open('w') as out:
+              for path in files:
+                  with path.open('rb') as stream: checksum=hashlib.file_digest(stream,'sha256').hexdigest()
+                  out.write(checksum+'  '+path.name+'\n')
+          files.append(sums)
+          body=regular_file(root/'notes/release.md').read_text()+'\n'+pathlib.Path('.github/release_template.md').read_text().replace('VERSION',os.environ['RELEASE_VERSION'])
+          (target/'release.md').write_text(body)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('files<<CI_FILES\n'+'\n'.join(map(str,files))+'\nCI_FILES\n')
+          PYCODE
+      - name: Release final files
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          files: ./dist/*
-          body_path: './release.md'
+          tag_name: ${{ github.ref_name }}
+          files: ${{ steps.stage.outputs.files }}
+          body_path: ${{ runner.temp }}/release-files/release.md
+          fail_on_unmatched_files: true
 
-      - name: Create Homebrew Cask Source Dir
-        if: ${{ env.IS_STABLE == 'true' }}
+  publish_tap:
+    name: Publish tap
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.publish_gate.result == 'success' && needs.publish_gate.outputs.eligible == 'true' && needs.release_gate.outputs.stable == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha && needs.publish_gate.outputs.run_id == github.run_id && needs.publish_gate.outputs.attempt == github.run_attempt && needs.publish_gate.outputs.commit == github.sha
+    needs: [ release_gate, build, sign_android, notes, publish_gate ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Consume and verify exact release set
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py publish-gate --destination "$RUNNER_TEMP/release-artifacts"
+      - name: Generate Cask from exact macOS files
+        env:
+          RELEASE_VERSION: ${{ needs.release_gate.outputs.version }}
         run: |
-          version=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-          arm_sha=$(sha256sum "./dist/FlClash-${version}-macos-arm64.dmg" | awk '{print $1}')
-          amd_sha=$(sha256sum "./dist/FlClash-${version}-macos-amd64.dmg" | awk '{print $1}')
-
-          mkdir -p ./brew/Casks
-          sed \
-            -e "s|VERSION|$version|g" \
-            -e "s|ARM_SHA256|$arm_sha|g" \
-            -e "s|AMD_SHA256|$amd_sha|g" \
-            ./.github/homebrew_cask_template.rb > ./brew/Casks/flclash.rb
-
-      - name: Push to Homebrew tap
-        if: ${{ env.IS_STABLE == 'true' }}
-        uses: cpina/github-action-push-to-another-repository@07c4d7b3def0a8ebe788a8f2c843a4e1de4f6900 # v1.7.2
+          python - <<'PYCODE'
+          import hashlib,os,pathlib
+          from tool.ci_release import regular_file
+          version=os.environ['RELEASE_VERSION']; root=pathlib.Path(os.environ['RUNNER_TEMP'])/'release-artifacts'
+          template=pathlib.Path('.github/homebrew_cask_template.rb').read_text().replace('VERSION',version)
+          for arch,label in [('arm64','ARM_SHA256'),('amd64','AMD_SHA256')]:
+              with regular_file(root/('macos-'+arch)/f'FlClash-{version}-macos-{arch}.dmg').open('rb') as stream: checksum=hashlib.file_digest(stream,'sha256').hexdigest()
+              template=template.replace(label,checksum)
+          target=root.parent/'tap/Casks'; target.mkdir(parents=True); (target/'flclash.rb').write_text(template)
+          PYCODE
+      - name: Push Homebrew tap
         env:
           SSH_DEPLOY_KEY: ${{ secrets.HOMEBREW_SSH_DEPLOY_KEY }}
+        run: python tool/ci_push.py --target tap --source "$RUNNER_TEMP/tap"
+
+  publish_fdroid:
+    name: Publish F-Droid
+    if: github.repository == 'chen08209/FlClash' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && needs.release_gate.result == 'success' && needs.release_gate.outputs.eligible == 'true' && needs.publish_gate.result == 'success' && needs.publish_gate.outputs.eligible == 'true' && needs.release_gate.outputs.stable == 'true' && needs.release_gate.outputs.run_id == github.run_id && needs.release_gate.outputs.attempt == github.run_attempt && needs.release_gate.outputs.commit == github.sha && needs.publish_gate.outputs.run_id == github.run_id && needs.publish_gate.outputs.attempt == github.run_attempt && needs.publish_gate.outputs.commit == github.sha
+    needs: [ release_gate, build, sign_android, notes, publish_gate ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          source-directory: ./brew/
-          destination-github-username: chen08209
-          destination-repository-name: homebrew-tap
-          user-name: 'chen08029'
-          user-email: 'chen08209@gmail.com'
-          target-branch: main
-          commit-message: Update Homebrew cask from ${{ github.ref_name }}
-          target-directory: /
-
-      - name: Create Fdroid Source Dir
-        if: ${{ env.IS_STABLE == 'true' }}
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Consume and verify exact release set
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python tool/ci_release.py publish-gate --destination "$RUNNER_TEMP/release-artifacts"
+      - name: Stage exact signed ARM64 APK
+        env:
+          RELEASE_VERSION: ${{ needs.release_gate.outputs.version }}
         run: |
-          mkdir -p ./tmp
-          cp ./dist/*android-arm64-v8a* ./tmp/ || true
-          echo "Files copied successfully"
-
-      - name: Push to fdroid repo
-        if: ${{ env.IS_STABLE == 'true' }}
-        uses: cpina/github-action-push-to-another-repository@07c4d7b3def0a8ebe788a8f2c843a4e1de4f6900 # v1.7.2
+          python - <<'PYCODE'
+          import os,pathlib,shutil
+          from tool.ci_release import regular_file
+          root=pathlib.Path(os.environ['RUNNER_TEMP']); name='FlClash-'+os.environ['RELEASE_VERSION']+'-android-arm64-v8a.apk'
+          target=root/'fdroid'; target.mkdir(); shutil.copyfile(regular_file(root/'release-artifacts/android-final'/name),target/name)
+          PYCODE
+      - name: Push F-Droid repository
         env:
           SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
-        with:
-          source-directory: ./tmp/
-          destination-github-username: chen08209
-          destination-repository-name: FlClash-fdroid-repo
-          user-name: 'chen08029'
-          user-email: 'chen08209@gmail.com'
-          target-branch: main
-          commit-message: Update from ${{ github.ref_name }}
-          target-directory: /tmp/
+        run: python tool/ci_push.py --target fdroid --source "$RUNNER_TEMP/fdroid"

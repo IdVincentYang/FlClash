@@ -181,40 +181,38 @@ void main() {
   });
 
   group('run', () {
-    test(
-      'reports read files and written directories as dependencies',
-      () async {
-        final goFile = p.join(repository.path, 'core', 'lib.go');
-        final coreDir = p.join(repository.path, 'libclash', 'linux');
-        BuildRequest? seen;
-        final builder = CoreBuilder(
-          build: (request) async {
-            seen = request;
-            return BuildReport(
-              inputs: [goFile],
-              outputs: [
-                p.join(coreDir, 'FlClashCore'),
-                p.join(coreDir, 'manifest.json'),
-              ],
-              rebuilt: true,
-            );
-          },
-        );
-        final output = BuildOutputBuilder();
+    test('reports input and output file contents as dependencies', () async {
+      final goFile = p.join(repository.path, 'core', 'lib.go');
+      final coreDir = p.join(repository.path, 'libclash', 'linux');
+      BuildRequest? seen;
+      final builder = CoreBuilder(
+        build: (request) async {
+          seen = request;
+          return BuildReport(
+            inputs: [goFile],
+            outputs: [
+              p.join(coreDir, 'FlClashCore'),
+              p.join(coreDir, 'manifest.json'),
+            ],
+            rebuilt: true,
+          );
+        },
+      );
+      final output = BuildOutputBuilder();
 
-        await builder.run(
-          input: buildInput(os: OS.linux, architecture: Architecture.x64),
-          output: output,
-        );
+      await builder.run(
+        input: buildInput(os: OS.linux, architecture: Architecture.x64),
+        output: output,
+      );
 
-        expect(seen?.target, Target.linuxAmd64);
-        expect(BuildOutput(output.json).dependencies, [
-          Uri.file(p.join(repository.path, 'build_config.yaml')),
-          Uri.file(goFile),
-          Uri.directory(coreDir),
-        ]);
-      },
-    );
+      expect(seen?.target, Target.linuxAmd64);
+      expect(BuildOutput(output.json).dependencies, [
+        Uri.file(p.join(repository.path, 'build_config.yaml')),
+        Uri.file(goFile),
+        Uri.file(p.join(coreDir, 'FlClashCore')),
+        Uri.file(p.join(coreDir, 'manifest.json')),
+      ]);
+    });
 
     test('declares no dependencies when nothing is built', () async {
       var built = false;

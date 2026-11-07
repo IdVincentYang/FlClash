@@ -33,11 +33,11 @@ void main() {
     key: 'windows-amd64-core',
     fingerprint: () async => Fingerprint(fingerprint),
     primaryOutput: coreOutput.path,
+    outputs: [coreOutput.path],
     notice: notice,
-    build: () async {
+    build: (staging) async {
       coreBuilds++;
-      coreOutput.writeAsStringSync('core-$fingerprint');
-      return [coreOutput.path];
+      staging.file(coreOutput.path).writeAsStringSync('core-$fingerprint');
     },
   );
 
@@ -48,11 +48,13 @@ void main() {
     key: 'windows-amd64-helper-release',
     fingerprint: () async => Fingerprint('$sourceFingerprint:$coreSha256'),
     primaryOutput: helperOutput.path,
+    outputs: [helperOutput.path],
     notice: notice,
-    build: () async {
+    build: (staging) async {
       helperBuilds++;
-      helperOutput.writeAsStringSync('helper-$sourceFingerprint-$coreSha256');
-      return [helperOutput.path];
+      staging
+          .file(helperOutput.path)
+          .writeAsStringSync('helper-$sourceFingerprint-$coreSha256');
     },
   );
 

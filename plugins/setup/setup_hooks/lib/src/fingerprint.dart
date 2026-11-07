@@ -43,9 +43,15 @@ class FingerprintBuilder {
     _inputs.add(absolutePath);
   }
 
+  void addOptionalFile(String path) {
+    addValue('optional:$path', File(path).existsSync());
+    if (File(path).existsSync()) addFile(path);
+  }
+
   void addFiles(Iterable<String> filePaths) {
-    final paths = filePaths.map((path) => p.normalize(p.absolute(path))).toSet()
-      ..removeWhere((path) => !File(path).existsSync());
+    final paths = filePaths
+        .map((path) => p.normalize(p.absolute(path)))
+        .toSet();
     final sortedPaths = paths.toList()..sort();
     for (final path in sortedPaths) {
       addFile(path);

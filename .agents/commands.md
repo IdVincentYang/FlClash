@@ -17,7 +17,7 @@ dart setup.dart windows
 dart setup.dart android
 ```
 
-The ARM64 local APK build guide covers tool versions, Rust compiler selection, disabled upload tasks, and troubleshooting:
+The ARM64 local APK build guide covers tool versions, Rust compiler selection, refused publication tasks, and troubleshooting:
 [docs/development/android_build_guide.md](../docs/development/android_build_guide.md).
 
 The Go core and the Rust helper build automatically: Flutter runs
@@ -27,10 +27,11 @@ and the hook drives `CoreBuilder` from the `setup_hooks` package in
 Flutter hands the hook; no `ANDROID_NDK` variable is needed.
 Artifacts land in `libclash/`. The hook reruns only when Go, Rust, or
 `setup_hooks` inputs change; the fingerprint cache lives in
-`.dart_tool/setup_build_cache/`. To force a rebuild, delete that directory:
+`.dart_tool/setup_build_cache/`. To force a rebuild, first confirm all owned writers have exited and no retained `generation-*` exists.
+Remove only the v2 records; preserve backups and unknown in-flight state:
 
 ```bash
-rm -rf .dart_tool/setup_build_cache
+rm -rf .dart_tool/setup_build_cache/v2
 ```
 
 Flutter hides the hook's output on success, so to see why the Core was or was
@@ -158,6 +159,20 @@ flutter test plugins/proxy/test/proxy_test.dart
 `plugins/setup/setup_hooks/` is a pure Dart package and is tested with `dart test` from its own directory, which is
 also what CI runs; `tool/check_plugins.sh` does not descend into it. It must stay out of `flutter test`, because a test
 run of `plugins/setup` would execute the build hook itself.
+
+Build execution/CI contract checks use local fixtures and do not publish:
+
+```bash
+python3 -m unittest discover -s tool -p 'test_ci_*.py' -v
+python3 -m unittest discover -s tool -p 'test_release_telegram.py' -v
+```
+
+The Git/SSH/LFS fixtures need native Git, SSH and Git-LFS; workflow parsing needs PyYAML or Ruby Psych, and the
+inline Pages consumer needs Node. Android signing tests require explicit accepted roots in
+`FLCLASH_CI_ANDROID_FIXTURE_SDK`, `FLCLASH_CI_ANDROID_FIXTURE_JDK` and `FLCLASH_CI_ANDROID_FIXTURE_FLUTTER`;
+raw signer extraction also needs `FLCLASH_CI_ANDROID_BUILD_TOOLS_ARCHIVE`. Absent Android fixture roots select explicit skips,
+not evidence of passing signing checks; native Git/SSH/LFS prerequisites must be installed for their fixtures. The optional pure-package host Cargo adapter fixture additionally uses
+`FLCLASH_HELPER_CARGO_FIXTURE=1` and an owned `CARGO_TARGET_DIR`; it is not a Windows/Linux service test.
 
 Native plugin code under `plugins/*/{linux,macos,windows}` is compiled by the CI `desktop` job, which runs
 `flutter build <platform> --debug` on every push; `tool/check_plugins.sh` only analyzes and tests the Dart side.

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 
 import 'build.dart';
@@ -12,8 +11,6 @@ import 'options.dart';
 import 'source_restore.dart';
 import 'target.dart';
 import 'util.dart';
-
-final _log = Logger('go_builder');
 
 class GoBuilder {
   GoBuilder({
@@ -55,62 +52,83 @@ class GoBuilder {
     final outDir = target.isLib
         ? p.join(_outputPath, target.platformDir, target.abi!)
         : p.join(_outputPath, target.platformDir);
-    ensureDir(outDir);
 
     final fileName = target.isLib
         ? '${config.libName}.so'
         : '${config.coreName}${target.executableExtension}';
     final outFile = p.join(outDir, fileName);
 
+    final includesPath = p.join(
+      _outputPath,
+      target.platformDir,
+      'includes',
+      target.abi ?? '',
+    );
+    final mainPath = p.join(rootDir, 'android/core/src/main');
+    final cppIncludesPath = p.join(mainPath, 'cpp/includes', target.abi ?? '');
+    final jniOutput = p.join(mainPath, 'jniLibs', target.abi ?? '', fileName);
+    final staticHeaders = target.isLib
+        ? Directory(_corePath)
+              .listSync(followLinks: false)
+              .where((file) => file.path.endsWith('.h'))
+              .map((file) => file.path)
+              .toList()
+        : <String>[];
+    final generatedHeader = '${p.basenameWithoutExtension(fileName)}.h';
+    final headerNames = [generatedHeader, ...staticHeaders.map(p.basename)];
+    if (target.isLib && headerNames.toSet().length != headerNames.length) {
+      throw BuildException('Conflicting generated and source header names');
+    }
+    final outputs = <String>[
+      outFile,
+      if (target.isLib) ...[
+        jniOutput,
+        for (final name in headerNames) ...[
+          p.join(includesPath, name),
+          p.join(cppIncludesPath, name),
+        ],
+      ],
+    ];
     return cache.run(
       key: '${target.platformDir}-${target.goarch}-core',
       fingerprint: () => _calculateFingerprint(target, sourceInputs),
       primaryOutput: outFile,
+      outputs: outputs,
+      outputDirectories: target.isLib ? [includesPath, cppIncludesPath] : [],
       notice: notice,
-      build: () async {
-        final env = _buildEnvironment(target);
-        _log.info(
-          'Building Go core: $target '
-          '${target.isLib ? "(CGO, c-shared)" : "(standalone)"}',
+      build: (staging) async {
+        final staged = p.join(staging.work.path, fileName);
+        await runCommandStream(
+          'go',
+          _buildArguments(target, outFile: staged),
+          workingDirectory: _corePath,
+          environment: _buildEnvironment(target),
         );
-
-        // A failed build must not destroy the previous artifacts.
-        final stagingDir = Directory(
-          p.join(outDir, '.staging-${target.goarch}-$pid'),
-        );
-        final staged = p.join(stagingDir.path, fileName);
-        try {
-          await runCommandStream(
-            'go',
-            _buildArguments(target, outFile: staged),
-            workingDirectory: _corePath,
-            environment: env,
-          );
-
-          final outputs = <String>[outFile];
-          if (target.isLib) {
-            outputs.addAll(
-              _installAndroidOutput(
-                abi: target.abi!,
-                platformDir: p.join(_outputPath, target.platformDir),
-                stagingDir: stagingDir.path,
-                libName: fileName,
-                outFile: outFile,
-              ),
-            );
-          } else {
-            replaceFile(staged, outFile);
-          }
-
-          _log.info('Built: $outFile');
-          return outputs;
-        } finally {
-          if (stagingDir.existsSync()) {
-            stagingDir.deleteSync(recursive: true);
+        _stageCopy(staged, staging.file(outFile));
+        if (target.isLib) {
+          _stageCopy(staged, staging.file(jniOutput));
+          for (final source in [
+            p.join(p.dirname(staged), generatedHeader),
+            ...staticHeaders,
+          ]) {
+            for (final directory in [includesPath, cppIncludesPath]) {
+              _stageCopy(
+                source,
+                staging.file(p.join(directory, p.basename(source))),
+              );
+            }
           }
         }
       },
     );
+  }
+
+  void _stageCopy(String source, File destination) {
+    if (FileSystemEntity.typeSync(source, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw BuildException('Expected a regular generated output: $source');
+    }
+    File(source).copySync(destination.path);
   }
 
   Map<String, String> _buildEnvironment(Target target) {
@@ -188,7 +206,7 @@ class GoBuilder {
 
     final inputs = _resolveGoInputs(target, env);
     final configuration = p.join(rootDir, 'build_config.yaml');
-    if (File(configuration).existsSync()) inputs.add(configuration);
+    builder.addOptionalFile(configuration);
     final goWork = (goEnv as Map<String, dynamic>)['GOWORK'];
     if (goWork is String && goWork.isNotEmpty && goWork != 'off') {
       inputs.add(goWork);
@@ -207,7 +225,7 @@ class GoBuilder {
       );
     }
 
-    builder.addFiles(inputs);
+    builder.addFiles([...inputs, resolveToolExecutable('go')]);
     return builder.finishWithInputs();
   }
 
@@ -220,7 +238,6 @@ class GoBuilder {
       workingDirectory: _corePath,
       environment: environment,
     );
-    final corePath = p.normalize(p.absolute(_corePath));
     final inputs = <String>{};
     for (final line in (result.stdout as String).split('\n')) {
       final value = line.trim();
@@ -228,10 +245,6 @@ class GoBuilder {
       final filePath = p.normalize(
         p.absolute(p.isAbsolute(value) ? value : p.join(_corePath, value)),
       );
-      if (!p.isWithin(corePath, filePath) && !p.equals(corePath, filePath)) {
-        continue;
-      }
-      if (!File(filePath).existsSync()) continue;
       inputs.add(filePath);
       if (p.basename(filePath) == 'go.mod') {
         final goSum = p.join(p.dirname(filePath), 'go.sum');
@@ -244,62 +257,5 @@ class GoBuilder {
       if (File(filePath).existsSync()) inputs.add(filePath);
     }
     return inputs;
-  }
-
-  List<String> _installAndroidOutput({
-    required String abi,
-    required String platformDir,
-    required String stagingDir,
-    required String libName,
-    required String outFile,
-  }) {
-    final includesPath = p.join(platformDir, 'includes', abi);
-    final androidCoreMainPath = p.join(
-      rootDir,
-      'android',
-      'core',
-      'src',
-      'main',
-    );
-    final jniLibsPath = p.join(androidCoreMainPath, 'jniLibs', abi);
-    final cppIncludesPath = p.join(androidCoreMainPath, 'cpp', 'includes', abi);
-    final outputs = <String>[];
-
-    ensureDir(includesPath);
-    _clearDirectory(includesPath);
-    ensureDir(cppIncludesPath);
-    _clearDirectory(cppIncludesPath);
-
-    replaceFile(p.join(stagingDir, libName), outFile);
-    copyFile(outFile, p.join(jniLibsPath, libName));
-    outputs.add(p.join(jniLibsPath, libName));
-
-    final generatedHeaders = Directory(stagingDir).listSync();
-    final staticHeaders = Directory(_corePath).listSync();
-    for (final file in [...generatedHeaders, ...staticHeaders]) {
-      if (!file.path.endsWith('.h')) continue;
-      final headerName = p.basename(file.path);
-      final includePath = p.join(includesPath, headerName);
-      final cppIncludePath = p.join(cppIncludesPath, headerName);
-      copyFile(file.path, includePath);
-      copyFile(file.path, cppIncludePath);
-      outputs
-        ..add(includePath)
-        ..add(cppIncludePath);
-    }
-    return outputs;
-  }
-
-  void _clearDirectory(String dirPath) {
-    final dir = Directory(dirPath);
-    if (!dir.existsSync()) return;
-
-    for (final entity in dir.listSync()) {
-      if (entity is File || entity is Link) {
-        entity.deleteSync();
-      } else if (entity is Directory) {
-        entity.deleteSync(recursive: true);
-      }
-    }
   }
 }

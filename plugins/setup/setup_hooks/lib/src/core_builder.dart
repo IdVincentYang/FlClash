@@ -22,11 +22,14 @@ final class CoreBuilder implements Builder {
   const CoreBuilder({
     CoreBuildFunction build = buildPlatform,
     Architecture? hostArchitecture,
+    Future<void> Function(BuildReport report)? onBuild,
   }) : _build = build,
-       _hostArchitecture = hostArchitecture;
+       _hostArchitecture = hostArchitecture,
+       _onBuild = onBuild;
 
   final CoreBuildFunction _build;
   final Architecture? _hostArchitecture;
+  final Future<void> Function(BuildReport report)? _onBuild;
 
   @override
   Future<void> run({
@@ -62,6 +65,7 @@ final class CoreBuilder implements Builder {
         '=== ${DateTime.now().toIso8601String()} ${request.target} pid $pid',
       );
       report = await _build(request);
+      await _onBuild?.call(report);
     } on BuildException catch (error, stackTrace) {
       throw BuildError(
         message: error.message,
@@ -90,7 +94,7 @@ final class CoreBuilder implements Builder {
     output.dependencies.addAll({
       Uri.file(p.join(repositoryRoot(input), 'build_config.yaml')),
       for (final path in report.inputs) Uri.file(path),
-      for (final path in report.outputDirectories) Uri.directory(path),
+      for (final path in report.outputs) Uri.file(path),
     });
   }
 

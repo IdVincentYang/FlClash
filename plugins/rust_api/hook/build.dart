@@ -26,6 +26,17 @@ void main(List<String> args) async {
       extraCargoEnvironmentVariables: _bindgenEnvironment(input),
     ).run(input: input, output: output);
     if (context != null) {
+      final assets = output.json['assets'] as List;
+      final paths = [
+        for (final asset in assets)
+          if ((asset as Map)['type'] == 'code_assets/code')
+            (asset['encoding'] as Map)['file'] as String,
+      ];
+      if (paths.length != 1) {
+        throw StateError('Expected one managed Rust output');
+      }
+      output.metadata['flclash_android_generated_outputs'] =
+          await managedAndroidOutputIdentity(paths);
       output.metadata['flclash_android_environment_sha256'] = context.digest;
       output.metadata['flclash_android_hook_input_sha256'] =
           context.inputDigest;

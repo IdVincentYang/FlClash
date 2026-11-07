@@ -1,0 +1,148 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+
+interface FlclashExecOperations {
+    @Inject ExecOperations getExecOperations()
+}
+
+def profile = System.getenv('FLCLASH_ANDROID_PROFILE')
+if (profile != 'macos_arm64_android_arm64_dev') {
+    throw new GradleException('Native checkpoint requires the current managed profile')
+}
+def ownedRoot = new File(System.getenv('HOME')).canonicalFile.parentFile
+
+def requireOwned = { File file ->
+    if (file.absoluteFile.toPath().normalize() != file.toPath() ||
+        !file.toPath().startsWith(ownedRoot.toPath()) ||
+        file.canonicalFile != file.absoluteFile) {
+        throw new GradleException('Native checkpoint path leaves its owned workspace')
+    }
+    file
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def transfers = graph.allTasks.findAll {
+        def name = it.name.toLowerCase(Locale.ROOT)
+        name.startsWith('upload') || name.startsWith('publish')
+    }
+    if (!transfers.empty) throw new GradleException('Local package refuses publication tasks')
+    def flutterTasks = graph.allTasks.findAll { it.name.startsWith('compileFlutterBuild') }
+    if (flutterTasks.empty) return
+    if (flutterTasks.size() != 1) throw new GradleException('Expected one managed Flutter request')
+    def task = flutterTasks.first()
+    def exec = task.project.objects.newInstance(FlclashExecOperations).execOperations
+    def loader = task.class.classLoader
+    def type = loader.loadClass('com.flutter.gradle.tasks.BaseFlutterTaskHelper')
+    def helper = type.getField('INSTANCE').get(null)
+    def method = { String prefix ->
+        def found = type.methods.findAll { it.name.startsWith(prefix) && it.parameterCount == 1 }
+        if (found.size() != 1) throw new GradleException('Fixed SDK task helper signature changed')
+        found.first()
+    }
+    def action = method('createExecSpecActionFromTask').invoke(helper, task)
+    def rules = method('generateRuleNames').invoke(helper, task).collect { it.toString() }
+    if (rules != ['android_aot_bundle_release_android-arm64']) {
+        throw new GradleException('Fixed SDK rules differ from the managed Android request')
+    }
+    def source = requireOwned(task.sourceDir.absoluteFile)
+    def output = requireOwned(task.intermediateDir.absoluteFile)
+    def sdk = requireOwned(task.flutterRoot.absoluteFile)
+    if (source != new File(ownedRoot, 'source') || sdk != new File(ownedRoot, 'flutter') ||
+        task.buildMode != 'release' || task.minSdkVersion != 24 ||
+        task.targetPlatformValues != ['android-arm64'] || task.targetPath != 'lib/main.dart') {
+        throw new GradleException('Flutter task changed the managed target or source')
+    }
+    def dartDefines = task.dartDefines.split(',').collect {
+        new String(Base64.decoder.decode(it), 'UTF-8')
+    }
+    if (dartDefines.count { it == 'APP_ENV=dev' } != 1 ||
+        dartDefines.any { it.startsWith('APP_ENV=') && it != 'APP_ENV=dev' }) {
+        throw new GradleException('Flutter task changed the managed application environment')
+    }
+    def inspectOutputs = {
+        def bytes = new ByteArrayOutputStream()
+        exec.exec { spec ->
+            spec.commandLine(System.getenv('FLCLASH_ANDROID_PYTHON'),
+                new File(source, 'tool/android_native_checkpoint.py').path, ownedRoot.path)
+            spec.workingDir(source)
+            spec.standardOutput = bytes
+        }.assertNormalExitValue()
+        new JsonSlurper().parseText(bytes.toString('UTF-8'))
+    }
+    def expected = null
+    def buildId = null
+    def captured = null
+    def nativeFiles = {
+        ['build_hooks.stamp', 'build_hooks_result.json', 'build_hooks.d'].collectEntries { name ->
+            def file = requireOwned(new File(source, ".dart_tool/flutter_build/${buildId}/${name}"))
+            if (!file.isFile() || file.length() <= 0) throw new GradleException('Original SDK Native intermediate is unavailable')
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            file.withInputStream { stream ->
+                byte[] buffer = new byte[65536]
+                int count
+                while ((count = stream.read(buffer)) > 0) digest.update(buffer, 0, count)
+            }
+            [(name): [size: file.length(), sha256: digest.digest().encodeHex().toString()]]
+        }
+    }
+    def observations = []
+    def diagnostics = null
+    task.doFirst {
+        diagnostics = requireOwned(java.nio.file.Files.createTempDirectory(
+            new File(ownedRoot, 'logs').toPath(), 'native-checkpoint-').toFile())
+        for (int iteration = 1; iteration <= 2; iteration++) {
+            if (buildId != null) {
+                def stamp = requireOwned(new File(source, ".dart_tool/flutter_build/${buildId}/build_hooks.stamp"))
+                if (!stamp.isFile() || !stamp.delete()) throw new GradleException('Cannot invalidate owned Native stamp')
+            }
+            def log = requireOwned(new File(diagnostics, "checkpoint-${iteration}.log"))
+            def outputs = requireOwned(new File(diagnostics, "outputs-${iteration}.txt"))
+            log.withOutputStream { stream ->
+                exec.exec { spec ->
+                    action.execute(spec)
+                    def arguments = spec.args.collect { it.toString() }
+                    if (arguments.takeRight(rules.size()) != rules || spec.executable != new File(sdk, 'bin/flutter').path ||
+                        spec.workingDir.canonicalFile != source) {
+                        throw new GradleException('Fixed SDK execution request differs from actual Flutter task')
+                    }
+                    if (captured != null && arguments != captured) throw new GradleException('Flutter request changed between checkpoints')
+                    captured = arguments
+                    spec.setArgs(arguments + ['--build-outputs', outputs.path])
+                    spec.standardOutput = stream
+                    spec.errorOutput = stream
+                }.assertNormalExitValue()
+            }
+            def currentId = requireOwned(new File(output, '.last_build_id')).text.trim()
+            if (!(currentId ==~ /[0-9a-f]{32}/) || (buildId != null && currentId != buildId)) {
+                throw new GradleException('Native checkpoint selected another buildDir')
+            }
+            buildId = currentId
+            def intermediates = nativeFiles()
+            if (!outputs.isFile() || outputs.length() > 16 * 1024 * 1024) throw new GradleException('Original SDK build diagnostics are unavailable')
+            def observed = inspectOutputs()
+            if (expected != null && observed != expected) throw new GradleException('Native outputs changed between checkpoints')
+            if (iteration == 2 && log.text.contains('File modified during build')) {
+                throw new GradleException('Native checkpoint is not stable')
+            }
+            expected = observed
+            observations.add([iteration: iteration, native_files: intermediates,
+                diagnostic_outputs: outputs.readLines()])
+            task.logger.lifecycle("Managed Native checkpoint ${iteration} completed")
+        }
+        if (inspectOutputs() != expected) throw new GradleException('Native outputs changed before original Flutter consumption')
+    }
+    task.doLast {
+        if (new File(output, '.last_build_id').text.trim() != buildId || inspectOutputs() != expected) {
+            throw new GradleException('Original Flutter build used a different Native context or output')
+        }
+        def report = requireOwned(new File(diagnostics, 'report.json'))
+        report.text = JsonOutput.toJson([build_id: buildId, source: source.path,
+            output: output.path, original_arguments: captured, generated: expected,
+            checkpoint_count: 2, original_task_completed: true,
+            diagnostic_directory: diagnostics.path,
+            checkpoints: observations, final_native_files: nativeFiles()]) + '\n'
+        requireOwned(new File(ownedRoot, 'native-checkpoint.json')).text = report.text
+    }
+}

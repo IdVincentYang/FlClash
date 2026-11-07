@@ -45,7 +45,9 @@ def binding_source(workspace, digest):
             f"const String? androidHookContextDigest = '{digest}';\n")
 
 
-def configure_hook_pubspec(workspace):
+def configure_hook_pubspec(workspace, request_digest):
+    if not isinstance(request_digest, str) or not re.fullmatch("[0-9a-f]{64}", request_digest):
+        raise MaterialError("Missing managed build request digest")
     root = Path(workspace)
     path = root / 'source/pubspec.yaml'
     text = path.read_text()
@@ -56,7 +58,8 @@ def configure_hook_pubspec(workspace):
         if text.count(needle) != 1:
             raise MaterialError('Expected original enabled project hook definition')
         value = json.dumps(str(root / 'hook-environment.json'))
-        text = text.replace(needle, needle + f'      flclash_android_environment: {value}\n')
+        text = text.replace(needle, needle + f'      flclash_android_environment: {value}\n'
+                            + f'      flclash_android_inputs_sha256: {json.dumps(request_digest)}\n')
     path.write_text(text)
 
 
@@ -69,6 +72,7 @@ def context_files(workspace):
         'source/plugins/rust_api/rust/Cargo.lock',
         'source/plugins/rust_api/rust/rust-toolchain.toml',
         'source/tool/android_hook_environment.dart', 'source/tool/android_artifacts.toml',
+        'source/tool/android_native_checkpoint.gradle',
         'source/tool/verify_android_inputs.py', 'home/.gitconfig', 'rustup/settings.toml',
     }
     for pattern in ('source/tool/android_*.py', 'source/plugins/setup/setup_hooks/lib/**/*.dart'):
@@ -76,14 +80,15 @@ def context_files(workspace):
     return names
 
 
-def write_hook_context(workspace, environment, archives, material_roots):
+def write_hook_context(workspace, environment, archives, material_roots, request_digest):
     root = Path(workspace)
     binding = root / BINDING
     if binding.read_text() != EMPTY_BINDING:
         raise MaterialError('Owned hook binding must start from its tracked empty template')
     roles = set().union(*HOOK_ROLES.values())
     data = {
-        'schema': 1, 'profile': PROFILE, 'workspace': str(root),
+        'schema': 2, 'profile': PROFILE, 'workspace': str(root),
+        'request_sha256': request_digest,
         'source': str(root / 'source'), 'environment': environment,
         'archives': {role: archives[role] for role in sorted(roles)},
         'material_roots': {role: str(material_roots[role]) for role in sorted(roles)},
@@ -136,8 +141,10 @@ def read_hook_context(path, digest, hook, repository):
     data = json.loads(raw, object_pairs_hook=unique_fields)
     if (not isinstance(data, dict)
             or set(data) != {'schema', 'profile', 'workspace', 'source', 'environment',
-                             'archives', 'material_roots', 'files'}
-            or type(data['schema']) is not int or data['schema'] != 1
+                             'archives', 'material_roots', 'files', 'request_sha256'}
+            or type(data['schema']) is not int or data['schema'] != 2
+            or not isinstance(data['request_sha256'], str)
+            or not re.fullmatch('[0-9a-f]{64}', data['request_sha256'])
             or data['profile'] != PROFILE or data['workspace'] != str(root)
             or data['source'] != str(root / 'source')):
         raise MaterialError('Unexpected or stale hook context')
@@ -201,7 +208,7 @@ def check_hook_context(path, digest, hook, repository, policy):
             'context_sha256': digest, 'profile_ready': False}
 
 
-def check_hook_outputs(workspace, digest):
+def check_hook_outputs(workspace, digest, request_digest, expected_outputs=None):
     root = Path(workspace)
     result = {}
     for hook in HOOK_ROLES:
@@ -218,23 +225,52 @@ def check_hook_outputs(workspace, digest):
         with SelectedRoot(output_path, False) as selected, selected.file() as stream:
             output = json.load(stream, object_pairs_hook=unique_fields)
         defines = native_input.get('user_defines', {}).get('workspace_pubspec', {})
-        metadata = [
-            {'type': 'hooks/metadata', 'encoding': {
-                'key': 'flclash_android_environment_sha256', 'value': digest}},
-            {'type': 'hooks/metadata', 'encoding': {
-                'key': 'flclash_android_hook_input_sha256',
-                'value': hashlib.sha256(raw_input).hexdigest()}},
-        ]
+        metadata = {}
+        for asset in output.get('assets_for_build', []):
+            if (not isinstance(asset, dict) or asset.get('type') != 'hooks/metadata'
+                    or set(asset) != {'type', 'encoding'}):
+                raise MaterialError('Unexpected managed hook metadata')
+            encoding = asset['encoding']
+            if (not isinstance(encoding, dict) or set(encoding) != {'key', 'value'}
+                    or not isinstance(encoding['key'], str) or encoding['key'] in metadata):
+                raise MaterialError('Duplicate managed hook metadata')
+            metadata[encoding['key']] = encoding['value']
+        required = {'flclash_android_environment_sha256', 'flclash_android_hook_input_sha256',
+                    'flclash_android_generated_outputs'}
         if (native_input.get('package_name') != hook
                 or native_input.get('package_root', '').rstrip('/') != str(root / 'source/plugins' / hook)
                 or defines.get('base_path') != str(root / 'source/pubspec.yaml')
                 or defines.get('defines') != {'build_assets': True,
-                    'flclash_android_environment': str(root / 'hook-environment.json')}
+                    'flclash_android_environment': str(root / 'hook-environment.json'),
+                    'flclash_android_inputs_sha256': request_digest}
                 or native_input.get('config', {}).get('build_asset_types') != ['code_assets/code']
-                or output.get('status') != 'success'
-                or output.get('assets_for_build') != metadata
+                or output.get('status') != 'success' or set(metadata) != required
+                or metadata['flclash_android_environment_sha256'] != digest
+                or metadata['flclash_android_hook_input_sha256'] != hashlib.sha256(raw_input).hexdigest()
                 or not {str(root / 'hook-environment.json'), str(root / BINDING)} <= set(output.get('dependencies', []))):
             raise MaterialError('Native Assets did not complete both current managed hooks')
+        generated = json.loads(metadata['flclash_android_generated_outputs'], object_pairs_hook=unique_fields)
+        if not isinstance(generated, dict) or not generated:
+            raise MaterialError('Missing actual producer outputs')
+        if hook == 'setup':
+            mandatory = {str(root / 'source/libclash/android/arm64-v8a/libclash.so'),
+                         str(root / 'source/android/core/src/main/jniLibs/arm64-v8a/libclash.so')}
+            header_roots = [str(root / 'source/libclash/android/includes/arm64-v8a') + '/',
+                            str(root / 'source/android/core/src/main/cpp/includes/arm64-v8a') + '/']
+            if (not mandatory <= set(generated) or any(path not in mandatory and not any(
+                    path.startswith(prefix) and '/' not in path[len(prefix):]
+                    and path.endswith('.h') for prefix in header_roots) for path in generated)
+                    or any(not any(path.startswith(prefix) for path in generated) for prefix in header_roots)):
+                raise MaterialError('Go output set differs from the Android producer role')
+        else:
+            expected = root / 'source/.dart_tool/hooks_runner/shared/rust_api/build' / input_path.parent.name / 'target/aarch64-linux-android/release/librust_api.so'
+            if set(generated) != {str(expected)}:
+                raise MaterialError('Rust output differs from its Native Assets target')
+        for path, identity in generated.items():
+            if not isinstance(identity, dict) or set(identity) != {'size', 'sha256'} or file_identity(path) != identity:
+                raise MaterialError('Actual output differs from the completed producer')
+        if expected_outputs is not None and generated != expected_outputs[hook]['generated']:
+            raise MaterialError('Native output changed after initial production')
         result[hook] = {'input': file_identity(input_path), 'output': file_identity(output_path),
-                        'context_sha256': digest}
+                        'context_sha256': digest, 'generated': generated}
     return result
