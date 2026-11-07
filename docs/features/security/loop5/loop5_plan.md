@@ -1,7 +1,7 @@
 # Loop 5：源码对应、官方工件与 Android 构建信任
 
 本轮建立实际源码、第三方组件、构建工具、缓存和最终 APK 的对应关系，处置来源未知或被替换的执行内容。依据[共同安全目标](../security_requirements.md)，对应[审计基线](../android_security_baseline.md) A-08、A-09、A-14。
-阶段拆解及T01／T02设计和实现经M1通过，已交付并完成M普通fork推送及独立远端核实；用户2026-11-06授权连续完成后续任务，用户2026-11-07明确延期[原EasyTier源码／生成缺口](../deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)后，T03按调整范围实现评审通过，已本地合入security/android，待M独立远端收尾。单层任务、归属及交付版本由[Tasks](loop5_tasks.md)维护，实际对象与证据边界见[来源基线](../android_build_sources.md)。
+阶段拆解及T01／T02设计和实现经M1通过，已交付并完成M普通fork推送及独立远端核实；用户2026-11-06授权连续完成后续任务，用户2026-11-07明确延期[原EasyTier源码／生成缺口](../deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)后，T03按调整范围已交付并完成任务记录收尾，远端核实后接续T04设计。单层任务、归属及交付定稿历史由[Tasks](loop5_tasks.md)维护，实际对象与证据边界见[来源基线](../android_build_sources.md)。
 
 ## 本轮路径与当前边界
 
