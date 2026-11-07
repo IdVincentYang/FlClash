@@ -1,7 +1,7 @@
 # Loop 5：源码对应、官方工件与 Android 构建信任
 
 本轮建立实际源码、第三方组件、构建工具、缓存和最终 APK 的对应关系，处置来源未知或被替换的执行内容。依据[共同安全目标](../security_requirements.md)，对应[审计基线](../android_security_baseline.md) A-08、A-09、A-14。
-阶段拆解及T01／T02设计和实现经M1通过，已交付并完成任务记录收尾；用户2026-11-06授权连续完成后续任务，当前接续T03细化。单层任务、归属及T01定稿历史由[Tasks](loop5_tasks.md)维护，实际对象与证据边界见[来源基线](../android_build_sources.md)。
+阶段拆解及T01／T02设计和实现经M1通过，已交付并完成M普通fork推送及独立远端核实；用户2026-11-06授权连续完成后续任务，用户2026-11-07明确延期[原EasyTier源码／生成缺口](../deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)后，T03按调整范围实现评审通过，已本地合入security/android，待M独立远端收尾。单层任务、归属及交付版本由[Tasks](loop5_tasks.md)维护，实际对象与证据边界见[来源基线](../android_build_sources.md)。
 
 ## 本轮路径与当前边界
 
@@ -35,8 +35,8 @@ Core／mihomo／依赖源码／gitlink／carrier不改；未来方案涉及这�
 
 | 风险入口 | 当前事实与待核实边界 | 不处理时可能发生什么 |
 | --- | --- | --- |
-| 下载与版本引用 | 当前Wrapper发行包未配置期望SHA-256，未见Gradle依赖锁／验证元数据；CI actions及distributor仍有tag引用 | 工具/插件/库可能换成不同内容，在构建机执行或污染 APK |
-| 实际工具与声明 | 当前未跟踪的Wrapper JAR自报2.10，distribution指向9.8.0；JNI的CMake记录28.2 NDK，Native Assets hooks选择29.0 | 审核错误版本或不能复现；声明、现存缓存与本次执行须分别绑定，差异本身不证明篡改 |
+| 下载与版本引用 | T01发现的Wrapper、发布接受及tag缺口已由T02受管入口处理；直接旁路、完整CI与跨次派生缓存仍待T04 | 未覆盖的入口仍可能执行不同内容或污染 APK，不能把受管入口的局部保证扩大 |
+| 实际工具与声明 | T02已固定正式Wrapper及同次工具选择；JNI选择NDK28.2，Native Assets hooks选择29.0 | 审核错误版本或不能复现；声明、现存缓存与本次执行须分别绑定，差异本身不证明篡改 |
 | 随包可执行资产与信任数据 | 当前APK含EasyTier WASM的精确模块字节，生成源码关系未闭环；Android实际tag含no_zerotier，不能沿旧A-14声称装入ZeroTier根节点数据 | 未审执行代码可能进入产物；编入不证明已启用或联网，禁用项也不能由缓存／锁文件存在推导装包 |
 | hooks、脚本与缓存 | 构建依赖脚本/缓存，本地禁上传流程仅覆盖部分任务 | 读取无关文件/密钥、上传符号/日志，或混入不对应当前源码的旧库 |
 | 签名和最终包 | 既有本机构建为 Debug 签名 release APK，正式包条件仍需绑定 | 用户安装包与受审代码/配置不同，或错误签名与产物替换无法识别 |
@@ -74,7 +74,7 @@ T01建立只读对账与明确缺口入口，发布认证、WASM／预编译生�
 - 向 Loop 4 提供实际运行组件和源码范围，向 [Loop 7](../loop7/loop7_plan.md)提供受审构建输入、最终工件及签名/符号绑定。
 - 完成时关键执行内容有可信来源和可说明的源码关系，官方发布身份核验可复核，错误工件/版本/缓存受到约束，正常本机构建可用。
 - 缺少源码、无公开签名或不能证明历史生成关系时如实记录证据强度及处置；不能用编译成功或“官方”两个字掩盖缺口。
-- 已知关键执行内容来源缺口未处置时不宣称本轮整体通过；超出no-Core范围的部分及时交M决定，其余独立工作不受牵连。About UI已有5项原基线失败不在本轮顺手清修；DNS R1／Core日志race、Loop6延期备忘及其它未授权Loop保持原结论。
+- 已知关键执行内容来源缺口未处置时不宣称本轮整体通过；原EasyTier源码／生成关系仅按上述用户决定明确延期，不升级其来源或风险结论。超出no-Core范围的部分及时交M决定，其余独立工作不受牵连。About UI已有5项原基线失败不在本轮顺手清修；DNS R1／Core日志race、Loop6延期备忘及其它未授权Loop保持原结论。
 - 按[官方同步约定](../../../../CONTRIBUTING.md)分开维护版本锁、生成输入和必要窄补丁；同步后比较依赖、构建标签、下载来源、上传路径和最终包变化。
 
 依据入口：[构建指南](../../../development/android_build_guide.md)、[Gradle 配置](../../../../android/settings.gradle.kts)、[Wrapper](../../../../android/gradle/wrapper/gradle-wrapper.properties)、[Native Assets 参数](../../../../plugins/setup/setup_hooks/lib/src/options.dart)、[构建工作流](../../../../.github/workflows/build.yaml)、[EasyTier](../../../../core/Clash.Meta/adapter/outbound/easytier.go)、[ZeroTier Android拒绝分支](../../../../core/Clash.Meta/adapter/outbound/zerotier_stub.go)。

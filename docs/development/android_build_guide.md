@@ -24,6 +24,24 @@ Native Assets 曾选用本机 NDK 29.0.14206865，与 Gradle 声明不同。每�
 
 ### 构建来源只读对账
 
+构建记录只读增量已实现并经验证；T03按用户调整范围实现评审通过；交付状态见[Loop5 Tasks](../features/security/loop5/loop5_tasks.md)。原EasyTier源码／生成缺口的明确延期及恢复条件见[备忘](../features/security/deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)。显式选择构建根及可读材料后增加`--build-evidence build`，不会执行Gradle／生成器或自动读取记录中的旧路径。范围和证明限制见[来源契约](../features/security/android_build_sources.md#构建记录与组件来源)。
+实现Review发现的续行拼名及路径上跳隐去symlink问题已修正并通过M限定复审。旧报告不追认相关输入；修后会保留原声明和映射依据，含上跳路径逐段核对，不能安全读取时拒绝或报告不可用。
+
+```bash
+python3 tool/inspect_android_build_sources.py \
+  --apk /absolute/path/to/original.apk \
+  --record /absolute/path/to/observation.json \
+  --input build=/absolute/path/to/run/source \
+  --input pub=/absolute/path/to/run/pub-cache \
+  --input sdk=/absolute/path/to/run/flutter \
+  --input cargo=/absolute/path/to/run/cargo \
+  --input run=/absolute/path/to/run/result.json \
+  --build-evidence build --abi arm64-v8a
+```
+
+观察record可选`build_evidence`对象：`input`为构建根别名，`context`为原run文件的普通input／sha256引用，`source_commit`为该run源码提交。缺绑定保持unknown，声明矛盾失败。它们不授予发布信任或生成成功。
+CMake记录直接声明cwd；depfile没有cwd，相对输入默认`unresolved_relative_path`。确有依据时在`working_directories`中分别声明`flutter_depfile`／`rust_dep_info`的绝对cwd；这仍是外部声明，不能填当前HEAD或猜目录追认历史。目录依赖只报告目录，不计算不存在的内容身份。
+
 实际对象、来源关系与unknown由[来源基线](../features/security/android_build_sources.md)维护，不另复制工具版本表。
 
 先只枚举一个显式APK，或用已选择的观察记录及材料进行对账；`--input`可选一个文件或一个目录，优先选必要的最小范围：

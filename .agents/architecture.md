@@ -821,6 +821,8 @@ Android source/artifact attribution is maintained in
 Input hashes, intermediate bytes, packaged contents and runtime loading are separate facts;
 the read-only inspection baseline does not replace version locks or Core ownership.
 
+The source inspection CLI retains file-selection authority; its build-evidence helper only parses metadata bytes and never executes their commands. Historical paths and matching current files do not establish generation causality. The extension passed T03 implementation review within the user-adjusted scope; only the original EasyTier WASM source/generation gap is explicitly deferred. See the Android source contract.
+
 The managed Android entry prepares accepted tool and pub
 inputs before first loading, then delegates to the existing setup/packager flow with one resolved tool profile.
 Its writable SDK, configuration and build workspace are task-owned; original private configuration and global caches

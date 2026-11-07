@@ -1,7 +1,7 @@
 # 暂缓安全事项备忘
 
 本文维护尚未解决且需要接续的安全事项：Loop 1 T04/T05 保持用户决定的暂缓状态，
-L2-T02-R1 保留已证实缺陷及上游跟踪，Loop6 T02/T03等待后续Core修复。记录/暂缓不表示风险已解决或被用户接受，
+L2-T02-R1 保留已证实缺陷及上游跟踪，Loop6 T02/T03等待后续Core修复，L5-T03保留用户明确延期的EasyTier WASM源码／生成缺口。记录/暂缓不表示风险已解决或被用户接受，
 也不构成自动修改 Core、恢复其它任务或扩大权限的授权。
 共同目标见[安全要求](security_requirements.md)，当前用途和局部保护见[联网用途清单](android_network_inventory.md)。
 
@@ -10,6 +10,7 @@ L2-T02-R1 保留已证实缺陷及上游跟踪，Loop6 T02/T03等待后续Core�
 - [L2-T02-R1 共享 IP 与域名身份](#l2-t02-r1-共享-ip-与域名身份)
 - [Core 完整安装的日志级别并发](#core-完整安装的日志级别并发)
 - [Loop6 T02/T03 Geo 更新与实际采用](#loop6-t02t03-geo-更新与实际采用)
+- [Loop5 T03 EasyTier WASM 源码与生成对应](#loop5-t03-easytier-wasm-源码与生成对应)
 
 ## T04：服务身份、认证与跳转
 
@@ -208,6 +209,34 @@ rule trace可能参与；未在旧基线做同输入实测对照，不能据此�
 
 已交付能力与限制见[Geo契约](geo_data_design.md)和[指南](geo_data_guide.md)。已有私有文件不会因安装新版APK自动获信，
 内置seed核验不等于运行期更新或loaded证明。此备忘不启动自动上游巡视、其它Loop或Core修改。
+
+## Loop5 T03 EasyTier WASM 源码与生成对应
+
+状态：**用户明确延期，原源码及生成对应仍未证明**。2026-11-07用户选择“保持不改Core，延期该缺口并继续”，
+仅将原EasyTier WASM源码／生成关系移出本次T03交付出口；其余T03成果按调整范围通过实现评审并已本地合入`security/android`。
+这项范围决定不表示来源可信、行为安全、独立生成已证或剩余风险被接受，也不自动完成Loop5／T04／T05。
+
+- 对象：固定Core `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`的easytier-go模块
+  `v0.0.0-20260910071355-3d0c9c3ca5e2`所嵌入的6,850,909-byte WASM；
+  SHA-256为`8b82f37d62fba2ffe8e256386096fddf448d4261d51c495d5bd97cd11bbb24a0`。
+  payload及Go binding声明源码`63519db2b5f2a6a1b9b7f20905f036dab54eb829`。
+  原T02第五次APK中的完整字节对应成立，不给该原包套用后续HEAD或设备身份。
+- 已核事实：官方repo、已标识PR／fork及固定Git对象的有限恢复未取得原声明树，不由有限负证据推导不存在或恶意。
+  唯一一次获审实验以未改公开候选`3d0c9c3ca5e2c0b680383dedf5898f6c7eef9253`及原配方生成7,104,680 bytes，
+  SHA-256 `f6910e5032d7fce1eaa60c278efb82e67aefb18ddc745a42eac2aab7c18f10db`；
+  code／data等段不同，且原Go schema声明与所核父树／候选不一致，不能用新blob替代原生成关系。
+- 消费与影响：正常EasyTier TCP DialContext、UDP ListenPacketContext及对应DNS路径可经ensureStarted进入corehost.New，
+  由wazero编译／实例化该模块。替换、升级或禁用会影响EasyTier及其TCP／UDP／DNS能力；
+  未触发不等于未编入。本项没有真实流量或运行错误证明，也不以关闭功能、静默DIRECT绕过缺口。
+- 当前限制：Core／依赖源码／gitlink／carrier、原WASM和现有功能保持不改；停止无依据检索和第二次编译。
+  工具、其它组件及后续构建约束沿各自已审范围推进，不将这一例外推广给其它来源缺口。
+- 恢复条件：后续实际取得原源码，或取得与原payload绑定的有效发布证据后，才重新核对应关系；
+  没有新证据时不反复巡视或试版本／flags。若未来另行采用来源合格的新模块，须核匹配binding／schema／proto并验证真实消费者，
+  且任何Core／依赖／gitlink／carrier变更仍需新的明确权限。旧连续Loop授权不自动恢复延期项或授权替换。
+
+当前组件及保留依据见[来源契约](android_build_sources.md#受管原包的源码对应)，实际证据与失败继续保存在原
+`build/verification/l5-t03/`；原冻结及失败不倒改。后续升级／同步涉及此对象时先复查本条，不凭release说明或编译成功升级结论。
+本记录不创建新台账、自动上游巡视或其它Loop任务。
 
 ## 历史与接续
 

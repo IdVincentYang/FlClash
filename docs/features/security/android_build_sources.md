@@ -5,7 +5,7 @@
 
 ## 对象与证据分层
 
-来源调查对象为父仓库`c45563eb36ebd9a6b7cff9d1802715e7ebb053f1`的ARM64 dev release，APK为55,180,515 bytes、SHA-256 `0550bfd0c8ff710fd409579635592657303611b63844529879a64f97fce2d425`。
+T01来源基线对象为父仓库`c45563eb36ebd9a6b7cff9d1802715e7ebb053f1`的ARM64 dev release，APK为55,180,515 bytes、SHA-256 `0550bfd0c8ff710fd409579635592657303611b63844529879a64f97fce2d425`。
 本包有401项、10份native及1份DEX；它与旧T04已安装包不同，无本包设备安装结论。
 Core仍为`6c6e3e472bb246cc55f2e8577d9eddccc2623afc`，不改Core、第三方依赖源码、gitlink或carrier。
 对本对象的观察记录覆盖401个条目hash，33条材料关系及1680个所选输入身份核同；只有15个包内条目有已核材料关系，其余386个仍未绑定材料。
@@ -42,6 +42,28 @@ Core仍为`6c6e3e472bb246cc55f2e8577d9eddccc2623afc`，不改Core、第三方依
 | Camera的两份JNI | Maven camera-core1.6.1的libimage_processing_util_jni／libsurface_util_jni | AAR member→merge→strip→包对应；发布认证及JNI源码／生成来源另核 |
 | DataStore JNI | Maven datastore-core-android1.1.7的libdatastore_shared_counter | AAR member→merge→strip→包对应；同名库或缓存存在不代替该关系 |
 | Geo及其它资产 | Geo沿用[已接受基线](geo_data_design.md)；字体、图标、许可、Flutter资源分别分类 | 资源打包／首次缺失seed与运行加载分开；不恢复Loop6延期更新能力 |
+
+## 受管原包的源码对应
+
+另一个明确对象是T02第五次受管ARM64 dev release：55,189,483 bytes，SHA-256 `845a3804de290e148ec52c6472ed65ea3b3b81b3389a628ac37c4ccb931c68ff`。
+它保留原`de0b868`加同次source_wip的输入身份；后续I1／Python常量整理、文档或新诊断不使其成为新HEAD生成的APK。
+下表补充此对象的源码及保留理由，发布接受复用下文工具契约，生成与运行证据仍分层；T03按用户2026-11-07调整范围实现评审通过；只有原EasyTier WASM源码／生成缺口明确延期，其余组件不沿用该例外。
+
+| 组件 | 源码／生成输入与保留依据 | 结论边界 |
+| --- | --- | --- |
+| engine／Dart | 固定engine `06a2e2a110089dff50fe635cffd2a61e1b24fbcd`根树及DEPS、Dart `1d1a730ef918d602aedafc939a4cf5940e7589ab`原源均可审。另按固定Android GN补Skia、ICU、HarfBuzz、BoringSSL、字体／图像／JSON／Abseil／FlatBuffers及Vulkan相关固定源；ICU数据与原engine内嵌字节对应。保留已接受官方engine及SDK。 | 源码对象和配方支持保留，不称独立重建engine、取得原完整逐文件编译轨迹或实际设备加载。条件及host／test分支单列，不把全部DEPS当运行清单。 |
+| JVM／DEX | 新的自有Gradle配置解析取得ARM64 release的实际外部工件；全部108份去重归档均与原第五次缓存字节对应。同坐标sources JAR、ConstraintLayout2.0.1固定源码及DataStore重打包protobuf4.28.2的原源／relocation配方可审。原R8映射另对包内DEX定义及提供方核对。 | 保留已接受官方工件。新配置图不是原R8执行轨迹，source JAR可能为空，类名对应不证明完整生成或运行可达；JNI另按下列关系判断。 |
+| SQLite | 默认hook从sqlite3-3.5.1不可变release取ARM64资产；固定源码配方commit `ac40b296e7069c4e83503bcbe4a3b22dfe5431a7`指SQLite3.53.4。官方amalgamation的source ID与原ELF声明对应，pub接受的raw hash与release asset digest一致；已核NDK strip副本与包内库逐字同。 | 保留官方预编译。strip对应已独立核，不称本机编译了SQLite C源码；其它cipher／system／自定义hook分支不由此获准。 |
+| Camera JNI／libyuv | 同版本AAR两成员到包的字节链已核；Camera1.6.1的support `987b9ac8585b31424a397206c492196dd163997b`及C++／CMake可审。匹配该support的固定manifest `b12ce2adc0a0bc4501e07067287fafcba8b73e3a`将libyuv固定为`afae031e789e344bfc34c9e763c83f861a1ff3f1`，该完整源对象已核。 | 保留已接受官方AAR JNI，不把Java source JAR当完整JNI源，也不称已独立重建AndroidX。 |
+| DataStore JNI | 同版本1.1.7 AAR的shared counter成员到包已核；support `420da5f291449f11801e378c6789a328a06ec6cb`的shared_counter.cc／头及CMake、JNI声明已取得并核Git blob。 | 保留已接受官方AAR JNI；源码／配方及发布对应独立于运行加载。 |
+| Go／Core | 包内Go build info的120个版本化依赖与原go.sum、原始module ZIP h1及当前解出树逐文件／成员核同；项目和本地Core另按固定源码／carrier维护。Go SDK含对应标准库源码。 | module归档可能含未编译平台和测试文件，不能把整包都称作运行代码；嵌入WASM须单独判断。 |
+| Rust／QuickJS／标准库 | 原Cargo.lock对应119份现存registry源码归档及物化树核同，target dep-info涉及50个包候选。rquickjs-sys0.12.2携带可审QuickJS C／头和build.rs；原target dep-info列出该run目录的bindgen输出，其当前文件身份已记录。官方Rust1.98.1 library source另按发布checksum取得。 | 依赖锁、目标输入和生成配置可审；不把host proc-macro／桌面依赖自动列为Android运行库，不称全部crate源码最终存活。API35别名不证明API24运行兼容。 |
+| 项目C++／Dart／提交生成代码 | 原CMake指向项目core及jni包的C源码／SDK头；编译命令、当前输入和生成配置可审。AOT、Freezed／Riverpod／Drift／本地化／FRB按原输入及配置可审，两个Git fork与原发布源的修改另有比对，本地code_forge按项目维护的裁剪源接收。 | 已提交文件作为可审项目源码保留；其生成头和当前generator锁不证明本次重新生成。depfile、R8对应及新配置图各自只支持其记录范围。 |
+
+EasyTier原6,850,909-byte WASM及Go binding均声明`63519db2b5f2a6a1b9b7f20905f036dab54eb829`，已查官方repo、PR已标识fork及固定Git对象仍未恢复该树。
+Go host导入前的已知父树和当前公开候选均不是原声明源的替代。一次固定未改候选／原配方局部构建产生不同完整字节；原Go binding的schema声明也与所核父树／候选不一致，不能因此推导恶意或已证运行错误。
+正常TCP、UDP或对应DNS请求可沿Core的ensureStarted进入wazero消费者；未触发不等于没有编入。本项不替换payload、不改Core／依赖／gitlink／carrier、不禁正常功能或默认DIRECT。
+原来源生成资格未通过；用户仅明确延期这一缺口并继续，范围、风险及恢复条件见[备忘](deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)。没有第二次构建或无限检索许可，不将范围批准当来源信任、风险接受或Loop5完成。
 
 ## 构建时执行、下载与运行时输入
 
@@ -82,6 +104,26 @@ links及source_inputs通过input名称引用调用者的选择，目录另给pat
 重复／越界／symlink archive条目拒绝；ZIP只读取不解包，有大小及条目数量界限。工具不是Android安装有效性、通用反恶意代码或签名认证工具。
 
 ## 工具、缓存、CI及未决项
+
+### 构建记录与组件来源
+
+只读增量已实现并通过相称正反例；T03按用户明确调整范围实现评审通过。实际APK、编译器记录的输入、源码身份、发布配方、独立再生成与运行加载分别判断；新观察不改写旧APK身份。
+通过只读入口的`--build-evidence <input-name>`读取调用者已选择的构建根内已知Flutter depfile、ARM64 CMake记录及Rust target dep-info，复用R8对应；解析器只处理字节，CLI持有唯一读取权限。
+声明路径只能映射到显式`--input`根后安全读取，未选择、缺失、不支持格式及矛盾分别显示；不跟随symlink、不读取原绝对路径、不执行记录内命令，不以全部pub／Maven／Cargo缓存替代实际输入。
+可选record.build_evidence须包含input、context和source_commit：input为所选目录别名，context沿普通input／sha256引用且仅可省略relation或用source_file，source_commit为40位小写Git ID。原context须含绝对workspace、source_commit和apks摘要列表，用于核APK／workspace／source声明；匹配仅标matched_declarations，不是独立attestation。
+depfile不携带cwd；相对路径只有在可选working_directories按flutter_depfile／rust_dep_info分别声明规范绝对路径后才映射读取，否则保留unresolved_relative_path。CMake使用自己的directory，不接受外部覆盖。工作目录仍是外部声明，不是已观察执行；缺同次绑定保持unknown，矛盾失败。使用此record对象须同时传--build-evidence，避免声明被静默忽略。当前材料hash与历史路径相同只说明当前身份；原partial_inventory及source_generation=not_proven边界不变。
+
+发现范围限Flutter build目录的depfile、项目／插件ARM64 CMake compile_commands和rust_api的Android release target dep-info；不是任意build系统的完整闭包。空Flutter依赖规则、目录依赖、未选择引用和缺失watch marker不会产生源码内容身份或生成成功。
+depfile按Make默认续行语义折叠LF／CRLF及相邻空白，保留token／转义边界；多反斜杠紧邻换行、bare CR或.POSIX语义明确拒绝，不实现完整Make解释器。
+输入保留declared_inputs／declared_path、candidate_path及mapping_basis。含`..`的路径只在已选目录内逐段打开并核目录，用保留的父descriptor返回；不能越出所选根或跳过symlink／缺失组件。mapped_path只在安全打开后给出，文件的尾随`/`或`/.`不能被当作普通文件读取；未选择路径仍不自动解析或读取。
+每个运行组件须从包内角色／ABI追到实际提供方、固定源码或已接受官方预编译件及生成配方、merge／strip／装配关系。上节维护当前组件取舍；官方源码／配方与发布对应不能冒称独立重建。
+已提交Freezed／Riverpod／Drift／本地化／FRB代码作为可审项目源码，并关联生成输入、配置和版本；没有重跑的不能称本次生成。构建期bindgen／JNI头等仅在同次输入输出有绑定时增加对应，AOT depfile不等于所有输入最终存活。
+
+engine源码范围沿Android flutter_shell_native、Skia／txt、Impeller renderer及Dart libdart／dart:io的固定GN展开；根树已有tonic／accessibility及Dart double-conversion不重复获取。图像／字体库、BoringSSL、RapidJSON、Abseil、FlatBuffers及Vulkan Headers／allocator从DEPS固定对象核原源；HarfBuzz pin为annotated tag，原tag字节及其指向的commit分别核对，不把tag hash冒称commit。
+Brotli的WOFF2和libtess2的独立tessellator／测试分支即使取得源码也不自动算作此APK代码。Vulkan-deps仅作为固定配方／gitlink来源，取实际需要的Headers；shader compiler、SDK工具、验证层、playground、其它平台及关闭特性按各自条件排除。未执行DEPS、hooks、完整gclient同步或engine编译；未掌握历史完整构建参数的范围保持明确。
+
+EasyTier原声明源码及生成关系仍未闭合。获审的一次独立WASI比较已经执行，输出与包内模块不同；有限来源恢复亦未取得原树，不再重复搜索或编译。新增工具与T02正式profile分离，实际工具接受、固定cargo分派的`--locked`及绝对WASM_OPT绑定、失败和差异保留在任务结果中。
+其它组件按获审范围交付；不得替换模块／Core、伪造旧Git身份或将编译成功当生成闭合。原EasyTier关系的明确延期仅由上述备忘维护，不授予Core、依赖源、gitlink或carrier变更例外，也不扩大到其它Loop5出口。
 
 ### 工具接受与受管构建
 

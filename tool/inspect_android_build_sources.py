@@ -2,6 +2,7 @@
 """Inspect explicitly selected APK/material bytes; never execute build inputs."""
 
 import argparse
+import fnmatch
 from contextlib import ExitStack, contextmanager
 import hashlib
 import json
@@ -13,6 +14,8 @@ import stat
 import struct
 import sys
 import zipfile
+
+import android_build_evidence as build_evidence
 
 
 MAX_FILE = 256 * 1024 * 1024
@@ -77,6 +80,7 @@ class SelectedInput:
         if path.is_symlink():
             raise Rejected('Select the actual input, not a symbolic link')
         path = path.resolve(strict=True)
+        self.path = path
         if not hasattr(os, 'O_NOFOLLOW') or os.open not in os.supports_dir_fd:
             raise Rejected('Safe descriptor-relative reads require POSIX support')
         self.directory = path.is_dir()
@@ -95,33 +99,53 @@ class SelectedInput:
         os.close(self.fd)
 
     @contextmanager
-    def open(self, path=None):
-        if not self.directory:
-            if path is not None:
-                raise Rejected('A selected file does not grant directory access')
+    def descriptor(self, path=None, *, compiler_path=False):
+        if path is None:
             fd = os.dup(self.fd)
+        elif not self.directory:
+            raise Rejected('A selected file does not grant directory access')
         else:
-            parts = relative_parts(path)
+            parts = path.split('/') if compiler_path else relative_parts(path)
+            if compiler_path:
+                for part in parts:
+                    if part != '..':
+                        relative_parts(part)
             with ExitStack() as stack:
-                parent = self.fd
+                parents = [self.fd]
                 for part in parts[:-1]:
-                    parent = os.open(part, os.O_RDONLY | os.O_DIRECTORY
-                                     | os.O_NOFOLLOW, dir_fd=parent)
-                    stack.callback(os.close, parent)
+                    if part == '..':
+                        if len(parents) == 1:
+                            raise Rejected('Compiler path leaves the selected input')
+                        parents.pop()
+                    else:
+                        parent = os.open(part, os.O_RDONLY | os.O_DIRECTORY
+                                         | os.O_NOFOLLOW, dir_fd=parents[-1])
+                        parents.append(parent)
+                        stack.callback(os.close, parent)
                 try:
-                    fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW
-                                 | os.O_NONBLOCK, dir_fd=parent)
+                    if parts[-1] == '..':
+                        if len(parents) == 1:
+                            raise Rejected('Compiler path leaves the selected input')
+                        fd = os.dup(parents[-2])
+                    else:
+                        fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW
+                                     | os.O_NONBLOCK, dir_fd=parents[-1])
                 except OSError as error:
                     if error.errno in (40, 62):
                         raise Rejected('Symbolic-link input rejected') from error
                     raise
         try:
+            yield fd
+        finally:
+            os.close(fd)
+
+    @contextmanager
+    def open(self, path=None):
+        with self.descriptor(path) as fd:
             regular(fd)
             with os.fdopen(fd, 'rb', closefd=False) as stream:
                 stream.seek(0)
                 yield stream
-        finally:
-            os.close(fd)
 
 
 def read_bounded(stream, limit=MAX_FILE):
@@ -378,7 +402,7 @@ def check_reference(ref, selections):
 
 
 def apply_record(report, record, selections, archive):
-    keys(record, ('apk_sha256', 'objects'), ('source_inputs', 'r8'))
+    keys(record, ('apk_sha256', 'objects'), ('source_inputs', 'r8', 'build_evidence'))
     digest(record['apk_sha256'])
     if record['apk_sha256'] != report['apk']['sha256']:
         report['contradictions'].append('apk_hash_mismatch')
@@ -481,6 +505,203 @@ def apply_record(report, record, selections, archive):
             result['limitation'] = 'R8 names do not prove generation or runtime reachability; zero is not absence'
 
 
+BUILD_PATTERNS = {
+    'flutter_depfile': ['.dart_tool/flutter_build/*/*.d'],
+    'cmake_compile_commands': ['android/*/.cxx/*/*/arm64-v8a/compile_commands.json',
+                               'android/.cxx/*/*/arm64-v8a/compile_commands.json',
+                               '.cxx/*/*/arm64-v8a/compile_commands.json'],
+    'rust_dep_info': ['.dart_tool/hooks_runner/shared/rust_api/build/*/target/'
+                      'aarch64-linux-android/release/deps/*.d'],
+}
+
+
+def selected_matches(selected, pattern):
+    visited = 0
+
+    def walk(parent, parts, prefix):
+        nonlocal visited
+        try:
+            with os.scandir(parent) as entries:
+                names = []
+                for entry in entries:
+                    visited += 1
+                    if visited > 50000:
+                        raise Rejected('Build metadata discovery exceeds limits')
+                    if fnmatch.fnmatchcase(entry.name, parts[0]):
+                        names.append(entry.name)
+            for name in sorted(names):
+                path = prefix + [name]
+                info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                if stat.S_ISLNK(info.st_mode):
+                    raise Rejected('Symbolic link in build metadata selection')
+                if len(parts) == 1:
+                    yield '/'.join(path)
+                elif stat.S_ISDIR(info.st_mode):
+                    child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                    dir_fd=parent)
+                    try:
+                        yield from walk(child, parts[1:], path)
+                    finally:
+                        os.close(child)
+        except FileNotFoundError:
+            return
+
+    yield from walk(selected.fd, pattern.split('/'), [])
+
+
+def build_context(report, declaration, root_name, selections):
+    if declaration is None:
+        return {'status': 'unknown', 'reason': 'No same-run context was selected'}
+    keys(declaration, ('input', 'context', 'source_commit'), ('working_directories',))
+    if declaration['input'] != root_name:
+        raise Rejected('Build context selects a different input root')
+    if not isinstance(declaration['source_commit'], str) or not re.fullmatch(
+            '[0-9a-f]{40}', declaration['source_commit']):
+        raise Rejected('Invalid build source commit declaration')
+    directories = declaration.get('working_directories', {})
+    if (not isinstance(directories, dict)
+            or set(directories) - {'flutter_depfile', 'rust_dep_info'}
+            or any(not isinstance(path, str) or not Path(path).is_absolute()
+                   or os.path.normpath(path) != path for path in directories.values())):
+        raise Rejected('Working directories must explicitly declare canonical absolute paths')
+    keys(declaration['context'], ('input', 'sha256'), ('path', 'member', 'relation'))
+    if declaration['context'].get('relation') not in (None, 'source_file'):
+        raise Rejected('Build context only asserts input identity')
+    result, data = check_reference(declaration['context'], selections)
+    if result['status'] == 'contradiction':
+        report['contradictions'].append('build_context_hash_mismatch')
+    if result['status'] != 'matched':
+        return result
+    context = json.loads(data, object_pairs_hook=unique_object)
+    if (not isinstance(context, dict) or not isinstance(context.get('workspace'), str)
+            or not isinstance(context.get('apks'), list)):
+        raise Rejected('Unsupported run context')
+    workspace = Path(context['workspace'])
+    if not workspace.is_absolute() or os.path.normpath(workspace) != str(workspace):
+        raise Rejected('Run context workspace must be canonical and absolute')
+    contradictions = []
+    if context.get('source_commit') != declaration['source_commit']:
+        contradictions.append('build_source_commit_mismatch')
+    if not selections[root_name].path.is_relative_to(workspace):
+        contradictions.append('build_workspace_mismatch')
+    if not any(isinstance(item, dict) and item.get('sha256') == report['apk']['sha256']
+               for item in context['apks']):
+        contradictions.append('build_context_apk_mismatch')
+    report['contradictions'].extend(contradictions)
+    return {'status': 'contradiction' if contradictions else 'matched_declarations',
+            'reference': result, 'source_commit': context.get('source_commit'),
+            'workspace': str(workspace),
+            'limitation': 'Selected context declarations, not independent build attestation'}
+
+
+def inspect_build_evidence(report, root_name, selections, declaration):
+    if root_name not in selections or not selections[root_name].directory:
+        raise Rejected('Build evidence must name an explicitly selected directory')
+    root = selections[root_name]
+    evidence = {'input': root_name, 'binding': build_context(
+        report, declaration, root_name, selections), 'records': [], 'inputs': [],
+        'generation_causality': 'not_proven', 'runtime_loading': 'not_observed',
+        'scope': 'Known Flutter depfiles, ARM64 CMake commands and Rust target dep-info; not an exhaustive build graph'}
+    report['build_evidence'] = evidence
+    identities, total = {}, 0
+
+    def identity(name, directory):
+        nonlocal total
+        if not isinstance(name, str) or not name or any(ord(c) < 32 for c in name):
+            raise Rejected('Invalid compiler input path')
+        path = Path(name)
+        basis = 'absolute_declaration'
+        if not path.is_absolute():
+            if directory is None:
+                key = 'relative:' + name
+                identities[key] = {'declared_path': name, 'status': 'unresolved_relative_path'}
+                if len(identities) > build_evidence.MAX_PATHS:
+                    raise Rejected('Excessive recorded build inputs')
+                return key
+            path = Path(directory) / path
+            basis = 'declared_working_directory'
+        if str(path) in identities:
+            return str(path)
+        if len(identities) >= build_evidence.MAX_PATHS:
+            raise Rejected('Excessive recorded build inputs')
+        row = {'declared_path': name, 'candidate_path': str(path),
+               'mapping_basis': basis, 'status': 'unselected'}
+        matches = []
+        for alias, selected in selections.items():
+            if selected.directory and path.is_relative_to(selected.path):
+                relative_path = None if path == selected.path else path.relative_to(selected.path).as_posix()
+                matches.append((len(selected.path.parts), alias, relative_path))
+            elif not selected.directory and path == selected.path:
+                matches.append((len(selected.path.parts), alias, None))
+        if matches:
+            _, alias, relative_path = max(matches)
+            row.update(input=alias, path=relative_path)
+            try:
+                with selections[alias].descriptor(relative_path, compiler_path=True) as fd:
+                    info = os.fstat(fd)
+                    if name.endswith(('/', '/.')) and not stat.S_ISDIR(info.st_mode):
+                        raise Rejected('Compiler input directory suffix names a non-directory')
+                    row['mapped_path'] = os.path.normpath(path)
+                    if stat.S_ISDIR(info.st_mode):
+                        row['status'] = 'directory_declaration'
+                    else:
+                        regular(fd)
+                        total += info.st_size
+                        if total > MAX_TOTAL:
+                            raise Rejected('Build input identity reads exceed limits')
+                        with os.fdopen(fd, 'rb', closefd=False) as stream:
+                            payload = read_bounded(stream, info.st_size)
+                        if len(payload) != info.st_size:
+                            raise Rejected('Build input changed size while reading')
+                        row.update(status='current_identity', size=info.st_size,
+                                   sha256=hashlib.sha256(payload).hexdigest())
+            except FileNotFoundError:
+                row['status'] = 'unavailable'
+        identities[str(path)] = row
+        return str(path)
+
+    seen, metadata_size = set(), 0
+    for kind, patterns in BUILD_PATTERNS.items():
+        for pattern in patterns:
+            for name in selected_matches(root, pattern):
+                if name in seen:
+                    continue
+                seen.add(name)
+                if len(seen) > 4096:
+                    raise Rejected('Excessive build metadata files')
+                with root.open(name) as stream:
+                    data = read_bounded(stream, 8 * 1024 * 1024)
+                metadata_size += len(data)
+                if metadata_size > 64 * 1024 * 1024:
+                    raise Rejected('Build metadata exceeds total read limit')
+                row = {'path': name, 'kind': kind, 'sha256': hashlib.sha256(data).hexdigest()}
+                if kind == 'cmake_compile_commands':
+                    commands = build_evidence.compile_commands(data)
+                else:
+                    directory = declaration.get('working_directories', {}).get(kind) if declaration else None
+                    commands = [dict(build_evidence.depfile(data), directory=directory,
+                                     working_directory_basis='external_record_declaration' if directory else 'unknown')]
+                row['commands'] = []
+                evidence['records'].append(row)
+                for command in commands:
+                    recorded = dict(command, declared_inputs=command['inputs'], inputs=[])
+                    row['commands'].append(recorded)
+                    directory = command['directory']
+                    if directory is not None and not Path(directory).is_absolute():
+                        raise Rejected('Compiler working directory must be absolute')
+                    recorded['inputs'] = [identity(path, directory) for path in command['inputs']]
+    evidence['inputs'] = list(identities.values())
+    evidence['coverage'] = {
+        'metadata_files': len(seen), 'declared_inputs': len(identities),
+        'current_identities': sum(x['status'] == 'current_identity' for x in identities.values()),
+        'directory_declarations': sum(x['status'] == 'directory_declaration' for x in identities.values()),
+        'unselected_inputs': sum(x['status'] == 'unselected' for x in identities.values()),
+        'unavailable_inputs': sum(x['status'] == 'unavailable' for x in identities.values()),
+        'unresolved_relative_inputs': sum(x['status'] == 'unresolved_relative_path' for x in identities.values()),
+    }
+    evidence['limitation'] = 'Current selected bytes and compiler declarations do not establish contemporaneous inputs, live AOT code or source generation'
+
+
 def finalize(report):
     objects = report['objects']
     for item in objects:
@@ -535,7 +756,7 @@ def finalize(report):
     return report
 
 
-def inspect(apk, record_path=None, inputs=(), expected_abi=None):
+def inspect(apk, record_path=None, inputs=(), expected_abi=None, build_root=None):
     report = {'apk': {}, 'objects': [], 'source_inputs': [],
               'records_not_in_apk': [], 'contradictions': [], 'errors': [],
               'reference_kind': 'explicit_external_record' if record_path else 'no_reference',
@@ -573,6 +794,7 @@ def inspect(apk, record_path=None, inputs=(), expected_abi=None):
                         selected = SelectedInput(path)
                         stack.callback(selected.close)
                         selections[alias] = selected
+                    value = {}
                     if record_path is not None:
                         selected = SelectedInput(record_path)
                         stack.callback(selected.close)
@@ -580,6 +802,11 @@ def inspect(apk, record_path=None, inputs=(), expected_abi=None):
                             value = json.loads(read_bounded(record, 4 * 1024 * 1024),
                                                object_pairs_hook=unique_object)
                         apply_record(report, value, selections, archive)
+                    if build_root is not None:
+                        inspect_build_evidence(report, build_root, selections,
+                                               value.get('build_evidence'))
+                    elif 'build_evidence' in value:
+                        raise Rejected('Build context requires --build-evidence')
     except (Rejected, OSError, ValueError, RuntimeError, zipfile.BadZipFile,
             NotImplementedError) as error:
         report['errors'].append({'kind': type(error).__name__, 'reason': str(error)})
@@ -592,8 +819,9 @@ def main():
     parser.add_argument('--record', type=Path)
     parser.add_argument('--input', action='append', default=[], metavar='NAME=PATH')
     parser.add_argument('--abi', choices=sorted(ABI))
+    parser.add_argument('--build-evidence', metavar='INPUT_NAME')
     args = parser.parse_args()
-    report = inspect(args.apk, args.record, args.input, args.abi)
+    report = inspect(args.apk, args.record, args.input, args.abi, args.build_evidence)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return report['exit_code']
 
