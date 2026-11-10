@@ -123,11 +123,308 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     return _core.validateConfigWithData(data);
   }
 
-  Future<void> manageSourcePermissions(Profile profile) async {
+  Future<SourceReviewStatus> sourceReviewStatus(Profile profile) async {
+    if (!requestClient.requiresSourceAcceptance) {
+      return SourceReviewStatus.ready;
+    }
+    final source = await requestClient.captureSource('profile:${profile.id}');
+    final file = File(await appPath.getProfilePath(profile.id.toString()));
+    if (!await file.exists()) {
+      throw const RequestUnavailable('source_material_unavailable');
+    }
+    return _sourceAcceptance(_core, requestClient).subscriptionStatus(
+      source: source,
+      identity: _profileSourceIdentity(profile),
+      settings: _profileSourceSettings(profile),
+      body: await _sourceBody(file.path, preserveBom: true),
+    );
+  }
+
+  Future<void> saveLocalGroups(
+    Profile expected,
+    List<LocalProxyGroup> groups, {
+    void Function()? onSaved,
+  }) async {
+    if (groups.length > localProxyGroupsLimit ||
+        groups.map((group) => group.id).toSet().length != groups.length ||
+        groups.any(
+          (group) =>
+              group.id < 0 || group.nodes.length > localProxyGroupMembersLimit,
+        )) {
+      throw const LocalProxyGroupProblem('limit');
+    }
+    final setup = ref.read(setupActionProvider.notifier);
+    final sequence = setup.reserveSetupSequence();
+    String? candidateHash;
+    _AcceptedLocalInput? acceptedLocalInput;
+    String? applyFailure;
+    Map<String, Object?>? expectedRun;
+    ConfigFact? previousFact;
+    Profile? previous;
+    await requestClient.mutate(() async {
+      final current = (await database.profilesDao.query().get()).getProfile(
+        expected.id,
+      );
+      if (current == null ||
+          !const ListEquality<LocalProxyGroup>().equals(
+            current.localGroups,
+            expected.localGroups,
+          ) ||
+          _profileSourceIdentity(current) != _profileSourceIdentity(expected) ||
+          SourceAcceptance.fingerprint(_profileSourceSettings(current)) !=
+              SourceAcceptance.fingerprint(_profileSourceSettings(expected)) ||
+          ref.read(currentProfileIdProvider) != current.id) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      previous = current;
+      final showingCurrent =
+          ref.read(configStateProvider).fact.profileId == current.id;
+      var picks = <String, String>{
+        for (final group in ref.read(groupsProvider))
+          if (showingCurrent &&
+              group.type == GroupType.Selector &&
+              (group.now?.isNotEmpty ?? false))
+            group.name: group.now!,
+      };
+      Future<void> persist() async {
+        final latest = (await database.profilesDao.query().get()).getProfile(
+          current.id,
+        );
+        if (latest == null ||
+            !const ListEquality<LocalProxyGroup>().equals(
+              latest.localGroups,
+              current.localGroups,
+            ) ||
+            _profileSourceIdentity(latest) != _profileSourceIdentity(current) ||
+            SourceAcceptance.fingerprint(_profileSourceSettings(latest)) !=
+                SourceAcceptance.fingerprint(_profileSourceSettings(current))) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        await ref
+            .read(profilesProvider.notifier)
+            .persist(
+              latest.copyWith(
+                localGroups: groups,
+                selectedMap: {
+                  ...current.selectedMap,
+                  ...picks,
+                  for (final entry in latest.selectedMap.entries)
+                    if (entry.value != current.selectedMap[entry.key])
+                      entry.key: entry.value,
+                },
+              ),
+            );
+      }
+
+      if (const ListEquality<LocalProxyGroup>().equals(
+        groups,
+        current.localGroups,
+      )) {
+        return;
+      }
+      final state = await ref.read(setupStateProvider(current.id).future);
+      final canSaveInactive = groups.every(
+        (group) =>
+            !group.enabled ||
+            current.localGroups.any(
+              (previous) => previous == group && previous.enabled,
+            ),
+      );
+      if (state.policySelection != null) {
+        if (!canSaveInactive) throw const LocalProxyGroupProblem('managed');
+        await persist();
+        return;
+      }
+      final removed = current.localGroups
+          .where(
+            (old) =>
+                old.enabled &&
+                !groups.any((group) => group.enabled && group.name == old.name),
+          )
+          .map((group) => group.name)
+          .toSet();
+      if (showingCurrent &&
+          ref
+              .read(groupsProvider)
+              .any(
+                (group) =>
+                    removed.contains(group.now) ||
+                    current.localGroups.any(
+                      (old) =>
+                          group.now == old.name &&
+                          old.entrances.contains(group.name) &&
+                          !groups.any(
+                            (next) =>
+                                next.enabled &&
+                                next.name == old.name &&
+                                next.entrances.contains(group.name),
+                          ),
+                    ),
+              )) {
+        throw const LocalProxyGroupProblem('inUse');
+      }
+      final source = await requestClient.captureSource('application-config');
+      ConfigFact fact;
+      try {
+        fact = previousFact = await _core.getConfigState();
+      } catch (_) {
+        if (!canSaveInactive) rethrow;
+        await persist();
+        return;
+      }
+      if (fact.profileId != current.id ||
+          !const {'ready', 'installed'}.contains(fact.phase)) {
+        if (canSaveInactive) {
+          await persist();
+          return;
+        }
+        throw const LocalProxyGroupProblem('loading');
+      }
+      expectedRun = await requestClient.captureNativeRunState();
+      if (requestClient.requiresSourceAcceptance) {
+        try {
+          final approved = await _sourceAcceptance(_core, requestClient)
+              .approveLocalGroups(
+                source: source,
+                profileId: current.id,
+                expected: fact,
+                before: current.localGroups,
+                after: groups,
+              );
+          picks = approved.picks;
+          acceptedLocalInput = (
+            document: approved.document,
+            expected: fact,
+            reportFailure: (message) => applyFailure = message,
+          );
+          candidateHash = sha256
+              .convert(utf8.encode(approved.document['yaml'] as String))
+              .toString();
+        } on RequestUnavailable catch (error) {
+          if (!canSaveInactive ||
+              !const {
+                'local_groups_source_unavailable',
+                'local_groups_changed',
+                'source_permissions_unavailable',
+              }.contains(error.code) ||
+              !await requestClient.configSourceCurrent(source)) {
+            rethrow;
+          }
+          await persist();
+          return;
+        }
+      } else {
+        final composition = await setup.getProfile(
+          setupState: state.copyWith(localGroups: groups),
+          patchConfig: ref.read(patchClashConfigProvider),
+          isCurrent: () => requestClient.configSourceCurrent(source),
+        );
+        candidateHash = sha256
+            .convert(utf8.encode(composition.yaml))
+            .toString();
+      }
+      if (candidateHash == fact.yamlSha256) {
+        await persist();
+        candidateHash = null;
+        return;
+      }
+      await requestClient.invalidate('application-config');
+      await persist();
+    });
+    onSaved?.call();
+    if (candidateHash == null) return;
+    final applied = await setup._runSetup(
+      force: true,
+      preferHot:
+          requestClient.requiresSourceAcceptance &&
+          previousFact?.businessActive == true &&
+          previousFact?.isManaged == false,
+      setupSequence: sequence,
+      expectedRun: expectedRun,
+      acceptedLocalInput: acceptedLocalInput,
+      isCurrent: () async =>
+          ref.mounted &&
+          ref.read(currentProfileIdProvider) == expected.id &&
+          const ListEquality<LocalProxyGroup>().equals(
+            ref.read(profileProvider(expected.id))?.localGroups,
+            groups,
+          ),
+    );
+    if (applied == _SetupTaskResult.completed) return;
+    final fact = await _core.getConfigState();
+    if (fact.yamlSha256 == candidateHash &&
+        fact.profileId == expected.id &&
+        const {'ready', 'installed'}.contains(fact.phase)) {
+      return;
+    }
+    if (onSaved == null &&
+        fact.yamlSha256 == previousFact?.yamlSha256 &&
+        fact.profileId == expected.id) {
+      await requestClient.mutate(() async {
+        final current = (await database.profilesDao.query().get()).getProfile(
+          expected.id,
+        );
+        if (current != null &&
+            const ListEquality<LocalProxyGroup>().equals(
+              current.localGroups,
+              groups,
+            ) &&
+            _profileSourceIdentity(current) ==
+                _profileSourceIdentity(previous!)) {
+          await ref
+              .read(profilesProvider.notifier)
+              .persist(current.copyWith(localGroups: previous!.localGroups));
+        }
+      });
+    }
+    if (applied == _SetupTaskResult.foregroundRequired) {
+      throw const LocalProxyGroupProblem('foreground');
+    }
+    if (applied == _SetupTaskResult.superseded ||
+        applied == _SetupTaskResult.staleInput) {
+      throw const LocalProxyGroupProblem('changed');
+    }
+    if (applyFailure?.isNotEmpty == true) throw MessageException(applyFailure!);
+    throw const LocalProxyGroupProblem('apply');
+  }
+
+  Future<void> manageSourcePermissions(
+    Profile profile, {
+    bool review = false,
+  }) async {
+    if (review && requestClient.requiresSourceAcceptance) {
+      return presentSourceReview(
+        profile,
+        (confirm, current) => _manageSourcePermissions(
+          profile,
+          review: true,
+          confirm: confirm,
+          isCurrent: current,
+        ),
+      );
+    }
+    return _manageSourcePermissions(profile, review: review);
+  }
+
+  @protected
+  Future<void> presentSourceReview(
+    Profile profile,
+    Future<void> Function(SourceConfirmation confirm, bool Function() current)
+    work,
+  ) => _prepareSourceReview(ref, profile.realLabel, work);
+
+  Future<void> _manageSourcePermissions(
+    Profile profile, {
+    bool review = false,
+    SourceConfirmation? confirm,
+    bool Function()? isCurrent,
+  }) async {
     if (!requestClient.requiresSourceAcceptance) return;
     final setup = ref.read(setupActionProvider.notifier);
     final setupSequence = setup.reserveSetupSequence();
-    if (await requestClient.materialRecoveryRequired()) {
+    final recovery = await requestClient.materialRecoveryRequired();
+    if (isCurrent != null && !isCurrent()) return;
+    if (recovery) {
       final expectedRun = await _recoverSourceMaterialCommit(
         _core,
         requestClient,
@@ -136,6 +433,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
         await setup.applyProfile(
           force: true,
           allowBootstrap: true,
+          allowSourceReview: true,
           expectedRun: expectedRun,
           setupSequence: setupSequence,
         );
@@ -145,42 +443,155 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     final acceptance = _sourceAcceptance(
       _core,
       requestClient,
-      confirm: ref.read(sourceConfirmationProvider),
+      confirm: confirm ?? ref.read(sourceConfirmationProvider),
     );
     final source = await requestClient.captureSource('profile:${profile.id}');
-    final config = await requestClient.captureSource('application-config');
-    final permissions = [
-      ...await acceptance.permissions(source: source, kind: 'profile'),
-      ...await acceptance.permissions(
-        source: config,
-        kind: 'config',
-        entityKey: 'config:${profile.id}',
-      ),
-    ];
-    final choice = await dialogs.showCommonDialog<SourcePermissionChoice>(
-      child: SourcePermissionsDialog(
-        label: profile.realLabel,
-        permissions: permissions,
-      ),
-    );
+    final expectedRun = await requestClient.captureNativeRunState();
+    SourcePermissionChoice? choice;
+    if (review) {
+      choice = (action: SourcePermissionAction.review, permission: null);
+    } else {
+      final config = await requestClient.captureSource('application-config');
+      final permissions = [
+        ...await acceptance.permissions(source: source, kind: 'profile'),
+        ...await acceptance.permissions(
+          source: config,
+          kind: 'config',
+          entityKey: 'config:${profile.id}',
+        ),
+      ];
+      choice = await dialogs.showCommonDialog<SourcePermissionChoice>(
+        child: SourcePermissionsDialog(
+          label: profile.realLabel,
+          permissions: permissions,
+        ),
+      );
+    }
     if (choice == null) return;
     if (choice.action == SourcePermissionAction.review) {
       await _reviewProfileSource(
-        confirm: ref.read(sourceConfirmationProvider),
+        confirm: confirm ?? ref.read(sourceConfirmationProvider),
         core: _core,
         requests: requestClient,
         profile: profile,
         path: await appPath.getProfilePath(profile.id.toString()),
         source: source,
         forceReview: true,
+        isCurrent: isCurrent == null ? null : () async => isCurrent(),
       );
+      await _completeSubscriptionReview(profile);
+      if (ref.mounted &&
+          expectedRun != null &&
+          ref.read(currentProfileIdProvider) == profile.id) {
+        await setup.applyProfile(
+          force: true,
+          allowSourceReview: true,
+          expectedRun: expectedRun,
+          setupSequence: setupSequence,
+        );
+      }
     } else {
       await acceptance.withdraw(
         choice.permission!,
         stopUse: choice.action == SourcePermissionAction.stopUse,
       );
     }
-    await ref.read(configStateProvider.notifier).refresh();
+    if (ref.mounted) {
+      await ref.read(configStateProvider.notifier).refresh();
+    }
+  }
+
+  @override
+  Future<void> _completeSubscriptionReview(
+    Profile profile, {
+    SourceConfirmation? confirm,
+  }) async {
+    final store = SourceReviewBatchStore.forRequests(requestClient);
+    if (store.isEmpty) return;
+    final source = await requestClient.captureSource('profile:${profile.id}');
+    final reviewed = store.configuration(source.key, source.client);
+    if (reviewed == null) return;
+    final application = await requestClient.captureSource('application-config');
+    Future<bool> current() async =>
+        ref.mounted &&
+        await requestClient.configSourceCurrent(source) &&
+        await requestClient.configSourceCurrent(application);
+    final uses = <Map<String, Object?>>[];
+    final confirmation = confirm ?? ref.read(sourceConfirmationProvider);
+    final setup = ref.read(setupActionProvider.notifier);
+    final state = await ref.read(setupStateProvider(profile.id).future);
+    final selection = state.policySelection;
+    final selected = selection == null
+        ? null
+        : SelectedPolicy.decode(selection.rawContent);
+    final patch = setup._effectivePatchConfig(
+      ref.read(patchClashConfigProvider),
+    );
+    late ({String yaml, String md5}) composition;
+    if (selected?.usesMaterials == true) {
+      final frame = await _ManagedMaterialFrame.capture(profile, state);
+      try {
+        final resolved = await frame.resolve(
+          _core,
+          state,
+          selected!,
+          requests: requestClient,
+          confirm: confirmation,
+          onSourceUse: uses.add,
+          isCurrent: current,
+        );
+        composition = await setup._composeManagedSubscription(
+          state: state,
+          patch: patch,
+          selected: resolved,
+        );
+      } finally {
+        await frame.file.close();
+      }
+    } else {
+      composition = await setup.getProfile(
+        setupState: state,
+        patchConfig: patch,
+        allowSourceReview: true,
+        isCurrent: current,
+        onSourceUse: uses.add,
+      );
+    }
+    if (!await current() ||
+        sha256.convert(utf8.encode(composition.yaml)).toString() !=
+            reviewed.bodyHash) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+    final acceptance = _sourceAcceptance(
+      _core,
+      requestClient,
+      confirm: confirmation,
+    );
+    final root = await acceptance.review(
+      source: application,
+      entityKey: 'config:${profile.id}',
+      identity: SourceAcceptance.fingerprint({'profile': profile.id}),
+      settings: reviewed.settings,
+      body: composition.yaml,
+      label: profile.realLabel,
+      location: profile.url,
+      kind: 'config',
+      uses: uses,
+      isCurrent: current,
+    );
+    try {
+      final bundle = await acceptance.completeProviders(
+        root: root,
+        dependencies: uses,
+        source: application,
+        automatic: false,
+        isCurrent: current,
+        reviewed: true,
+      );
+      await bundle.release();
+    } finally {
+      await root.release();
+    }
   }
 
   void _watchRefreshProfiles() {
@@ -279,6 +690,8 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     bool sourceMustMatch = false,
     bool importing = false,
     RequestSource? expectedSource,
+    ProfileImportTask? importTask,
+    SourceConfirmation? confirm,
     Iterable<int> renameIn = const [],
   }) async {
     if (_refreshDisposed) {
@@ -298,7 +711,10 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
         allowBootstrap: allowBootstrap,
         sourceMustMatch: sourceMustMatch,
         expectedSource: expectedSource,
+        importTask: importTask,
+        confirm: confirm,
       );
+      importTask?.attach(job.cancel);
       final result = await job.completion.future;
       if (result.failure != null &&
           (!result.materialSaved ||
@@ -400,6 +816,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       } else {
         await requestClient.mutate(persist);
       }
+      await _completeSubscriptionReview(profile);
     } finally {
       await approval?.release();
       await staged.close();
@@ -419,12 +836,14 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     );
   }
 
-  Future<void> addProfileFormURL(
+  Future<ProfileRefreshResult?> addProfileFormURL(
     String url, {
     String? label,
     RequestMode mode = RequestMode.auto,
     String? proxy,
     bool confirmed = false,
+    ProfileImportTask? importTask,
+    SourceReviewPresentation? reviewPresentation,
   }) async {
     if (!confirmed) {
       final result = await dialogs.showNamedUrlInput(
@@ -438,7 +857,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
           proxy = value.$2;
         },
       );
-      if (result == null) return;
+      if (result == null) return null;
       url = result.url;
       label = result.label;
     }
@@ -447,7 +866,21 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       url: url,
     ).copyWith(requestMode: mode, requestProxy: proxy);
     ref.read(currentPageLabelProvider.notifier).value = PageLabel.profiles;
-    await globalState.loadingRun(
+    if (importTask != null) {
+      return updateProfile(
+        profile,
+        importing: true,
+        importTask: importTask,
+        confirm: reviewPresentation == null
+            ? null
+            : (review) => confirmSourceReview(
+                ref,
+                review,
+                presentation: reviewPresentation,
+              ),
+      );
+    }
+    return globalState.loadingRun(
       () => updateProfile(profile, importing: true),
       tag: LoadingTag.profiles,
       title: currentAppLocalizations.addProfile,

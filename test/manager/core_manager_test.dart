@@ -10,6 +10,7 @@ import 'package:fl_clash/manager/core_manager.dart';
 import 'package:fl_clash/manager/status_manager.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
@@ -40,6 +41,17 @@ class _FakePathProvider extends PathProviderPlatform {
 
   @override
   Future<String?> getApplicationCachePath() async => root;
+}
+
+class _RejectedSetup extends SetupAction {
+  final selected = <int?>[];
+  @override
+  void build() {}
+  @override
+  Future<bool> fullSetup() async {
+    selected.add(ref.read(currentProfileIdProvider));
+    return false;
+  }
 }
 
 const _nullProfileSetupState = SetupState(
@@ -400,23 +412,22 @@ void main() {
       tester,
     ) async {
       final coreInterface = _coreInterface();
-      var setupCalls = 0;
-      when(() => coreInterface.setupConfig(any())).thenAnswer((_) async {
-        setupCalls++;
-        return 'rejected';
-      });
+      final setup = _RejectedSetup();
       final container = await _pumpCoreManager(
         tester,
         coreInterface,
-        overrides: profileOverrides(),
+        overrides: [
+          ...profileOverrides(),
+          setupActionProvider.overrideWith(() => setup),
+        ],
       );
       globalState.container = container;
 
       container.read(currentProfileIdProvider.notifier).value = next.id;
-      await _waitForSetupToSettle(tester, () => setupCalls >= 1);
+      await _waitForSetupToSettle(tester, () => setup.selected.isNotEmpty);
 
       expect(container.read(currentProfileIdProvider), next.id);
-      expect(setupCalls, 1);
+      expect(setup.selected, [next.id]);
 
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -425,11 +436,7 @@ void main() {
       tester,
     ) async {
       final coreInterface = _coreInterface();
-      var setupCalls = 0;
-      when(() => coreInterface.setupConfig(any())).thenAnswer((_) async {
-        setupCalls++;
-        return 'rejected';
-      });
+      final setup = _RejectedSetup();
       final a = Profile.normal(label: 'a');
       final b = Profile.normal(label: 'b');
       final c = Profile.normal(label: 'c');
@@ -437,6 +444,7 @@ void main() {
         tester,
         coreInterface,
         overrides: [
+          setupActionProvider.overrideWith(() => setup),
           initProvider.overrideWithBuild((_, _) => true),
           profilesProvider.overrideWith(() => TestProfiles([a, b, c])),
           currentProfileIdProvider.overrideWithBuild((_, _) => a.id),
@@ -447,29 +455,25 @@ void main() {
 
       container.read(currentProfileIdProvider.notifier).value = b.id;
       container.read(currentProfileIdProvider.notifier).value = c.id;
-      await _waitForSetupToSettle(tester, () => setupCalls >= 2);
+      await _waitForSetupToSettle(tester, () => setup.selected.length >= 2);
 
       expect(container.read(currentProfileIdProvider), c.id);
-      expect(setupCalls, 2);
+      expect(setup.selected, [c.id, c.id]);
 
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
     testWidgets(
-      'a missing profile id recovers to a fallback without looping when '
-      'the fallback is also rejected',
+      'a missing selected id is passed to Setup without an implicit fallback',
       (tester) async {
         final coreInterface = _coreInterface();
-        var setupCalls = 0;
-        when(() => coreInterface.setupConfig(any())).thenAnswer((_) async {
-          setupCalls++;
-          return 'rejected';
-        });
+        final setup = _RejectedSetup();
         const missingId = -1;
         final container = await _pumpCoreManager(
           tester,
           coreInterface,
           overrides: [
+            setupActionProvider.overrideWith(() => setup),
             initProvider.overrideWithBuild((_, _) => true),
             profilesProvider.overrideWith(() => TestProfiles([previous])),
             currentProfileIdProvider.overrideWithBuild((_, _) => null),
@@ -479,16 +483,40 @@ void main() {
         globalState.container = container;
 
         container.read(currentProfileIdProvider.notifier).value = missingId;
-        await _waitForSetupToSettle(
-          tester,
-          () => container.read(currentProfileIdProvider) == previous.id,
-        );
+        await _waitForSetupToSettle(tester, () => setup.selected.isNotEmpty);
 
-        expect(setupCalls, lessThanOrEqualTo(3));
-        expect(container.read(currentProfileIdProvider), previous.id);
+        expect(setup.selected, [missingId]);
+        expect(container.read(currentProfileIdProvider), missingId);
 
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
   });
+  testWidgets(
+    'bootstrap profile restoration does not dispatch a duplicate full setup',
+    (tester) async {
+      final setup = _RejectedSetup();
+      final profile = Profile.normal(label: 'restored');
+      final container = await _pumpCoreManager(
+        tester,
+        _coreInterface(),
+        overrides: [
+          initProvider.overrideWithBuild((_, _) => false),
+          profilesProvider.overrideWith(() => TestProfiles([profile])),
+          currentProfileIdProvider.overrideWithBuild((_, _) => null),
+          setupActionProvider.overrideWith(() => setup),
+        ],
+      );
+      container.read(currentProfileIdProvider.notifier).value = profile.id;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(setup.selected, isEmpty);
+      container.read(initProvider.notifier).value = true;
+      container.read(currentProfileIdProvider.notifier).value = profile.id + 1;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(setup.selected, [profile.id + 1]);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

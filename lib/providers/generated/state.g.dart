@@ -2584,6 +2584,94 @@ final class DelayTestPhaseFamily extends $Family
   String toString() => r'delayTestPhaseProvider';
 }
 
+@ProviderFor(delayTestFailure)
+final delayTestFailureProvider = DelayTestFailureFamily._();
+
+final class DelayTestFailureProvider
+    extends $FunctionalProvider<Object?, Object?, Object?>
+    with $Provider<Object?> {
+  DelayTestFailureProvider._({
+    required DelayTestFailureFamily super.from,
+    required ({String proxyName, String? testUrl}) super.argument,
+  }) : super(
+         retry: null,
+         name: r'delayTestFailureProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$delayTestFailureHash();
+
+  @override
+  String toString() {
+    return r'delayTestFailureProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<Object?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Object? create(Ref ref) {
+    final argument = this.argument as ({String proxyName, String? testUrl});
+    return delayTestFailure(
+      ref,
+      proxyName: argument.proxyName,
+      testUrl: argument.testUrl,
+    );
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Object? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Object?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is DelayTestFailureProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$delayTestFailureHash() => r'ce3c3231dd489d77df609976eba02a3fcad064e7';
+
+final class DelayTestFailureFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          Object?,
+          ({String proxyName, String? testUrl})
+        > {
+  DelayTestFailureFamily._()
+    : super(
+        retry: null,
+        name: r'delayTestFailureProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  DelayTestFailureProvider call({required String proxyName, String? testUrl}) =>
+      DelayTestFailureProvider._(
+        argument: (proxyName: proxyName, testUrl: testUrl),
+        from: this,
+      );
+
+  @override
+  String toString() => r'delayTestFailureProvider';
+}
+
 @ProviderFor(selectedMap)
 final selectedMapProvider = SelectedMapProvider._();
 
@@ -3085,7 +3173,7 @@ final class NavigationItemsStateProvider
 }
 
 String _$navigationItemsStateHash() =>
-    r'3c633d4f3e5f2e80b7cfd166a46397f9a207bb1e';
+    r'ca7b610493dd79ae339373cce1454065a0d280cc';
 
 @ProviderFor(currentNavigationItemsState)
 final currentNavigationItemsStateProvider =
@@ -3847,7 +3935,7 @@ final class SetupStateProvider
   }
 }
 
-String _$setupStateHash() => r'3a47e725b2ac525251aafd67defa55daa8fc8437';
+String _$setupStateHash() => r'0d4e38a247be70d2327bcfff3ce7c293f0bcf97c';
 
 final class SetupStateFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<SetupState>, int?> {

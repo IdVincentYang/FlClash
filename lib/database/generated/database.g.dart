@@ -142,6 +142,16 @@ class $ProfilesTable extends Profiles
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       ).withConverter<Set<String>>($ProfilesTable.$converterunfoldSet);
+  @override
+  late final GeneratedColumnWithTypeConverter<List<LocalProxyGroup>, String>
+  localGroups = GeneratedColumn<String>(
+    'local_groups',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  ).withConverter<List<LocalProxyGroup>>($ProfilesTable.$converterlocalGroups);
   static const VerificationMeta _requestModeMeta = const VerificationMeta(
     'requestMode',
   );
@@ -189,6 +199,7 @@ class $ProfilesTable extends Profiles
     autoUpdate,
     selectedMap,
     unfoldSet,
+    localGroups,
     requestMode,
     requestProxy,
     order,
@@ -369,6 +380,12 @@ class $ProfilesTable extends Profiles
           data['${effectivePrefix}unfold_set'],
         )!,
       ),
+      localGroups: $ProfilesTable.$converterlocalGroups.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}local_groups'],
+        )!,
+      ),
       requestMode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}request_mode'],
@@ -399,6 +416,8 @@ class $ProfilesTable extends Profiles
       const StringMapConverter();
   static TypeConverter<Set<String>, String> $converterunfoldSet =
       const StringSetConverter();
+  static TypeConverter<List<LocalProxyGroup>, String> $converterlocalGroups =
+      const LocalProxyGroupsConverter();
 }
 
 class RawProfile extends DataClass implements Insertable<RawProfile> {
@@ -415,6 +434,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
   final bool autoUpdate;
   final Map<String, String> selectedMap;
   final Set<String> unfoldSet;
+  final List<LocalProxyGroup> localGroups;
   final String requestMode;
   final String? requestProxy;
   final int? order;
@@ -432,6 +452,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     required this.autoUpdate,
     required this.selectedMap,
     required this.unfoldSet,
+    required this.localGroups,
     required this.requestMode,
     this.requestProxy,
     this.order,
@@ -478,6 +499,11 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
         $ProfilesTable.$converterunfoldSet.toSql(unfoldSet),
       );
     }
+    {
+      map['local_groups'] = Variable<String>(
+        $ProfilesTable.$converterlocalGroups.toSql(localGroups),
+      );
+    }
     map['request_mode'] = Variable<String>(requestMode);
     if (!nullToAbsent || requestProxy != null) {
       map['request_proxy'] = Variable<String>(requestProxy);
@@ -513,6 +539,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
       autoUpdate: Value(autoUpdate),
       selectedMap: Value(selectedMap),
       unfoldSet: Value(unfoldSet),
+      localGroups: Value(localGroups),
       requestMode: Value(requestMode),
       requestProxy: requestProxy == null && nullToAbsent
           ? const Value.absent()
@@ -550,6 +577,9 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
         json['selectedMap'],
       ),
       unfoldSet: serializer.fromJson<Set<String>>(json['unfoldSet']),
+      localGroups: serializer.fromJson<List<LocalProxyGroup>>(
+        json['localGroups'],
+      ),
       requestMode: serializer.fromJson<String>(json['requestMode']),
       requestProxy: serializer.fromJson<String?>(json['requestProxy']),
       order: serializer.fromJson<int?>(json['order']),
@@ -578,6 +608,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
       'autoUpdate': serializer.toJson<bool>(autoUpdate),
       'selectedMap': serializer.toJson<Map<String, String>>(selectedMap),
       'unfoldSet': serializer.toJson<Set<String>>(unfoldSet),
+      'localGroups': serializer.toJson<List<LocalProxyGroup>>(localGroups),
       'requestMode': serializer.toJson<String>(requestMode),
       'requestProxy': serializer.toJson<String?>(requestProxy),
       'order': serializer.toJson<int?>(order),
@@ -598,6 +629,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     bool? autoUpdate,
     Map<String, String>? selectedMap,
     Set<String>? unfoldSet,
+    List<LocalProxyGroup>? localGroups,
     String? requestMode,
     Value<String?> requestProxy = const Value.absent(),
     Value<int?> order = const Value.absent(),
@@ -622,6 +654,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     autoUpdate: autoUpdate ?? this.autoUpdate,
     selectedMap: selectedMap ?? this.selectedMap,
     unfoldSet: unfoldSet ?? this.unfoldSet,
+    localGroups: localGroups ?? this.localGroups,
     requestMode: requestMode ?? this.requestMode,
     requestProxy: requestProxy.present ? requestProxy.value : this.requestProxy,
     order: order.present ? order.value : this.order,
@@ -657,6 +690,9 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
           ? data.selectedMap.value
           : this.selectedMap,
       unfoldSet: data.unfoldSet.present ? data.unfoldSet.value : this.unfoldSet,
+      localGroups: data.localGroups.present
+          ? data.localGroups.value
+          : this.localGroups,
       requestMode: data.requestMode.present
           ? data.requestMode.value
           : this.requestMode,
@@ -683,6 +719,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
           ..write('autoUpdate: $autoUpdate, ')
           ..write('selectedMap: $selectedMap, ')
           ..write('unfoldSet: $unfoldSet, ')
+          ..write('localGroups: $localGroups, ')
           ..write('requestMode: $requestMode, ')
           ..write('requestProxy: $requestProxy, ')
           ..write('order: $order')
@@ -705,6 +742,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
     autoUpdate,
     selectedMap,
     unfoldSet,
+    localGroups,
     requestMode,
     requestProxy,
     order,
@@ -726,6 +764,7 @@ class RawProfile extends DataClass implements Insertable<RawProfile> {
           other.autoUpdate == this.autoUpdate &&
           other.selectedMap == this.selectedMap &&
           other.unfoldSet == this.unfoldSet &&
+          other.localGroups == this.localGroups &&
           other.requestMode == this.requestMode &&
           other.requestProxy == this.requestProxy &&
           other.order == this.order);
@@ -745,6 +784,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
   final Value<bool> autoUpdate;
   final Value<Map<String, String>> selectedMap;
   final Value<Set<String>> unfoldSet;
+  final Value<List<LocalProxyGroup>> localGroups;
   final Value<String> requestMode;
   final Value<String?> requestProxy;
   final Value<int?> order;
@@ -762,6 +802,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     this.autoUpdate = const Value.absent(),
     this.selectedMap = const Value.absent(),
     this.unfoldSet = const Value.absent(),
+    this.localGroups = const Value.absent(),
     this.requestMode = const Value.absent(),
     this.requestProxy = const Value.absent(),
     this.order = const Value.absent(),
@@ -780,6 +821,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     required bool autoUpdate,
     required Map<String, String> selectedMap,
     required Set<String> unfoldSet,
+    this.localGroups = const Value.absent(),
     this.requestMode = const Value.absent(),
     this.requestProxy = const Value.absent(),
     this.order = const Value.absent(),
@@ -804,6 +846,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     Expression<bool>? autoUpdate,
     Expression<String>? selectedMap,
     Expression<String>? unfoldSet,
+    Expression<String>? localGroups,
     Expression<String>? requestMode,
     Expression<String>? requestProxy,
     Expression<int>? order,
@@ -823,6 +866,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
       if (autoUpdate != null) 'auto_update': autoUpdate,
       if (selectedMap != null) 'selected_map': selectedMap,
       if (unfoldSet != null) 'unfold_set': unfoldSet,
+      if (localGroups != null) 'local_groups': localGroups,
       if (requestMode != null) 'request_mode': requestMode,
       if (requestProxy != null) 'request_proxy': requestProxy,
       if (order != null) 'order': order,
@@ -843,6 +887,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
     Value<bool>? autoUpdate,
     Value<Map<String, String>>? selectedMap,
     Value<Set<String>>? unfoldSet,
+    Value<List<LocalProxyGroup>>? localGroups,
     Value<String>? requestMode,
     Value<String?>? requestProxy,
     Value<int?>? order,
@@ -862,6 +907,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
       autoUpdate: autoUpdate ?? this.autoUpdate,
       selectedMap: selectedMap ?? this.selectedMap,
       unfoldSet: unfoldSet ?? this.unfoldSet,
+      localGroups: localGroups ?? this.localGroups,
       requestMode: requestMode ?? this.requestMode,
       requestProxy: requestProxy ?? this.requestProxy,
       order: order ?? this.order,
@@ -920,6 +966,11 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
         $ProfilesTable.$converterunfoldSet.toSql(unfoldSet.value),
       );
     }
+    if (localGroups.present) {
+      map['local_groups'] = Variable<String>(
+        $ProfilesTable.$converterlocalGroups.toSql(localGroups.value),
+      );
+    }
     if (requestMode.present) {
       map['request_mode'] = Variable<String>(requestMode.value);
     }
@@ -948,6 +999,7 @@ class ProfilesCompanion extends UpdateCompanion<RawProfile> {
           ..write('autoUpdate: $autoUpdate, ')
           ..write('selectedMap: $selectedMap, ')
           ..write('unfoldSet: $unfoldSet, ')
+          ..write('localGroups: $localGroups, ')
           ..write('requestMode: $requestMode, ')
           ..write('requestProxy: $requestProxy, ')
           ..write('order: $order')
@@ -5197,6 +5249,7 @@ typedef $$ProfilesTableCreateCompanionBuilder =
       required bool autoUpdate,
       required Map<String, String> selectedMap,
       required Set<String> unfoldSet,
+      Value<List<LocalProxyGroup>> localGroups,
       Value<String> requestMode,
       Value<String?> requestProxy,
       Value<int?> order,
@@ -5216,6 +5269,7 @@ typedef $$ProfilesTableUpdateCompanionBuilder =
       Value<bool> autoUpdate,
       Value<Map<String, String>> selectedMap,
       Value<Set<String>> unfoldSet,
+      Value<List<LocalProxyGroup>> localGroups,
       Value<String> requestMode,
       Value<String?> requestProxy,
       Value<int?> order,
@@ -5409,6 +5463,16 @@ class $$ProfilesTableFilterComposer
   ColumnWithTypeConverterFilters<Set<String>, Set<String>, String>
   get unfoldSet => $composableBuilder(
     column: $table.unfoldSet,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    List<LocalProxyGroup>,
+    List<LocalProxyGroup>,
+    String
+  >
+  get localGroups => $composableBuilder(
+    column: $table.localGroups,
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
@@ -5628,6 +5692,11 @@ class $$ProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get localGroups => $composableBuilder(
+    column: $table.localGroups,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get requestMode => $composableBuilder(
     column: $table.requestMode,
     builder: (column) => ColumnOrderings(column),
@@ -5710,6 +5779,12 @@ class $$ProfilesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<Set<String>, String> get unfoldSet =>
       $composableBuilder(column: $table.unfoldSet, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<List<LocalProxyGroup>, String>
+  get localGroups => $composableBuilder(
+    column: $table.localGroups,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get requestMode => $composableBuilder(
     column: $table.requestMode,
@@ -5901,6 +5976,7 @@ class $$ProfilesTableTableManager
                 Value<bool> autoUpdate = const Value.absent(),
                 Value<Map<String, String>> selectedMap = const Value.absent(),
                 Value<Set<String>> unfoldSet = const Value.absent(),
+                Value<List<LocalProxyGroup>> localGroups = const Value.absent(),
                 Value<String> requestMode = const Value.absent(),
                 Value<String?> requestProxy = const Value.absent(),
                 Value<int?> order = const Value.absent(),
@@ -5918,6 +5994,7 @@ class $$ProfilesTableTableManager
                 autoUpdate: autoUpdate,
                 selectedMap: selectedMap,
                 unfoldSet: unfoldSet,
+                localGroups: localGroups,
                 requestMode: requestMode,
                 requestProxy: requestProxy,
                 order: order,
@@ -5938,6 +6015,7 @@ class $$ProfilesTableTableManager
                 required bool autoUpdate,
                 required Map<String, String> selectedMap,
                 required Set<String> unfoldSet,
+                Value<List<LocalProxyGroup>> localGroups = const Value.absent(),
                 Value<String> requestMode = const Value.absent(),
                 Value<String?> requestProxy = const Value.absent(),
                 Value<int?> order = const Value.absent(),
@@ -5955,6 +6033,7 @@ class $$ProfilesTableTableManager
                 autoUpdate: autoUpdate,
                 selectedMap: selectedMap,
                 unfoldSet: unfoldSet,
+                localGroups: localGroups,
                 requestMode: requestMode,
                 requestProxy: requestProxy,
                 order: order,

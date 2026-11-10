@@ -162,6 +162,12 @@ func TestSourceInlineRejectsStaleMissingAuthorityAndUnsafeHistory(t *testing.T) 
 			if result.Status == "applied" || p.receipt.InputID != oldInput {
 				t.Fatalf("%s changed input: %+v", negative, result)
 			}
+			if (negative == "old-quic-reader" || negative == "budget" || negative == "structure") && !result.RequiresFullApply {
+				t.Fatal("missing full apply requirement", negative, result)
+			}
+			if (negative == "stale-fence" || negative == "no-hook" || negative == "noop-hook" || negative == "no-client" || negative == "stopped") && result.RequiresFullApply {
+				t.Fatal("authority failure allowed a full apply retry", negative, result)
+			}
 			after := tunnel.AllProxies()
 			for name, proxy := range before {
 				if proxy != after[name] {

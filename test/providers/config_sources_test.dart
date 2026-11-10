@@ -53,6 +53,8 @@ class _SnapshotSetup extends SetupAction {
     void Function(Map<String, Object?>)? onRuleLedger,
     bool allowSourceReview = true,
     Future<bool> Function()? isCurrent,
+    Map<String, dynamic>? previewDocument,
+    bool previewOwnRouting = false,
   }) async {
     captured = setupState;
     return (yaml: 'mode: rule\nrules: ["MATCH,REJECT"]\n', md5: 'snapshot');

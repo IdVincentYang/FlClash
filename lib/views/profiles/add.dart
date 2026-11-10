@@ -1,15 +1,15 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/pages/scan.dart';
 import 'package:fl_clash/providers/action.dart';
-import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'import_url.dart';
 
 void showAddProfilePage() {
   final context = globalState.navigatorKey.currentState!.context;
@@ -45,46 +45,14 @@ class AddProfileView extends ConsumerWidget {
     }
   }
 
-  Future<void> _toAdd(WidgetRef ref) async {
-    final profilesAction = ref.read(profilesActionProvider.notifier);
-    final appLocalizations = context.appLocalizations;
-    final reservedLabels = ref.read(
-      appProviderLabelsProvider(ProviderKind.proxy),
+  Future<void> _toAdd(BuildContext context) async {
+    final route = ModalRoute.of(context);
+    final imported = await dialogs.showCommonDialog<bool>(
+      dismissible: false,
+      child: const ProfileUrlImportDialog(),
     );
-    var mode = RequestMode.auto;
-    String? proxy;
-    final res = await dialogs.showNamedUrlInput(
-      title: appLocalizations.importFromURL,
-      onRequestRouteChanged: (value) {
-        mode = value.$1;
-        proxy = value.$2;
-      },
-      labelValidator: (value) {
-        if (reservedLabels.contains(value?.trim())) {
-          return appLocalizations.existsTip(appLocalizations.name);
-        }
-        return null;
-      },
-      urlValidator: (value) {
-        if (value == null || value.isEmpty) {
-          return appLocalizations.emptyTip('').trim();
-        }
-        if (!value.isUrl) {
-          return appLocalizations.urlTip('').trim();
-        }
-        return null;
-      },
-    );
-    if (res != null) {
-      unawaited(
-        profilesAction.addProfileFormURL(
-          res.url,
-          label: res.label,
-          mode: mode,
-          proxy: proxy,
-          confirmed: true,
-        ),
-      );
+    if (imported == true && context.mounted && route?.isCurrent == true) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -110,7 +78,7 @@ class AddProfileView extends ConsumerWidget {
           leading: const GlyphIcon(AppGlyphs.cloudDownload),
           title: Text(appLocalizations.url),
           subtitle: Text(appLocalizations.urlDesc),
-          onTap: () => _toAdd(ref),
+          onTap: () => _toAdd(context),
         ),
       ],
     );

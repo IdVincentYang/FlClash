@@ -84,7 +84,7 @@ Future<ProviderContainer> pumpProfiles(
 }
 
 void main() {
-  testWidgets('arrow right from a profile card focuses its more button', (
+  testWidgets('arrow right from a profile card reaches Use then More', (
     tester,
   ) async {
     final profiles = [
@@ -107,7 +107,10 @@ void main() {
             ?.findAncestorWidgetOfExactType<OutlinedButton>();
         final focusedAction = context
             ?.findAncestorWidgetOfExactType<IconButton>();
-        if (focusedAction == null && identical(focusedCard, cards[index])) {
+        final focusedUse = context?.findAncestorWidgetOfExactType<TextButton>();
+        if (focusedAction == null &&
+            focusedUse == null &&
+            identical(focusedCard, cards[index])) {
           return;
         }
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -122,6 +125,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
 
+      if (profileIndex != 0) {
+        final context = FocusManager.instance.primaryFocus?.context;
+        expect(context?.findAncestorWidgetOfExactType<TextButton>(), isNotNull);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
       final context = FocusManager.instance.primaryFocus?.context;
       expect(context?.findAncestorWidgetOfExactType<IconButton>(), isNotNull);
       expect(

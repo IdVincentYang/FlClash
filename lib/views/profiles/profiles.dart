@@ -5,6 +5,8 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/common/source_acceptance.dart';
+import 'package:fl_clash/providers/source_review_status.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/profiles/overwrite/overwrite.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -189,12 +191,14 @@ class ProfileItem extends ConsumerWidget {
   final Profile profile;
   final int? groupValue;
   final void Function(int? value) onChanged;
+  final bool? sourceReviewEnabled;
 
   const ProfileItem({
     super.key,
     required this.profile,
     required this.groupValue,
     required this.onChanged,
+    this.sourceReviewEnabled,
   });
 
   Future<void> _handleDeleteProfile(BuildContext context, WidgetRef ref) async {
@@ -332,6 +336,20 @@ class ProfileItem extends ConsumerWidget {
     BaseNavigator.push(context, OverwriteView(profileId: id));
   }
 
+  Future<void> _handleReviewSource(WidgetRef ref) async {
+    try {
+      await globalState.safeRun(
+        () => ref
+            .read(profilesActionProvider.notifier)
+            .manageSourcePermissions(profile, review: true),
+      );
+    } finally {
+      if (ref.context.mounted) {
+        ref.invalidate(profileReviewStatusProvider(profile));
+      }
+    }
+  }
+
   List<CommonPopupMenuItem> _menuItems(BuildContext context, WidgetRef ref) {
     final appLocalizations = context.appLocalizations;
     final isUrl = profile.type == ProfileType.url;
@@ -339,6 +357,12 @@ class ProfileItem extends ConsumerWidget {
     final hasSubscriptionInfo =
         isUrl && subscriptionInfo != null && subscriptionInfo.total > 0;
     return [
+      if (sourceReviewEnabled ?? request.requiresSourceAcceptance)
+        CommonPopupMenuItem(
+          glyph: AppGlyphs.eye,
+          label: appLocalizations.sourceReviewTitle,
+          onPressed: () => _handleReviewSource(ref),
+        ),
       CommonPopupMenuItem(
         glyph: AppGlyphs.edit,
         label: appLocalizations.edit,
@@ -416,62 +440,109 @@ class ProfileItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final reviewStatus =
+        (sourceReviewEnabled ?? request.requiresSourceAcceptance)
+        ? ref.watch(profileReviewStatusProvider(profile))
+        : null;
+    final needsReview =
+        reviewStatus?.asData?.value == SourceReviewStatus.required;
     return CommonCard(
       enterActionsOnRight: true,
       radius: AppCorner.xl,
       isSelected: profile.id == groupValue,
       onPressed: () {
-        onChanged(profile.id);
+        if (needsReview) {
+          unawaited(_handleReviewSource(ref));
+        } else {
+          _handleShowEditExtendPage(context);
+        }
       },
       child: ListItem(
         key: Key(profile.id.toString()),
         horizontalTitleGap: 8,
         minVerticalPadding: 12,
         padding: const EdgeInsets.only(left: 16, right: 6),
-        trailing: SizedBox(
-          height: 40,
-          width: 40,
-          child: Consumer(
-            builder: (context, ref, _) {
-              final isUpdating = ref.watch(
-                isUpdatingProvider(profile.updatingKey),
-              );
-              return FadeThroughBox(
-                alignment: Alignment.center,
-                child: isUpdating
-                    ? const Padding(
-                        key: ValueKey('loading'),
-                        padding: EdgeInsets.all(8),
-                        child: CommonCircleLoading(),
-                      )
-                    : CommonPopupBox(
-                        key: const ValueKey('menu'),
-                        popupBuilder: (_) =>
-                            CommonPopupMenu(items: _menuItems(context, ref)),
-                        targetBuilder: (open) {
-                          return IconButton(
-                            style: IconButton.styleFrom(
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.standard,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: profile.id == groupValue || needsReview
+                  ? null
+                  : () => onChanged(profile.id),
+              child: Text(
+                profile.id == groupValue
+                    ? context.appLocalizations.selected
+                    : context.appLocalizations.useProfile,
+              ),
+            ),
+            SizedBox(
+              height: 40,
+              width: 40,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final isUpdating = ref.watch(
+                    isUpdatingProvider(profile.updatingKey),
+                  );
+                  return FadeThroughBox(
+                    alignment: Alignment.center,
+                    child: isUpdating
+                        ? const Padding(
+                            key: ValueKey('loading'),
+                            padding: EdgeInsets.all(8),
+                            child: CommonCircleLoading(),
+                          )
+                        : CommonPopupBox(
+                            key: const ValueKey('menu'),
+                            popupBuilder: (_) => CommonPopupMenu(
+                              items: _menuItems(context, ref),
                             ),
-                            tooltip: context.appLocalizations.more,
-                            onPressed: () {
-                              open();
+                            targetBuilder: (open) {
+                              return IconButton(
+                                style: IconButton.styleFrom(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.standard,
+                                ),
+                                tooltip: context.appLocalizations.more,
+                                onPressed: () {
+                                  open();
+                                },
+                                icon: const GlyphIcon(AppGlyphs.more),
+                              );
                             },
-                            icon: const GlyphIcon(AppGlyphs.more),
-                          );
-                        },
-                      ),
-              );
-            },
-          ),
+                          ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
         title: _ProfileCardTitle(
           profile: profile,
-          info: switch (profile.type) {
-            ProfileType.file => _buildFileProfileInfo(context),
-            ProfileType.url => _buildUrlProfileInfo(context),
-          },
+          info: [
+            ...switch (profile.type) {
+              ProfileType.file => _buildFileProfileInfo(context),
+              ProfileType.url => _buildUrlProfileInfo(context),
+            },
+            if (needsReview)
+              Text(
+                context.appLocalizations.sourceReviewPending,
+                style: context.textTheme.labelMedium?.copyWith(
+                  color: context.colorScheme.error,
+                ),
+              ),
+            if (reviewStatus?.isLoading == true)
+              Text(
+                context.appLocalizations.sourceStatusChecking,
+                style: context.textTheme.bodySmall,
+              ),
+            if (reviewStatus?.hasError == true)
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(profileReviewStatusProvider(profile)),
+                child: Text(context.appLocalizations.sourceStatusRetry),
+              ),
+          ],
         ),
         tileTitleAlignment: ListTileTitleAlignment.top,
       ),

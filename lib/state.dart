@@ -95,6 +95,7 @@ class GlobalState {
           dialogs.showMessage(
             title: title ?? currentAppLocalizations.tip,
             message: TextSpan(text: message),
+            cancelable: false,
           ),
         );
       }

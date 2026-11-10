@@ -1525,6 +1525,58 @@ abstract class _$PendingDelayTests
   }
 }
 
+@ProviderFor(DelayTestFailures)
+final delayTestFailuresProvider = DelayTestFailuresProvider._();
+
+final class DelayTestFailuresProvider
+    extends $NotifierProvider<DelayTestFailures, Map<String, Object>> {
+  DelayTestFailuresProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'delayTestFailuresProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$delayTestFailuresHash();
+
+  @$internal
+  @override
+  DelayTestFailures create() => DelayTestFailures();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, Object> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, Object>>(value),
+    );
+  }
+}
+
+String _$delayTestFailuresHash() => r'cc9af903a7354d6aa58327601d363d519bcaf396';
+
+abstract class _$DelayTestFailures extends $Notifier<Map<String, Object>> {
+  Map<String, Object> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Map<String, Object>, Map<String, Object>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Map<String, Object>, Map<String, Object>>,
+              Map<String, Object>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(DelayTestingGroups)
 final delayTestingGroupsProvider = DelayTestingGroupsProvider._();
 

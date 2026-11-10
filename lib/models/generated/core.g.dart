@@ -144,6 +144,7 @@ _ChangeProxyParams _$ChangeProxyParamsFromJson(Map<String, dynamic> json) =>
       proxyName: json['proxy-name'] as String,
       owner: (json['owner'] as num?)?.toInt() ?? 0,
       token: (json['token'] as num?)?.toInt() ?? 0,
+      transient: json['transient'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$ChangeProxyParamsToJson(_ChangeProxyParams instance) =>
@@ -152,6 +153,7 @@ Map<String, dynamic> _$ChangeProxyParamsToJson(_ChangeProxyParams instance) =>
       'proxy-name': instance.proxyName,
       'owner': instance.owner,
       'token': instance.token,
+      'transient': instance.transient,
     };
 
 _ChangeProxyResult _$ChangeProxyResultFromJson(Map<String, dynamic> json) =>

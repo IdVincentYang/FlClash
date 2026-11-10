@@ -34,13 +34,18 @@ class ConfigState extends Notifier<ConfigViewState> with CoreEventListener {
   Future<void> refresh() async {
     final sequence = ++_refreshSequence;
     try {
-      final fact = await ref.read(coreHandlerProvider).getConfigState();
+      final fact = await Future<ConfigFact>.sync(
+        () => ref.read(coreHandlerProvider).getConfigState(),
+      );
       if (ref.mounted && sequence == _refreshSequence) {
         accept(fact, authoritative: true);
       }
     } catch (_) {
       if (ref.mounted && sequence == _refreshSequence) {
-        state = const ConfigViewState();
+        state = ConfigViewState(
+          fact: state.fact,
+          buildFailed: state.buildFailed,
+        );
       }
     }
   }

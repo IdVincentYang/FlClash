@@ -205,7 +205,7 @@ func patchSelectGroup(mapping map[string]string) {
 		}
 
 		selector, ok := outbound.ProxyAdapter.(outboundgroup.SelectAble)
-		if !ok {
+		if !ok || proxy.Type() != constant.Selector {
 			continue
 		}
 

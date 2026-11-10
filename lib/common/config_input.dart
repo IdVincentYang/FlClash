@@ -48,6 +48,46 @@ class ConfigInput {
       a.inputId == b.inputId &&
       a.profileId == b.profileId;
 
+  static Future<List<Map<String, dynamic>>?> acceptedLocalGroups({
+    required String home,
+    required ConfigFact accepted,
+    required Future<ConfigFact> Function() readFact,
+  }) async {
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(accepted.inputId) ||
+        !sameAcceptedInput(accepted, await readFact())) {
+      return null;
+    }
+    try {
+      final buffered = BytesBuilder(copy: false);
+      await for (final chunk in File(
+        path.join(home, 'config-inputs', '${accepted.inputId}.json'),
+      ).openRead()) {
+        if (buffered.length + chunk.length > 4 * 1024 * 1024) return null;
+        buffered.add(chunk);
+      }
+      final bytes = buffered.takeBytes();
+      if (sha256.convert(bytes).toString() != accepted.inputId) return null;
+      final manifest = jsonDecode(utf8.decode(bytes));
+      if (manifest is! Map ||
+          !const {1, 2}.contains(manifest['version']) ||
+          manifest['profileId'] != accepted.profileId) {
+        return null;
+      }
+      final values = manifest['localGroups'] ?? const [];
+      if (values is! List ||
+          values.any((value) => value is! Map<String, dynamic>)) {
+        return null;
+      }
+      return sameAcceptedInput(accepted, await readFact())
+          ? values.cast<Map<String, dynamic>>()
+          : null;
+    } on FileSystemException {
+      return null;
+    } on FormatException {
+      return null;
+    }
+  }
+
   static Future<Set<String>?> acceptedDependencies({
     required String home,
     required ConfigFact accepted,
@@ -142,9 +182,11 @@ class ConfigInput {
     int version = 1,
     List<Map<String, Object?>> sourceUses = const [],
     List<Map<String, Object?>> providerMaterials = const [],
+    List<Map<String, Object?>> localGroups = const [],
     Map<String, Object?>? ruleLedger,
     Map<String, Object?>? managedPolicy,
     Map<String, Object?>? managedMaterials,
+    Map<String, Object?> acceptedOverrides = const {},
   }) async {
     if (version != 1 && version != 2 ||
         version == 1 &&
@@ -172,12 +214,13 @@ class ConfigInput {
         'profileName': profileName,
         'dependencies': [for (final source in sources) source.key],
         'sourceUses': sourceUses,
+        if (localGroups.isNotEmpty) 'localGroups': localGroups,
         'ruleLedger': ?ruleLedger,
         if (providerMaterials.isNotEmpty)
           'providerMaterials': providerMaterials,
         'selectedMap': Map<String, String>.of(selectedMap),
         'testUrl': testUrl,
-        'acceptedOverrides': <String, Object?>{},
+        'acceptedOverrides': acceptedOverrides,
         'managedPolicy': ?managedPolicy,
         'managedMaterials': ?managedMaterials,
       }),

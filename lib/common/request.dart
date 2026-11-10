@@ -21,6 +21,11 @@ class RequestUnavailable implements Exception {
   final String code;
   @override
   String toString() => switch (code) {
+    'local_groups_ambiguous' => currentAppLocalizations.localGroupsAmbiguous,
+    'local_groups_in_use' => currentAppLocalizations.localGroupsInUse,
+    'local_groups_source_unavailable' =>
+      currentAppLocalizations.localGroupsSourceUnavailable,
+    'local_groups_changed' => currentAppLocalizations.localGroupsChanged,
     'profile_download_timeout' =>
       currentAppLocalizations.profileDownloadTimeout,
     'profile_download_too_large' =>
@@ -29,6 +34,8 @@ class RequestUnavailable implements Exception {
     'profile_invalid' => currentAppLocalizations.profileInvalidBody,
     'source_review_required' => currentAppLocalizations.sourceReviewRequired,
     'source_storage_full' => currentAppLocalizations.sourceStorageFull,
+    'source_material_unavailable' =>
+      currentAppLocalizations.sourceMaterialUnavailable,
     'source_permissions_unavailable' =>
       currentAppLocalizations.sourcePermissionsUnavailable,
     'source_routing_excluded' => currentAppLocalizations.sourceRoutingExcluded,
@@ -37,6 +44,9 @@ class RequestUnavailable implements Exception {
     'profile_refresh_failed' ||
     'profile_publish_failed' ||
     'profile_cleanup_failed' => currentAppLocalizations.profileRefreshFailed,
+    'delay_test_requires_proxy' =>
+      currentAppLocalizations.delayTestRequiresProxy,
+    'delay_test_no_result' => currentAppLocalizations.delayTestNoResult,
     'request_partial_commit' => currentAppLocalizations.requestPartialCommit,
     'request_restart_required' =>
       currentAppLocalizations.requestRestartRequired,

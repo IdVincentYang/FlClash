@@ -65,6 +65,7 @@ class ConfigApplyResult {
   ConfigApplyResult.fromJson(Map<String, Object?> json)
     : status = json['status'] as String? ?? 'unknown',
       message = json['message'] as String? ?? '',
+      requiresFullApply = json['requiresFullApply'] == true,
       receipt = Map.unmodifiable(
         Map<String, Object?>.from(json['receipt'] as Map? ?? const {}),
       ),
@@ -73,6 +74,7 @@ class ConfigApplyResult {
       );
 
   final String status, message;
+  final bool requiresFullApply;
   final Map<String, Object?> receipt;
   final ConfigFact fact;
   bool get succeeded =>

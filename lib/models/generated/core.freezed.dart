@@ -1234,7 +1234,7 @@ as int,
 /// @nodoc
 mixin _$ChangeProxyParams {
 
-@JsonKey(name: 'group-name') String get groupName;@JsonKey(name: 'proxy-name') String get proxyName; int get owner; int get token;
+@JsonKey(name: 'group-name') String get groupName;@JsonKey(name: 'proxy-name') String get proxyName; int get owner; int get token; bool get transient;
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1248,20 +1248,20 @@ $ChangeProxyParamsCopyWith<ChangeProxyParams> get copyWith => _$ChangeProxyParam
 @override
 bool operator ==(Object other) {
   final _this = this as ChangeProxyParams;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChangeProxyParams&&(identical(other.groupName, _this.groupName) || other.groupName == _this.groupName)&&(identical(other.proxyName, _this.proxyName) || other.proxyName == _this.proxyName)&&(identical(other.owner, _this.owner) || other.owner == _this.owner)&&(identical(other.token, _this.token) || other.token == _this.token));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChangeProxyParams&&(identical(other.groupName, _this.groupName) || other.groupName == _this.groupName)&&(identical(other.proxyName, _this.proxyName) || other.proxyName == _this.proxyName)&&(identical(other.owner, _this.owner) || other.owner == _this.owner)&&(identical(other.token, _this.token) || other.token == _this.token)&&(identical(other.transient, _this.transient) || other.transient == _this.transient));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as ChangeProxyParams;
-  return Object.hash(runtimeType,_this.groupName,_this.proxyName,_this.owner,_this.token);
+  return Object.hash(runtimeType,_this.groupName,_this.proxyName,_this.owner,_this.token,_this.transient);
 }
 
 @override
 String toString() {
   final _this = this as ChangeProxyParams;
-  return 'ChangeProxyParams(groupName: ${_this.groupName}, proxyName: ${_this.proxyName}, owner: ${_this.owner}, token: ${_this.token})';
+  return 'ChangeProxyParams(groupName: ${_this.groupName}, proxyName: ${_this.proxyName}, owner: ${_this.owner}, token: ${_this.token}, transient: ${_this.transient})';
 }
 
 
@@ -1272,7 +1272,7 @@ abstract mixin class $ChangeProxyParamsCopyWith<$Res>  {
   factory $ChangeProxyParamsCopyWith(ChangeProxyParams value, $Res Function(ChangeProxyParams) _then) = _$ChangeProxyParamsCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'group-name') String groupName,@JsonKey(name: 'proxy-name') String proxyName, int owner, int token
+@JsonKey(name: 'group-name') String groupName,@JsonKey(name: 'proxy-name') String proxyName, int owner, int token, bool transient
 });
 
 
@@ -1289,13 +1289,14 @@ class _$ChangeProxyParamsCopyWithImpl<$Res>
 
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? groupName = null,Object? proxyName = null,Object? owner = null,Object? token = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? groupName = null,Object? proxyName = null,Object? owner = null,Object? token = null,Object? transient = null,}) {
   return _then(ChangeProxyParams(
 groupName: null == groupName ? _self.groupName : groupName // ignore: cast_nullable_to_non_nullable
 as String,proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
 as String,owner: null == owner ? _self.owner : owner // ignore: cast_nullable_to_non_nullable
 as int,token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
-as int,
+as int,transient: null == transient ? _self.transient : transient // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -1380,10 +1381,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName,  int owner,  int token)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName,  int owner,  int token,  bool transient)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ChangeProxyParams() when $default != null:
-return $default(_that.groupName,_that.proxyName,_that.owner,_that.token);case _:
+return $default(_that.groupName,_that.proxyName,_that.owner,_that.token,_that.transient);case _:
   return orElse();
 
 }
@@ -1401,10 +1402,10 @@ return $default(_that.groupName,_that.proxyName,_that.owner,_that.token);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName,  int owner,  int token)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName,  int owner,  int token,  bool transient)  $default,) {final _that = this;
 switch (_that) {
 case _ChangeProxyParams():
-return $default(_that.groupName,_that.proxyName,_that.owner,_that.token);case _:
+return $default(_that.groupName,_that.proxyName,_that.owner,_that.token,_that.transient);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1421,10 +1422,10 @@ return $default(_that.groupName,_that.proxyName,_that.owner,_that.token);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName,  int owner,  int token)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName,  int owner,  int token,  bool transient)?  $default,) {final _that = this;
 switch (_that) {
 case _ChangeProxyParams() when $default != null:
-return $default(_that.groupName,_that.proxyName,_that.owner,_that.token);case _:
+return $default(_that.groupName,_that.proxyName,_that.owner,_that.token,_that.transient);case _:
   return null;
 
 }
@@ -1436,13 +1437,14 @@ return $default(_that.groupName,_that.proxyName,_that.owner,_that.token);case _:
 @JsonSerializable()
 
 class _ChangeProxyParams implements ChangeProxyParams {
-  const _ChangeProxyParams({@JsonKey(name: 'group-name') required this.groupName, @JsonKey(name: 'proxy-name') required this.proxyName, this.owner = 0, this.token = 0});
+  const _ChangeProxyParams({@JsonKey(name: 'group-name') required this.groupName, @JsonKey(name: 'proxy-name') required this.proxyName, this.owner = 0, this.token = 0, this.transient = false});
   factory _ChangeProxyParams.fromJson(Map<String, dynamic> json) => _$ChangeProxyParamsFromJson(json);
 
 @override@JsonKey(name: 'group-name') final  String groupName;
 @override@JsonKey(name: 'proxy-name') final  String proxyName;
 @override@JsonKey() final  int owner;
 @override@JsonKey() final  int token;
+@override@JsonKey() final  bool transient;
 
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
@@ -1457,18 +1459,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChangeProxyParams&&(identical(other.groupName, groupName) || other.groupName == groupName)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&(identical(other.owner, owner) || other.owner == owner)&&(identical(other.token, token) || other.token == token));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChangeProxyParams&&(identical(other.groupName, groupName) || other.groupName == groupName)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&(identical(other.owner, owner) || other.owner == owner)&&(identical(other.token, token) || other.token == token)&&(identical(other.transient, transient) || other.transient == transient));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,groupName,proxyName,owner,token);
+    return Object.hash(runtimeType,groupName,proxyName,owner,token,transient);
 }
 
 @override
 String toString() {
-    return 'ChangeProxyParams(groupName: $groupName, proxyName: $proxyName, owner: $owner, token: $token)';
+    return 'ChangeProxyParams(groupName: $groupName, proxyName: $proxyName, owner: $owner, token: $token, transient: $transient)';
 }
 
 
@@ -1479,7 +1481,7 @@ abstract mixin class _$ChangeProxyParamsCopyWith<$Res> implements $ChangeProxyPa
   factory _$ChangeProxyParamsCopyWith(_ChangeProxyParams value, $Res Function(_ChangeProxyParams) _then) = __$ChangeProxyParamsCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'group-name') String groupName,@JsonKey(name: 'proxy-name') String proxyName, int owner, int token
+@JsonKey(name: 'group-name') String groupName,@JsonKey(name: 'proxy-name') String proxyName, int owner, int token, bool transient
 });
 
 
@@ -1496,13 +1498,14 @@ class __$ChangeProxyParamsCopyWithImpl<$Res>
 
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? groupName = null,Object? proxyName = null,Object? owner = null,Object? token = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? groupName = null,Object? proxyName = null,Object? owner = null,Object? token = null,Object? transient = null,}) {
   return _then(_ChangeProxyParams(
 groupName: null == groupName ? _self.groupName : groupName // ignore: cast_nullable_to_non_nullable
 as String,proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
 as String,owner: null == owner ? _self.owner : owner // ignore: cast_nullable_to_non_nullable
 as int,token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
-as int,
+as int,transient: null == transient ? _self.transient : transient // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

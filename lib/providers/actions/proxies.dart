@@ -20,15 +20,19 @@ class _DelayTestJob {
   final Set<String> held;
   final Set<String> startedOnDispatch = {};
   bool cancelled = false;
+  Object? failure;
+  final cancellation = Completer<void>();
 }
 
 @Riverpod(keepAlive: true)
 class ProxiesAction extends _$ProxiesAction {
   CoreController get _core => ref.read(coreHandlerProvider);
+  Request get requestClient => request;
 
   final TaskPool _delayTestPool = TaskPool(maxConcurrentDelayTests);
 
   final List<_DelayTestJob> _delayTestJobs = [];
+  final Map<String, _DelayTestJob> _delayTestOwners = {};
 
   final List<Delay> _bufferedDelays = [];
 
@@ -37,13 +41,21 @@ class ProxiesAction extends _$ProxiesAction {
   final List<String> _bufferedFinishes = [];
 
   Timer? _delayFlushTimer;
+  String _localGroupInput = '';
+  int _groupsRefreshSequence = 0;
 
   final Map<String, String> _pendingSelectedRollback = {};
   final _delaySessions = <RequestSession>{};
 
   @override
   void build() {
-    ref.onDispose(() => _delayFlushTimer?.cancel());
+    ref.onDispose(() {
+      _delayFlushTimer?.cancel();
+      for (final job in _delayTestJobs) {
+        job.cancelled = true;
+        if (!job.cancellation.isCompleted) job.cancellation.complete();
+      }
+    });
     ref.listen(coreStatusProvider, (_, next) {
       if (next != CoreStatus.connected) {
         cancelDelayTests();
@@ -57,14 +69,17 @@ class ProxiesAction extends _$ProxiesAction {
     }
     for (final job in _delayTestJobs) {
       job.cancelled = true;
+      if (!job.cancellation.isCompleted) job.cancellation.complete();
       job.held.clear();
     }
+    _delayTestOwners.clear();
     _delayFlushTimer?.cancel();
     _delayFlushTimer = null;
     _bufferedDelays.clear();
     _bufferedStarts.clear();
     _bufferedFinishes.clear();
     ref.read(pendingDelayTestsProvider.notifier).clear();
+    ref.read(delayTestFailuresProvider.notifier).clear();
   }
 
   void _scheduleDelayFlush() {
@@ -78,6 +93,9 @@ class ProxiesAction extends _$ProxiesAction {
       final delays = List.of(_bufferedDelays);
       _bufferedDelays.clear();
       ref.read(delayDataSourceProvider.notifier).setDelays(delays);
+      ref
+          .read(delayTestFailuresProvider.notifier)
+          .remove(delays.map((delay) => delayTestKey(delay.url, delay.name)));
     }
     if (_bufferedStarts.isNotEmpty || _bufferedFinishes.isNotEmpty) {
       final started = List.of(_bufferedStarts);
@@ -94,15 +112,24 @@ class ProxiesAction extends _$ProxiesAction {
     debouncer.call(FunctionTag.updateGroups, updateGroups, duration: duration);
   }
 
-  void changeProxyDebounce(String groupName, String proxyName) {
+  void changeProxyDebounce(
+    String groupName,
+    String proxyName, {
+    bool transient = false,
+  }) {
     final observed = ref.read(configStateProvider).fact;
-    _pendingSelectedRollback.putIfAbsent(
-      groupName,
-      () => _currentSelectedName(groupName),
-    );
-    ref
-        .read(profilesActionProvider.notifier)
-        .updateCurrentSelectedMap(groupName, proxyName);
+    if (observed.profileId != ref.read(currentProfileIdProvider)) return;
+    if (!transient) {
+      _pendingSelectedRollback.putIfAbsent(
+        groupName,
+        () => _currentSelectedName(groupName),
+      );
+    }
+    if (!transient) {
+      ref
+          .read(profilesActionProvider.notifier)
+          .updateCurrentSelectedMap(groupName, proxyName);
+    }
     debouncer.call((FunctionTag.changeProxy, groupName), (
       String groupName,
       String proxyName,
@@ -111,6 +138,7 @@ class ProxiesAction extends _$ProxiesAction {
         groupName: groupName,
         proxyName: proxyName,
         observed: observed,
+        transient: transient,
       );
       updateGroupsDebounce();
     }, args: [groupName, proxyName]);
@@ -123,6 +151,18 @@ class ProxiesAction extends _$ProxiesAction {
   Future<void> updateGroups({Future<bool> Function()? isCurrent}) async {
     try {
       commonPrint.log('updateGroups');
+      final observed = ref.read(configStateProvider).fact;
+      if (observed.profileId != null &&
+          observed.profileId != ref.read(currentProfileIdProvider)) {
+        ref.read(groupsProvider.notifier).value = [];
+        return;
+      }
+      bool keepCachedGroups() =>
+          isCurrent == null &&
+          ref.read(proxyPreparationProvider).stage != null &&
+          ref.read(groupsProvider).isNotEmpty;
+      if (keepCachedGroups()) return;
+      final sequence = ++_groupsRefreshSequence;
       final groups = await retry<List<Group>>(
         task: () async {
           final sortType = ref.read(
@@ -152,8 +192,56 @@ class ProxiesAction extends _$ProxiesAction {
         },
         retryIf: (res) => res.isEmpty,
       );
-      if (ref.mounted && (isCurrent == null || await isCurrent())) {
+      if (ref.mounted &&
+          sequence == _groupsRefreshSequence &&
+          !keepCachedGroups() &&
+          groups.isNotEmpty &&
+          (isCurrent == null || await isCurrent()) &&
+          observed.profileId == ref.read(configStateProvider).fact.profileId &&
+          observed.profileId == ref.read(currentProfileIdProvider)) {
         ref.read(groupsProvider.notifier).value = groups;
+        final fact = ref.read(configStateProvider).fact;
+        if (fact.inputId.isNotEmpty &&
+            fact.inputId != _localGroupInput &&
+            fact.profileId == ref.read(currentProfileIdProvider)) {
+          final applied = await ConfigInput.acceptedLocalGroups(
+            home: await appPath.homeDirPath,
+            accepted: fact,
+            readFact: _core.getConfigState,
+          );
+          if (applied != null &&
+              ref.mounted &&
+              (isCurrent == null || await isCurrent())) {
+            final accepted = applied.map(LocalProxyGroup.fromJson).toList();
+            final profile = ref.read(currentProfileProvider);
+            if (profile != null && profile.id == fact.profileId) {
+              bool sameDefinitions(List<LocalProxyGroup> groups) =>
+                  const ListEquality<LocalProxyGroup>().equals(
+                    groups
+                        .map((group) => group.copyWith(matchedNodes: const []))
+                        .toList(),
+                    accepted
+                        .map((group) => group.copyWith(matchedNodes: const []))
+                        .toList(),
+                  );
+              if (sameDefinitions(profile.localGroups) &&
+                  !const ListEquality<LocalProxyGroup>().equals(
+                    profile.localGroups,
+                    accepted,
+                  )) {
+                await ref
+                    .read(profilesProvider.notifier)
+                    .updateProfile(
+                      profile.id,
+                      (current) => sameDefinitions(current.localGroups)
+                          ? current.copyWith(localGroups: accepted)
+                          : current,
+                    );
+              }
+              _localGroupInput = fact.inputId;
+            }
+          }
+        }
       }
     } catch (e) {
       // The Core failure path already runs inside the retry task above; a
@@ -201,13 +289,17 @@ class ProxiesAction extends _$ProxiesAction {
     required String groupName,
     required String proxyName,
     ConfigFact? observed,
+    bool transient = false,
   }) async {
     final fact = observed ?? ref.read(configStateProvider).fact;
+    if (fact.profileId != ref.read(currentProfileIdProvider)) return;
     final profilesAction = ref.read(profilesActionProvider.notifier);
     final rollbackName =
         _pendingSelectedRollback.remove(groupName) ??
         _currentSelectedName(groupName);
-    profilesAction.updateCurrentSelectedMap(groupName, proxyName);
+    if (!transient) {
+      profilesAction.updateCurrentSelectedMap(groupName, proxyName);
+    }
     final ChangeProxyResult result;
     try {
       result = await _core.changeProxy(
@@ -216,6 +308,7 @@ class ProxiesAction extends _$ProxiesAction {
           proxyName: proxyName,
           owner: fact.owner,
           token: fact.token,
+          transient: transient,
         ),
       );
       if (result.message.isNotEmpty) {
@@ -226,7 +319,9 @@ class ProxiesAction extends _$ProxiesAction {
         'changeProxy($groupName -> $proxyName) failed: $error',
         logLevel: coreFailureLogLevel(error),
       );
-      profilesAction.updateCurrentSelectedMap(groupName, rollbackName);
+      if (!transient) {
+        profilesAction.updateCurrentSelectedMap(groupName, rollbackName);
+      }
       dialogs.showNotifier(
         currentAppLocalizations.changeProxyFailedTip,
         level: MessageLevel.error,
@@ -401,6 +496,10 @@ class ProxiesAction extends _$ProxiesAction {
   Future<void> delayTestPageGroup(String groupName) async {
     final group = ref.read(groupsProvider).getGroup(groupName);
     if (group == null) {
+      dialogs.showNotifier(
+        currentAppLocalizations.localGroupsLoadFirst,
+        level: MessageLevel.warning,
+      );
       return;
     }
     final testing = ref.read(delayTestingGroupsProvider.notifier);
@@ -463,12 +562,63 @@ class ProxiesAction extends _$ProxiesAction {
     final pending = ref.read(pendingDelayTestsProvider.notifier);
     final job = _DelayTestJob(targets.map((target) => target.key));
     _delayTestJobs.add(job);
+    for (final key in job.held) {
+      _delayTestOwners[key] = job;
+    }
+    ref.read(delayTestFailuresProvider.notifier).remove(job.held);
     // TaskPool.run starts a task synchronously while it has an idle slot.
     job.startedOnDispatch.addAll(
       targets.take(_delayTestPool.idleSlots).map((target) => target.key),
     );
+    final preparing = ref.read(proxyPreparationProvider).stage != null;
+    if (preparing || requestClient.hasNativeClient) {
+      job.startedOnDispatch.clear();
+    }
     pending.apply(acquired: job.held, started: job.startedOnDispatch);
     try {
+      if (preparing) {
+        final ready = Completer<void>();
+        final subscription = ref.listen(proxyPreparationProvider, (_, next) {
+          if (next.stage == null && !ready.isCompleted) ready.complete();
+        });
+        try {
+          if (ref.read(proxyPreparationProvider).stage != null) {
+            await Future.any([ready.future, job.cancellation.future]);
+          }
+        } finally {
+          subscription.close();
+        }
+      }
+      if (job.cancelled) return;
+      if (requestClient.hasNativeClient) {
+        Object? unavailable;
+        try {
+          final run = await requestClient.captureNativeRunState();
+          if (run?['intentRunning'] != true ||
+              run?['phase'] != 'started' ||
+              run?['paused'] == true) {
+            unavailable = const RequestUnavailable('delay_test_requires_proxy');
+          }
+        } catch (error) {
+          unavailable = error;
+        }
+        if (job.cancelled) return;
+        if (unavailable != null) {
+          ref.read(delayTestFailuresProvider.notifier).setAll({
+            for (final target in targets) target.key: unavailable,
+          });
+          _reportDelayTestFailure(unavailable);
+          return;
+        }
+      }
+
+      if (job.cancelled) return;
+      if (job.startedOnDispatch.isEmpty) {
+        job.startedOnDispatch.addAll(
+          targets.take(_delayTestPool.idleSlots).map((target) => target.key),
+        );
+        pending.apply(started: job.startedOnDispatch);
+      }
       await Future.wait(
         targets.map(
           (target) => _delayTestPool.run(() => _runDelayTest(job, target)),
@@ -476,16 +626,32 @@ class ProxiesAction extends _$ProxiesAction {
       );
     } finally {
       _delayTestJobs.remove(job);
-      _flushDelayResults();
+      _delayTestOwners.removeWhere((_, owner) => identical(owner, job));
+      if (ref.mounted) _flushDelayResults();
       final abandoned = job.held.toList();
       job.held.clear();
-      pending.apply(
-        finished: abandoned.where(job.startedOnDispatch.contains),
-        released: abandoned.where(
-          (key) => !job.startedOnDispatch.contains(key),
-        ),
-      );
+      if (ref.mounted) {
+        pending.apply(
+          finished: abandoned.where(job.startedOnDispatch.contains),
+          released: abandoned.where(
+            (key) => !job.startedOnDispatch.contains(key),
+          ),
+        );
+      }
     }
+    if (ref.mounted && job.failure != null) {
+      final error = job.failure!;
+      _reportDelayTestFailure(error);
+    }
+  }
+
+  void _reportDelayTestFailure(Object error) {
+    dialogs.showNotifier(
+      currentAppLocalizations.delayTestFailed(
+        userFacingErrorMessage(error, currentAppLocalizations),
+      ),
+      level: MessageLevel.warning,
+    );
   }
 
   Future<void> _runDelayTest(_DelayTestJob job, _DelayTestTarget target) async {
@@ -498,7 +664,7 @@ class ProxiesAction extends _$ProxiesAction {
     }
     RequestSession? session;
     try {
-      session = await request.begin(
+      session = await requestClient.begin(
         key: 'delay:${target.key}',
         url: target.testUrl,
         explicitTarget: target.proxyName,
@@ -512,21 +678,29 @@ class ProxiesAction extends _$ProxiesAction {
         () => _core.getDelay(target.testUrl, target.proxyName),
       );
       await session.check();
-      if (delay != null && !job.cancelled) {
+      if (!job.cancelled) {
+        if (delay == null) {
+          throw const RequestUnavailable('delay_test_no_result');
+        }
         setDelay(delay);
       }
     } catch (error) {
+      if (!job.cancelled && identical(_delayTestOwners[target.key], job)) {
+        job.failure ??= error;
+        ref.read(delayTestFailuresProvider.notifier).set(target.key, error);
+      }
       if (error is CoreMethodException && error.isCoreUnavailable) {
         job.cancelled = true;
       }
       commonPrint.log(
-        'Delay test failed for ${target.proxyName}: $error',
+        'Delay test failed for ${target.proxyName}: '
+        '${error is RequestUnavailable ? error.code : error}',
         logLevel: coreFailureLogLevel(error),
       );
     } finally {
       session?.close();
       _delaySessions.remove(session);
-      if (job.held.remove(target.key)) {
+      if (job.held.remove(target.key) && ref.mounted) {
         _bufferedFinishes.add(target.key);
         _scheduleDelayFlush();
       }

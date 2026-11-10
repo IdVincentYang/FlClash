@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/local_proxy_groups.dart';
+import 'package:fl_clash/common/profile_import.dart';
 import 'package:fl_clash/common/config_input.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/common/policy_selection.dart';
@@ -24,7 +26,8 @@ import 'package:fl_clash/models/profile_refresh.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:flutter/widgets.dart';
+import 'package:fl_clash/widgets/source_review.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -35,6 +38,7 @@ import '../helpers/policy_core_bridge.dart';
 import '../plugins/code_forge/support.dart' show initEditorNative;
 import '../helpers/boot_fixture.dart';
 import '../helpers/test_profiles.dart';
+import '../helpers/test_app.dart';
 
 class _Native extends Mock implements Service {}
 
@@ -155,11 +159,15 @@ class _BridgeCore extends CoreHandlerInterface {
   final PolicyCoreBridge bridge;
   final calls = <CoreMethod>[];
   final sourceReviews = <Map<String, Object?>>[];
+  Map<String, Object?>? pendingReviewInput;
+  String? pendingReviewCandidate;
+  final sourceActions = <String>[];
   Completer<void>? registerEntered, registerGate;
   Completer<void>? failureEntered, failureGate;
   Completer<void>? projectionEntered, projectionGate;
   Completer<void>? readEntered, readGate;
   String? nativeAfterActivation;
+  String? inlineRejection;
   Map<String, dynamic> Function(Map<String, dynamic>)? materialReadOverride;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -173,6 +181,16 @@ class _BridgeCore extends CoreHandlerInterface {
     final sourceAction = method == CoreMethod.sourceAcceptance
         ? (arguments as Map)['action']
         : null;
+    if (sourceAction is String) sourceActions.add(sourceAction);
+    if (sourceAction == 'adoptInline' && inlineRejection != null) {
+      return {
+            'status': 'deferred',
+            'message': inlineRejection,
+            'fact': await bridge.call('fact'),
+          }
+          as T;
+    }
+
     if ((method == CoreMethod.getConfig || sourceAction == 'project') &&
         readGate != null) {
       final gate = readGate!;
@@ -247,6 +265,10 @@ class _BridgeCore extends CoreHandlerInterface {
     }
     if (method == CoreMethod.sourceAcceptance) {
       final result = Map<String, dynamic>.from(response['result'] as Map);
+      if (sourceAction == 'review' && result['status'] == 'reviewRequired') {
+        pendingReviewInput = Map<String, Object?>.from(arguments as Map);
+        pendingReviewCandidate = result['candidate'] as String;
+      }
       if (sourceAction == 'review') {
         sourceReviews.add({
           'key': (arguments as Map)['key'],
@@ -291,6 +313,7 @@ void main() {
   late Request client;
   late ProviderContainer container;
   var containerDisposed = false;
+  var interactiveReview = false;
   late ProfilesAction profiles;
   late SetupAction setup;
   late _Native native;
@@ -298,6 +321,7 @@ void main() {
   final confirmations = <SourceReview>[];
   final holds = <String, Completer<void>>{};
   final responses = <String, String>{};
+  final statuses = <String, int>{};
   final controls = <Map<String, Object?>>[];
   String? ackFault;
   Completer<void>? nextNativeRead;
@@ -325,11 +349,13 @@ void main() {
   });
   setUp(() async {
     containerDisposed = false;
+    interactiveReview = false;
     SharedPreferences.setMockInitialValues({});
     received.clear();
     confirmations.clear();
     holds.clear();
     responses.clear();
+    statuses.clear();
     controls.clear();
     ackFault = null;
     nextNativeRead = null;
@@ -360,6 +386,7 @@ void main() {
           'subscription-userinfo',
           'upload=10; download=20; expire=999999999999999999999',
         );
+        request.response.statusCode = statuses[name] ?? 200;
         request.response.write(responses[name] ?? yaml);
         await request.response.close();
       } catch (_) {}
@@ -391,13 +418,16 @@ void main() {
     client = Request.scoped(native: native, isAndroid: true);
     container = ProviderContainer(
       overrides: [
-        sourceConfirmationProvider.overrideWithValue((review) async {
-          confirmations.add(review);
-          return SourceReviewDecision(
-            automatic: review.kind != 'script',
-            routing: 'source',
-          );
-        }),
+        sourceConfirmationProvider.overrideWith(
+          (ref) => (review) async {
+            confirmations.add(review);
+            if (interactiveReview) return confirmSourceReview(ref, review);
+            return SourceReviewDecision(
+              automatic: review.kind != 'script',
+              routing: 'source',
+            );
+          },
+        ),
         profilesActionProvider.overrideWith(() => _Profiles(client)),
         backupActionProvider.overrideWith(() => _Backup(client)),
         scriptsActionProvider.overrideWith(() => _Scripts(client)),
@@ -483,7 +513,10 @@ void main() {
 
   Future<void> existingService() async {
     await put([profile(1)]);
-    expect(await setup.applyProfile(force: true), true);
+    expect(
+      await setup.applyProfile(force: true, allowSourceReview: true),
+      true,
+    );
     await bridge.call('refreshRunning');
     expect(
       await setup.setRunning(true, initialize: true, preparedRequestId: 2),
@@ -516,6 +549,732 @@ void main() {
       await store.profilesDao.putAll([entry.toCompanion()]);
     }
   }
+
+  for (final newerCandidate in [false, true]) {
+    testWidgets(
+      'cancelled subscription inspection keeps status accurate: newer=$newerCandidate',
+      (tester) async {
+        final entry = profile(2);
+        const original =
+            '${yaml}proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\n'
+            'proxy-groups: [{name: Main, type: select, proxies: [a]}]\n';
+        late ConfigFact before;
+        late List<int> permissions;
+        await tester.runAsync(() async {
+          await put([entry]);
+          await File(await appPath.getProfilePath('2')).writeAsString(original);
+          container.read(currentProfileIdProvider.notifier).value = 2;
+          expect(
+            await setup.applyProfile(force: true, allowSourceReview: true),
+            true,
+          );
+          expect(
+            await profiles.sourceReviewStatus(entry),
+            SourceReviewStatus.ready,
+          );
+          before = await core.getConfigState();
+          permissions = await File(
+            '${root.path}/source-acceptance/permissions.json',
+          ).readAsBytes();
+        });
+        core.sourceActions.clear();
+        container.read(appVisibleProvider.notifier).value = true;
+        container.read(viewSizeProvider.notifier).value = const Size(1000, 900);
+        tester.view.physicalSize = const Size(1000, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const TestApp(child: Scaffold()),
+          ),
+        );
+        Object? failure;
+        var finished = false;
+        await tester.runAsync(() async {
+          unawaited(
+            profiles
+                .manageSourcePermissions(entry, review: true)
+                .then(
+                  (_) => finished = true,
+                  onError: (Object error) {
+                    failure = error;
+                    finished = true;
+                  },
+                ),
+          );
+        });
+        for (
+          var i = 0;
+          i < 500 && find.byType(SourceReviewDialog).evaluate().isEmpty;
+          i++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        expect(find.byType(SourceReviewDialog), findsOneWidget);
+        bool ready() {
+          final button = find.widgetWithText(
+            TextButton,
+            'Accept this revision',
+          );
+          return button.evaluate().isNotEmpty &&
+              tester.widget<TextButton>(button).onPressed != null;
+        }
+
+        for (var i = 0; i < 500 && !ready(); i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        expect(ready(), true);
+        Map<String, Object?>? newerInput;
+        String? newerId;
+        if (newerCandidate) {
+          await tester.runAsync(() async {
+            newerInput = {
+              ...core.pendingReviewInput!,
+              'forceReview': false,
+              'body': original.replaceFirst('MATCH,DIRECT', 'MATCH,REJECT'),
+            };
+            final result = await core.sourceAcceptance(newerInput!);
+            expect(result['status'], 'reviewRequired');
+            newerId = result['candidate'] as String;
+          });
+        }
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        for (var i = 0; i < 500 && !finished; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        expect(finished, true, reason: '${core.sourceActions} / $failure');
+        await tester.pumpAndSettle();
+        expect(failure, isNull);
+        expect(find.byType(SourceReviewDialog), findsNothing);
+        expect(core.sourceActions, contains('discard'));
+        expect(core.sourceActions, isNot(contains('accept')));
+        await tester.runAsync(() async {
+          expect(
+            await profiles.sourceReviewStatus(entry),
+            newerCandidate
+                ? SourceReviewStatus.required
+                : SourceReviewStatus.ready,
+          );
+          expect(
+            await File(
+              '${root.path}/source-acceptance/permissions.json',
+            ).readAsBytes(),
+            permissions,
+          );
+          expect((await core.getConfigState()).fence, before.fence);
+          if (newerInput != null) {
+            await core.sourceAcceptance({
+              ...newerInput!,
+              'action': 'discard',
+              'candidate': newerId,
+            });
+          }
+        });
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+      skip: executable == null,
+    );
+  }
+
+  test(
+    'URL import uses its own review surface once for all related sources',
+    () async {
+      container.read(appVisibleProvider.notifier).value = true;
+      responses['/import'] =
+          '${yaml}proxy-providers: {pool: {type: http, url: "http://127.0.0.1:${server.port}/import-pool", interval: 0}}\n'
+          'proxy-groups: [{name: Main, type: select, use: [pool]}]\n';
+      responses['/import-pool'] =
+          'proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\n';
+      var presentations = 0;
+      final phases = <ProfileImportPhase>[];
+      final task = ProfileImportTask(onPhase: phases.add);
+      final result = await profiles.addProfileFormURL(
+        'http://127.0.0.1:${server.port}/import',
+        label: 'Imported fixture',
+        mode: RequestMode.direct,
+        confirmed: true,
+        importTask: task,
+        reviewPresentation: (
+          present: (child) async {
+            presentations++;
+            final dialog = child as SourceReviewDialog;
+            expect(dialog.onDecision, isNotNull);
+            final related = await dialog.loadRelated!('source');
+            expect(
+              related.where((entry) => entry.kind == 'provider-proxy'),
+              hasLength(1),
+            );
+            expect(dialog.loading!.ready, true);
+            return const SourceReviewDecision(
+              automatic: false,
+              routing: 'source',
+            );
+          },
+          onDecision: (_) => fail('no widget was mounted by this fixture'),
+        ),
+      );
+      expect(result!.materialSaved, true);
+      expect(presentations, 1);
+      expect(confirmations, isEmpty);
+      expect(received.where((path) => path == '/import'), hasLength(1));
+      expect(received.where((path) => path == '/import-pool'), hasLength(1));
+      expect(phases, [
+        ProfileImportPhase.downloading,
+        ProfileImportPhase.saving,
+      ]);
+      expect(
+        (await store.profilesDao.query().get()).single.label,
+        'Imported fixture',
+      );
+      task.cancel();
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'reopening attaches to the valid running subscription without reapplying it',
+    () async {
+      await existingService();
+      final previous = container.read(configStateProvider).fact;
+      core.calls.clear();
+      core.sourceActions.clear();
+      received.clear();
+      confirmations.clear();
+      when(
+        () => native.initializeRequestState(any()),
+      ).thenAnswer((_) async => false);
+      globalState.needInitStatus = true;
+      await setup.initStatus();
+      final current = container.read(configStateProvider).fact;
+      expect(current.owner, previous.owner);
+      expect(current.token, previous.token);
+      expect(current.businessActive, true);
+      expect(
+        core.calls.where(
+          (call) => const [
+            CoreMethod.registerConfigInput,
+            CoreMethod.prepareConfig,
+            CoreMethod.installConfig,
+            CoreMethod.activateConfig,
+          ].contains(call),
+        ),
+        isEmpty,
+      );
+      expect(core.sourceActions, isNot(contains('adoptInline')));
+      expect(received, isEmpty);
+      expect(confirmations, isEmpty);
+      expect(globalState.needInitStatus, false);
+    },
+    skip: executable == null,
+  );
+
+  for (final external in [false, true]) {
+    for (final active in [false, true]) {
+      test(
+        'local group management applies ${external ? 'provider' : 'inline'} nodes while ${active ? 'active' : 'inactive'} without another source review or download',
+        () async {
+          final entry = profile(2);
+          final definition = external
+              ? 'proxy-providers:\n  pool: {type: http, url: "http://127.0.0.1:${server.port}/pool", interval: 0}\nproxy-groups:\n  - {name: Main, type: select, use: [pool]}\n'
+              : 'proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\nproxy-groups:\n  - {name: Main, type: select, proxies: [a]}\n';
+          responses['/2'] =
+              '$yaml$definition  - {name: Media, type: select, proxies: [Main]}\n';
+          responses['/pool'] =
+              'proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}, {name: b, type: socks5, server: 127.0.0.1, port: 10}]\n';
+          await put([entry]);
+          await File(
+            await appPath.getProfilePath('2'),
+          ).writeAsString(responses['/2']!);
+          if (await client.materialRecoveryRequired()) {
+            final acceptance = SourceAcceptance(
+              core: CoreController.scoped(core),
+              requests: client,
+            );
+            final source = await client.captureSource('application-config');
+            final snapshot = await acceptance.inspectMaterialRecovery(
+              source: source,
+              rows: [
+                {
+                  'key': 'profile:2',
+                  'identity': SourceAcceptance.fingerprint({
+                    'kind': 'profile',
+                    'id': entry.id,
+                    'url': entry.url,
+                    'type': entry.type.name,
+                  }),
+                },
+              ],
+            );
+            await acceptance.recoverMaterialCommit(
+              source: source,
+              snapshot: snapshot,
+            );
+          }
+          container.read(currentProfileIdProvider.notifier).value = 2;
+          expect(
+            await setup.applyProfile(force: true, allowSourceReview: true),
+            true,
+          );
+          if (active) {
+            await bridge.call('refreshRunning');
+            expect(
+              await setup.setRunning(
+                true,
+                initialize: true,
+                preparedRequestId: 2,
+              ),
+              true,
+            );
+          }
+          confirmations.clear();
+          received.clear();
+          const group = LocalProxyGroup(
+            id: 7,
+            name: 'Mine',
+            nodes: ['a'],
+            parent: 'Main',
+          );
+          Profile current() => container.read(profileProvider(2))!;
+          await profiles.saveLocalGroups(current(), [group]);
+          final activeGroups = await bridge.call('refreshGroups');
+          final groups = (activeGroups['value'] as Map)['proxies'] as Map;
+          expect((groups['Mine'] as Map)['all'], ['a']);
+          expect((groups['Main'] as Map)['all'], contains('Mine'));
+          expect((groups['Main'] as Map)['now'], 'a');
+          expect(confirmations, isEmpty);
+          expect(received, isEmpty);
+          expect(current().localGroups, [group]);
+          final renamed = group.copyWith(name: 'My group');
+          final stale = current();
+          await profiles.saveLocalGroups(current(), [renamed]);
+          await expectLater(
+            profiles.saveLocalGroups(stale, [group.copyWith(name: 'Old edit')]),
+            throwsA(
+              isA<RequestUnavailable>().having(
+                (error) => error.code,
+                'code',
+                'request_cancelled',
+              ),
+            ),
+          );
+          final selected = await bridge.call('refreshSelect', {
+            'group-name': 'Main',
+            'proxy-name': renamed.name,
+          });
+          expect((selected['value'] as Map)['changed'], true);
+          await expectLater(
+            profiles.saveLocalGroups(current(), [
+              renamed.copyWith(enabled: false),
+            ]),
+            throwsA(
+              isA<RequestUnavailable>().having(
+                (error) => error.code,
+                'code',
+                'local_groups_in_use',
+              ),
+            ),
+          );
+          await bridge.call('refreshSelect', {
+            'group-name': 'Main',
+            'proxy-name': 'a',
+          });
+          await profiles.saveLocalGroups(current(), [
+            renamed.copyWith(enabled: false),
+          ]);
+          expect(current().localGroups.single.enabled, isFalse);
+          final disabled = await bridge.call('refreshGroups');
+          expect(
+            ((disabled['value'] as Map)['proxies'] as Map).containsKey(
+              renamed.name,
+            ),
+            isFalse,
+          );
+          await profiles.saveLocalGroups(current(), []);
+          expect(current().localGroups, isEmpty);
+          expect(confirmations, isEmpty);
+          expect(received, isEmpty);
+          expect(
+            (await store.profilesDao.query().get()).getProfile(2)!.localGroups,
+            isEmpty,
+          );
+          final matched = await core.sourceAcceptance({
+            'action': 'matchLocalNodes',
+            'pattern': '^a',
+            'names': ['a', 'b'],
+          });
+          expect(matched['matches'], ['a']);
+          const automatic = LocalProxyGroup(
+            id: 8,
+            name: 'Automatic',
+            type: GroupType.Fallback,
+            nodes: ['a'],
+            regex: '^a',
+            matchedNodes: ['a'],
+            testUrl: 'http://127.0.0.1:1/test',
+          );
+          await profiles.saveLocalGroups(current(), [automatic]);
+          final independent =
+              ((await bridge.call('refreshGroups'))['value'] as Map)['proxies']
+                  as Map;
+          expect(
+            (independent['Main'] as Map)['all'],
+            isNot(contains('Automatic')),
+          );
+          final sourceFile = File(await appPath.getProfilePath('2'));
+          final reviewedBody = await sourceFile.readAsString();
+          final pendingBody = reviewedBody.replaceFirst(
+            'MATCH,DIRECT',
+            'MATCH,REJECT',
+          );
+          await sourceFile.writeAsString(pendingBody);
+          final pendingSource = await client.captureSource('profile:2');
+          final pendingReview = await core.sourceAcceptance({
+            'action': 'review',
+            'key': 'profile:2',
+            'kind': 'profile',
+            'identity': SourceAcceptance.fingerprint({
+              'kind': 'profile',
+              'id': entry.id,
+              'url': entry.url,
+              'type': entry.type.name,
+            }),
+            'settings': SourceAcceptance.fingerprint({
+              'fixture': 'pending update',
+            }),
+            'body': pendingBody,
+            'source': {
+              'client': pendingSource.client,
+              'dataset': pendingSource.snapshot['dataset'],
+              'sources': {
+                pendingSource.key: pendingSource.snapshot['sourceRevision'],
+              },
+            },
+          });
+          expect(pendingReview['status'], 'reviewRequired');
+          expect(
+            await profiles.sourceReviewStatus(current()),
+            SourceReviewStatus.required,
+          );
+          final beforeReference = await core.getConfigState();
+          core.sourceActions.clear();
+          final attached = automatic.copyWith(parents: ['Main', 'Media']);
+          await profiles.saveLocalGroups(current(), [attached]);
+          expect(current().localGroups.single, attached);
+          final afterReference = await core.getConfigState();
+          expect(afterReference.businessActive, active);
+          if (active) {
+            expect(afterReference.owner, beforeReference.owner);
+            expect(afterReference.token, beforeReference.token);
+          }
+          expect(core.sourceActions, isNot(contains('review')));
+          expect(core.sourceActions, isNot(contains('status')));
+          expect(core.sourceActions, isNot(contains('fetchProvider')));
+          final appliedBody = await File(
+            '${root.path}/config-inputs/${afterReference.yamlSha256}.yaml',
+          ).readAsString();
+          expect(appliedBody, contains('MATCH,DIRECT'));
+          expect(appliedBody, isNot(contains('MATCH,REJECT')));
+          expect(await sourceFile.readAsString(), pendingBody);
+
+          expect(core.sourceActions, isNot(contains('resolveLocalGroups')));
+          final autoRuntime =
+              ((await bridge.call('refreshGroups'))['value'] as Map)['proxies']
+                  as Map;
+          expect((autoRuntime['Automatic'] as Map)['all'], ['a']);
+          expect((autoRuntime['Main'] as Map)['all'], contains('Automatic'));
+          expect((autoRuntime['Main'] as Map)['now'], 'a');
+          expect((autoRuntime['Media'] as Map)['all'], contains('Automatic'));
+          expect((autoRuntime['Media'] as Map)['now'], 'Main');
+          expect(
+            await profiles.sourceReviewStatus(current()),
+            SourceReviewStatus.required,
+          );
+          await bridge.call('refreshSelect', {
+            'group-name': 'Main',
+            'proxy-name': 'Automatic',
+          });
+          await expectLater(
+            profiles.saveLocalGroups(current(), [
+              attached.copyWith(parents: ['Media']),
+            ]),
+            throwsA(
+              isA<RequestUnavailable>().having(
+                (error) => error.code,
+                'code',
+                'local_groups_in_use',
+              ),
+            ),
+          );
+          await bridge.call('refreshSelect', {
+            'group-name': 'Main',
+            'proxy-name': 'a',
+          });
+          await profiles.saveLocalGroups(current(), [
+            attached.copyWith(parents: ['Media']),
+          ]);
+          final detached =
+              ((await bridge.call('refreshGroups'))['value'] as Map)['proxies']
+                  as Map;
+          expect(
+            (detached['Main'] as Map)['all'],
+            isNot(contains('Automatic')),
+          );
+          expect((detached['Media'] as Map)['all'], contains('Automatic'));
+          expect((detached['Media'] as Map)['now'], 'Main');
+          expect(
+            await profiles.sourceReviewStatus(current()),
+            SourceReviewStatus.required,
+          );
+          final discardSource = await client.captureSource('profile:2');
+          await core.sourceAcceptance({
+            'source': {
+              'client': discardSource.client,
+              'dataset': discardSource.snapshot['dataset'],
+              'sources': {
+                discardSource.key: discardSource.snapshot['sourceRevision'],
+              },
+            },
+            'kind': 'profile',
+            'action': 'discard',
+            'key': 'profile:2',
+            'candidate': pendingReview['candidate'],
+          });
+          await sourceFile.writeAsString(reviewedBody);
+          expect(
+            await profiles.sourceReviewStatus(current()),
+            SourceReviewStatus.ready,
+          );
+          expect(confirmations, isEmpty);
+          expect(received, isEmpty);
+        },
+        skip: executable == null,
+      );
+    }
+  }
+
+  for (final restriction in [
+    'controller',
+    'retired',
+    'background',
+    'unclassified',
+  ]) {
+    test(
+      'local group Save handles $restriction inline rejection without reviewing new sources',
+      () async {
+        final entry = profile(2);
+        await put([entry]);
+        final file = File(await appPath.getProfilePath('2'));
+        final original = restriction == 'controller'
+            ? '${yaml}proxy-providers: {pool: {type: http, url: "http://127.0.0.1:${server.port}/pool", interval: 0}}\n'
+                  'proxy-groups: [{name: Main, type: select, use: [pool]}]\n'
+            : '${yaml}proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\n'
+                  'proxy-groups: [{name: Main, type: select, proxies: [a]}]\n';
+        responses['/pool'] =
+            'proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\n';
+        await file.writeAsString(original);
+        container.read(currentProfileIdProvider.notifier).value = 2;
+        expect(
+          await setup.applyProfile(force: true, allowSourceReview: true),
+          true,
+        );
+        const group = LocalProxyGroup(id: 7, name: 'Mine', nodes: ['a']);
+        Profile current() => container.read(profileProvider(2))!;
+        await profiles.saveLocalGroups(current(), [group]);
+        await bridge.call('refreshRunning');
+        expect(
+          await setup.setRunning(true, initialize: true, preparedRequestId: 2),
+          true,
+        );
+        final before = await core.getConfigState();
+        final beforeNative = await bridge.call('nativeState');
+        await file.writeAsString(
+          original.replaceFirst('MATCH,DIRECT', 'MATCH,REJECT'),
+        );
+        await bridge.call(
+          'inlineBlock',
+          restriction == 'retired' ? 'retired' : 'controller',
+        );
+        if (restriction == 'background') {
+          container.read(appVisibleProvider.notifier).value = false;
+        }
+        if (restriction == 'unclassified') {
+          core.inlineRejection = 'synthetic unclassified apply rejection';
+        }
+        core.calls.clear();
+        core.sourceActions.clear();
+        confirmations.clear();
+        received.clear();
+        if (restriction == 'background' || restriction == 'unclassified') {
+          await expectLater(
+            profiles.saveLocalGroups(current(), [
+              group.copyWith(parents: ['Main']),
+            ]),
+            restriction == 'background'
+                ? throwsA(
+                    isA<LocalProxyGroupProblem>().having(
+                      (error) => error.code,
+                      'code',
+                      'foreground',
+                    ),
+                  )
+                : throwsA(
+                    isA<MessageException>().having(
+                      (error) => error.message,
+                      'message',
+                      core.inlineRejection,
+                    ),
+                  ),
+          );
+          expect(core.calls, isNot(contains(CoreMethod.registerConfigInput)));
+          expect(current().localGroups, [group]);
+          expect((await core.getConfigState()).owner, before.owner);
+        } else {
+          await profiles.saveLocalGroups(current(), [
+            group.copyWith(parents: ['Main']),
+          ]);
+          final after = await core.getConfigState();
+          expect(core.calls, contains(CoreMethod.registerConfigInput));
+          expect(after.businessActive, true);
+          expect(after.owner, isNot(before.owner));
+          expect(
+            (await bridge.call('nativeState'))['intentRevision'],
+            beforeNative['intentRevision'],
+          );
+          final runtime =
+              ((await bridge.call('refreshGroups'))['value'] as Map)['proxies']
+                  as Map;
+          expect((runtime['Main'] as Map)['all'], contains('Mine'));
+          expect((runtime['Main'] as Map)['now'], 'a');
+          final body = await File(
+            '${root.path}/config-inputs/${after.yamlSha256}.yaml',
+          ).readAsString();
+          expect(body, contains('MATCH,DIRECT'));
+          expect(body, isNot(contains('MATCH,REJECT')));
+        }
+        expect(core.sourceActions, isNot(contains('review')));
+        expect(confirmations, isEmpty);
+        expect(received, isEmpty);
+      },
+      skip: executable == null,
+    );
+  }
+
+  test(
+    'local group references cannot restore withdrawn source permissions',
+    () async {
+      final entry = profile(2);
+      await put([entry]);
+      final sourceFile = File(await appPath.getProfilePath('2'));
+      await sourceFile.writeAsString(
+        '$yaml'
+        'proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\n'
+        'proxy-groups: [{name: Main, type: select, proxies: [a]}]\n',
+      );
+      container.read(currentProfileIdProvider.notifier).value = 2;
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
+      const group = LocalProxyGroup(id: 7, name: 'Mine', nodes: ['a']);
+      Profile current() => container.read(profileProvider(2))!;
+      await profiles.saveLocalGroups(current(), [group]);
+      final acceptance = SourceAcceptance(
+        core: CoreController.scoped(core),
+        requests: client,
+      );
+      final permissions = await acceptance.permissions(
+        source: await client.captureSource('profile:2'),
+        kind: 'profile',
+      );
+      await acceptance.withdraw(permissions.single, stopUse: true);
+      confirmations.clear();
+      received.clear();
+      await expectLater(
+        profiles.saveLocalGroups(current(), [
+          group.copyWith(parents: ['Main']),
+        ]),
+        throwsA(
+          anyOf(isA<RequestUnavailable>(), isA<LocalProxyGroupProblem>()),
+        ),
+      );
+      expect(current().localGroups, [group]);
+      expect(confirmations, isEmpty);
+      expect(received, isEmpty);
+      expect((await core.getConfigState()).businessActive, false);
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'local group management can remove saved definitions while source review is pending',
+    () async {
+      final entry = profile(2);
+      await put([entry]);
+      final path = File(await appPath.getProfilePath('2'));
+      await path.writeAsString(
+        '$yaml'
+        'proxies: [{name: a, type: socks5, server: 127.0.0.1, port: 9}]\n'
+        'proxy-groups: [{name: Main, type: select, proxies: [a]}]\n',
+      );
+      container.read(currentProfileIdProvider.notifier).value = 2;
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
+      const group = LocalProxyGroup(
+        id: 7,
+        name: 'Mine',
+        nodes: ['a'],
+        parent: 'Main',
+      );
+      Profile current() => container.read(profileProvider(2))!;
+      await profiles.saveLocalGroups(current(), [group]);
+      final before = await core.getConfigState();
+      confirmations.clear();
+      await path.writeAsString('rules: ["MATCH,REJECT"]\n');
+      expect(
+        await profiles.sourceReviewStatus(current()),
+        SourceReviewStatus.required,
+      );
+      await profiles.saveLocalGroups(current(), [
+        group.copyWith(enabled: false),
+      ]);
+      final actual = await ConfigInput.acceptedLocalGroups(
+        home: root.path,
+        accepted: await core.getConfigState(),
+        readFact: core.getConfigState,
+      );
+      expect(actual!.single['enabled'], false);
+      expect((await core.getConfigState()).inputId, isNot(before.inputId));
+      expect(current().localGroups.single.enabled, false);
+      await profiles.saveLocalGroups(current(), []);
+      expect(current().localGroups, isEmpty);
+      final removed = await core.getConfigState();
+      expect(removed.yamlSha256, isNot(before.yamlSha256));
+      final appliedBody = await File(
+        '${root.path}/config-inputs/${removed.yamlSha256}.yaml',
+      ).readAsString();
+      expect(appliedBody, contains('MATCH,DIRECT'));
+      expect(appliedBody, isNot(contains('MATCH,REJECT')));
+      expect(
+        await profiles.sourceReviewStatus(current()),
+        SourceReviewStatus.required,
+      );
+      expect(confirmations, isEmpty);
+    },
+    skip: executable == null,
+  );
 
   for (final wake in ['attach', 'visible', 'started', 'timer']) {
     test(
@@ -643,7 +1402,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final before = await core.getConfigState();
       final groupCalls = core.calls
           .where((m) => m == CoreMethod.getProxies)
@@ -679,7 +1441,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       await bridge.call('refreshRunning');
       expect(
         await setup.setRunning(true, initialize: true, preparedRequestId: 2),
@@ -707,7 +1472,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       await bridge.call('refreshRunning');
       expect(
         await setup.setRunning(true, initialize: true, preparedRequestId: 2),
@@ -747,7 +1515,10 @@ void main() {
             ).toCompanion(),
           ]),
         );
-        expect(await setup.applyProfile(force: true), true);
+        expect(
+          await setup.applyProfile(force: true, allowSourceReview: true),
+          true,
+        );
         final before = await core.getConfigState();
         final applies = core.calls
             .where((m) => m == CoreMethod.registerConfigInput)
@@ -784,7 +1555,10 @@ void main() {
     );
     responses['/2'] =
         'proxies:\n  - {name: local-node, type: socks5, server: 127.0.0.1, port: 2}\n';
-    expect(await setup.applyProfile(force: true), true);
+    expect(
+      await setup.applyProfile(force: true, allowSourceReview: true),
+      true,
+    );
     final before = await core.getConfigState();
     expect(
       await ConfigInput.acceptedDependencies(
@@ -822,7 +1596,10 @@ void main() {
         final provider = File(await appPath.getProfilePath('2'));
         await provider.writeAsString(providerBody);
         responses['/2'] = providerBody;
-        expect(await setup.applyProfile(force: true), true);
+        expect(
+          await setup.applyProfile(force: true, allowSourceReview: true),
+          true,
+        );
         await bridge.call('refreshRunning');
         expect(
           await setup.setRunning(true, initialize: true, preparedRequestId: 2),
@@ -845,7 +1622,10 @@ void main() {
         expect(received, ['/2']);
         final entered = (profiles as _Profiles).materialDemandEntered =
             Completer<void>();
-        final oldSetup = setup.applyProfile(force: true);
+        final oldSetup = setup.applyProfile(
+          force: true,
+          allowSourceReview: true,
+        );
         await entered.future.timeout(const Duration(seconds: 3));
         expect(received, ['/2']);
         release.complete();
@@ -873,7 +1653,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       await bridge.call('refreshRunning');
       expect(
         await setup.setRunning(true, initialize: true, preparedRequestId: 2),
@@ -881,22 +1664,30 @@ void main() {
       );
       await File(await appPath.getProfilePath('1')).delete();
       core.calls.clear();
+      core.sourceActions.clear();
+      final previous = container.read(configStateProvider).fact;
       globalState.lastConfigMd5 = 'before-material-repair';
       core.readEntered = Completer<void>();
       final release = core.readGate = Completer<void>();
-      final original = setup.applyProfile(force: true);
+      final original = setup.applyProfile(force: true, allowSourceReview: true);
       await core.readEntered!.future.timeout(const Duration(seconds: 3));
       await pumpEventQueue();
       release.complete();
       expect(await original.timeout(const Duration(seconds: 3)), true);
       expect(
-        core.calls.where((call) => call == CoreMethod.registerConfigInput),
+        core.sourceActions.where((action) => action == 'adoptInline'),
         hasLength(1),
       );
       expect(
-        core.calls.where((call) => call == CoreMethod.installConfig),
-        hasLength(1),
+        core.calls.where(
+          (call) =>
+              call == CoreMethod.registerConfigInput ||
+              call == CoreMethod.installConfig,
+        ),
+        isEmpty,
       );
+      expect(container.read(configStateProvider).fact.owner, previous.owner);
+      expect(container.read(configStateProvider).fact.token, previous.token);
       expect(received, ['/1']);
       expect(globalState.lastConfigMd5, isNot('before-material-repair'));
       expect(
@@ -912,7 +1703,10 @@ void main() {
     () async {
       final a = profile(1), b = profile(2);
       await put([a, b]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final file = File(await appPath.getProfilePath('1'));
       await file.delete();
       final release = holds['/2'] = Completer<void>();
@@ -930,7 +1724,7 @@ void main() {
           .length;
       final entered = (profiles as _Profiles).materialDemandEntered =
           Completer<void>();
-      final oldSetup = setup.applyProfile(force: true);
+      final oldSetup = setup.applyProfile(force: true, allowSourceReview: true);
       await entered.future.timeout(const Duration(seconds: 3));
       for (
         var i = 0;
@@ -948,7 +1742,10 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 2));
       }
       await file.writeAsString(yaml);
-      final newerSetup = setup.applyProfile(force: true);
+      final newerSetup = setup.applyProfile(
+        force: true,
+        allowSourceReview: true,
+      );
       await Future.wait([
         oldSetup,
         newerSetup,
@@ -966,7 +1763,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final storeProfiles =
           container.read(profilesProvider.notifier) as _StoredProfiles;
       final release = storeProfiles.commitGate = Completer<void>();
@@ -999,7 +1799,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final gate = core.registerGate = Completer<void>();
       core.registerEntered = Completer<void>();
       final first = profiles.updateProfile(a);
@@ -1034,7 +1837,10 @@ void main() {
     () async {
       final a = profile(1).copyWith(autoUpdate: true);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final storeProfiles =
           container.read(profilesProvider.notifier) as _StoredProfiles;
       final release = storeProfiles.commitGate = Completer<void>();
@@ -1064,7 +1870,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final gate = core.registerGate = Completer<void>();
       core.registerEntered = Completer<void>();
       final first = profiles.updateProfile(a);
@@ -1115,7 +1924,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final previous = await core.getConfigState();
       (container.read(profilesProvider.notifier) as _StoredProfiles)
               .failProfile =
@@ -1157,7 +1969,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final gate = core.projectionGate = Completer<void>();
       core.projectionEntered = Completer<void>();
       final refresh = profiles.updateProfile(a);
@@ -1204,7 +2019,10 @@ void main() {
     () async {
       final a = profile(1);
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       (container.read(profilesProvider.notifier) as _StoredProfiles)
               .failPublication =
           true;
@@ -1229,7 +2047,10 @@ void main() {
     () async {
       final a = profile(1).copyWith(url: '');
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final before = await core.getConfigState();
       final path = File(await appPath.getProfilePath('1'));
       final old = await path.readAsBytes();
@@ -1255,7 +2076,10 @@ void main() {
     () async {
       final a = profile(1).copyWith(url: '');
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final source = await client.captureSource('profile:1');
       final acceptance = SourceAcceptance(
         core: CoreController.scoped(core),
@@ -1293,7 +2117,10 @@ void main() {
     () async {
       final a = profile(1).copyWith(url: '');
       await put([a]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final path = File(await appPath.getProfilePath('1'));
       final old = await path.readAsBytes();
       await store.customStatement(
@@ -1338,7 +2165,10 @@ void main() {
         snapshot: snapshot,
       );
       expect(client.partialCommit, false);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       expect(await path.readAsBytes(), old);
       expect(
         await File('${root.path}/request-recovery-required').exists(),
@@ -1388,7 +2218,10 @@ void main() {
     () async {
       final a = profile(1), b = profile(2);
       await put([a, b]);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final before = await core.getConfigState();
       final count = core.calls
           .where((m) => m == CoreMethod.registerConfigInput)
@@ -1516,7 +2349,10 @@ void main() {
         ),
       ),
     );
-    expect(await setup.applyProfile(force: true), true);
+    expect(
+      await setup.applyProfile(force: true, allowSourceReview: true),
+      true,
+    );
     expect((await bridge.call('probe', 'before.example.test'))['body'], 'A');
     return (profile: row, draft: draft, a: a, b: b);
   }
@@ -1834,7 +2670,10 @@ void main() {
               : null,
         );
         await put([changed], files: false);
-        expect(await setup.applyProfile(force: true), true);
+        expect(
+          await setup.applyProfile(force: true, allowSourceReview: true),
+          true,
+        );
         responses['/1'] = YamlWriter().write(f.b);
         final result = await profiles.updateProfile(changed);
         expect(result.materialSaved, true);
@@ -1955,7 +2794,7 @@ void main() {
             return evaluator(script: script, config: config);
           };
       expect(
-        await setup.applyProfile(force: true),
+        await setup.applyProfile(force: true, allowSourceReview: true),
         true,
         reason: '${core.sourceReviews} / evaluations:${scripts.length}',
       );
@@ -2010,7 +2849,10 @@ void main() {
           rawContent: selectPolicyDraft(f.draft),
         ),
       );
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       responses['/1'] = YamlWriter().write(f.b);
       expect((await profiles.updateProfile(row)).materialSaved, true);
       expect(
@@ -2060,7 +2902,10 @@ void main() {
           rawContent: selectPolicyDraft(f.draft),
         ),
       );
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       final domainA = await bridge.call('probe', 'before.added.test');
       expect(domainA['body'], 'B');
       expect(domainA['dnsFailed'], false);
@@ -2115,7 +2960,10 @@ void main() {
         },
       );
       await put([row], files: false);
-      expect(await setup.applyProfile(force: true), true);
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        true,
+      );
       expect((await bridge.call('probe', 'manual.other.test'))['body'], 'A');
       final next = PolicyDraftDocument.decode(f.draft.encode());
       next.policy['groups']['b'] = ['nodeB'];
@@ -2280,7 +3128,10 @@ void main() {
           responses['/2'] =
               'proxies:\n  - {name: ignored-node, type: socks5, server: 127.0.0.1, port: 2}\n';
         }
-        expect(await setup.applyProfile(force: true), true);
+        expect(
+          await setup.applyProfile(force: true, allowSourceReview: true),
+          true,
+        );
         final before = await core.getConfigState();
         expect(before.isManaged, true);
         final result = await profiles.updateProfile(b);
@@ -2447,4 +3298,369 @@ void main() {
       );
     }
   }
+  test(
+    'passive setup does not enqueue an interactive download for a missing profile',
+    () async {
+      await put([profile(1)], files: false);
+      final entered = (profiles as _Profiles).materialDemandEntered =
+          Completer<void>();
+      expect(await setup.applyProfile(force: true), isFalse);
+      expect(entered.isCompleted, isFalse);
+      expect(received, isEmpty);
+      expect(confirmations, isEmpty);
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'passive startup reuses accepted materials without depending on the replay pointer',
+    () async {
+      final row = profile(1);
+      await put([row]);
+      final config =
+          'mode: rule\n'
+          'rule-providers:\n'
+          '  legacy: {type: http, url: "http://127.0.0.1:${server.port}/legacy", format: text, behavior: domain}\n'
+          'rules: ["RULE-SET,legacy,DIRECT", "MATCH,DIRECT"]\n';
+      await File(await appPath.getProfilePath('1')).writeAsString(config);
+      responses['/legacy'] = 'legacy.invalid\n';
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: true),
+        isTrue,
+      );
+      expect(received, contains('/legacy'));
+      SourceReviewBatchStore.forRequests(client).clear();
+      received.clear();
+      confirmations.clear();
+      core.sourceActions.clear();
+      expect(await setup.applyProfile(force: true), isTrue);
+      expect(core.sourceActions, contains('reuseCachedProviders'));
+      expect(core.sourceActions, isNot(contains('reuseReviewedProvider')));
+      expect(core.sourceActions, isNot(contains('reuseCachedProvider')));
+      expect(received, isEmpty);
+      expect(confirmations, isEmpty);
+      await File('${root.path}/config-inputs/checkpoint.json').delete();
+      core.sourceActions.clear();
+      final previous = container.read(configStateProvider).fact;
+      expect(
+        await setup.applyProfile(force: true, allowSourceReview: false),
+        isTrue,
+      );
+      expect(core.sourceActions, contains('reuseCachedProviders'));
+      expect(core.sourceActions, isNot(contains('reuseReviewedProvider')));
+      expect(core.sourceActions, isNot(contains('reuseCachedProvider')));
+      expect(core.sourceActions, isNot(contains('fetchProvider')));
+      expect(
+        container.read(configStateProvider).fact.token,
+        greaterThan(previous.token),
+      );
+      expect(received, isEmpty);
+      expect(confirmations, isEmpty);
+    },
+    skip: executable == null,
+  );
+
+  testWidgets(
+    'subscription batch cancels safely then accepts once and reuses persisted sources',
+    (tester) async {
+      bool canAccept() {
+        final button = find.widgetWithText(TextButton, 'Accept this revision');
+        return button.evaluate().isNotEmpty &&
+            tester.widget<TextButton>(button).onPressed != null;
+      }
+
+      for (final outcome in ['background', 'cancel', 'retry', 'accept']) {
+        final accept = outcome == 'accept';
+        interactiveReview = true;
+        container.read(appVisibleProvider.notifier).value = true;
+        tester.view.physicalSize = const Size(1000, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        container.read(viewSizeProvider.notifier).value = const Size(1000, 900);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const TestApp(child: Scaffold()),
+          ),
+        );
+        final p = profile(2);
+        responses['/2'] =
+            'mode: rule\n'
+            'rule-providers:\n'
+            '  first: {type: http, url: "http://127.0.0.1:${server.port}/first", proxy: DIRECT, format: text, behavior: domain}\n'
+            '  second: {type: http, url: "http://127.0.0.1:${server.port}/second", proxy: DIRECT, format: text, behavior: domain}\n'
+            'rules: ["RULE-SET,first,DIRECT", "RULE-SET,second,DIRECT", "MATCH,DIRECT"]\n';
+        responses['/first'] = 'first.invalid\n';
+        responses['/second'] = 'second.invalid\n';
+        if (outcome == 'retry') {
+          responses['/2'] = responses['/2']!.replaceFirst(
+            'rules: [',
+            '  third: {type: http, url: "http://127.0.0.1:${server.port}/third", proxy: DIRECT, format: text, behavior: domain}\n'
+                '  fourth: {type: http, url: "http://127.0.0.1:${server.port}/fourth", proxy: DIRECT, format: text, behavior: domain}\n'
+                'rules: [',
+          );
+          responses['/third'] = 'third.invalid\n';
+          responses['/fourth'] = 'fourth.invalid\n';
+          statuses['/first'] = 503;
+          for (final path in ['/first', '/second', '/third', '/fourth']) {
+            holds[path] = Completer<void>();
+          }
+          received.clear();
+        }
+        ProfileRefreshResult? result;
+        Object? failure;
+        var finished = false;
+        await tester.runAsync(() async {
+          unawaited(
+            profiles
+                .updateProfile(p, importing: true)
+                .then(
+                  (value) {
+                    result = value;
+                    finished = true;
+                  },
+                  onError: (Object error) {
+                    failure = error;
+                    finished = true;
+                  },
+                ),
+          );
+        });
+        if (outcome == 'retry') {
+          for (
+            var i = 0;
+            i < 1200 && received.where((path) => path != '/2').length < 3;
+            i++
+          ) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump();
+          }
+          expect(received.where((path) => path != '/2'), hasLength(3));
+          expect(find.text('Associated sources: 4'), findsOneWidget);
+          expect(find.text('Waiting'), findsOneWidget);
+          expect(canAccept(), isFalse);
+          for (final gate in holds.values) {
+            if (!gate.isCompleted) gate.complete();
+          }
+          for (
+            var i = 0;
+            i < 1200 &&
+                (find.byType(SourceReviewDialog).evaluate().isEmpty ||
+                    tester
+                        .widget<SourceReviewDialog>(
+                          find.byType(SourceReviewDialog),
+                        )
+                        .loading!
+                        .busy);
+            i++
+          ) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump();
+          }
+          final loading = tester
+              .widget<SourceReviewDialog>(find.byType(SourceReviewDialog))
+              .loading!;
+          final failed = loading.items.singleWhere(
+            (item) => item.error != null,
+          );
+          expect(failed.label, 'first');
+          expect(canAccept(), isFalse);
+          statuses.remove('/first');
+          final retryButton = find.byKey(ValueKey('retry:${failed.key}'));
+          await tester.ensureVisible(retryButton);
+          await tester.tap(retryButton);
+        }
+        for (var i = 0; i < 1200 && !canAccept() && !finished; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(failure, isNull);
+        expect(
+          find.text('Review subscription'),
+          findsOneWidget,
+          reason:
+              'finished=$finished failure=$failure received=$received reviews=${core.sourceReviews} confirmations=${confirmations.map((r) => r.kind).toList()}',
+        );
+        expect(
+          find.text('Associated sources: ${outcome == 'retry' ? 4 : 2}'),
+          findsOneWidget,
+        );
+        if (outcome == 'retry') {
+          expect(received.where((path) => path == '/first'), hasLength(2));
+          for (final path in ['/second', '/third', '/fourth']) {
+            expect(received.where((item) => item == path), hasLength(1));
+          }
+          holds.clear();
+        }
+        final before = await tester.runAsync(
+          () async =>
+              SourceAcceptance(
+                core: CoreController.scoped(core),
+                requests: client,
+              ).permissions(
+                source: await client.captureSource('profile:2'),
+                kind: 'profile',
+              ),
+        );
+        expect(before, isEmpty);
+        if (outcome == 'background') {
+          container.read(appVisibleProvider.notifier).value = false;
+        } else {
+          await tester.tap(
+            find.text(accept ? 'Accept this revision' : 'Cancel'),
+          );
+        }
+        for (var i = 0; i < 1200 && !finished; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        expect(
+          finished,
+          isTrue,
+          reason: '$failure ${core.sourceActions} ${core.calls}',
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(SourceReviewDialog), findsNothing);
+        if (accept) {
+          expect(failure, isNull);
+          expect(result?.materialSaved, isTrue);
+          SourceReviewBatchStore.forRequests(client).clear();
+          received.clear();
+          container.read(currentProfileIdProvider.notifier).value = 2;
+          final applied = await tester.runAsync(
+            () => setup.applyProfile(force: true, allowSourceReview: true),
+          );
+          await tester.pumpAndSettle();
+          expect(applied, isTrue, reason: '${core.sourceReviews}');
+          expect(
+            await tester.runAsync(() => profiles.sourceReviewStatus(p)),
+            SourceReviewStatus.ready,
+          );
+          expect(received, isEmpty);
+          expect(find.byType(SourceReviewDialog), findsNothing);
+          final legacyReview = await tester.runAsync(() async {
+            final composition = await setup.getProfile(
+              setupState: await container.read(setupStateProvider(2).future),
+              patchConfig: container.read(patchClashConfigProvider),
+            );
+            final service = SourceAcceptance(
+              core: CoreController.scoped(core),
+              requests: client,
+            );
+            final rootSource = await client.captureSource('profile:2');
+            final preview = await service.preview(
+              source: rootSource,
+              kind: 'config',
+              body: composition.yaml,
+              rootKey: rootSource.key,
+            );
+            final plan = (preview['providers'] as List).first as Map;
+            final mapping = Map<String, Object?>.from(plan['mapping'] as Map);
+            final bytes = utf8.encode(responses['/${plan['name']}']!);
+            return SourceReview(
+              source: await client.captureSource(plan['key'] as String),
+              subscriptionKey: rootSource.key,
+              key: plan['key'] as String,
+              kind: plan['kind'] as String,
+              bodyHash: sha256.convert(bytes).toString(),
+              settingsHash: SourceAcceptance.fingerprint(mapping),
+              binaryMaterial: bytes,
+              label: plan['name'] as String,
+              origin: '',
+              reasons: const ['first_use'],
+              routing: 'source',
+            );
+          });
+          SourceReviewBatchStore.forRequests(client).clear();
+          SourceReviewDecision? legacyDecision;
+          await tester.runAsync(() async {
+            unawaited(
+              container
+                  .read(sourceConfirmationProvider)(legacyReview!)
+                  .then((value) => legacyDecision = value),
+            );
+          });
+          for (var i = 0; i < 1200 && !canAccept(); i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump();
+          }
+          expect(find.text('Review subscription'), findsOneWidget);
+          expect(find.text('Associated sources: 2'), findsOneWidget);
+          await tester.tap(find.text('Accept this revision'));
+          for (var i = 0; i < 1200 && legacyDecision == null; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+          expect(legacyDecision, isNotNull);
+          expect(received, isEmpty);
+          await tester.pumpAndSettle();
+          expect(find.byType(SourceReviewDialog), findsNothing);
+          SourceReviewBatchStore.forRequests(client).clear();
+          var menuDone = false;
+          Object? menuError;
+          await tester.runAsync(() async {
+            unawaited(
+              profiles
+                  .manageSourcePermissions(p, review: true)
+                  .then(
+                    (_) => menuDone = true,
+                    onError: (Object error) {
+                      menuError = error;
+                      menuDone = true;
+                    },
+                  ),
+            );
+          });
+          await tester.pump();
+          expect(find.text('Review subscription'), findsOneWidget);
+          for (var i = 0; i < 1200 && !canAccept() && !menuDone; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+          expect(menuError, isNull);
+          expect(canAccept(), isTrue);
+          expect(received, isEmpty);
+          await tester.tap(find.text('Accept this revision'));
+          for (var i = 0; i < 1200 && !menuDone; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+          expect(menuDone, isTrue);
+          expect(menuError, isNull);
+          expect(
+            await tester.runAsync(() => profiles.sourceReviewStatus(p)),
+            SourceReviewStatus.ready,
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(SourceReviewDialog), findsNothing);
+          expect(received, isEmpty);
+        } else {
+          expect(failure, isA<RequestUnavailable>());
+          expect(
+            await tester.runAsync(() => store.profilesDao.query().get()),
+            isEmpty,
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+    skip: executable == null,
+  );
 }

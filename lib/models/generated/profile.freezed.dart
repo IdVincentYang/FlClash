@@ -295,7 +295,7 @@ as int,
 /// @nodoc
 mixin _$Profile {
 
- int get id; String get label; String? get currentGroupName; String get url; RequestMode get requestMode; String? get requestProxy; DateTime? get lastUpdateDate; Duration get autoUpdateDuration; SubscriptionInfo? get subscriptionInfo; bool get autoUpdate; Map<String, String> get selectedMap; Set<String> get unfoldSet; OverwriteType get overwriteType; int? get scriptId; String? get matchTarget; int? get order;
+ int get id; String get label; String? get currentGroupName; String get url; RequestMode get requestMode; String? get requestProxy; DateTime? get lastUpdateDate; Duration get autoUpdateDuration; SubscriptionInfo? get subscriptionInfo; bool get autoUpdate; Map<String, String> get selectedMap; Set<String> get unfoldSet; List<LocalProxyGroup> get localGroups; OverwriteType get overwriteType; int? get scriptId; String? get matchTarget; int? get order;
 /// Create a copy of Profile
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -309,20 +309,20 @@ $ProfileCopyWith<Profile> get copyWith => _$ProfileCopyWithImpl<Profile>(this as
 @override
 bool operator ==(Object other) {
   final _this = this as Profile;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Profile&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.label, _this.label) || other.label == _this.label)&&(identical(other.currentGroupName, _this.currentGroupName) || other.currentGroupName == _this.currentGroupName)&&(identical(other.url, _this.url) || other.url == _this.url)&&(identical(other.requestMode, _this.requestMode) || other.requestMode == _this.requestMode)&&(identical(other.requestProxy, _this.requestProxy) || other.requestProxy == _this.requestProxy)&&(identical(other.lastUpdateDate, _this.lastUpdateDate) || other.lastUpdateDate == _this.lastUpdateDate)&&(identical(other.autoUpdateDuration, _this.autoUpdateDuration) || other.autoUpdateDuration == _this.autoUpdateDuration)&&(identical(other.subscriptionInfo, _this.subscriptionInfo) || other.subscriptionInfo == _this.subscriptionInfo)&&(identical(other.autoUpdate, _this.autoUpdate) || other.autoUpdate == _this.autoUpdate)&&const DeepCollectionEquality().equals(other.selectedMap, _this.selectedMap)&&const DeepCollectionEquality().equals(other.unfoldSet, _this.unfoldSet)&&(identical(other.overwriteType, _this.overwriteType) || other.overwriteType == _this.overwriteType)&&(identical(other.scriptId, _this.scriptId) || other.scriptId == _this.scriptId)&&(identical(other.matchTarget, _this.matchTarget) || other.matchTarget == _this.matchTarget)&&(identical(other.order, _this.order) || other.order == _this.order));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Profile&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.label, _this.label) || other.label == _this.label)&&(identical(other.currentGroupName, _this.currentGroupName) || other.currentGroupName == _this.currentGroupName)&&(identical(other.url, _this.url) || other.url == _this.url)&&(identical(other.requestMode, _this.requestMode) || other.requestMode == _this.requestMode)&&(identical(other.requestProxy, _this.requestProxy) || other.requestProxy == _this.requestProxy)&&(identical(other.lastUpdateDate, _this.lastUpdateDate) || other.lastUpdateDate == _this.lastUpdateDate)&&(identical(other.autoUpdateDuration, _this.autoUpdateDuration) || other.autoUpdateDuration == _this.autoUpdateDuration)&&(identical(other.subscriptionInfo, _this.subscriptionInfo) || other.subscriptionInfo == _this.subscriptionInfo)&&(identical(other.autoUpdate, _this.autoUpdate) || other.autoUpdate == _this.autoUpdate)&&const DeepCollectionEquality().equals(other.selectedMap, _this.selectedMap)&&const DeepCollectionEquality().equals(other.unfoldSet, _this.unfoldSet)&&const DeepCollectionEquality().equals(other.localGroups, _this.localGroups)&&(identical(other.overwriteType, _this.overwriteType) || other.overwriteType == _this.overwriteType)&&(identical(other.scriptId, _this.scriptId) || other.scriptId == _this.scriptId)&&(identical(other.matchTarget, _this.matchTarget) || other.matchTarget == _this.matchTarget)&&(identical(other.order, _this.order) || other.order == _this.order));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Profile;
-  return Object.hash(runtimeType,_this.id,_this.label,_this.currentGroupName,_this.url,_this.requestMode,_this.requestProxy,_this.lastUpdateDate,_this.autoUpdateDuration,_this.subscriptionInfo,_this.autoUpdate,const DeepCollectionEquality().hash(_this.selectedMap),const DeepCollectionEquality().hash(_this.unfoldSet),_this.overwriteType,_this.scriptId,_this.matchTarget,_this.order);
+  return Object.hash(runtimeType,_this.id,_this.label,_this.currentGroupName,_this.url,_this.requestMode,_this.requestProxy,_this.lastUpdateDate,_this.autoUpdateDuration,_this.subscriptionInfo,_this.autoUpdate,const DeepCollectionEquality().hash(_this.selectedMap),const DeepCollectionEquality().hash(_this.unfoldSet),const DeepCollectionEquality().hash(_this.localGroups),_this.overwriteType,_this.scriptId,_this.matchTarget,_this.order);
 }
 
 @override
 String toString() {
   final _this = this as Profile;
-  return 'Profile(id: ${_this.id}, label: ${_this.label}, currentGroupName: ${_this.currentGroupName}, url: ${_this.url}, requestMode: ${_this.requestMode}, requestProxy: ${_this.requestProxy}, lastUpdateDate: ${_this.lastUpdateDate}, autoUpdateDuration: ${_this.autoUpdateDuration}, subscriptionInfo: ${_this.subscriptionInfo}, autoUpdate: ${_this.autoUpdate}, selectedMap: ${_this.selectedMap}, unfoldSet: ${_this.unfoldSet}, overwriteType: ${_this.overwriteType}, scriptId: ${_this.scriptId}, matchTarget: ${_this.matchTarget}, order: ${_this.order})';
+  return 'Profile(id: ${_this.id}, label: ${_this.label}, currentGroupName: ${_this.currentGroupName}, url: ${_this.url}, requestMode: ${_this.requestMode}, requestProxy: ${_this.requestProxy}, lastUpdateDate: ${_this.lastUpdateDate}, autoUpdateDuration: ${_this.autoUpdateDuration}, subscriptionInfo: ${_this.subscriptionInfo}, autoUpdate: ${_this.autoUpdate}, selectedMap: ${_this.selectedMap}, unfoldSet: ${_this.unfoldSet}, localGroups: ${_this.localGroups}, overwriteType: ${_this.overwriteType}, scriptId: ${_this.scriptId}, matchTarget: ${_this.matchTarget}, order: ${_this.order})';
 }
 
 
@@ -333,7 +333,7 @@ abstract mixin class $ProfileCopyWith<$Res>  {
   factory $ProfileCopyWith(Profile value, $Res Function(Profile) _then) = _$ProfileCopyWithImpl;
 @useResult
 $Res call({
- int id, String label, String? currentGroupName, String url, RequestMode requestMode, String? requestProxy, DateTime? lastUpdateDate, Duration autoUpdateDuration, SubscriptionInfo? subscriptionInfo, bool autoUpdate, Map<String, String> selectedMap, Set<String> unfoldSet, OverwriteType overwriteType, int? scriptId, String? matchTarget, int? order
+ int id, String label, String? currentGroupName, String url, RequestMode requestMode, String? requestProxy, DateTime? lastUpdateDate, Duration autoUpdateDuration, SubscriptionInfo? subscriptionInfo, bool autoUpdate, Map<String, String> selectedMap, Set<String> unfoldSet, List<LocalProxyGroup> localGroups, OverwriteType overwriteType, int? scriptId, String? matchTarget, int? order
 });
 
 
@@ -350,7 +350,7 @@ class _$ProfileCopyWithImpl<$Res>
 
 /// Create a copy of Profile
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? label = null,Object? currentGroupName = freezed,Object? url = null,Object? requestMode = null,Object? requestProxy = freezed,Object? lastUpdateDate = freezed,Object? autoUpdateDuration = null,Object? subscriptionInfo = freezed,Object? autoUpdate = null,Object? selectedMap = null,Object? unfoldSet = null,Object? overwriteType = null,Object? scriptId = freezed,Object? matchTarget = freezed,Object? order = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? label = null,Object? currentGroupName = freezed,Object? url = null,Object? requestMode = null,Object? requestProxy = freezed,Object? lastUpdateDate = freezed,Object? autoUpdateDuration = null,Object? subscriptionInfo = freezed,Object? autoUpdate = null,Object? selectedMap = null,Object? unfoldSet = null,Object? localGroups = null,Object? overwriteType = null,Object? scriptId = freezed,Object? matchTarget = freezed,Object? order = freezed,}) {
   return _then(Profile(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
@@ -364,7 +364,8 @@ as Duration,subscriptionInfo: freezed == subscriptionInfo ? _self.subscriptionIn
 as SubscriptionInfo?,autoUpdate: null == autoUpdate ? _self.autoUpdate : autoUpdate // ignore: cast_nullable_to_non_nullable
 as bool,selectedMap: null == selectedMap ? _self.selectedMap : selectedMap // ignore: cast_nullable_to_non_nullable
 as Map<String, String>,unfoldSet: null == unfoldSet ? _self.unfoldSet : unfoldSet // ignore: cast_nullable_to_non_nullable
-as Set<String>,overwriteType: null == overwriteType ? _self.overwriteType : overwriteType // ignore: cast_nullable_to_non_nullable
+as Set<String>,localGroups: null == localGroups ? _self.localGroups : localGroups // ignore: cast_nullable_to_non_nullable
+as List<LocalProxyGroup>,overwriteType: null == overwriteType ? _self.overwriteType : overwriteType // ignore: cast_nullable_to_non_nullable
 as OverwriteType,scriptId: freezed == scriptId ? _self.scriptId : scriptId // ignore: cast_nullable_to_non_nullable
 as int?,matchTarget: freezed == matchTarget ? _self.matchTarget : matchTarget // ignore: cast_nullable_to_non_nullable
 as String?,order: freezed == order ? _self.order : order // ignore: cast_nullable_to_non_nullable
@@ -465,10 +466,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String label,  String? currentGroupName,  String url,  RequestMode requestMode,  String? requestProxy,  DateTime? lastUpdateDate,  Duration autoUpdateDuration,  SubscriptionInfo? subscriptionInfo,  bool autoUpdate,  Map<String, String> selectedMap,  Set<String> unfoldSet,  OverwriteType overwriteType,  int? scriptId,  String? matchTarget,  int? order)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String label,  String? currentGroupName,  String url,  RequestMode requestMode,  String? requestProxy,  DateTime? lastUpdateDate,  Duration autoUpdateDuration,  SubscriptionInfo? subscriptionInfo,  bool autoUpdate,  Map<String, String> selectedMap,  Set<String> unfoldSet,  List<LocalProxyGroup> localGroups,  OverwriteType overwriteType,  int? scriptId,  String? matchTarget,  int? order)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Profile() when $default != null:
-return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requestMode,_that.requestProxy,_that.lastUpdateDate,_that.autoUpdateDuration,_that.subscriptionInfo,_that.autoUpdate,_that.selectedMap,_that.unfoldSet,_that.overwriteType,_that.scriptId,_that.matchTarget,_that.order);case _:
+return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requestMode,_that.requestProxy,_that.lastUpdateDate,_that.autoUpdateDuration,_that.subscriptionInfo,_that.autoUpdate,_that.selectedMap,_that.unfoldSet,_that.localGroups,_that.overwriteType,_that.scriptId,_that.matchTarget,_that.order);case _:
   return orElse();
 
 }
@@ -486,10 +487,10 @@ return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requ
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String label,  String? currentGroupName,  String url,  RequestMode requestMode,  String? requestProxy,  DateTime? lastUpdateDate,  Duration autoUpdateDuration,  SubscriptionInfo? subscriptionInfo,  bool autoUpdate,  Map<String, String> selectedMap,  Set<String> unfoldSet,  OverwriteType overwriteType,  int? scriptId,  String? matchTarget,  int? order)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String label,  String? currentGroupName,  String url,  RequestMode requestMode,  String? requestProxy,  DateTime? lastUpdateDate,  Duration autoUpdateDuration,  SubscriptionInfo? subscriptionInfo,  bool autoUpdate,  Map<String, String> selectedMap,  Set<String> unfoldSet,  List<LocalProxyGroup> localGroups,  OverwriteType overwriteType,  int? scriptId,  String? matchTarget,  int? order)  $default,) {final _that = this;
 switch (_that) {
 case _Profile():
-return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requestMode,_that.requestProxy,_that.lastUpdateDate,_that.autoUpdateDuration,_that.subscriptionInfo,_that.autoUpdate,_that.selectedMap,_that.unfoldSet,_that.overwriteType,_that.scriptId,_that.matchTarget,_that.order);case _:
+return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requestMode,_that.requestProxy,_that.lastUpdateDate,_that.autoUpdateDuration,_that.subscriptionInfo,_that.autoUpdate,_that.selectedMap,_that.unfoldSet,_that.localGroups,_that.overwriteType,_that.scriptId,_that.matchTarget,_that.order);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -506,10 +507,10 @@ return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requ
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String label,  String? currentGroupName,  String url,  RequestMode requestMode,  String? requestProxy,  DateTime? lastUpdateDate,  Duration autoUpdateDuration,  SubscriptionInfo? subscriptionInfo,  bool autoUpdate,  Map<String, String> selectedMap,  Set<String> unfoldSet,  OverwriteType overwriteType,  int? scriptId,  String? matchTarget,  int? order)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String label,  String? currentGroupName,  String url,  RequestMode requestMode,  String? requestProxy,  DateTime? lastUpdateDate,  Duration autoUpdateDuration,  SubscriptionInfo? subscriptionInfo,  bool autoUpdate,  Map<String, String> selectedMap,  Set<String> unfoldSet,  List<LocalProxyGroup> localGroups,  OverwriteType overwriteType,  int? scriptId,  String? matchTarget,  int? order)?  $default,) {final _that = this;
 switch (_that) {
 case _Profile() when $default != null:
-return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requestMode,_that.requestProxy,_that.lastUpdateDate,_that.autoUpdateDuration,_that.subscriptionInfo,_that.autoUpdate,_that.selectedMap,_that.unfoldSet,_that.overwriteType,_that.scriptId,_that.matchTarget,_that.order);case _:
+return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requestMode,_that.requestProxy,_that.lastUpdateDate,_that.autoUpdateDuration,_that.subscriptionInfo,_that.autoUpdate,_that.selectedMap,_that.unfoldSet,_that.localGroups,_that.overwriteType,_that.scriptId,_that.matchTarget,_that.order);case _:
   return null;
 
 }
@@ -521,7 +522,7 @@ return $default(_that.id,_that.label,_that.currentGroupName,_that.url,_that.requ
 @JsonSerializable()
 
 class _Profile implements Profile {
-  const _Profile({required this.id, this.label = '', this.currentGroupName, this.url = '', this.requestMode = RequestMode.auto, this.requestProxy, this.lastUpdateDate, required this.autoUpdateDuration, this.subscriptionInfo, this.autoUpdate = true,  Map<String, String> selectedMap = const {},  Set<String> unfoldSet = const {}, this.overwriteType = OverwriteType.standard, this.scriptId, this.matchTarget, this.order}): _selectedMap = selectedMap,_unfoldSet = unfoldSet;
+  const _Profile({required this.id, this.label = '', this.currentGroupName, this.url = '', this.requestMode = RequestMode.auto, this.requestProxy, this.lastUpdateDate, required this.autoUpdateDuration, this.subscriptionInfo, this.autoUpdate = true,  Map<String, String> selectedMap = const {},  Set<String> unfoldSet = const {},  List<LocalProxyGroup> localGroups = const [], this.overwriteType = OverwriteType.standard, this.scriptId, this.matchTarget, this.order}): _selectedMap = selectedMap,_unfoldSet = unfoldSet,_localGroups = localGroups;
   factory _Profile.fromJson(Map<String, dynamic> json) => _$ProfileFromJson(json);
 
 @override final  int id;
@@ -548,6 +549,13 @@ class _Profile implements Profile {
   return EqualUnmodifiableSetView(_unfoldSet);
 }
 
+ final  List<LocalProxyGroup> _localGroups;
+@override@JsonKey() List<LocalProxyGroup> get localGroups {
+  if (_localGroups is EqualUnmodifiableListView) return _localGroups;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_localGroups);
+}
+
 @override@JsonKey() final  OverwriteType overwriteType;
 @override final  int? scriptId;
 @override final  String? matchTarget;
@@ -566,18 +574,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Profile&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&(identical(other.currentGroupName, currentGroupName) || other.currentGroupName == currentGroupName)&&(identical(other.url, url) || other.url == url)&&(identical(other.requestMode, requestMode) || other.requestMode == requestMode)&&(identical(other.requestProxy, requestProxy) || other.requestProxy == requestProxy)&&(identical(other.lastUpdateDate, lastUpdateDate) || other.lastUpdateDate == lastUpdateDate)&&(identical(other.autoUpdateDuration, autoUpdateDuration) || other.autoUpdateDuration == autoUpdateDuration)&&(identical(other.subscriptionInfo, subscriptionInfo) || other.subscriptionInfo == subscriptionInfo)&&(identical(other.autoUpdate, autoUpdate) || other.autoUpdate == autoUpdate)&&const DeepCollectionEquality().equals(other.selectedMap, _selectedMap)&&const DeepCollectionEquality().equals(other.unfoldSet, _unfoldSet)&&(identical(other.overwriteType, overwriteType) || other.overwriteType == overwriteType)&&(identical(other.scriptId, scriptId) || other.scriptId == scriptId)&&(identical(other.matchTarget, matchTarget) || other.matchTarget == matchTarget)&&(identical(other.order, order) || other.order == order));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Profile&&(identical(other.id, id) || other.id == id)&&(identical(other.label, label) || other.label == label)&&(identical(other.currentGroupName, currentGroupName) || other.currentGroupName == currentGroupName)&&(identical(other.url, url) || other.url == url)&&(identical(other.requestMode, requestMode) || other.requestMode == requestMode)&&(identical(other.requestProxy, requestProxy) || other.requestProxy == requestProxy)&&(identical(other.lastUpdateDate, lastUpdateDate) || other.lastUpdateDate == lastUpdateDate)&&(identical(other.autoUpdateDuration, autoUpdateDuration) || other.autoUpdateDuration == autoUpdateDuration)&&(identical(other.subscriptionInfo, subscriptionInfo) || other.subscriptionInfo == subscriptionInfo)&&(identical(other.autoUpdate, autoUpdate) || other.autoUpdate == autoUpdate)&&const DeepCollectionEquality().equals(other.selectedMap, _selectedMap)&&const DeepCollectionEquality().equals(other.unfoldSet, _unfoldSet)&&const DeepCollectionEquality().equals(other.localGroups, _localGroups)&&(identical(other.overwriteType, overwriteType) || other.overwriteType == overwriteType)&&(identical(other.scriptId, scriptId) || other.scriptId == scriptId)&&(identical(other.matchTarget, matchTarget) || other.matchTarget == matchTarget)&&(identical(other.order, order) || other.order == order));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,label,currentGroupName,url,requestMode,requestProxy,lastUpdateDate,autoUpdateDuration,subscriptionInfo,autoUpdate,const DeepCollectionEquality().hash(_selectedMap),const DeepCollectionEquality().hash(_unfoldSet),overwriteType,scriptId,matchTarget,order);
+    return Object.hash(runtimeType,id,label,currentGroupName,url,requestMode,requestProxy,lastUpdateDate,autoUpdateDuration,subscriptionInfo,autoUpdate,const DeepCollectionEquality().hash(_selectedMap),const DeepCollectionEquality().hash(_unfoldSet),const DeepCollectionEquality().hash(_localGroups),overwriteType,scriptId,matchTarget,order);
 }
 
 @override
 String toString() {
-    return 'Profile(id: $id, label: $label, currentGroupName: $currentGroupName, url: $url, requestMode: $requestMode, requestProxy: $requestProxy, lastUpdateDate: $lastUpdateDate, autoUpdateDuration: $autoUpdateDuration, subscriptionInfo: $subscriptionInfo, autoUpdate: $autoUpdate, selectedMap: $selectedMap, unfoldSet: $unfoldSet, overwriteType: $overwriteType, scriptId: $scriptId, matchTarget: $matchTarget, order: $order)';
+    return 'Profile(id: $id, label: $label, currentGroupName: $currentGroupName, url: $url, requestMode: $requestMode, requestProxy: $requestProxy, lastUpdateDate: $lastUpdateDate, autoUpdateDuration: $autoUpdateDuration, subscriptionInfo: $subscriptionInfo, autoUpdate: $autoUpdate, selectedMap: $selectedMap, unfoldSet: $unfoldSet, localGroups: $localGroups, overwriteType: $overwriteType, scriptId: $scriptId, matchTarget: $matchTarget, order: $order)';
 }
 
 
@@ -588,7 +596,7 @@ abstract mixin class _$ProfileCopyWith<$Res> implements $ProfileCopyWith<$Res> {
   factory _$ProfileCopyWith(_Profile value, $Res Function(_Profile) _then) = __$ProfileCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String label, String? currentGroupName, String url, RequestMode requestMode, String? requestProxy, DateTime? lastUpdateDate, Duration autoUpdateDuration, SubscriptionInfo? subscriptionInfo, bool autoUpdate, Map<String, String> selectedMap, Set<String> unfoldSet, OverwriteType overwriteType, int? scriptId, String? matchTarget, int? order
+ int id, String label, String? currentGroupName, String url, RequestMode requestMode, String? requestProxy, DateTime? lastUpdateDate, Duration autoUpdateDuration, SubscriptionInfo? subscriptionInfo, bool autoUpdate, Map<String, String> selectedMap, Set<String> unfoldSet, List<LocalProxyGroup> localGroups, OverwriteType overwriteType, int? scriptId, String? matchTarget, int? order
 });
 
 
@@ -605,7 +613,7 @@ class __$ProfileCopyWithImpl<$Res>
 
 /// Create a copy of Profile
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? label = null,Object? currentGroupName = freezed,Object? url = null,Object? requestMode = null,Object? requestProxy = freezed,Object? lastUpdateDate = freezed,Object? autoUpdateDuration = null,Object? subscriptionInfo = freezed,Object? autoUpdate = null,Object? selectedMap = null,Object? unfoldSet = null,Object? overwriteType = null,Object? scriptId = freezed,Object? matchTarget = freezed,Object? order = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? label = null,Object? currentGroupName = freezed,Object? url = null,Object? requestMode = null,Object? requestProxy = freezed,Object? lastUpdateDate = freezed,Object? autoUpdateDuration = null,Object? subscriptionInfo = freezed,Object? autoUpdate = null,Object? selectedMap = null,Object? unfoldSet = null,Object? localGroups = null,Object? overwriteType = null,Object? scriptId = freezed,Object? matchTarget = freezed,Object? order = freezed,}) {
   return _then(_Profile(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
@@ -619,7 +627,8 @@ as Duration,subscriptionInfo: freezed == subscriptionInfo ? _self.subscriptionIn
 as SubscriptionInfo?,autoUpdate: null == autoUpdate ? _self.autoUpdate : autoUpdate // ignore: cast_nullable_to_non_nullable
 as bool,selectedMap: null == selectedMap ? _self._selectedMap : selectedMap // ignore: cast_nullable_to_non_nullable
 as Map<String, String>,unfoldSet: null == unfoldSet ? _self._unfoldSet : unfoldSet // ignore: cast_nullable_to_non_nullable
-as Set<String>,overwriteType: null == overwriteType ? _self.overwriteType : overwriteType // ignore: cast_nullable_to_non_nullable
+as Set<String>,localGroups: null == localGroups ? _self._localGroups : localGroups // ignore: cast_nullable_to_non_nullable
+as List<LocalProxyGroup>,overwriteType: null == overwriteType ? _self.overwriteType : overwriteType // ignore: cast_nullable_to_non_nullable
 as OverwriteType,scriptId: freezed == scriptId ? _self.scriptId : scriptId // ignore: cast_nullable_to_non_nullable
 as int?,matchTarget: freezed == matchTarget ? _self.matchTarget : matchTarget // ignore: cast_nullable_to_non_nullable
 as String?,order: freezed == order ? _self.order : order // ignore: cast_nullable_to_non_nullable
@@ -640,6 +649,330 @@ $SubscriptionInfoCopyWith<$Res>? get subscriptionInfo {
     return _then(_self.copyWith(subscriptionInfo: value));
   });
 }
+}
+
+
+/// @nodoc
+mixin _$LocalProxyGroup {
+
+ int get id; String get name; GroupType get type; List<String> get nodes; String get regex; List<String> get matchedNodes; List<String> get excludedNodes; List<String> get parents; String? get parent; bool get enabled; String get testUrl;
+/// Create a copy of LocalProxyGroup
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$LocalProxyGroupCopyWith<LocalProxyGroup> get copyWith => _$LocalProxyGroupCopyWithImpl<LocalProxyGroup>(this as LocalProxyGroup, _$identity);
+
+  /// Serializes this LocalProxyGroup to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  final _this = this as LocalProxyGroup;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LocalProxyGroup&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.type, _this.type) || other.type == _this.type)&&const DeepCollectionEquality().equals(other.nodes, _this.nodes)&&(identical(other.regex, _this.regex) || other.regex == _this.regex)&&const DeepCollectionEquality().equals(other.matchedNodes, _this.matchedNodes)&&const DeepCollectionEquality().equals(other.excludedNodes, _this.excludedNodes)&&const DeepCollectionEquality().equals(other.parents, _this.parents)&&(identical(other.parent, _this.parent) || other.parent == _this.parent)&&(identical(other.enabled, _this.enabled) || other.enabled == _this.enabled)&&(identical(other.testUrl, _this.testUrl) || other.testUrl == _this.testUrl));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode {
+  final _this = this as LocalProxyGroup;
+  return Object.hash(runtimeType,_this.id,_this.name,_this.type,const DeepCollectionEquality().hash(_this.nodes),_this.regex,const DeepCollectionEquality().hash(_this.matchedNodes),const DeepCollectionEquality().hash(_this.excludedNodes),const DeepCollectionEquality().hash(_this.parents),_this.parent,_this.enabled,_this.testUrl);
+}
+
+@override
+String toString() {
+  final _this = this as LocalProxyGroup;
+  return 'LocalProxyGroup(id: ${_this.id}, name: ${_this.name}, type: ${_this.type}, nodes: ${_this.nodes}, regex: ${_this.regex}, matchedNodes: ${_this.matchedNodes}, excludedNodes: ${_this.excludedNodes}, parents: ${_this.parents}, parent: ${_this.parent}, enabled: ${_this.enabled}, testUrl: ${_this.testUrl})';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $LocalProxyGroupCopyWith<$Res>  {
+  factory $LocalProxyGroupCopyWith(LocalProxyGroup value, $Res Function(LocalProxyGroup) _then) = _$LocalProxyGroupCopyWithImpl;
+@useResult
+$Res call({
+ int id, String name, GroupType type, List<String> nodes, String regex, List<String> matchedNodes, List<String> excludedNodes, List<String> parents, String? parent, bool enabled, String testUrl
+});
+
+
+
+
+}
+/// @nodoc
+class _$LocalProxyGroupCopyWithImpl<$Res>
+    implements $LocalProxyGroupCopyWith<$Res> {
+  _$LocalProxyGroupCopyWithImpl(this._self, this._then);
+
+  final LocalProxyGroup _self;
+  final $Res Function(LocalProxyGroup) _then;
+
+/// Create a copy of LocalProxyGroup
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nodes = null,Object? regex = null,Object? matchedNodes = null,Object? excludedNodes = null,Object? parents = null,Object? parent = freezed,Object? enabled = null,Object? testUrl = null,}) {
+  return _then(LocalProxyGroup(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as GroupType,nodes: null == nodes ? _self.nodes : nodes // ignore: cast_nullable_to_non_nullable
+as List<String>,regex: null == regex ? _self.regex : regex // ignore: cast_nullable_to_non_nullable
+as String,matchedNodes: null == matchedNodes ? _self.matchedNodes : matchedNodes // ignore: cast_nullable_to_non_nullable
+as List<String>,excludedNodes: null == excludedNodes ? _self.excludedNodes : excludedNodes // ignore: cast_nullable_to_non_nullable
+as List<String>,parents: null == parents ? _self.parents : parents // ignore: cast_nullable_to_non_nullable
+as List<String>,parent: freezed == parent ? _self.parent : parent // ignore: cast_nullable_to_non_nullable
+as String?,enabled: null == enabled ? _self.enabled : enabled // ignore: cast_nullable_to_non_nullable
+as bool,testUrl: null == testUrl ? _self.testUrl : testUrl // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [LocalProxyGroup].
+extension LocalProxyGroupPatterns on LocalProxyGroup {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _LocalProxyGroup value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _LocalProxyGroup() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _LocalProxyGroup value)  $default,){
+final _that = this;
+switch (_that) {
+case _LocalProxyGroup():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _LocalProxyGroup value)?  $default,){
+final _that = this;
+switch (_that) {
+case _LocalProxyGroup() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  String testUrl)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _LocalProxyGroup() when $default != null:
+return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.testUrl);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  String testUrl)  $default,) {final _that = this;
+switch (_that) {
+case _LocalProxyGroup():
+return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.testUrl);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  String testUrl)?  $default,) {final _that = this;
+switch (_that) {
+case _LocalProxyGroup() when $default != null:
+return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.testUrl);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _LocalProxyGroup extends LocalProxyGroup {
+  const _LocalProxyGroup({required this.id, required this.name, this.type = GroupType.Selector,  List<String> nodes = const [], this.regex = '',  List<String> matchedNodes = const [],  List<String> excludedNodes = const [],  List<String> parents = const [], this.parent, this.enabled = true, this.testUrl = ''}): _nodes = nodes,_matchedNodes = matchedNodes,_excludedNodes = excludedNodes,_parents = parents,super._();
+  factory _LocalProxyGroup.fromJson(Map<String, dynamic> json) => _$LocalProxyGroupFromJson(json);
+
+@override final  int id;
+@override final  String name;
+@override@JsonKey() final  GroupType type;
+ final  List<String> _nodes;
+@override@JsonKey() List<String> get nodes {
+  if (_nodes is EqualUnmodifiableListView) return _nodes;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_nodes);
+}
+
+@override@JsonKey() final  String regex;
+ final  List<String> _matchedNodes;
+@override@JsonKey() List<String> get matchedNodes {
+  if (_matchedNodes is EqualUnmodifiableListView) return _matchedNodes;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_matchedNodes);
+}
+
+ final  List<String> _excludedNodes;
+@override@JsonKey() List<String> get excludedNodes {
+  if (_excludedNodes is EqualUnmodifiableListView) return _excludedNodes;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_excludedNodes);
+}
+
+ final  List<String> _parents;
+@override@JsonKey() List<String> get parents {
+  if (_parents is EqualUnmodifiableListView) return _parents;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_parents);
+}
+
+@override final  String? parent;
+@override@JsonKey() final  bool enabled;
+@override@JsonKey() final  String testUrl;
+
+/// Create a copy of LocalProxyGroup
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$LocalProxyGroupCopyWith<_LocalProxyGroup> get copyWith => __$LocalProxyGroupCopyWithImpl<_LocalProxyGroup>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$LocalProxyGroupToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LocalProxyGroup&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&const DeepCollectionEquality().equals(other.nodes, _nodes)&&(identical(other.regex, regex) || other.regex == regex)&&const DeepCollectionEquality().equals(other.matchedNodes, _matchedNodes)&&const DeepCollectionEquality().equals(other.excludedNodes, _excludedNodes)&&const DeepCollectionEquality().equals(other.parents, _parents)&&(identical(other.parent, parent) || other.parent == parent)&&(identical(other.enabled, enabled) || other.enabled == enabled)&&(identical(other.testUrl, testUrl) || other.testUrl == testUrl));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode {
+    return Object.hash(runtimeType,id,name,type,const DeepCollectionEquality().hash(_nodes),regex,const DeepCollectionEquality().hash(_matchedNodes),const DeepCollectionEquality().hash(_excludedNodes),const DeepCollectionEquality().hash(_parents),parent,enabled,testUrl);
+}
+
+@override
+String toString() {
+    return 'LocalProxyGroup(id: $id, name: $name, type: $type, nodes: $nodes, regex: $regex, matchedNodes: $matchedNodes, excludedNodes: $excludedNodes, parents: $parents, parent: $parent, enabled: $enabled, testUrl: $testUrl)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$LocalProxyGroupCopyWith<$Res> implements $LocalProxyGroupCopyWith<$Res> {
+  factory _$LocalProxyGroupCopyWith(_LocalProxyGroup value, $Res Function(_LocalProxyGroup) _then) = __$LocalProxyGroupCopyWithImpl;
+@override @useResult
+$Res call({
+ int id, String name, GroupType type, List<String> nodes, String regex, List<String> matchedNodes, List<String> excludedNodes, List<String> parents, String? parent, bool enabled, String testUrl
+});
+
+
+
+
+}
+/// @nodoc
+class __$LocalProxyGroupCopyWithImpl<$Res>
+    implements _$LocalProxyGroupCopyWith<$Res> {
+  __$LocalProxyGroupCopyWithImpl(this._self, this._then);
+
+  final _LocalProxyGroup _self;
+  final $Res Function(_LocalProxyGroup) _then;
+
+/// Create a copy of LocalProxyGroup
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nodes = null,Object? regex = null,Object? matchedNodes = null,Object? excludedNodes = null,Object? parents = null,Object? parent = freezed,Object? enabled = null,Object? testUrl = null,}) {
+  return _then(_LocalProxyGroup(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as GroupType,nodes: null == nodes ? _self._nodes : nodes // ignore: cast_nullable_to_non_nullable
+as List<String>,regex: null == regex ? _self.regex : regex // ignore: cast_nullable_to_non_nullable
+as String,matchedNodes: null == matchedNodes ? _self._matchedNodes : matchedNodes // ignore: cast_nullable_to_non_nullable
+as List<String>,excludedNodes: null == excludedNodes ? _self._excludedNodes : excludedNodes // ignore: cast_nullable_to_non_nullable
+as List<String>,parents: null == parents ? _self._parents : parents // ignore: cast_nullable_to_non_nullable
+as List<String>,parent: freezed == parent ? _self.parent : parent // ignore: cast_nullable_to_non_nullable
+as String?,enabled: null == enabled ? _self.enabled : enabled // ignore: cast_nullable_to_non_nullable
+as bool,testUrl: null == testUrl ? _self.testUrl : testUrl // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
 }
 
 /// @nodoc

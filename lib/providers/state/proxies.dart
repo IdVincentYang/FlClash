@@ -243,6 +243,19 @@ DelayTestPhase? delayTestPhase(
 }
 
 @riverpod
+Object? delayTestFailure(
+  Ref ref, {
+  required String proxyName,
+  String? testUrl,
+}) {
+  final currentTestUrl = ref.watch(realTestUrlProvider(testUrl));
+  final proxyState = ref.watch(realSelectedProxyStateProvider(proxyName));
+  final effectiveTestUrl = proxyState.testUrl.takeFirstValid([currentTestUrl]);
+  final key = delayTestKey(effectiveTestUrl, proxyState.proxyName);
+  return ref.watch(delayTestFailuresProvider.select((state) => state[key]));
+}
+
+@riverpod
 Map<String, String> selectedMap(Ref ref) {
   final selectedMap = ref.watch(
     currentProfileProvider.select((state) => state?.selectedMap ?? {}),
@@ -312,4 +325,37 @@ String proxyDesc(Ref ref, Proxy proxy) {
     proxiesStyleSettingProvider.select((state) => state.sortType),
   );
   return (isProxies: isProxies, sortNum: sortNum, sortType: sortType);
+}
+
+enum ProxyPreparationStage { configuration, sources, downloading, applying }
+
+final proxyPreparationProvider =
+    NotifierProvider<
+      ProxyPreparation,
+      ({ProxyPreparationStage? stage, bool failed})
+    >(ProxyPreparation.new);
+
+class ProxyPreparation
+    extends Notifier<({ProxyPreparationStage? stage, bool failed})> {
+  int _sequence = 0;
+  @override
+  ({ProxyPreparationStage? stage, bool failed}) build() =>
+      (stage: null, failed: false);
+
+  int start() {
+    state = (stage: ProxyPreparationStage.configuration, failed: false);
+    return ++_sequence;
+  }
+
+  void phase(int sequence, ProxyPreparationStage stage) {
+    if (ref.mounted && sequence == _sequence) {
+      state = (stage: stage, failed: false);
+    }
+  }
+
+  void finish(int sequence, {required bool failed}) {
+    if (ref.mounted && sequence == _sequence) {
+      state = (stage: null, failed: failed);
+    }
+  }
 }

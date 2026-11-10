@@ -4060,6 +4060,66 @@ class AppLocalizations {
     return Intl.message('Add profile', name: 'addProfile', desc: '', args: []);
   }
 
+  /// `Waiting`
+  String get delayTestWaiting {
+    return Intl.message(
+      'Waiting',
+      name: 'delayTestWaiting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Waiting for result`
+  String get delayTestWaitingResult {
+    return Intl.message(
+      'Waiting for result',
+      name: 'delayTestWaitingResult',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Start the proxy and wait for it to connect before testing node latency.`
+  String get delayTestRequiresProxy {
+    return Intl.message(
+      'Start the proxy and wait for it to connect before testing node latency.',
+      name: 'delayTestRequiresProxy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unavailable`
+  String get delayTestUnavailable {
+    return Intl.message(
+      'Unavailable',
+      name: 'delayTestUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The Core returned no test result. Check that the proxy is connected and retry.`
+  String get delayTestNoResult {
+    return Intl.message(
+      'The Core returned no test result. Check that the proxy is connected and retry.',
+      name: 'delayTestNoResult',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delay test did not complete: {reason}`
+  String delayTestFailed(String reason) {
+    return Intl.message(
+      'Delay test did not complete: $reason',
+      name: 'delayTestFailed',
+      desc: '',
+      args: [reason],
+    );
+  }
+
   /// `Delay test`
   String get delayTest {
     return Intl.message('Delay test', name: 'delayTest', desc: '', args: []);
@@ -8223,6 +8283,401 @@ class AppLocalizations {
     );
   }
 
+  /// `Use`
+  String get useProfile {
+    return Intl.message('Use', name: 'useProfile', desc: '', args: []);
+  }
+
+  /// `Review required`
+  String get sourceReviewPending {
+    return Intl.message(
+      'Review required',
+      name: 'sourceReviewPending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking source permissions…`
+  String get sourceStatusChecking {
+    return Intl.message(
+      'Checking source permissions…',
+      name: 'sourceStatusChecking',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Permissions unavailable · retry`
+  String get sourceStatusRetry {
+    return Intl.message(
+      'Permissions unavailable · retry',
+      name: 'sourceStatusRetry',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Some selected node names occur in multiple sources. Use uniquely named nodes to avoid choosing the wrong endpoint.`
+  String get localGroupsAmbiguous {
+    return Intl.message(
+      'Some selected node names occur in multiple sources. Use uniquely named nodes to avoid choosing the wrong endpoint.',
+      name: 'localGroupsAmbiguous',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Saved changes are waiting to be applied.`
+  String get localGroupsPending {
+    return Intl.message(
+      'Saved changes are waiting to be applied.',
+      name: 'localGroupsPending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Group management`
+  String get localGroupsTitle {
+    return Intl.message(
+      'Group management',
+      name: 'localGroupsTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `New group`
+  String get localGroupsCreate {
+    return Intl.message(
+      'New group',
+      name: 'localGroupsCreate',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Create a group by choosing nodes from this subscription.`
+  String get localGroupsEmpty {
+    return Intl.message(
+      'Create a group by choosing nodes from this subscription.',
+      name: 'localGroupsEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{name}`
+  String localGroupsScope(Object name) {
+    return Intl.message(
+      '$name',
+      name: 'localGroupsScope',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Add as an option in`
+  String get localGroupsParent {
+    return Intl.message(
+      'Add as an option in',
+      name: 'localGroupsParent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Standalone group`
+  String get localGroupsIndependent {
+    return Intl.message(
+      'Standalone group',
+      name: 'localGroupsIndependent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Manual`
+  String get localGroupsManual {
+    return Intl.message(
+      'Manual',
+      name: 'localGroupsManual',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Latency-based`
+  String get localGroupsAutomatic {
+    return Intl.message(
+      'Latency-based',
+      name: 'localGroupsAutomatic',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Failover`
+  String get localGroupsFallback {
+    return Intl.message(
+      'Failover',
+      name: 'localGroupsFallback',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use this subscription and complete source review to load its nodes.`
+  String get localGroupsLoadFirst {
+    return Intl.message(
+      'Use this subscription and complete source review to load its nodes.',
+      name: 'localGroupsLoadFirst',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose another node or group before removing this reference, disabling or deleting this group.`
+  String get localGroupsInUse {
+    return Intl.message(
+      'Choose another node or group before removing this reference, disabling or deleting this group.',
+      name: 'localGroupsInUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delete group “{name}”?`
+  String localGroupsDelete(Object name) {
+    return Intl.message(
+      'Delete group “$name”?',
+      name: 'localGroupsDelete',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Unavailable node: {name}`
+  String localGroupsMissing(Object name) {
+    return Intl.message(
+      'Unavailable node: $name',
+      name: 'localGroupsMissing',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Choose a unique group name.`
+  String get localGroupsNameConflict {
+    return Intl.message(
+      'Choose a unique group name.',
+      name: 'localGroupsNameConflict',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Select at least one available node.`
+  String get localGroupsMembersRequired {
+    return Intl.message(
+      'Select at least one available node.',
+      name: 'localGroupsMembersRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Select an available manual group or Standalone group.`
+  String get localGroupsInvalidParent {
+    return Intl.message(
+      'Select an available manual group or Standalone group.',
+      name: 'localGroupsInvalidParent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enter a valid HTTP(S) test URL.`
+  String get localGroupsInvalidTestUrl {
+    return Intl.message(
+      'Enter a valid HTTP(S) test URL.',
+      name: 'localGroupsInvalidTestUrl',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The changes could not be applied. Check the configuration and retry.`
+  String get localGroupsApplyFailed {
+    return Intl.message(
+      'The changes could not be applied. Check the configuration and retry.',
+      name: 'localGroupsApplyFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The configuration changed. Refresh group management and retry.`
+  String get localGroupsChanged {
+    return Intl.message(
+      'The configuration changed. Refresh group management and retry.',
+      name: 'localGroupsChanged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Manage groups in Policy draft for this configuration.`
+  String get localGroupsManaged {
+    return Intl.message(
+      'Manage groups in Policy draft for this configuration.',
+      name: 'localGroupsManaged',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The group or member limit was exceeded.`
+  String get localGroupsLimit {
+    return Intl.message(
+      'The group or member limit was exceeded.',
+      name: 'localGroupsLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Search nodes`
+  String get localGroupsSearch {
+    return Intl.message(
+      'Search nodes',
+      name: 'localGroupsSearch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Subscription groups (read-only)`
+  String get localGroupsSource {
+    return Intl.message(
+      'Subscription groups (read-only)',
+      name: 'localGroupsSource',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review subscription`
+  String get sourceSubscriptionReview {
+    return Intl.message(
+      'Review subscription',
+      name: 'sourceSubscriptionReview',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Associated sources: {count}`
+  String sourceRelatedSourcesCount(Object count) {
+    return Intl.message(
+      'Associated sources: $count',
+      name: 'sourceRelatedSourcesCount',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Checking subscription and permissions…`
+  String get sourceLoadChecking {
+    return Intl.message(
+      'Checking subscription and permissions…',
+      name: 'sourceLoadChecking',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Ready: {ready}/{total}`
+  String sourceLoadProgress(Object ready, Object total) {
+    return Intl.message(
+      'Ready: $ready/$total',
+      name: 'sourceLoadProgress',
+      desc: '',
+      args: [ready, total],
+    );
+  }
+
+  /// `Waiting`
+  String get sourceLoadQueued {
+    return Intl.message(
+      'Waiting',
+      name: 'sourceLoadQueued',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Downloading…`
+  String get sourceLoadDownloading {
+    return Intl.message(
+      'Downloading…',
+      name: 'sourceLoadDownloading',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Verifying…`
+  String get sourceLoadVerifying {
+    return Intl.message(
+      'Verifying…',
+      name: 'sourceLoadVerifying',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Ready`
+  String get sourceLoadReady {
+    return Intl.message('Ready', name: 'sourceLoadReady', desc: '', args: []);
+  }
+
+  /// `Ready · verified snapshot`
+  String get sourceLoadCached {
+    return Intl.message(
+      'Ready · verified snapshot',
+      name: 'sourceLoadCached',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Failed`
+  String get sourceLoadFailed {
+    return Intl.message('Failed', name: 'sourceLoadFailed', desc: '', args: []);
+  }
+
+  /// `Loading associated sources…`
+  String get sourceBatchPreparing {
+    return Intl.message(
+      'Loading associated sources…',
+      name: 'sourceBatchPreparing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review this subscription, its final configuration and all listed sources. Accept approves only the content snapshots displayed here.`
+  String get sourceBatchScope {
+    return Intl.message(
+      'Review this subscription, its final configuration and all listed sources. Accept approves only the content snapshots displayed here.',
+      name: 'sourceBatchScope',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Review source`
   String get sourceReviewTitle {
     return Intl.message(
@@ -8703,11 +9158,31 @@ class AppLocalizations {
     );
   }
 
-  /// `Source permissions are unavailable. Wait for the Core to be ready and retry.`
+  /// `FlClash could not start. Open the app to review pending sources or check the error.`
+  String get backgroundStartFailed {
+    return Intl.message(
+      'FlClash could not start. Open the app to review pending sources or check the error.',
+      name: 'backgroundStartFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Source permissions could not be read or verified. Retry; if this persists, check the app log.`
   String get sourcePermissionsUnavailable {
     return Intl.message(
-      'Source permissions are unavailable. Wait for the Core to be ready and retry.',
+      'Source permissions could not be read or verified. Retry; if this persists, check the app log.',
       name: 'sourcePermissionsUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An associated source could not be loaded. Check its address, connection and request route, then retry.`
+  String get sourceMaterialUnavailable {
+    return Intl.message(
+      'An associated source could not be loaded. Check its address, connection and request route, then retry.',
+      name: 'sourceMaterialUnavailable',
       desc: '',
       args: [],
     );
@@ -8798,6 +9273,411 @@ class AppLocalizations {
     return Intl.message(
       'An unfinished local save may still be running. Open App info → Force stop, then open FlClash again. Restarting the proxy service or closing the screen is not enough. Review the saved data in Source permissions after reopening.',
       name: 'requestRestartRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enable speed test`
+  String get localGroupsEnableSpeedTest {
+    return Intl.message(
+      'Enable speed test',
+      name: 'localGroupsEnableSpeedTest',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `On: choose by latency. Off: fail over in Core order. Both check availability automatically.`
+  String get localGroupsStrategyHelp {
+    return Intl.message(
+      'On: choose by latency. Off: fail over in Core order. Both check availability automatically.',
+      name: 'localGroupsStrategyHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Node regular expression (optional)`
+  String get localGroupsRegex {
+    return Intl.message(
+      'Node regular expression (optional)',
+      name: 'localGroupsRegex',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Matches start selected. Tap a node to change its selection.`
+  String get localGroupsRegexHelp {
+    return Intl.message(
+      'Matches start selected. Tap a node to change its selection.',
+      name: 'localGroupsRegexHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Regular expression help`
+  String get localGroupsRegexDocs {
+    return Intl.message(
+      'Regular expression help',
+      name: 'localGroupsRegexDocs',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Preferred node: {name}`
+  String localGroupsPreferred(String name) {
+    return Intl.message(
+      'Preferred node: $name',
+      name: 'localGroupsPreferred',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Current exit: {name}`
+  String localGroupsActualExit(String name) {
+    return Intl.message(
+      'Current exit: $name',
+      name: 'localGroupsActualExit',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Tap a node to use it for this run. If it fails, the group switches automatically. This choice is not saved.`
+  String get localGroupsTransientHelp {
+    return Intl.message(
+      'Tap a node to use it for this run. If it fails, the group switches automatically. This choice is not saved.',
+      name: 'localGroupsTransientHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This group is not active. Enable it or wait for the configuration to be ready.`
+  String get localGroupsUnavailable {
+    return Intl.message(
+      'This group is not active. Enable it or wait for the configuration to be ready.',
+      name: 'localGroupsUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Manage group references`
+  String get localGroupsUse {
+    return Intl.message(
+      'Manage group references',
+      name: 'localGroupsUse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose where this custom group is available. Save applies the references and keeps each group’s current selection.`
+  String get localGroupsUseHelp {
+    return Intl.message(
+      'Choose where this custom group is available. Save applies the references and keeps each group’s current selection.',
+      name: 'localGroupsUseHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `There is no selectable routing entry in this configuration.`
+  String get localGroupsNoEntrance {
+    return Intl.message(
+      'There is no selectable routing entry in this configuration.',
+      name: 'localGroupsNoEntrance',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking saved configuration…`
+  String get localGroupsPreparing {
+    return Intl.message(
+      'Checking saved configuration…',
+      name: 'localGroupsPreparing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking saved source files…`
+  String get localGroupsPreparingSources {
+    return Intl.message(
+      'Checking saved source files…',
+      name: 'localGroupsPreparingSources',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Applying configuration…`
+  String get localGroupsApplying {
+    return Intl.message(
+      'Applying configuration…',
+      name: 'localGroupsApplying',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Group details`
+  String get localGroupsIdentitySection {
+    return Intl.message(
+      'Group details',
+      name: 'localGroupsIdentitySection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Switching strategy`
+  String get localGroupsStrategySection {
+    return Intl.message(
+      'Switching strategy',
+      name: 'localGroupsStrategySection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Nodes`
+  String get localGroupsNodesSection {
+    return Intl.message(
+      'Nodes',
+      name: 'localGroupsNodesSection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Custom`
+  String get localGroupsOwn {
+    return Intl.message('Custom', name: 'localGroupsOwn', desc: '', args: []);
+  }
+
+  /// `Subscription`
+  String get localGroupsSubscription {
+    return Intl.message(
+      'Subscription',
+      name: 'localGroupsSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{count} nodes`
+  String localGroupsNodeCount(int count) {
+    return Intl.message(
+      '$count nodes',
+      name: 'localGroupsNodeCount',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Actions for {name}`
+  String localGroupsActions(String name) {
+    return Intl.message(
+      'Actions for $name',
+      name: 'localGroupsActions',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Enable`
+  String get localGroupsEnable {
+    return Intl.message(
+      'Enable',
+      name: 'localGroupsEnable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Disable`
+  String get localGroupsDisable {
+    return Intl.message(
+      'Disable',
+      name: 'localGroupsDisable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Manage group references`
+  String get localGroupsRouteThis {
+    return Intl.message(
+      'Manage group references',
+      name: 'localGroupsRouteThis',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No custom groups yet. Create one in Group management.`
+  String get localGroupsNoSaved {
+    return Intl.message(
+      'No custom groups yet. Create one in Group management.',
+      name: 'localGroupsNoSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking and saving group…`
+  String get localGroupsSaving {
+    return Intl.message(
+      'Checking and saving group…',
+      name: 'localGroupsSaving',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Downloading source updates…`
+  String get localGroupsDownloading {
+    return Intl.message(
+      'Downloading source updates…',
+      name: 'localGroupsDownloading',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Added to {count} groups`
+  String localGroupsReferences(int count) {
+    return Intl.message(
+      'Added to $count groups',
+      name: 'localGroupsReferences',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `References applied. Current selections were kept.`
+  String get localGroupsReferencesSaved {
+    return Intl.message(
+      'References applied. Current selections were kept.',
+      name: 'localGroupsReferencesSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Currently selected`
+  String get localGroupsReferenceUsing {
+    return Intl.message(
+      'Currently selected',
+      name: 'localGroupsReferenceUsing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Added to choices`
+  String get localGroupsReferenceAdded {
+    return Intl.message(
+      'Added to choices',
+      name: 'localGroupsReferenceAdded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Not added`
+  String get localGroupsReferenceNotAdded {
+    return Intl.message(
+      'Not added',
+      name: 'localGroupsReferenceNotAdded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The accepted configuration or its permissions are unavailable. Check source permissions in Profiles.`
+  String get localGroupsSourceUnavailable {
+    return Intl.message(
+      'The accepted configuration or its permissions are unavailable. Check source permissions in Profiles.',
+      name: 'localGroupsSourceUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open the app to apply this change. A full configuration reload is required.`
+  String get localGroupsForegroundRequired {
+    return Intl.message(
+      'Open the app to apply this change. A full configuration reload is required.',
+      name: 'localGroupsForegroundRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Continue`
+  String get profileImportContinue {
+    return Intl.message(
+      'Continue',
+      name: 'profileImportContinue',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Downloading subscription…`
+  String get profileImportDownloading {
+    return Intl.message(
+      'Downloading subscription…',
+      name: 'profileImportDownloading',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Saving subscription…`
+  String get profileImportSaving {
+    return Intl.message(
+      'Saving subscription…',
+      name: 'profileImportSaving',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Preparing import…`
+  String get profileImportPreparing {
+    return Intl.message(
+      'Preparing import…',
+      name: 'profileImportPreparing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not download the subscription. Check the URL and request route, then retry.`
+  String get profileImportDownloadFailed {
+    return Intl.message(
+      'Could not download the subscription. Check the URL and request route, then retry.',
+      name: 'profileImportDownloadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The downloaded file is not a valid subscription. Check the URL.`
+  String get profileImportInvalid {
+    return Intl.message(
+      'The downloaded file is not a valid subscription. Check the URL.',
+      name: 'profileImportInvalid',
       desc: '',
       args: [],
     );

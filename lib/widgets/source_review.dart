@@ -1,9 +1,17 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
+import 'package:fl_clash/common/source_review_loading.dart';
 import 'package:fl_clash/widgets/dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
 enum SourcePermissionAction { review, stopAutomatic, stopUse }
+
+typedef SourceReviewPresentation = ({
+  Future<SourceReviewDecision?> Function(Widget) present,
+  void Function(SourceReviewDecision?) onDecision,
+});
 
 typedef SourcePermissionChoice = ({
   SourcePermissionAction action,
@@ -93,8 +101,19 @@ class SourcePermissionsDialog extends StatelessWidget {
 }
 
 class SourceReviewDialog extends StatefulWidget {
-  const SourceReviewDialog({super.key, required this.review});
+  const SourceReviewDialog({
+    super.key,
+    required this.review,
+    this.loadRelated,
+    this.loading,
+    this.routingEditable = true,
+    this.onDecision,
+  });
   final SourceReview review;
+  final Future<List<SourceReview>> Function(String routing)? loadRelated;
+  final SourceReviewLoading? loading;
+  final bool routingEditable;
+  final ValueChanged<SourceReviewDecision?>? onDecision;
 
   @override
   State<SourceReviewDialog> createState() => _SourceReviewDialogState();
@@ -104,6 +123,66 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
   bool _automatic = false;
   bool _inspectMaterial = false;
   late bool _sourceRouting = widget.review.routing != 'own';
+  List<SourceReview> _related = const [];
+  bool _loading = false;
+  Object? _error;
+  int _loadGeneration = 0;
+  bool _decided = false;
+
+  void _finish(SourceReviewDecision? decision) {
+    if (_decided) return;
+    _decided = true;
+    final respond = widget.onDecision;
+    if (respond == null) {
+      Navigator.of(context).pop(decision);
+    } else {
+      respond(decision);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.loading?.addListener(_progressChanged);
+    if (widget.loadRelated != null) unawaited(_loadRelated());
+  }
+
+  void _progressChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.loading?.removeListener(_progressChanged);
+    super.dispose();
+  }
+
+  Future<void> _loadRelated() async {
+    final generation = ++_loadGeneration;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _related = const [];
+    });
+    try {
+      final related = await widget.loadRelated!(
+        _sourceRouting ? 'source' : 'own',
+      );
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _related = related;
+          _loading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _error = error;
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,19 +220,27 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
       _ => l10n.sourceUnknownChanged,
     };
     return CommonDialog(
-      title: script == null ? l10n.sourceReviewTitle : l10n.sourceScriptTitle,
+      title: widget.loadRelated != null
+          ? l10n.sourceSubscriptionReview
+          : script != null
+          ? l10n.sourceScriptTitle
+          : widget.review.kind == 'config'
+          ? l10n.sourceFinalUse
+          : l10n.sourceReviewTitle,
       actions: [
+        TextButton(onPressed: () => _finish(null), child: Text(l10n.cancel)),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(
-            SourceReviewDecision(
-              automatic: script == null && _automatic,
-              routing: _sourceRouting ? 'source' : 'own',
-            ),
-          ),
+          onPressed:
+              _loading ||
+                  _error != null ||
+                  widget.loading != null && !widget.loading!.ready
+              ? null
+              : () => _finish(
+                  SourceReviewDecision(
+                    automatic: script == null && _automatic,
+                    routing: _sourceRouting ? 'source' : 'own',
+                  ),
+                ),
           child: Text(l10n.sourceAcceptRevision),
         ),
       ],
@@ -163,13 +250,91 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
         children: [
           Text(widget.review.label),
           if (widget.review.origin.isNotEmpty) Text(widget.review.origin),
+          if (widget.loadRelated != null) ...[
+            const SizedBox(height: 12),
+            if (widget.loading != null && widget.loading!.items.isNotEmpty) ...[
+              _SourceReviewProgress(loading: widget.loading!),
+            ] else if (_loading) ...[
+              Text(l10n.sourceBatchPreparing),
+              const LinearProgressIndicator(),
+            ] else if (_error != null) ...[
+              Text(userFacingErrorMessage(_error!, l10n)),
+              TextButton(
+                onPressed: () => unawaited(_loadRelated()),
+                child: Text(l10n.retry),
+              ),
+            ] else ...[
+              Text(
+                l10n.sourceRelatedSourcesCount(
+                  _related.where((item) => item.kind != 'config').length,
+                ),
+              ),
+              for (final related in _related)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${switch (related.kind) {
+                          'config' => l10n.sourceFinalUse,
+                          'provider-rule' => l10n.sourceRuleSetUse,
+                          _ => l10n.sourceNodeUse,
+                        }} · ${related.label}',
+                      ),
+                      if (related.origin.isNotEmpty) Text(related.origin),
+                      if (related.details['binary'] == true)
+                        Text(l10n.sourceBinaryMaterial)
+                      else
+                        Text(
+                          l10n.sourceMaterialCounts(
+                            (related.details['nodes'] as num?)?.toInt() ?? 0,
+                            (related.details['rules'] as num?)?.toInt() ?? 0,
+                          ),
+                        ),
+                      if ((related.details['protocols'] as List?)?.isNotEmpty ==
+                          true)
+                        Text(
+                          l10n.sourceProtocols(
+                            (related.details['protocols'] as List).join(', '),
+                          ),
+                        ),
+                      if ((related.details['features'] as List?)?.isNotEmpty ==
+                          true)
+                        Text(
+                          l10n.sourceDeclaredCapabilities(
+                            (related.details['features'] as List).join(', '),
+                          ),
+                        ),
+                      if ((related.details['dns'] as List?)?.isNotEmpty == true)
+                        Text(
+                          l10n.sourceProposedDns(
+                            (related.details['dns'] as List).join(', '),
+                          ),
+                        ),
+                      if (related.details['defaultTarget'] is String)
+                        Text(
+                          l10n.sourceDefaultExit(
+                            related.details['defaultTarget'] as String,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+
           const SizedBox(height: 12),
           for (final item in widget.review.reasons)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(reason(item)),
             ),
-          Text(l10n.sourceReviewScope),
+          Text(
+            widget.loadRelated == null
+                ? l10n.sourceReviewScope
+                : l10n.sourceBatchScope,
+          ),
           if (script == null) ...[
             const SizedBox(height: 12),
             if (details['binary'] == true)
@@ -207,12 +372,14 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
                       l10n.sourceImplicitDirect,
                 ),
               ),
-            if (widget.review.kind == 'profile')
+            if (widget.review.kind == 'profile' && widget.routingEditable)
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _sourceRouting,
-                onChanged: (value) =>
-                    setState(() => _sourceRouting = value ?? false),
+                onChanged: (value) {
+                  setState(() => _sourceRouting = value ?? false);
+                  if (widget.loadRelated != null) unawaited(_loadRelated());
+                },
                 title: Text(l10n.sourceUseRouting),
                 subtitle: Text(l10n.sourceOwnRoutingHint),
               ),
@@ -243,6 +410,114 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SourceReviewProgress extends StatelessWidget {
+  const _SourceReviewProgress({required this.loading});
+  final SourceReviewLoading loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.appLocalizations;
+    final sources = loading.items
+        .where((item) => item.kind != 'config')
+        .toList();
+    final ready = sources
+        .where((item) => item.phase == SourceReviewLoadPhase.ready)
+        .length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.sourceRelatedSourcesCount(sources.length)),
+        Text(l10n.sourceLoadProgress(ready, sources.length)),
+        if (!loading.ready)
+          LinearProgressIndicator(
+            value: sources.isEmpty ? null : ready / sources.length,
+          ),
+        for (final item in [
+          ...sources,
+          ...loading.items.where((item) => item.kind == 'config'),
+        ])
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${switch (item.kind) {
+                    'config' => l10n.sourceFinalUse,
+                    'provider-rule' => l10n.sourceRuleSetUse,
+                    _ => l10n.sourceNodeUse,
+                  }} · ${item.label}',
+                ),
+                if (item.origin.isNotEmpty) Text(item.origin),
+                Text(switch (item.phase) {
+                  SourceReviewLoadPhase.queued => l10n.sourceLoadQueued,
+                  SourceReviewLoadPhase.loading => l10n.sourceLoadDownloading,
+                  SourceReviewLoadPhase.parsing => l10n.sourceLoadVerifying,
+                  SourceReviewLoadPhase.ready =>
+                    item.cached ? l10n.sourceLoadCached : l10n.sourceLoadReady,
+                  SourceReviewLoadPhase.failed => l10n.sourceLoadFailed,
+                }),
+                if (item.phase == SourceReviewLoadPhase.loading ||
+                    item.phase == SourceReviewLoadPhase.parsing)
+                  const LinearProgressIndicator(),
+                if (item.error != null) ...[
+                  Text(
+                    userFacingErrorMessage(item.error!, l10n),
+                    style: TextStyle(color: context.colorScheme.error),
+                  ),
+                  TextButton(
+                    key: ValueKey('retry:${item.key}'),
+                    onPressed: () => unawaited(loading.retry(item.key)),
+                    child: Text(l10n.retry),
+                  ),
+                ],
+                if (item.entry case final SourceReviewBatchEntry entry) ...[
+                  if (entry.review.details['binary'] == true)
+                    Text(l10n.sourceBinaryMaterial)
+                  else
+                    Text(
+                      l10n.sourceMaterialCounts(
+                        (entry.review.details['nodes'] as num?)?.toInt() ?? 0,
+                        (entry.review.details['rules'] as num?)?.toInt() ?? 0,
+                      ),
+                    ),
+                  if ((entry.review.details['protocols'] as List?)
+                          ?.isNotEmpty ==
+                      true)
+                    Text(
+                      l10n.sourceProtocols(
+                        (entry.review.details['protocols'] as List).join(', '),
+                      ),
+                    ),
+                  if ((entry.review.details['features'] as List?)?.isNotEmpty ==
+                      true)
+                    Text(
+                      l10n.sourceDeclaredCapabilities(
+                        (entry.review.details['features'] as List).join(', '),
+                      ),
+                    ),
+                  if ((entry.review.details['dns'] as List?)?.isNotEmpty ==
+                      true)
+                    Text(
+                      l10n.sourceProposedDns(
+                        (entry.review.details['dns'] as List).join(', '),
+                      ),
+                    ),
+                  if (entry.review.details['defaultTarget'] is String)
+                    Text(
+                      l10n.sourceDefaultExit(
+                        entry.review.details['defaultTarget'] as String,
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

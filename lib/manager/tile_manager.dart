@@ -30,7 +30,12 @@ class _TileContainerState extends ConsumerState<TileManager> with TileListener {
     unawaited(
       ref
           .read(setupActionProvider.notifier)
-          .setRunning(true, initialize: true, preparedRequestId: requestId),
+          .setRunning(
+            true,
+            initialize: true,
+            preparedRequestId: requestId,
+            source: 'tile',
+          ),
     );
   }
 
@@ -48,8 +53,12 @@ class _TileContainerState extends ConsumerState<TileManager> with TileListener {
     if (isStart && ref.read(coreStatusProvider) == CoreStatus.connected) {
       return;
     }
-    unawaited(ref.read(setupActionProvider.notifier).setRunning(true));
-    unawaited(app?.tip(currentAppLocalizations.startVpn));
+    final started = await ref
+        .read(setupActionProvider.notifier)
+        .setRunning(true, source: 'tile');
+    if (mounted && started) {
+      await app?.tip(currentAppLocalizations.startVpn);
+    }
     super.onStart();
   }
 

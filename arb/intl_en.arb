@@ -507,6 +507,19 @@
   "restoreOnlyConfig": "Restore profiles only",
   "restoreAllData": "Restore all data",
   "addProfile": "Add profile",
+  "delayTestWaiting": "Waiting",
+  "delayTestWaitingResult": "Waiting for result",
+  "delayTestRequiresProxy": "Start the proxy and wait for it to connect before testing node latency.",
+  "delayTestUnavailable": "Unavailable",
+  "delayTestNoResult": "The Core returned no test result. Check that the proxy is connected and retry.",
+  "delayTestFailed": "Delay test did not complete: {reason}",
+  "@delayTestFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "delayTest": "Delay test",
   "proxyGroupEmpty": "Proxy group is empty",
   "proxyGroupNameDuplicate": "Duplicate proxy group name",
@@ -955,6 +968,47 @@
   "androidServiceVpnActive": "VPN active",
   "androidServiceProxyOnly": "Proxy only",
   "androidServiceUnavailable": "Service unavailable",
+  "useProfile": "Use",
+  "sourceReviewPending": "Review required",
+  "sourceStatusChecking": "Checking source permissions…",
+  "sourceStatusRetry": "Permissions unavailable · retry",
+  "localGroupsAmbiguous": "Some selected node names occur in multiple sources. Use uniquely named nodes to avoid choosing the wrong endpoint.",
+  "localGroupsPending": "Saved changes are waiting to be applied.",
+  "localGroupsTitle": "Group management",
+  "localGroupsCreate": "New group",
+  "localGroupsEmpty": "Create a group by choosing nodes from this subscription.",
+  "localGroupsScope": "{name}",
+  "localGroupsParent": "Add as an option in",
+  "localGroupsIndependent": "Standalone group",
+  "localGroupsManual": "Manual",
+  "localGroupsAutomatic": "Latency-based",
+  "localGroupsFallback": "Failover",
+  "localGroupsLoadFirst": "Use this subscription and complete source review to load its nodes.",
+  "localGroupsInUse": "Choose another node or group before removing this reference, disabling or deleting this group.",
+  "localGroupsDelete": "Delete group “{name}”?",
+  "localGroupsMissing": "Unavailable node: {name}",
+  "localGroupsNameConflict": "Choose a unique group name.",
+  "localGroupsMembersRequired": "Select at least one available node.",
+  "localGroupsInvalidParent": "Select an available manual group or Standalone group.",
+  "localGroupsInvalidTestUrl": "Enter a valid HTTP(S) test URL.",
+  "localGroupsApplyFailed": "The changes could not be applied. Check the configuration and retry.",
+  "localGroupsChanged": "The configuration changed. Refresh group management and retry.",
+  "localGroupsManaged": "Manage groups in Policy draft for this configuration.",
+  "localGroupsLimit": "The group or member limit was exceeded.",
+  "localGroupsSearch": "Search nodes",
+  "localGroupsSource": "Subscription groups (read-only)",
+  "sourceSubscriptionReview": "Review subscription",
+  "sourceRelatedSourcesCount": "Associated sources: {count}",
+  "sourceLoadChecking": "Checking subscription and permissions…",
+  "sourceLoadProgress": "Ready: {ready}/{total}",
+  "sourceLoadQueued": "Waiting",
+  "sourceLoadDownloading": "Downloading…",
+  "sourceLoadVerifying": "Verifying…",
+  "sourceLoadReady": "Ready",
+  "sourceLoadCached": "Ready · verified snapshot",
+  "sourceLoadFailed": "Failed",
+  "sourceBatchPreparing": "Loading associated sources…",
+  "sourceBatchScope": "Review this subscription, its final configuration and all listed sources. Accept approves only the content snapshots displayed here.",
   "sourceReviewTitle": "Review source",
   "sourceScriptTitle": "Review script",
   "sourceAcceptRevision": "Accept this revision",
@@ -1003,7 +1057,9 @@
   "sourceStopUse": "Stop using this content",
   "sourceBinaryMaterial": "Binary RuleSet: accept only these exact bytes. The rule count is unknown until the original parser validates the material.",
   "sourceStorageFull": "The source storage limit was reached. This operation could not be completed.",
-  "sourcePermissionsUnavailable": "Source permissions are unavailable. Wait for the Core to be ready and retry.",
+  "backgroundStartFailed": "FlClash could not start. Open the app to review pending sources or check the error.",
+  "sourcePermissionsUnavailable": "Source permissions could not be read or verified. Retry; if this persists, check the app log.",
+  "sourceMaterialUnavailable": "An associated source could not be loaded. Check its address, connection and request route, then retry.",
   "sourceRoutingExcluded": "This content includes routing capabilities you excluded. Remove them or explicitly change the source routing choice.",
   "sourceRecoveryUnavailable": "Source permission changed, but the recovery checkpoint could not be updated. Restart recovery is unavailable.",
   "sourceAppliedNotSaved": "Applied; recovery not saved",
@@ -1012,5 +1068,81 @@
   "sourceLocalPolicy": "Local policy",
   "sourceRecoveryTitle": "Review incomplete save",
   "sourceRecoveryDescription": "Check the saved profiles, scripts and permissions on this device. This will stop traffic through the current configuration and discard unfinished approvals. Review sources and apply the configuration again after the check.",
-  "requestRestartRequired": "An unfinished local save may still be running. Open App info → Force stop, then open FlClash again. Restarting the proxy service or closing the screen is not enough. Review the saved data in Source permissions after reopening."
+  "requestRestartRequired": "An unfinished local save may still be running. Open App info → Force stop, then open FlClash again. Restarting the proxy service or closing the screen is not enough. Review the saved data in Source permissions after reopening.",
+  "localGroupsEnableSpeedTest": "Enable speed test",
+  "localGroupsStrategyHelp": "On: choose by latency. Off: fail over in Core order. Both check availability automatically.",
+  "localGroupsRegex": "Node regular expression (optional)",
+  "localGroupsRegexHelp": "Matches start selected. Tap a node to change its selection.",
+  "localGroupsRegexDocs": "Regular expression help",
+  "localGroupsPreferred": "Preferred node: {name}",
+  "@localGroupsPreferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsActualExit": "Current exit: {name}",
+  "@localGroupsActualExit": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsTransientHelp": "Tap a node to use it for this run. If it fails, the group switches automatically. This choice is not saved.",
+  "localGroupsUnavailable": "This group is not active. Enable it or wait for the configuration to be ready.",
+  "localGroupsUse": "Manage group references",
+  "localGroupsUseHelp": "Choose where this custom group is available. Save applies the references and keeps each group’s current selection.",
+  "localGroupsNoEntrance": "There is no selectable routing entry in this configuration.",
+  "localGroupsPreparing": "Checking saved configuration…",
+  "localGroupsPreparingSources": "Checking saved source files…",
+  "localGroupsApplying": "Applying configuration…",
+  "localGroupsIdentitySection": "Group details",
+  "localGroupsStrategySection": "Switching strategy",
+  "localGroupsNodesSection": "Nodes",
+  "localGroupsOwn": "Custom",
+  "localGroupsSubscription": "Subscription",
+  "localGroupsNodeCount": "{count} nodes",
+  "localGroupsActions": "Actions for {name}",
+  "localGroupsEnable": "Enable",
+  "localGroupsDisable": "Disable",
+  "localGroupsRouteThis": "Manage group references",
+  "localGroupsNoSaved": "No custom groups yet. Create one in Group management.",
+  "@localGroupsNodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@localGroupsActions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsSaving": "Checking and saving group…",
+  "localGroupsDownloading": "Downloading source updates…",
+  "localGroupsReferences": "Added to {count} groups",
+  "localGroupsReferencesSaved": "References applied. Current selections were kept.",
+  "localGroupsReferenceUsing": "Currently selected",
+  "localGroupsReferenceAdded": "Added to choices",
+  "localGroupsReferenceNotAdded": "Not added",
+  "@localGroupsReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localGroupsSourceUnavailable": "The accepted configuration or its permissions are unavailable. Check source permissions in Profiles.",
+  "localGroupsForegroundRequired": "Open the app to apply this change. A full configuration reload is required.",
+  "profileImportContinue": "Continue",
+  "profileImportDownloading": "Downloading subscription…",
+  "profileImportSaving": "Saving subscription…",
+  "profileImportPreparing": "Preparing import…",
+  "profileImportDownloadFailed": "Could not download the subscription. Check the URL and request route, then retry.",
+  "profileImportInvalid": "The downloaded file is not a valid subscription. Check the URL."
 }

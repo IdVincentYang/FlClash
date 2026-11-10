@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/metacubex/mihomo/component/auth"
@@ -24,6 +26,18 @@ func TestApplicationInputBridge(t *testing.T) {
 	C.SetHomeDir(home)
 	isInit.Store(true)
 	var fixture *managedFixture
+	var running sync.WaitGroup
+	var output sync.Mutex
+	emit := func(id int, result any) {
+		encoded, err := json.Marshal(map[string]any{"id": id, "result": result})
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		output.Lock()
+		fmt.Printf("application-input-bridge:%s\n", encoded)
+		output.Unlock()
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 4096), 128<<20)
 	for scanner.Scan() {
@@ -62,7 +76,42 @@ func TestApplicationInputBridge(t *testing.T) {
 			appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
 			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback", ProtectPhase: "none"})
 			result = map[string]any{"ok": true}
+		case "inlineBlock":
+			var kind string
+			if err := json.Unmarshal(call.Arguments, &kind); err != nil {
+				t.Fatal(err)
+			}
+			configMu.Lock()
+			switch kind {
+			case "controller":
+				recordSourceReaderRisk("controller-reader")
+			case "retired":
+				appliedConfig.sourceRetiredCount = sourceRetiredGenerationLimit
+			default:
+				t.Fatal("unknown inline block fixture")
+			}
+			configMu.Unlock()
+			result = map[string]bool{"ok": true}
 		case "source":
+			var preview sourceAcceptanceRequest
+			if err := json.Unmarshal(call.Arguments, &preview); err != nil {
+				t.Fatal(err)
+			}
+			if preview.Action == "previewProvider" {
+				running.Add(1)
+				go func(id int, request sourceAcceptanceRequest) {
+					defer running.Done()
+					body, err := fetchSourceProviderMaterial(home, request)
+					envelope := map[string]any{"id": "source-bridge"}
+					if err != nil {
+						envelope["error"] = map[string]any{"code": "source_material_unavailable", "message": "Provider material is unavailable"}
+					} else {
+						envelope["result"] = sourceAcceptanceResult{Status: "downloaded", BodyBase64: base64.StdEncoding.EncodeToString(body)}
+					}
+					emit(id, envelope)
+				}(call.ID, preview)
+				continue
+			}
 			frames := captureFrames(t, func() {
 				handleMethodCall(&MethodCall{ID: "source-bridge", Method: sourceAcceptanceMethod, Arguments: call.Arguments}, newMethodResponse("source-bridge", nil))
 			})
@@ -111,6 +160,12 @@ func TestApplicationInputBridge(t *testing.T) {
 			result = map[string]any{"value": collectConfigInputs(name) == nil}
 		case "refreshGroups":
 			result = map[string]any{"value": handleGetProxies()}
+		case "refreshSelect":
+			var params ChangeProxyParams
+			if err := json.Unmarshal(call.Arguments, &params); err != nil {
+				t.Fatal(err)
+			}
+			result = map[string]any{"value": handleChangeProxy(&params)}
 		case "refreshProviders":
 			result = map[string]any{"value": handleGetExternalProviders()}
 		case "fixture", "refreshFixture":
@@ -220,12 +275,9 @@ func TestApplicationInputBridge(t *testing.T) {
 		default:
 			t.Fatal("unknown bridge method")
 		}
-		encoded, err := json.Marshal(map[string]any{"id": call.ID, "result": result})
-		if err != nil {
-			t.Fatal(err)
-		}
-		fmt.Printf("application-input-bridge:%s\n", encoded)
+		emit(call.ID, result)
 	}
+	running.Wait()
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}

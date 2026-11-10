@@ -1,3 +1,4 @@
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -24,14 +25,24 @@ class _TabStateNotifier extends Notifier<ProxiesTabState> {
   void set(ProxiesTabState value) => state = value;
 }
 
+class _RecordingDelayAction extends ProxiesAction {
+  final tested = <String>[];
+  @override
+  Future<void> delayTestPageGroup(String groupName) async =>
+      tested.add(groupName);
+}
+
 void main() {
   late ProviderContainer globalContainer;
   late ProviderSubscription<Profile?> currentProfileSubscription;
+  late _RecordingDelayAction delayActions;
 
   setUp(() {
+    delayActions = _RecordingDelayAction();
     final profile = Profile.normal().copyWith(currentGroupName: 'B');
     globalContainer = ProviderContainer(
       overrides: [
+        proxiesActionProvider.overrideWith(() => delayActions),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentGroupsStateProvider.overrideWithValue(
@@ -70,6 +81,17 @@ void main() {
     await tester.pump();
     return key;
   }
+
+  testWidgets('delay button dispatches only the currently rendered group', (
+    tester,
+  ) async {
+    final key = await pumpTabView(tester);
+    final tabs = tester.widget<TabBar>(find.byType(TabBar));
+    tabs.controller!.animateTo(1);
+    await tester.pumpAndSettle();
+    await key.currentState!.delayTestCurrentGroup();
+    expect(delayActions.tested, ['C']);
+  });
 
   testWidgets('current group follows the rendered tab list', (tester) async {
     final key = await pumpTabView(tester);

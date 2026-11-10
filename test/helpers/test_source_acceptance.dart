@@ -20,6 +20,8 @@ void stubAcceptedSourceFixtures(
     }
     final key = input['key'] as String;
     switch (input['action']) {
+      case 'reuseCachedProviders':
+        return {'status': 'missing'};
       case 'inspect':
         return {'status': 'inspected'};
       case 'reset':

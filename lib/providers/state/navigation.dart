@@ -6,16 +6,14 @@ NavigationItemsState navigationItemsState(Ref ref) {
   final hasProfiles = ref.watch(
     profilesProvider.select((state) => state.isNotEmpty),
   );
-  final hasProxies = ref.watch(
-    currentGroupsStateProvider.select((state) => state.value.isNotEmpty),
-  );
-  final isInit = ref.watch(initProvider);
+  final hasProxies =
+      hasProfiles ||
+      ref.watch(
+        currentGroupsStateProvider.select((state) => state.value.isNotEmpty),
+      );
   return NavigationItemsState(
     value:
-        navigationPort?.getItems(
-          openLogs: openLogs,
-          hasProxies: !isInit ? hasProfiles : hasProxies,
-        ) ??
+        navigationPort?.getItems(openLogs: openLogs, hasProxies: hasProxies) ??
         const [],
   );
 }

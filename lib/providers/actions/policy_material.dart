@@ -604,25 +604,49 @@ mixin _PolicyMaterialSetup on _$SetupAction {
     );
     selected.picks(snapshot.profile.selectedMap);
     resolved(selected);
+    return _composeManagedSubscription(
+      state: snapshot.state,
+      patch: snapshot.patch,
+      selected: selected,
+      network: snapshot.network,
+      overrideDns: snapshot.overrideDns,
+      overrideNtp: snapshot.overrideNtp,
+      safeMode: snapshot.safeMode,
+      onRuleLedger: onRuleLedger,
+    );
+  }
+
+  Future<({String yaml, String md5})> _composeManagedSubscription({
+    required SetupState state,
+    required PatchClashConfig patch,
+    required SelectedPolicy selected,
+    NetworkProps? network,
+    bool? overrideDns,
+    bool? overrideNtp,
+    bool? safeMode,
+    void Function(Map<String, Object?>)? onRuleLedger,
+  }) async {
+    final NetworkProps networkSetting =
+        network ?? ref.read<NetworkProps>(networkSettingProvider);
     final composition = await makeProfileCompositionTask(
       MakeRealProfileState(
         rules: const [],
         proxyGroups: const [],
         addedRules: const [],
         profilesPath: await appPath.profilesPath,
-        profileId: snapshot.profile.id,
+        profileId: state.profileId!,
         rawConfig: const {},
-        realPatchConfig: snapshot.patch.copyWith(
-          tun: snapshot.patch.tun.getRealTun(snapshot.network.routeMode),
+        realPatchConfig: patch.copyWith(
+          tun: patch.tun.getRealTun(networkSetting.routeMode),
         ),
-        overrideDns: snapshot.overrideDns,
-        overrideNtp: snapshot.overrideNtp,
-        appendSystemDns: snapshot.network.appendSystemDns,
+        overrideDns: overrideDns ?? ref.read(overrideDnsProvider),
+        overrideNtp: overrideNtp ?? ref.read(overrideNtpProvider),
+        appendSystemDns: networkSetting.appendSystemDns,
         defaultUA: globalState.packageInfo.ua,
-        authentication: snapshot.network.authentication.credentials,
-        matchTarget: snapshot.state.matchTarget,
-        safeMode: snapshot.safeMode,
-        policySelection: snapshot.state.policySelection,
+        authentication: networkSetting.authentication.credentials,
+        matchTarget: state.matchTarget,
+        safeMode: safeMode ?? ref.read(safeModeProvider),
+        policySelection: state.policySelection,
         resolvedManagedPolicy: selected.policyJson,
       ),
     );

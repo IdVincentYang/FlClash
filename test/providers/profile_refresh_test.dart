@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/profile_import.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/database/database.dart';
@@ -241,6 +242,47 @@ void main() {
       );
     },
   );
+
+  test('cancelled URL import cannot save a late download', () async {
+    final incoming = profile(21, 'import-held');
+    final gate = held['/import-held'] = Completer<void>();
+    final phases = <ProfileImportPhase>[];
+    final task = ProfileImportTask(onPhase: phases.add);
+    final operation = action.updateProfile(
+      incoming,
+      importing: true,
+      importTask: task,
+    );
+    await _until(() => received.contains('/import-held'));
+    expect(phases, [ProfileImportPhase.downloading]);
+    task.cancel();
+    gate.complete();
+    final result = await operation;
+    expect(result.materialSaved, false);
+    expect((await store.profilesDao.query().get()).getProfile(21), isNull);
+    expect(await File(await appPath.getProfilePath('21')).exists(), false);
+    expect(phases, [ProfileImportPhase.downloading]);
+  });
+
+  test('cancelled queued URL import never starts its download', () async {
+    final existing = profile(22, 'existing-held');
+    await put([existing]);
+    final gate = held['/existing-held'] = Completer<void>();
+    final first = action.updateProfile(existing);
+    await _until(() => received.contains('/existing-held'));
+    final task = ProfileImportTask(onPhase: (_) {});
+    final operation = action.updateProfile(
+      profile(23, 'cancelled-import'),
+      importing: true,
+      importTask: task,
+    );
+    task.cancel();
+    gate.complete();
+    await first;
+    expect((await operation).materialSaved, false);
+    expect(received, isNot(contains('/cancelled-import')));
+    expect((await store.profilesDao.query().get()).getProfile(23), isNull);
+  });
 
   for (final change in ['delete', 'disable', 'period', 'url', 'file']) {
     test(

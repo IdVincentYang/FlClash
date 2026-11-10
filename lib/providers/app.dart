@@ -428,6 +428,32 @@ class PendingDelayTests extends _$PendingDelayTests
 }
 
 @Riverpod(keepAlive: true)
+class DelayTestFailures extends _$DelayTestFailures
+    with AutoDisposeNotifierMixin {
+  final Map<String, Object> _failures = {};
+
+  @override
+  Map<String, Object> build() => const {};
+
+  void set(String key, Object error) => setAll({key: error});
+
+  void setAll(Map<String, Object> failures) {
+    _failures.addAll(failures);
+    value = UnmodifiableMapView(_failures);
+  }
+
+  void remove(Iterable<String> keys) {
+    var changed = false;
+    for (final key in keys) {
+      changed = _failures.remove(key) != null || changed;
+    }
+    if (changed) value = UnmodifiableMapView(_failures);
+  }
+
+  void clear() => remove(_failures.keys.toList());
+}
+
+@Riverpod(keepAlive: true)
 class DelayTestingGroups extends _$DelayTestingGroups
     with AutoDisposeNotifierMixin {
   @override

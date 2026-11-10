@@ -83,6 +83,7 @@ abstract class Profile with _$Profile {
     @Default(true) bool autoUpdate,
     @Default({}) Map<String, String> selectedMap,
     @Default({}) Set<String> unfoldSet,
+    @Default([]) List<LocalProxyGroup> localGroups,
     @Default(OverwriteType.standard) OverwriteType overwriteType,
     int? scriptId,
     String? matchTarget,
@@ -101,6 +102,32 @@ abstract class Profile with _$Profile {
       autoUpdateDuration: defaultUpdateDuration,
     );
   }
+}
+
+@freezed
+abstract class LocalProxyGroup with _$LocalProxyGroup {
+  const LocalProxyGroup._();
+
+  List<String> get effectiveNodes => regex.isEmpty
+      ? nodes
+      : matchedNodes.where((node) => !excludedNodes.contains(node)).toList();
+  Set<String> get entrances => {...parents, ?parent};
+  const factory LocalProxyGroup({
+    required int id,
+    required String name,
+    @Default(GroupType.Selector) GroupType type,
+    @Default([]) List<String> nodes,
+    @Default('') String regex,
+    @Default([]) List<String> matchedNodes,
+    @Default([]) List<String> excludedNodes,
+    @Default([]) List<String> parents,
+    String? parent,
+    @Default(true) bool enabled,
+    @Default('') String testUrl,
+  }) = _LocalProxyGroup;
+
+  factory LocalProxyGroup.fromJson(Map<String, Object?> json) =>
+      _$LocalProxyGroupFromJson(json);
 }
 
 @freezed

@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'setting.dart';
 import 'tab.dart';
+import 'local_groups.dart';
+import 'group_routing.dart';
 
 class ProxiesView extends ConsumerStatefulWidget {
   const ProxiesView({super.key});
@@ -24,9 +26,21 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   bool _hasProviders = false;
   bool _isTab = false;
 
+  Future<void> _manageReferences() => manageLocalGroupReferences(context, ref);
+
   List<CommonPopupMenuItem> _buildMenuItems(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     return [
+      CommonPopupMenuItem(
+        glyph: AppGlyphs.layers,
+        label: appLocalizations.localGroupsUse,
+        onPressed: _manageReferences,
+      ),
+      CommonPopupMenuItem(
+        glyph: AppGlyphs.layers,
+        label: appLocalizations.localGroupsTitle,
+        onPressed: () => BaseNavigator.push(context, const LocalGroupsView()),
+      ),
       CommonPopupMenuItem(
         glyph: AppGlyphs.sliders,
         label: appLocalizations.settings,
@@ -121,8 +135,21 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       proxiesStyleSettingProvider.select((state) => state.type),
     );
     final isLoading = ref.watch(loadingProvider(LoadingTag.proxies));
+    final preparation = ref.watch(proxyPreparationProvider);
+    final active = preparation.stage != null || isLoading;
+    final phaseLabel = switch (preparation.stage) {
+      ProxyPreparationStage.configuration =>
+        context.appLocalizations.localGroupsPreparing,
+      ProxyPreparationStage.sources =>
+        context.appLocalizations.localGroupsPreparingSources,
+      ProxyPreparationStage.downloading =>
+        context.appLocalizations.localGroupsDownloading,
+      ProxyPreparationStage.applying =>
+        context.appLocalizations.localGroupsApplying,
+      null => context.appLocalizations.localGroupsPreparing,
+    };
     return CommonScaffold(
-      isLoading: isLoading,
+      isLoading: false,
       resizeToAvoidBottomInset: false,
       primaryAction: _buildPrimaryAction(),
       iconActions: [
@@ -138,10 +165,46 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       menuItems: _buildMenuItems(context),
       title: context.appLocalizations.proxies,
       searchState: AppBarSearchState(onSearch: _onSearch),
-      body: switch (proxiesType) {
-        ProxiesType.tab => ProxiesTabView(key: _proxiesTabKey),
-        ProxiesType.list => const ProxiesListView(),
-      },
+      body: Column(
+        children: [
+          if (active || preparation.failed)
+            Padding(
+              padding: EdgeInsets.only(top: context.contentTopPadding),
+              child: ListTile(
+                leading: active
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const GlyphIcon(AppGlyphs.info),
+                title: Text(
+                  active
+                      ? phaseLabel
+                      : ref.watch(configStateProvider).fact.businessActive
+                      ? context.appLocalizations.configRetained
+                      : context.appLocalizations.profileRefreshFailed,
+                ),
+                trailing: active
+                    ? null
+                    : TextButton(
+                        onPressed: () => ref
+                            .read(setupActionProvider.notifier)
+                            .applyProfile(force: true),
+                        child: Text(context.appLocalizations.retry),
+                      ),
+              ),
+            ),
+          if (!active && !preparation.failed) const SizedBox.shrink(),
+          Expanded(
+            key: const ValueKey('proxy-pages'),
+            child: switch (proxiesType) {
+              ProxiesType.tab => ProxiesTabView(key: _proxiesTabKey),
+              ProxiesType.list => const ProxiesListView(),
+            },
+          ),
+        ],
+      ),
     );
   }
 }

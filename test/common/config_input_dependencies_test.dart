@@ -66,6 +66,9 @@ void main() {
       testUrl: '',
       sources: [],
       sourceUses: uses,
+      localGroups: [
+        {'id': 7, 'name': 'Mine', 'enabled': false},
+      ],
       version: 2,
     );
     final manifest =
@@ -77,6 +80,33 @@ void main() {
             as Map;
     expect(manifest['version'], 2);
     expect(manifest['sourceUses'], uses);
+    final accepted = ConfigFact(
+      runtimeEpoch: 'fixture',
+      owner: 2,
+      token: 3,
+      inputId: input.id,
+      profileId: 1,
+      phase: 'ready',
+    );
+    expect(
+      await ConfigInput.acceptedLocalGroups(
+        home: root.path,
+        accepted: accepted,
+        readFact: () async => accepted,
+      ),
+      manifest['localGroups'],
+    );
+    await File(
+      '${root.path}/config-inputs/${input.id}.json',
+    ).writeAsString('{}');
+    expect(
+      await ConfigInput.acceptedLocalGroups(
+        home: root.path,
+        accepted: accepted,
+        readFact: () async => accepted,
+      ),
+      isNull,
+    );
     await input.releaseMarker();
   });
   test(

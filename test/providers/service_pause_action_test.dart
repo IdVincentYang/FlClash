@@ -157,6 +157,9 @@ void main() {
 
   for (final entry in ['ui', 'tile', 'initialize', 'prepared', 'paused']) {
     test('only a fresh UI intent carries provider recovery: $entry', () async {
+      if (entry == 'tile') {
+        when(native.getRequestState).thenAnswer((_) async => snapshot());
+      }
       await setup.setRunning(
         true,
         initialize: entry == 'initialize',

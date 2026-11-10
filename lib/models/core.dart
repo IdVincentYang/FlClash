@@ -78,6 +78,7 @@ abstract class ChangeProxyParams with _$ChangeProxyParams {
     @JsonKey(name: 'proxy-name') required String proxyName,
     @Default(0) int owner,
     @Default(0) int token,
+    @Default(false) bool transient,
   }) = _ChangeProxyParams;
 
   factory ChangeProxyParams.fromJson(Map<String, Object?> json) =>

@@ -211,7 +211,7 @@ func prepareSourceInlineGraph(p *preparedConfig, old, next *config.RawConfig) (_
 			g.ownedProxies = append(g.ownedProxies, proxy)
 			if oldGroup, valid := p.cfg.Proxies[name]; valid {
 				if previous, valid := oldGroup.Adapter().(outboundgroup.ProxyGroup); valid {
-					if selectable, valid := group.(outboundgroup.SelectAble); valid {
+					if selectable, valid := group.(outboundgroup.SelectAble); valid && group.Type() == C.Selector {
 						_ = selectable.Set(previous.Now())
 					}
 				}

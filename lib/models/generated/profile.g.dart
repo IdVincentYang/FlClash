@@ -51,6 +51,11 @@ _Profile _$ProfileFromJson(Map<String, dynamic> json) => _Profile(
   unfoldSet:
       (json['unfoldSet'] as List<dynamic>?)?.map((e) => e as String).toSet() ??
       const {},
+  localGroups:
+      (json['localGroups'] as List<dynamic>?)
+          ?.map((e) => LocalProxyGroup.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
   overwriteType:
       $enumDecodeNullable(_$OverwriteTypeEnumMap, json['overwriteType']) ??
       OverwriteType.standard,
@@ -72,6 +77,7 @@ Map<String, dynamic> _$ProfileToJson(_Profile instance) => <String, dynamic>{
   'autoUpdate': instance.autoUpdate,
   'selectedMap': instance.selectedMap,
   'unfoldSet': instance.unfoldSet.toList(),
+  'localGroups': instance.localGroups,
   'overwriteType': _$OverwriteTypeEnumMap[instance.overwriteType]!,
   'scriptId': instance.scriptId,
   'matchTarget': instance.matchTarget,
@@ -88,6 +94,60 @@ const _$OverwriteTypeEnumMap = {
   OverwriteType.standard: 'standard',
   OverwriteType.script: 'script',
   OverwriteType.custom: 'custom',
+};
+
+_LocalProxyGroup _$LocalProxyGroupFromJson(Map<String, dynamic> json) =>
+    _LocalProxyGroup(
+      id: (json['id'] as num).toInt(),
+      name: json['name'] as String,
+      type:
+          $enumDecodeNullable(_$GroupTypeEnumMap, json['type']) ??
+          GroupType.Selector,
+      nodes:
+          (json['nodes'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+          const [],
+      regex: json['regex'] as String? ?? '',
+      matchedNodes:
+          (json['matchedNodes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      excludedNodes:
+          (json['excludedNodes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      parents:
+          (json['parents'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      parent: json['parent'] as String?,
+      enabled: json['enabled'] as bool? ?? true,
+      testUrl: json['testUrl'] as String? ?? '',
+    );
+
+Map<String, dynamic> _$LocalProxyGroupToJson(_LocalProxyGroup instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'type': _$GroupTypeEnumMap[instance.type]!,
+      'nodes': instance.nodes,
+      'regex': instance.regex,
+      'matchedNodes': instance.matchedNodes,
+      'excludedNodes': instance.excludedNodes,
+      'parents': instance.parents,
+      'parent': instance.parent,
+      'enabled': instance.enabled,
+      'testUrl': instance.testUrl,
+    };
+
+const _$GroupTypeEnumMap = {
+  GroupType.Selector: 'select',
+  GroupType.URLTest: 'url-test',
+  GroupType.Fallback: 'fallback',
+  GroupType.LoadBalance: 'load-balance',
+  GroupType.Relay: 'relay',
 };
 
 _StandardOverwrite _$StandardOverwriteFromJson(Map<String, dynamic> json) =>

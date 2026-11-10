@@ -507,6 +507,19 @@
   "restoreOnlyConfig": "Восстановить только профили",
   "restoreAllData": "Восстановить все данные",
   "addProfile": "Добавить профиль",
+  "delayTestWaiting": "В очереди",
+  "delayTestWaitingResult": "Ожидание результата",
+  "delayTestRequiresProxy": "Запустите прокси и дождитесь подключения перед тестированием задержки узлов.",
+  "delayTestUnavailable": "Недоступно",
+  "delayTestNoResult": "Core не вернул результат теста. Проверьте подключение прокси и повторите попытку.",
+  "delayTestFailed": "Тест задержки не завершён: {reason}",
+  "@delayTestFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "delayTest": "Тест задержки",
   "proxyGroupEmpty": "Группа прокси пуста",
   "proxyGroupNameDuplicate": "Название группы прокси уже используется",
@@ -955,6 +968,47 @@
   "androidServiceVpnActive": "VPN активен",
   "androidServiceProxyOnly": "Только прокси",
   "androidServiceUnavailable": "Служба недоступна",
+  "useProfile": "Использовать",
+  "sourceReviewPending": "Требуется проверка",
+  "sourceStatusChecking": "Проверка разрешений источника…",
+  "sourceStatusRetry": "Разрешения недоступны · повторить",
+  "localGroupsAmbiguous": "Выбранные имена узлов повторяются в разных источниках. Выберите узлы с уникальными именами.",
+  "localGroupsPending": "Изменения сохранены и ожидают применения.",
+  "localGroupsTitle": "Управление группами",
+  "localGroupsCreate": "Новая группа",
+  "localGroupsEmpty": "Создайте группу из узлов этой подписки.",
+  "localGroupsScope": "{name}",
+  "localGroupsParent": "Добавить в группу",
+  "localGroupsIndependent": "Отдельная группа",
+  "localGroupsManual": "Вручную",
+  "localGroupsAutomatic": "По задержке",
+  "localGroupsFallback": "Резервирование",
+  "localGroupsLoadFirst": "Выберите эту подписку и подтвердите источники для загрузки узлов.",
+  "localGroupsInUse": "Выберите другой узел или группу перед удалением связи, отключением или удалением этой группы.",
+  "localGroupsDelete": "Удалить группу «{name}»?",
+  "localGroupsMissing": "Узел недоступен: {name}",
+  "localGroupsNameConflict": "Укажите имя, не занятое узлом или другой группой.",
+  "localGroupsMembersRequired": "Выберите хотя бы один доступный узел.",
+  "localGroupsInvalidParent": "Выберите доступную ручную группу или отдельную группу.",
+  "localGroupsInvalidTestUrl": "Введите корректный HTTP(S) URL проверки.",
+  "localGroupsApplyFailed": "Не удалось применить изменения. Проверьте конфигурацию и повторите.",
+  "localGroupsChanged": "Конфигурация изменилась. Обновите список групп и повторите.",
+  "localGroupsManaged": "Для этой конфигурации управляйте группами в черновике политики.",
+  "localGroupsLimit": "Превышено ограничение числа групп или участников.",
+  "localGroupsSearch": "Поиск узлов",
+  "localGroupsSource": "Группы подписки (только чтение)",
+  "sourceSubscriptionReview": "Проверка подписки",
+  "sourceRelatedSourcesCount": "Связанные источники: {count}",
+  "sourceLoadChecking": "Проверка подписки и разрешений…",
+  "sourceLoadProgress": "Готово: {ready}/{total}",
+  "sourceLoadQueued": "Ожидание",
+  "sourceLoadDownloading": "Загрузка…",
+  "sourceLoadVerifying": "Проверка…",
+  "sourceLoadReady": "Готово",
+  "sourceLoadCached": "Готово · проверенный снимок",
+  "sourceLoadFailed": "Ошибка",
+  "sourceBatchPreparing": "Загрузка связанных источников…",
+  "sourceBatchScope": "Проверьте подписку, итоговую конфигурацию и все перечисленные источники. Подтверждение разрешает только показанные снимки содержимого.",
   "sourceReviewTitle": "Проверка источника",
   "sourceScriptTitle": "Проверка скрипта",
   "sourceAcceptRevision": "Принять эту версию",
@@ -1003,7 +1057,9 @@
   "sourceStopUse": "Прекратить использование этих данных",
   "sourceBinaryMaterial": "Двоичный RuleSet: принимаются только эти точные байты. Число правил неизвестно до проверки исходным парсером.",
   "sourceStorageFull": "Достигнут предел хранилища источников. Операцию не удалось завершить.",
-  "sourcePermissionsUnavailable": "Разрешения источников недоступны. Дождитесь готовности Core и повторите попытку.",
+  "backgroundStartFailed": "Не удалось запустить FlClash. Откройте приложение, чтобы проверить источники, ожидающие одобрения, или сведения об ошибке.",
+  "sourcePermissionsUnavailable": "Не удалось прочитать или проверить разрешения источников. Повторите попытку; если ошибка сохраняется, проверьте журнал приложения.",
+  "sourceMaterialUnavailable": "Не удалось загрузить связанный источник. Проверьте адрес, подключение и маршрут запросов, затем повторите попытку.",
   "sourceRoutingExcluded": "Содержимое включает исключённые возможности маршрутизации. Удалите их или явно измените выбор маршрутизации источника.",
   "sourceRecoveryUnavailable": "Разрешение источника изменено, но checkpoint восстановления обновить не удалось. Восстановление после перезапуска недоступно.",
   "sourceAppliedNotSaved": "Применено; восстановление не сохранено",
@@ -1012,5 +1068,81 @@
   "sourceLocalPolicy": "Локальная политика",
   "sourceRecoveryTitle": "Проверить незавершённое сохранение",
   "sourceRecoveryDescription": "Проверьте сохранённые на устройстве профили, скрипты и разрешения. Передача трафика через текущую конфигурацию остановится, а незавершённые подтверждения будут отброшены. Затем проверьте источники и примените конфигурацию снова.",
-  "requestRestartRequired": "Незавершённое локальное сохранение может ещё выполняться. Откройте сведения о приложении → Остановить, затем снова откройте FlClash. Перезапуска прокси или закрытия экрана недостаточно. После открытия проверьте сохранённые данные в разрешениях источников."
+  "requestRestartRequired": "Незавершённое локальное сохранение может ещё выполняться. Откройте сведения о приложении → Остановить, затем снова откройте FlClash. Перезапуска прокси или закрытия экрана недостаточно. После открытия проверьте сохранённые данные в разрешениях источников.",
+  "localGroupsEnableSpeedTest": "Включить тест скорости",
+  "localGroupsStrategyHelp": "Вкл.: выбор по задержке. Выкл.: переключение в порядке Core. Доступность проверяется автоматически.",
+  "localGroupsRegex": "Регулярное выражение узлов (необязательно)",
+  "localGroupsRegexHelp": "Совпадения выбраны по умолчанию. Выбор можно изменить.",
+  "localGroupsRegexDocs": "Справка по регулярным выражениям",
+  "localGroupsPreferred": "Предпочтительный узел: {name}",
+  "@localGroupsPreferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsActualExit": "Текущий выход: {name}",
+  "@localGroupsActualExit": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsTransientHelp": "Выбор действует в текущем сеансе. При сбое группа переключится автоматически. Выбор не сохраняется.",
+  "localGroupsUnavailable": "Группа не активна. Включите её или дождитесь готовности конфигурации.",
+  "localGroupsUse": "Связи групп",
+  "localGroupsUseHelp": "Выберите группы, в которых будет доступна эта группа. Сохранение применит связи, не меняя текущий выбор.",
+  "localGroupsNoEntrance": "В этой конфигурации нет выбираемого входа маршрутизации.",
+  "localGroupsPreparing": "Проверка сохранённой конфигурации…",
+  "localGroupsPreparingSources": "Проверка сохранённых источников…",
+  "localGroupsApplying": "Применение конфигурации…",
+  "localGroupsIdentitySection": "Основные сведения",
+  "localGroupsStrategySection": "Стратегия переключения",
+  "localGroupsNodesSection": "Узлы",
+  "localGroupsOwn": "Своя",
+  "localGroupsSubscription": "Подписка",
+  "localGroupsNodeCount": "Узлов: {count}",
+  "localGroupsActions": "Действия: {name}",
+  "localGroupsEnable": "Включить",
+  "localGroupsDisable": "Отключить",
+  "localGroupsRouteThis": "Связи групп",
+  "localGroupsNoSaved": "Нет собственных групп. Создайте группу в разделе управления группами.",
+  "@localGroupsNodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@localGroupsActions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsSaving": "Проверка и сохранение группы…",
+  "localGroupsDownloading": "Загрузка обновлений источников…",
+  "localGroupsReferences": "Добавлена в {count} групп",
+  "localGroupsReferencesSaved": "Связи применены. Текущий выбор сохранён.",
+  "localGroupsReferenceUsing": "Сейчас используется",
+  "localGroupsReferenceAdded": "Добавлена в список выбора",
+  "localGroupsReferenceNotAdded": "Не добавлена",
+  "@localGroupsReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localGroupsSourceUnavailable": "Принятая конфигурация или её разрешения недоступны. Проверьте разрешения источника в профилях.",
+  "localGroupsForegroundRequired": "Для этого изменения нужна полная перезагрузка конфигурации. Откройте приложение и повторите попытку.",
+  "profileImportContinue": "Продолжить",
+  "profileImportDownloading": "Загрузка подписки…",
+  "profileImportSaving": "Сохранение подписки…",
+  "profileImportPreparing": "Подготовка импорта…",
+  "profileImportDownloadFailed": "Не удалось загрузить подписку. Проверьте URL и маршрут запроса и повторите попытку.",
+  "profileImportInvalid": "Загруженный файл не является допустимой подпиской. Проверьте URL."
 }

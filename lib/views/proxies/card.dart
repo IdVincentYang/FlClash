@@ -16,14 +16,13 @@ void selectGroupProxy(
 }) {
   final isComputedSelected = groupType.isComputedSelected;
   if (isComputedSelected || groupType == GroupType.Selector) {
-    final currentProxyName = ref.read(proxyNameProvider(groupName));
-    final nextProxyName = switch (isComputedSelected) {
-      true => currentProxyName == proxyName ? '' : proxyName,
-      false => proxyName,
-    };
     ref
         .read(proxiesActionProvider.notifier)
-        .changeProxyDebounce(groupName, nextProxyName);
+        .changeProxyDebounce(
+          groupName,
+          proxyName,
+          transient: isComputedSelected,
+        );
     return;
   }
   dialogs.showNotifier(
@@ -142,7 +141,7 @@ class ProxyCard extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        delayText,
+                        Flexible(flex: 2, child: delayText),
                       ],
                     ),
                   ),
@@ -252,6 +251,12 @@ class _DelayTextState extends ConsumerState<_DelayText> {
         testUrl: widget.testUrl,
       ),
     );
+    final failure = ref.watch(
+      delayTestFailureProvider(
+        proxyName: widget.proxy.name,
+        testUrl: widget.testUrl,
+      ),
+    );
     return Actions(
       actions: {
         ActivateIntent: CallbackAction<ActivateIntent>(
@@ -269,25 +274,76 @@ class _DelayTextState extends ConsumerState<_DelayText> {
             alignment: widget.type == ProxyCardType.expand
                 ? Alignment.centerLeft
                 : Alignment.centerRight,
-            child: phase != null || delay == null
+            child: phase == null && failure != null
+                ? Tooltip(
+                    message: userFacingErrorMessage(
+                      failure,
+                      context.appLocalizations,
+                    ),
+                    child: GestureDetector(
+                      onTap: _handleTestCurrentDelay,
+                      child: _withFocusRing(
+                        context,
+                        Text(
+                          context.appLocalizations.delayTestUnavailable,
+                          maxLines: 1,
+                          style: context.textTheme.labelSmall?.copyWith(
+                            color: context.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : phase != null
+                ? _withFocusRing(
+                    context,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (phase == DelayTestPhase.running) ...[
+                          SizedBox(
+                            width: measure.labelSmallHeight,
+                            height: measure.labelSmallHeight,
+                            child: const CommonCircleLoading(),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Flexible(
+                          child: Tooltip(
+                            message: phase == DelayTestPhase.queued
+                                ? context.appLocalizations.delayTestWaiting
+                                : context
+                                      .appLocalizations
+                                      .delayTestWaitingResult,
+                            child: Text(
+                              phase == DelayTestPhase.queued
+                                  ? context.appLocalizations.delayTestWaiting
+                                  : context
+                                        .appLocalizations
+                                        .delayTestWaitingResult,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.textTheme.labelSmall,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : delay == null
                 ? SizedBox(
                     height: measure.labelSmallHeight,
                     width: measure.labelSmallHeight,
-                    child: _withFocusRing(context, switch (phase) {
-                      DelayTestPhase.running => const CommonCircleLoading(),
-                      DelayTestPhase.queued => GlyphIcon(
-                        AppGlyphs.clock,
-                        size: measure.labelSmallHeight,
-                        color: context.colorScheme.onSurfaceVariant.opacity38,
-                      ),
-                      null => IconButton(
+                    child: _withFocusRing(
+                      context,
+                      IconButton(
                         tooltip: context.appLocalizations.delayTest,
                         icon: const GlyphIcon(AppGlyphs.bolt),
                         iconSize: measure.labelSmallHeight,
                         padding: EdgeInsets.zero,
                         onPressed: _handleTestCurrentDelay,
                       ),
-                    }),
+                    ),
                   )
                 : GestureDetector(
                     onTap: _handleTestCurrentDelay,
@@ -336,7 +392,7 @@ class _ProxyComputedMark extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final proxyName = ref.watch(proxyNameProvider(groupName));
+    final proxyName = ref.watch(selectedProxyNameProvider(groupName));
     if (proxyName != proxy.name) {
       return const SizedBox();
     }

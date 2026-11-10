@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/tunnel"
 )
@@ -43,13 +44,40 @@ func (r *sourceProviderRuntime) adoptLocked(body []byte, use SourceUse, hash str
 			manifest.ProviderMaterials[i] = material
 		}
 	}
-	derived, err := bindSourceProviderMaterials(home, root, manifest.YAMLSHA256, manifest.ProviderMaterials)
+	for i, previous := range manifest.SourceUses {
+		if previous == r.material.Use {
+			manifest.SourceUses[i] = material.Use
+		}
+	}
+	refresh, err := prepareLocalGroupRefresh(home, p, manifest)
 	if err != nil {
 		return err
 	}
-	manifest.SourceUses, err = sourceCompositionUses(home, derived)
-	if err != nil {
-		return err
+	publishedGraph := false
+	defer func() {
+		if refresh != nil && !publishedGraph {
+			refresh.graph.close()
+		}
+	}()
+	if refresh != nil {
+		if p.sourceRetiredBytes+len(oldBody)+len(body)+len(p.bytes)+len(refresh.body) > sourceMaterialTotal {
+			return errSourceBudget
+		}
+		manifest = refresh.manifest
+		for _, updated := range manifest.ProviderMaterials {
+			if updated.Use.Key == material.Use.Key {
+				material = updated
+			}
+		}
+	} else {
+		derived, err := bindSourceProviderMaterials(home, root, manifest.YAMLSHA256, manifest.ProviderMaterials)
+		if err != nil {
+			return err
+		}
+		manifest.SourceUses, err = sourceCompositionUses(home, derived)
+		if err != nil {
+			return err
+		}
 	}
 	data, err := json.Marshal(manifest)
 	if err != nil {
@@ -139,6 +167,24 @@ func (r *sourceProviderRuntime) adoptLocked(body []byte, use SourceUse, hash str
 	p.sourceRetiredBytes += len(oldBody)
 	checkpointMu.Lock()
 	p.sourceRetiredInputs = append(p.sourceRetiredInputs, parentInput)
+	if refresh != nil {
+		checkpointMu.Unlock()
+		selectMu.Lock()
+		checkpointMu.Lock()
+		tunnel.UpdateProxies(refresh.graph.proxies, refresh.graph.providers)
+		config.SetProxyNameList(refresh.graph.names)
+		p.cfg.Proxies, p.cfg.Providers = refresh.graph.proxies, refresh.graph.providers
+		refresh.graph.retired.input, refresh.graph.retired.materialHash = parentInput, p.manifest.YAMLSHA256
+		p.sourceInlineRetired = append(p.sourceInlineRetired, refresh.graph.retired)
+		p.sourceRetiredBytes += len(p.bytes)
+		p.bytes, p.raw = refresh.body, refresh.raw
+		configFact.YAMLSHA256, configFact.ParsedSHA256 = manifest.YAMLSHA256, refresh.parsedHash
+		checkpointMu.Unlock()
+		refreshRouteLocked(true)
+		selectMu.Unlock()
+		checkpointMu.Lock()
+		publishedGraph = true
+	}
 	p.manifest = manifest
 	p.receipt.InputID = target
 	p.sourceRecovery = &pending
@@ -149,6 +195,34 @@ func (r *sourceProviderRuntime) adoptLocked(body []byte, use SourceUse, hash str
 	configFact.Version = configFactSequence.Add(1)
 	publishSourceTraceState(p, target, false)
 	checkpointMu.Unlock()
+	if refresh != nil {
+		for _, task := range refresh.graph.tasks {
+			task()
+		}
+		for _, pd := range refresh.graph.ownedProviders {
+			_ = pd.Initial()
+		}
+		var root SourceUse
+		for _, use := range manifest.SourceUses {
+			if use.Kind == "config" {
+				root = use
+			}
+		}
+		plans, err := acceptedSourceProviderPlans(home, root, manifest.YAMLSHA256)
+		if err != nil {
+			return err
+		}
+		for _, plan := range plans {
+			if runtime := p.sourceProviders[plan.Key]; runtime != nil {
+				runtime.plan = plan
+				for _, material := range manifest.ProviderMaterials {
+					if material.Use.Key == plan.Key {
+						runtime.material = material
+					}
+				}
+			}
+		}
+	}
 	err = persistSourceMaterialLocked(p)
 	if r.rule != nil {
 		// Callback consumers reenter parent state, so notification cannot run under configMu.

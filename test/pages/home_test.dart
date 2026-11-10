@@ -20,13 +20,92 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/glyph_finders.dart';
 import '../helpers/test_app.dart';
+import '../helpers/test_config_state.dart';
 
 Finder _glyph(Glyph glyph) => find.byGlyph(glyph);
+
+class _NavigationStateProbe implements NavigationPort {
+  @override
+  List<NavigationItem> getItems({
+    bool openLogs = false,
+    bool hasProxies = false,
+  }) => navigation
+      .getItems(openLogs: openLogs, hasProxies: hasProxies)
+      .map(
+        (item) => item.copyWith(
+          builder: (_) => item.label == PageLabel.proxies
+              ? const TextField(key: ValueKey('proxies-state-probe'))
+              : const SizedBox.shrink(),
+        ),
+      )
+      .toList();
+}
 
 void main() {
   setUp(() {
     navigationPort = navigation;
     addTearDown(() => navigationPort = null);
+  });
+
+  testWidgets('startup keeps the Proxies destination and mounted page state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    navigationPort = _NavigationStateProbe();
+    final profile = Profile.normal();
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => _HomeTestProfiles([profile])),
+        currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        configStateProvider.overrideWith(TestConfigState.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container.read(viewSizeProvider.notifier).value = const Size(400, 900);
+    container.read(currentPageLabelProvider.notifier).toPage(PageLabel.proxies);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TestApp(includeNavigatorKey: false, child: HomePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final field = find.byKey(const ValueKey('proxies-state-probe'));
+    final pageState = tester.state(field);
+    await tester.enterText(field, 'kept filter');
+    final navigationBefore = container
+        .read(currentNavigationItemsStateProvider)
+        .value
+        .map((item) => item.label)
+        .toList();
+    container.read(initProvider.notifier).value = true;
+    final progress = container.read(proxyPreparationProvider.notifier);
+    final sequence = progress.start();
+    progress.phase(sequence, ProxyPreparationStage.sources);
+    container.read(groupsProvider.notifier).value = [];
+    await tester.pumpAndSettle();
+    expect(tester.state(field), same(pageState));
+    expect(find.text('kept filter'), findsOneWidget);
+    expect(
+      container
+          .read(currentNavigationItemsStateProvider)
+          .value
+          .map((item) => item.label),
+      navigationBefore,
+    );
+    progress.finish(sequence, failed: true);
+    await tester.pumpAndSettle();
+    expect(tester.state(field), same(pageState));
+    container.read(groupsProvider.notifier).value = const [
+      Group(name: 'Loaded', type: GroupType.Selector, hidden: false),
+    ];
+    await tester.pumpAndSettle();
+    expect(tester.state(field), same(pageState));
+    expect(container.read(currentPageLabelProvider), PageLabel.proxies);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('initial desktop layout does not animate mobile navigation out', (

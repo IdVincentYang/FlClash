@@ -32,6 +32,10 @@ class Profiles extends Table {
 
   TextColumn get unfoldSet => text().map(const StringSetConverter())();
 
+  TextColumn get localGroups => text()
+      .withDefault(const Constant('[]'))
+      .map(const LocalProxyGroupsConverter())();
+
   TextColumn get requestMode => text().withDefault(const Constant('auto'))();
 
   TextColumn get requestProxy => text().nullable()();
@@ -40,6 +44,20 @@ class Profiles extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+class LocalProxyGroupsConverter
+    extends TypeConverter<List<LocalProxyGroup>, String> {
+  const LocalProxyGroupsConverter();
+
+  @override
+  List<LocalProxyGroup> fromSql(String value) => [
+    for (final item in jsonDecode(value) as List)
+      LocalProxyGroup.fromJson(Map<String, Object?>.from(item as Map)),
+  ];
+
+  @override
+  String toSql(List<LocalProxyGroup> value) => jsonEncode(value);
 }
 
 class SubscriptionInfoConverter
@@ -125,6 +143,7 @@ extension RawProfilExt on RawProfile {
       autoUpdate: autoUpdate,
       selectedMap: selectedMap,
       unfoldSet: unfoldSet,
+      localGroups: localGroups,
       overwriteType: overwriteType,
       scriptId: scriptId,
       matchTarget: matchTarget,
@@ -148,6 +167,7 @@ extension ProfilesCompanionExt on Profile {
       autoUpdate: autoUpdate,
       selectedMap: selectedMap,
       unfoldSet: unfoldSet,
+      localGroups: Value(localGroups),
       overwriteType: overwriteType,
       scriptId: Value(scriptId),
       matchTarget: Value(matchTarget),

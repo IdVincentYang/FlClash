@@ -46,6 +46,8 @@ class _ProfileRefreshJob {
     required this.allowBootstrap,
     this.demandCurrent,
     this.ready = true,
+    this.importTask,
+    this.confirm,
   });
   final Profile profile;
   final RequestSource source;
@@ -53,6 +55,8 @@ class _ProfileRefreshJob {
   bool automatic, ready;
   final bool importing, allowBootstrap;
   final Future<bool> Function()? demandCurrent;
+  final ProfileImportTask? importTask;
+  final SourceConfirmation? confirm;
   final registration = Completer<void>();
   final material = Completer<ProfileRefreshResult>();
   final completion = Completer<ProfileRefreshResult>();
@@ -73,6 +77,8 @@ class _ProfileRefreshJob {
       importing == other.importing &&
       allowBootstrap == other.allowBootstrap &&
       identical(demandCurrent, other.demandCurrent) &&
+      identical(importTask, other.importTask) &&
+      identical(confirm, other.confirm) &&
       _refreshFields(profile) == _refreshFields(other.profile) &&
       _sameSource(
         materialSource ?? source,
@@ -105,6 +111,10 @@ class _ProfileRefreshJob {
 mixin _ProfileRefreshQueue on _$ProfilesAction {
   CoreController get _core;
   Request get requestClient;
+  Future<void> _completeSubscriptionReview(
+    Profile profile, {
+    SourceConfirmation? confirm,
+  });
   DateTime get refreshNow;
   Duration get refreshElapsed;
 
@@ -127,6 +137,8 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
     bool sourceMustMatch = false,
     RequestSource? expectedSource,
     Future<bool> Function()? demandCurrent,
+    ProfileImportTask? importTask,
+    SourceConfirmation? confirm,
   }) async {
     final predecessor = _refreshJobs[proposed.id];
     if (predecessor != null && predecessor.started && !predecessor.committing) {
@@ -147,6 +159,8 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       importing: importing,
       allowBootstrap: allowBootstrap,
       demandCurrent: demandCurrent,
+      importTask: importTask,
+      confirm: confirm,
     );
     if (_refreshDisposed ||
         (importing ? current != null : current == null) ||
@@ -283,6 +297,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
   }) async {
     if (_refreshDisposed ||
         job.superseded ||
+        job.importTask?.isCurrent == false ||
         job.demandCurrent != null && !await job.demandCurrent!()) {
       return false;
     }
@@ -291,6 +306,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
     );
     if (_refreshDisposed ||
         job.superseded ||
+        job.importTask?.isCurrent == false ||
         job.demandCurrent != null && !await job.demandCurrent!()) {
       return false;
     }
@@ -346,6 +362,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       final retry = _retryFor(profile);
       retry.attempted = refreshElapsed;
       retry.permissionBlocked = false;
+      job.importTask?.report(ProfileImportPhase.downloading);
       final response = await session.run(
         () => requestClient.downloadFileForUrl(profile.url),
       );
@@ -369,7 +386,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
         }
       }
       approval = await _reviewProfileMaterial(
-        confirm: ref.read(sourceConfirmationProvider),
+        confirm: job.confirm ?? ref.read(sourceConfirmationProvider),
         core: _core,
         requests: requestClient,
         profile: profile,
@@ -380,6 +397,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
         automatic: job.automatic,
         isCurrent: () => _refreshRowCurrent(job),
       );
+      job.importTask?.report(ProfileImportPhase.saving);
       final validation = await _core.validateConfig(staged.staged.path);
       if (validation.isNotEmpty) {
         throw const RequestUnavailable('profile_invalid');
@@ -470,6 +488,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       job.savedSource = await requestClient.captureSource(
         'profile:${profile.id}',
       );
+      if (!job.automatic) {
+        await _completeSubscriptionReview(profile, confirm: job.confirm);
+      }
       retry.failures = 0;
       result = ProfileRefreshResult(
         materialSaved: true,

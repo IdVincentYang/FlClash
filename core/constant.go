@@ -54,6 +54,7 @@ type SideLoadParams struct {
 }
 
 type ChangeProxyParams struct {
+	Transient bool   `json:"transient,omitempty"`
 	GroupName string `json:"group-name"`
 	ProxyName string `json:"proxy-name"`
 	Owner     uint64 `json:"owner"`

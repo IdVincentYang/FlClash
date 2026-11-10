@@ -136,6 +136,17 @@ Android requires v2 and cannot fall back when permissions, hooks or owner qualif
 Go validates v2 receipts on every platform; controlled host fixtures do not establish Android assembly coverage.
 Dart owns composition, routing selection and review UI; its database does not duplicate the grant authority.
 Request/source tickets, ConfigInput and ServiceState keep their existing distinct ownership.
+URL imports keep one modal from the name/URL form through preparation, download, bundled source review and saving.
+Their advanced request route fields remain expanded, without changing the collapsible fields on other screens.
+`SourceReviewPresentation` embeds the existing review widget in that surface; its decision callback advances the import
+instead of popping the route. `ProfileImportTask` cancels its queued or active refresh job when the user returns or leaves,
+and the refresh guards recheck it before persistence. Failures restore the retained form; saving blocks back navigation
+until the result is known, and a successful material save closes the import and add-method chooser together. Other import
+entry points and source permission authority retain their existing behavior.
+An abandoned interactive review discards its own candidate token even after the view's currentness guard closes;
+automatic pending revisions and newer candidates remain pending. Once a review has been displayed, the presentation
+owner lets cancellation cleanup finish before its caller refreshes the profile's review status. Cancellation neither
+accepts source permissions nor applies configuration.
 Frontend file/DB commit receipts also own the durable request recovery marker. A detached engine cannot prove
 its writer ended: acknowledged receipts retire, while a process-lifetime veto prevents new writes or positive trust
 until their actual completion or application process exit. Registry/JNI/Service reinitialization does not clear that veto;
@@ -758,6 +769,18 @@ directives, so consumers continue to import the same public API:
 - `ProfilesAction`: profile CRUD, auto-update, import.
 - `GeoResourceAction`: geo resource updates and URL configuration.
 - `UpdatingAction`: stale sweep over `UpdatingKeys`.
+
+Proxies exposes per-Profile local group management. `Profile.localGroups` stores the definitions; the composition
+layer appends enabled groups after the existing override pipeline. `ProfilesAction.saveLocalGroups` applies a
+fenced, group-only delta over the accepted input and preserves current selector choices. On Android, Core derives the
+candidate from its current accepted configuration; Setup applies that approved local input through the existing queue
+and lifecycle path without refreshing or reviewing a remote candidate. The base input, source grants and material
+checks still apply, and remote candidates stay pending. A structured `requiresFullApply` response may retry the same
+approved local input once through normal apply only for an explicit foreground local save, with the base input,
+material barrier and latest run intent still intact. Automatic refreshes and unclassified/authority failures do not
+use this retry. Full apply can renew connections. Reference management closes after a successful apply and
+contains no proxy-selection or target-navigation actions. Source groups stay read-only.
+See [the local group design](../docs/features/proxies/local_groups_design.md) for scope, recovery and provider membership.
 
 `UpdatingKeys` in `lib/providers/app.dart` owns every per-entity updating flag; `isUpdatingProvider(key)` is the
 read-only view widgets watch. Callers pair `start(key, scope: ...)` with `stop(key, operation)` using the returned

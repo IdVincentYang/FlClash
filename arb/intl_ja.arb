@@ -507,6 +507,19 @@
   "restoreOnlyConfig": "プロファイルのみ復元",
   "restoreAllData": "すべてのデータを復元",
   "addProfile": "プロファイルを追加",
+  "delayTestWaiting": "テスト待ち",
+  "delayTestWaitingResult": "結果待ち",
+  "delayTestRequiresProxy": "プロキシを起動し、接続が完了してからノードの遅延をテストしてください。",
+  "delayTestUnavailable": "テスト不可",
+  "delayTestNoResult": "Core からテスト結果が返されませんでした。プロキシの接続を確認して再試行してください。",
+  "delayTestFailed": "遅延テストが完了しませんでした：{reason}",
+  "@delayTestFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "delayTest": "遅延テスト",
   "proxyGroupEmpty": "プロキシグループが空です",
   "proxyGroupNameDuplicate": "プロキシグループ名が重複しています",
@@ -955,6 +968,47 @@
   "androidServiceVpnActive": "VPN 動作中",
   "androidServiceProxyOnly": "プロキシのみ",
   "androidServiceUnavailable": "サービス利用不可",
+  "useProfile": "使用",
+  "sourceReviewPending": "確認が必要",
+  "sourceStatusChecking": "ソースの権限を確認中…",
+  "sourceStatusRetry": "権限の状態を取得できません · 再試行",
+  "localGroupsAmbiguous": "選択したノード名が複数のソースに存在します。識別できる名前のノードを選択してください。",
+  "localGroupsPending": "変更を保存しました。適用待ちです。",
+  "localGroupsTitle": "グループ管理",
+  "localGroupsCreate": "新規グループ",
+  "localGroupsEmpty": "このサブスクリプションのノードからグループを作成します。",
+  "localGroupsScope": "{name}",
+  "localGroupsParent": "選択肢を追加するグループ",
+  "localGroupsIndependent": "独立グループ",
+  "localGroupsManual": "手動",
+  "localGroupsAutomatic": "遅延優先",
+  "localGroupsFallback": "フェイルオーバー",
+  "localGroupsLoadFirst": "このサブスクリプションを使用し、ソースの確認を完了してノードを読み込んでください。",
+  "localGroupsInUse": "参照の解除、無効化、削除の前に、別のノードまたはグループを選択してください。",
+  "localGroupsDelete": "グループ「{name}」を削除しますか？",
+  "localGroupsMissing": "利用できないノード: {name}",
+  "localGroupsNameConflict": "他のノードやグループと重複しない名前を指定してください。",
+  "localGroupsMembersRequired": "利用可能なノードを1つ以上選択してください。",
+  "localGroupsInvalidParent": "利用可能な手動グループまたは独立グループを選択してください。",
+  "localGroupsInvalidTestUrl": "有効なHTTP(S)テストURLを入力してください。",
+  "localGroupsApplyFailed": "変更を適用できませんでした。設定を確認して再試行してください。",
+  "localGroupsChanged": "設定が変更されました。グループ管理を更新して再試行してください。",
+  "localGroupsManaged": "この設定のグループはポリシー草案で管理してください。",
+  "localGroupsLimit": "グループ数またはメンバー数が上限を超えています。",
+  "localGroupsSearch": "ノードを検索",
+  "localGroupsSource": "サブスクリプショングループ（読み取り専用）",
+  "sourceSubscriptionReview": "サブスクリプションを確認",
+  "sourceRelatedSourcesCount": "関連ソース：{count} 件",
+  "sourceLoadChecking": "購読と権限を確認中…",
+  "sourceLoadProgress": "準備完了：{ready}/{total}",
+  "sourceLoadQueued": "待機中",
+  "sourceLoadDownloading": "ダウンロード中…",
+  "sourceLoadVerifying": "検証中…",
+  "sourceLoadReady": "準備完了",
+  "sourceLoadCached": "準備完了 · 検証済みスナップショット",
+  "sourceLoadFailed": "失敗",
+  "sourceBatchPreparing": "関連ソースを読み込み中…",
+  "sourceBatchScope": "この購読、最終設定、および一覧にあるすべての関連ソースをまとめて確認します。承認はここに表示された内容のスナップショットのみに適用されます。",
   "sourceReviewTitle": "ソースを確認",
   "sourceScriptTitle": "スクリプトを確認",
   "sourceAcceptRevision": "この版を承認",
@@ -1003,7 +1057,9 @@
   "sourceStopUse": "この内容の使用を停止",
   "sourceBinaryMaterial": "バイナリRuleSet：この正確なバイト列のみを承認します。元のパーサーが検証するまでルール数は不明です。",
   "sourceStorageFull": "ソース保存容量の上限に達したため、操作を完了できませんでした。",
-  "sourcePermissionsUnavailable": "ソース権限を利用できません。Coreの準備が整ってから再試行してください。",
+  "backgroundStartFailed": "FlClashを起動できませんでした。アプリを開いて保留中のソースを確認するか、エラーを確認してください。",
+  "sourcePermissionsUnavailable": "ソース権限を読み取れないか、検証できません。再試行し、解消しない場合はアプリのログを確認してください。",
+  "sourceMaterialUnavailable": "関連ソースを読み込めません。アドレス、ネットワーク接続、通信経路を確認して再試行してください。",
   "sourceRoutingExcluded": "この内容には除外したルーティング機能が含まれます。削除するか、ソースのルーティング設定を明示的に変更してください。",
   "sourceRecoveryUnavailable": "ソース権限は変更されましたが、復元checkpointを更新できませんでした。再起動時の復元は利用できません。",
   "sourceAppliedNotSaved": "適用済み・復元情報は未保存",
@@ -1012,5 +1068,81 @@
   "sourceLocalPolicy": "ローカルポリシー",
   "sourceRecoveryTitle": "未完了の保存を確認",
   "sourceRecoveryDescription": "この端末に保存されたプロファイル、スクリプト、権限を確認します。現在の設定による通信を停止し、未完了の承認を破棄します。確認後にソースを再確認して設定を適用してください。",
-  "requestRestartRequired": "未完了のローカル保存が実行中の可能性があります。アプリ情報 → 強制停止を選び、FlClashを開き直してください。プロキシサービスの再起動や画面を閉じるだけでは解決しません。開き直した後、ソースの権限で保存済みデータを確認してください。"
+  "requestRestartRequired": "未完了のローカル保存が実行中の可能性があります。アプリ情報 → 強制停止を選び、FlClashを開き直してください。プロキシサービスの再起動や画面を閉じるだけでは解決しません。開き直した後、ソースの権限で保存済みデータを確認してください。",
+  "localGroupsEnableSpeedTest": "速度テストを有効にする",
+  "localGroupsStrategyHelp": "オン：遅延で選択。オフ：Core の順序でフェイルオーバー。どちらも可用性を自動確認します。",
+  "localGroupsRegex": "ノードの正規表現（任意）",
+  "localGroupsRegexHelp": "一致したノードは選択済みです。タップで変更できます。",
+  "localGroupsRegexDocs": "正規表現のヘルプ",
+  "localGroupsPreferred": "優先ノード：{name}",
+  "@localGroupsPreferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsActualExit": "現在の出口：{name}",
+  "@localGroupsActualExit": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsTransientHelp": "タップで今回の接続に使用します。障害時は自動切替し、この選択は保存しません。",
+  "localGroupsUnavailable": "このグループは未稼働です。有効化するか、設定の準備をお待ちください。",
+  "localGroupsUse": "グループの参照を管理",
+  "localGroupsUseHelp": "このカスタムグループを追加する対象を選びます。保存すると参照が適用され、現在の選択は保持されます。",
+  "localGroupsNoEntrance": "この設定に選択可能なルーティング入口はありません。",
+  "localGroupsPreparing": "保存した設定を確認中…",
+  "localGroupsPreparingSources": "保存したソースを検証中…",
+  "localGroupsApplying": "設定を適用中…",
+  "localGroupsIdentitySection": "基本情報",
+  "localGroupsStrategySection": "切り替え方式",
+  "localGroupsNodesSection": "ノード",
+  "localGroupsOwn": "カスタム",
+  "localGroupsSubscription": "購読",
+  "localGroupsNodeCount": "{count} ノード",
+  "localGroupsActions": "{name} の操作",
+  "localGroupsEnable": "有効にする",
+  "localGroupsDisable": "無効にする",
+  "localGroupsRouteThis": "グループの参照を管理",
+  "localGroupsNoSaved": "カスタムグループがありません。グループ管理で作成してください。",
+  "@localGroupsNodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@localGroupsActions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsSaving": "グループを確認して保存中…",
+  "localGroupsDownloading": "ソースの更新をダウンロード中…",
+  "localGroupsReferences": "{count} 個のグループに追加済み",
+  "localGroupsReferencesSaved": "参照を適用しました。現在の選択は保持されています。",
+  "localGroupsReferenceUsing": "現在使用中",
+  "localGroupsReferenceAdded": "選択肢に追加済み",
+  "localGroupsReferenceNotAdded": "未追加",
+  "@localGroupsReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localGroupsSourceUnavailable": "承認済みの設定または権限を利用できません。プロファイルでソース権限を確認してください。",
+  "localGroupsForegroundRequired": "この変更には設定全体の再適用が必要です。アプリを開いて再試行してください。",
+  "profileImportContinue": "続ける",
+  "profileImportDownloading": "サブスクリプションをダウンロード中…",
+  "profileImportSaving": "サブスクリプションを保存中…",
+  "profileImportPreparing": "インポートを準備中…",
+  "profileImportDownloadFailed": "サブスクリプションをダウンロードできませんでした。URL とリクエスト経路を確認して再試行してください。",
+  "profileImportInvalid": "ダウンロードしたファイルは有効なサブスクリプションではありません。URL を確認してください。"
 }

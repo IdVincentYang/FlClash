@@ -302,6 +302,81 @@ void main() {
     },
   );
 
+  test('Proxies navigation stays available while startup has no groups', () {
+    final profile = Profile.normal(label: 'Saved subscription');
+    _profiles(container).replace([profile]);
+    container.read(viewSizeProvider.notifier).value = const Size(400, 900);
+    container.read(currentPageLabelProvider.notifier).toPage(PageLabel.proxies);
+    final snapshots = <List<PageLabel>>[];
+    container.listen(currentNavigationItemsStateProvider, (_, next) {
+      snapshots.add(next.value.map((item) => item.label).toList());
+    }, fireImmediately: true);
+    final before = container
+        .read(currentNavigationItemsStateProvider)
+        .value
+        .map((item) => item.label)
+        .toList();
+    expect(before, contains(PageLabel.proxies));
+    container.read(initProvider.notifier).value = true;
+    container.read(currentNavigationItemsStateProvider);
+    final progress = container.read(proxyPreparationProvider.notifier);
+    final sequence = progress.start();
+    progress.phase(sequence, ProxyPreparationStage.sources);
+    container.read(groupsProvider.notifier).value = [];
+    container.read(currentNavigationItemsStateProvider);
+    expect(
+      container
+          .read(navigationStateProvider)
+          .navigationItems[container.read(navigationStateProvider).currentIndex]
+          .label,
+      PageLabel.proxies,
+    );
+    progress.finish(sequence, failed: true);
+    container.read(currentNavigationItemsStateProvider);
+    container.read(groupsProvider.notifier).value = const [
+      Group(name: 'Ready', type: GroupType.Selector, hidden: false),
+    ];
+    container.read(currentNavigationItemsStateProvider);
+    expect(snapshots, everyElement(before));
+    expect(
+      container
+          .read(currentNavigationItemsStateProvider)
+          .value
+          .map((item) => item.label),
+      before,
+    );
+  });
+
+  test(
+    'Proxies navigation remains available for saved profiles in direct mode',
+    () async {
+      _profiles(
+        container,
+      ).replace([Profile.normal(label: 'Saved subscription')]);
+      container.read(viewSizeProvider.notifier).value = const Size(400, 900);
+      await container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith(mode: Mode.direct));
+      container.read(initProvider.notifier).value = true;
+      expect(container.read(currentGroupsStateProvider).value, isEmpty);
+      expect(
+        container
+            .read(currentNavigationItemsStateProvider)
+            .value
+            .map((item) => item.label),
+        contains(PageLabel.proxies),
+      );
+      _profiles(container).replace([]);
+      expect(
+        container
+            .read(currentNavigationItemsStateProvider)
+            .value
+            .map((item) => item.label),
+        isNot(contains(PageLabel.proxies)),
+      );
+    },
+  );
+
   test('layout and page state providers compose their dependencies', () async {
     final profile = Profile.normal(label: 'Primary');
     _profiles(container).replace([profile]);

@@ -12,10 +12,12 @@ class RequestRouteFields extends ConsumerWidget {
     required this.mode,
     this.proxy,
     required this.onChanged,
+    this.collapsible = true,
   });
   final RequestMode mode;
   final String? proxy;
   final ValueChanged<(RequestMode, String?)> onChanged;
+  final bool collapsible;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,51 +44,57 @@ class RequestRouteFields extends ConsumerWidget {
       RequestMode.proxy => strings.requestModeProxy,
       RequestMode.direct => strings.requestModeDirect,
     };
-    return ExpansionTile(
-      title: Text(strings.advancedConfig),
-      children: [
-        ListItem<RequestMode>.options(
-          title: Text(strings.requestMode),
-          subtitle: Text(label(mode)),
-          dialogTitle: strings.requestMode,
-          options: RequestMode.values,
-          value: mode,
-          textBuilder: label,
-          onChanged: (value) {
-            if (value != null) onChanged((value, proxy));
+    final fields = <Widget>[
+      ListItem<RequestMode>.options(
+        title: Text(strings.requestMode),
+        subtitle: Text(label(mode)),
+        dialogTitle: strings.requestMode,
+        options: RequestMode.values,
+        value: mode,
+        textBuilder: label,
+        onChanged: (value) {
+          if (value != null) onChanged((value, proxy));
+        },
+      ),
+      if (mode == RequestMode.proxy)
+        ListItem<String>.options(
+          title: Text(strings.requestProxyTarget),
+          subtitle: Text(
+            proxy == null || proxy!.isEmpty || proxy == 'GLOBAL'
+                ? strings.requestProxyDefault(selected)
+                : proxy!,
+          ),
+          dialogTitle: strings.requestProxyTarget,
+          options: names,
+          value: proxy == null || proxy!.isEmpty ? 'GLOBAL' : proxy!,
+          textBuilder: (name) =>
+              name == 'GLOBAL' ? strings.requestProxyDefault(selected) : name,
+          onChanged: (name) {
+            if (name != null) onChanged((mode, name));
           },
         ),
-        if (mode == RequestMode.proxy)
-          ListItem<String>.options(
-            title: Text(strings.requestProxyTarget),
-            subtitle: Text(
-              proxy == null || proxy!.isEmpty || proxy == 'GLOBAL'
-                  ? strings.requestProxyDefault(selected)
-                  : proxy!,
-            ),
-            dialogTitle: strings.requestProxyTarget,
-            options: names,
-            value: proxy == null || proxy!.isEmpty ? 'GLOBAL' : proxy!,
-            textBuilder: (name) =>
-                name == 'GLOBAL' ? strings.requestProxyDefault(selected) : name,
-            onChanged: (name) {
-              if (name != null) onChanged((mode, name));
-            },
-          ),
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(strings.requestModeHelp),
+      ),
+      if (managed &&
+          (selected.isEmpty ||
+              proxy != null &&
+                  proxy != 'GLOBAL' &&
+                  !proxy!.startsWith('fc-managed-')))
         Padding(
           padding: const EdgeInsets.all(16),
-          child: Text(strings.requestModeHelp),
+          child: Text(strings.policyMaintenanceRequired),
         ),
-        if (managed &&
-            (selected.isEmpty ||
-                proxy != null &&
-                    proxy != 'GLOBAL' &&
-                    !proxy!.startsWith('fc-managed-')))
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(strings.policyMaintenanceRequired),
-          ),
-      ],
-    );
+    ];
+    return collapsible
+        ? ExpansionTile(title: Text(strings.advancedConfig), children: fields)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListHeader(title: strings.advancedConfig),
+              ...fields,
+            ],
+          );
   }
 }

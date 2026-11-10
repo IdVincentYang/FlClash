@@ -97,6 +97,10 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   Future<void> delayTestCurrentGroup() async {
     final group = currentGroup;
     if (group == null) {
+      dialogs.showNotifier(
+        context.appLocalizations.localGroupsLoadFirst,
+        level: MessageLevel.warning,
+      );
       return;
     }
     await ref

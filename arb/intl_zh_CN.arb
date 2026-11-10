@@ -507,6 +507,19 @@
   "restoreOnlyConfig": "仅恢复配置文件",
   "restoreAllData": "恢复所有数据",
   "addProfile": "添加配置",
+  "delayTestWaiting": "等待测试",
+  "delayTestWaitingResult": "等待测试结果",
+  "delayTestRequiresProxy": "请先启动代理，连接成功后再测试节点延迟。",
+  "delayTestUnavailable": "不可测试",
+  "delayTestNoResult": "核心未返回测试结果，请确认代理已连接后重试。",
+  "delayTestFailed": "延迟测试未完成：{reason}",
+  "@delayTestFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "delayTest": "延迟测试",
   "proxyGroupEmpty": "策略组为空",
   "proxyGroupNameDuplicate": "策略组名称重复",
@@ -955,6 +968,47 @@
   "androidServiceVpnActive": "VPN 已启动",
   "androidServiceProxyOnly": "仅代理服务",
   "androidServiceUnavailable": "服务不可用",
+  "useProfile": "使用",
+  "sourceReviewPending": "待审核",
+  "sourceStatusChecking": "正在检查来源权限…",
+  "sourceStatusRetry": "权限状态暂不可用 · 重试",
+  "localGroupsAmbiguous": "所选节点在多个来源中重名，请选择名称可区分的节点，以免选错出口。",
+  "localGroupsPending": "已保存，正在等待应用。",
+  "localGroupsTitle": "分组管理",
+  "localGroupsCreate": "新建分组",
+  "localGroupsEmpty": "选择当前订阅的节点，创建自己的分组。",
+  "localGroupsScope": "{name}",
+  "localGroupsParent": "加入分组的可选项",
+  "localGroupsIndependent": "仅独立显示",
+  "localGroupsManual": "手动",
+  "localGroupsAutomatic": "测速优先",
+  "localGroupsFallback": "故障转移",
+  "localGroupsLoadFirst": "请先使用此订阅并完成来源审核，以加载可选节点。",
+  "localGroupsInUse": "请先选择其它节点或分组，再取消此引用、禁用或删除此组。",
+  "localGroupsDelete": "删除分组“{name}”？",
+  "localGroupsMissing": "节点已不可用：{name}",
+  "localGroupsNameConflict": "请使用未被节点或其他分组占用的名称。",
+  "localGroupsMembersRequired": "请至少选择一个可用节点。",
+  "localGroupsInvalidParent": "请选择可用的手动分组，或选择仅独立显示。",
+  "localGroupsInvalidTestUrl": "请输入有效的 HTTP(S) 测速地址。",
+  "localGroupsApplyFailed": "分组变更未能应用，请检查配置后重试。",
+  "localGroupsChanged": "配置已变化，请刷新分组管理后重试。",
+  "localGroupsManaged": "此配置请在策略草稿中管理分组。",
+  "localGroupsLimit": "分组或成员数量超出限制。",
+  "localGroupsSearch": "搜索节点",
+  "localGroupsSource": "订阅分组（只读）",
+  "sourceSubscriptionReview": "审核订阅",
+  "sourceRelatedSourcesCount": "关联数据源：{count} 个",
+  "sourceLoadChecking": "正在检查订阅和来源权限…",
+  "sourceLoadProgress": "已就绪：{ready}/{total}",
+  "sourceLoadQueued": "等待中",
+  "sourceLoadDownloading": "正在下载…",
+  "sourceLoadVerifying": "正在核验…",
+  "sourceLoadReady": "已就绪",
+  "sourceLoadCached": "已就绪 · 已核验快照",
+  "sourceLoadFailed": "失败",
+  "sourceBatchPreparing": "正在加载关联数据源…",
+  "sourceBatchScope": "统一审核此订阅、最终配置及列出的全部关联数据源。确认仅批准本次展示的内容快照。",
   "sourceReviewTitle": "审查来源",
   "sourceScriptTitle": "审查脚本",
   "sourceAcceptRevision": "接受此版本",
@@ -1003,7 +1057,9 @@
   "sourceStopUse": "停止使用此内容",
   "sourceBinaryMaterial": "二进制 RuleSet：只接受这些精确字节。原解析器验证材料前，规则数量未知。",
   "sourceStorageFull": "已达到来源存储上限，本次操作未完成。",
-  "sourcePermissionsUnavailable": "来源权限暂不可用，请等待 Core 就绪后重试。",
+  "backgroundStartFailed": "FlClash 未启动。请打开应用，处理待审核来源或查看错误。",
+  "sourcePermissionsUnavailable": "无法读取或核验来源权限。请重试；若持续失败，请查看应用日志。",
+  "sourceMaterialUnavailable": "无法加载关联数据源。请检查其地址、网络连接和请求出口，然后重试。",
   "sourceRoutingExcluded": "此内容包含已排除的路由能力。请移除这些能力，或明确更改来源路由选择。",
   "sourceRecoveryUnavailable": "来源权限已更改，但恢复 checkpoint 未能更新，重启恢复不可用。",
   "sourceAppliedNotSaved": "已应用，恢复尚未保存",
@@ -1012,5 +1068,81 @@
   "sourceLocalPolicy": "本地策略",
   "sourceRecoveryTitle": "核对未完成的保存",
   "sourceRecoveryDescription": "核对本机已保存的配置、脚本和权限。核对将停止当前配置的流量处理，并丢弃未完成的确认。之后请重新审查来源并应用配置。",
-  "requestRestartRequired": "未完成的本地保存可能仍在运行。请打开应用信息 → 强行停止，再重新打开 FlClash。仅重启代理服务或关闭界面无法解决。重新打开后，请在来源权限中核对已保存的数据。"
+  "requestRestartRequired": "未完成的本地保存可能仍在运行。请打开应用信息 → 强行停止，再重新打开 FlClash。仅重启代理服务或关闭界面无法解决。重新打开后，请在来源权限中核对已保存的数据。",
+  "localGroupsEnableSpeedTest": "启用速度测试",
+  "localGroupsStrategyHelp": "开启：按测速选择；关闭：按 Core 默认顺序故障转移。两种方式都会自动检查可用性。",
+  "localGroupsRegex": "节点正则表达式（可选）",
+  "localGroupsRegexHelp": "匹配节点默认选中，可继续手工调整。",
+  "localGroupsRegexDocs": "正则语法帮助",
+  "localGroupsPreferred": "首选节点：{name}",
+  "@localGroupsPreferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsActualExit": "实际出口：{name}",
+  "@localGroupsActualExit": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsTransientHelp": "点击节点用于当前运行；检测到故障后自动迁移，不保存这次手选。",
+  "localGroupsUnavailable": "该分组尚未运行，请启用或等待配置准备完成。",
+  "localGroupsUse": "管理分组引用",
+  "localGroupsUseHelp": "勾选允许选择此自建组的目标分组。保存后应用引用，保留各组当前选择。",
+  "localGroupsNoEntrance": "当前配置没有可选择的路由入口。",
+  "localGroupsPreparing": "正在检查已保存配置…",
+  "localGroupsPreparingSources": "正在校验已保存的来源文件…",
+  "localGroupsApplying": "正在应用配置…",
+  "localGroupsIdentitySection": "基本信息",
+  "localGroupsStrategySection": "切换策略",
+  "localGroupsNodesSection": "节点",
+  "localGroupsOwn": "自建",
+  "localGroupsSubscription": "订阅",
+  "localGroupsNodeCount": "{count} 个节点",
+  "localGroupsActions": "{name} 的操作",
+  "localGroupsEnable": "启用",
+  "localGroupsDisable": "禁用",
+  "localGroupsRouteThis": "管理分组引用",
+  "localGroupsNoSaved": "还没有自建分组，请先在分组管理中新建。",
+  "@localGroupsNodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@localGroupsActions": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "localGroupsSaving": "正在检查并保存分组…",
+  "localGroupsDownloading": "正在下载来源更新…",
+  "localGroupsReferences": "已加入 {count} 个分组",
+  "localGroupsReferencesSaved": "引用已生效，各分组的当前选择已保留。",
+  "localGroupsReferenceUsing": "正在使用",
+  "localGroupsReferenceAdded": "已加入可选列表",
+  "localGroupsReferenceNotAdded": "未加入",
+  "@localGroupsReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localGroupsSourceUnavailable": "当前已审核配置或来源许可不可用，请在订阅中检查来源权限。",
+  "localGroupsForegroundRequired": "此修改需要完整应用配置，请回到应用前台后重试。",
+  "profileImportContinue": "继续",
+  "profileImportDownloading": "正在下载订阅…",
+  "profileImportSaving": "正在保存订阅…",
+  "profileImportPreparing": "正在准备导入…",
+  "profileImportDownloadFailed": "无法下载订阅，请检查 URL 和请求方式后重试。",
+  "profileImportInvalid": "下载的文件不是有效订阅，请检查 URL。"
 }

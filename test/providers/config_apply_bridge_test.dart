@@ -92,6 +92,8 @@ class _BridgeSetup extends SetupAction {
     void Function(Map<String, Object?>)? onRuleLedger,
     bool allowSourceReview = true,
     Future<bool> Function()? isCurrent,
+    Map<String, dynamic>? previewDocument,
+    bool previewOwnRouting = false,
   }) async {
     final gate = buildGate;
     buildGate = null;

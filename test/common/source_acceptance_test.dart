@@ -2,6 +2,7 @@ import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
+import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -67,6 +68,70 @@ void main() {
     });
   });
   tearDown(() => requests.detach());
+
+  for (final status in ['accepted', 'reviewRequired', 'unexpected']) {
+    test('subscription status is read-only and validates $status', () async {
+      when(() => core.sourceAcceptance(any())).thenAnswer((invocation) async {
+        calls.add(
+          Map<String, Object?>.from(
+            invocation.positionalArguments.single as Map,
+          ),
+        );
+        return {'status': status};
+      });
+      final acceptance = SourceAcceptance(
+        core: CoreController.scoped(core),
+        requests: requests,
+      );
+      final result = acceptance.subscriptionStatus(
+        source: await requests.captureSource('profile:7'),
+        identity: 'a' * 64,
+        settings: const {},
+        body: 'rules: [MATCH,REJECT]',
+      );
+      if (status == 'unexpected') {
+        await expectLater(result, throwsA(isA<RequestUnavailable>()));
+      } else {
+        expect(
+          await result,
+          status == 'accepted'
+              ? SourceReviewStatus.ready
+              : SourceReviewStatus.required,
+        );
+      }
+      expect(calls.map((call) => call['action']), ['status']);
+      expect(calls.single['forceReview'], isNull);
+    });
+  }
+
+  test(
+    'material download errors do not claim Core permissions are unavailable',
+    () async {
+      when(() => core.sourceAcceptance(any())).thenThrow(
+        const CoreMethodException(
+          code: 'source_material_unavailable',
+          message: 'Provider material is unavailable',
+        ),
+      );
+      final service = SourceAcceptance(
+        core: CoreController.scoped(core),
+        requests: requests,
+      );
+      await expectLater(
+        service.permissions(
+          source: await requests.captureSource('profile:7'),
+          kind: 'profile',
+        ),
+        throwsA(
+          isA<RequestUnavailable>().having(
+            (error) => error.code,
+            'code',
+            'source_material_unavailable',
+          ),
+        ),
+      );
+    },
+  );
 
   test('accepted material lease is released once by its consumer', () async {
     materialLease = 'd' * 48;
@@ -160,6 +225,37 @@ void main() {
   });
 
   test(
+    'cancel clears only its candidate after the display guard closes',
+    () async {
+      var current = true;
+      final service = SourceAcceptance(
+        core: CoreController.scoped(core),
+        requests: requests,
+        confirm: (_) async {
+          current = false;
+          return null;
+        },
+      );
+      await expectLater(
+        service.review(
+          source: await requests.captureSource('profile:7'),
+          identity: 'a' * 64,
+          settings: const {},
+          body: 'rules: [MATCH,REJECT]',
+          label: 'fixture',
+          location: '',
+          kind: 'profile',
+          forceReview: true,
+          isCurrent: () async => current,
+        ),
+        throwsA(isA<RequestUnavailable>()),
+      );
+      expect(calls.map((call) => call['action']), ['review', 'discard']);
+      expect(calls.last['candidate'], 'fixture-candidate');
+    },
+  );
+
+  test(
     'final composition carries the same accepted ancestors into its decision',
     () async {
       final uses = [
@@ -227,7 +323,7 @@ void main() {
       ),
       throwsA(isA<RequestUnavailable>()),
     );
-    expect(calls.map((call) => call['action']), ['review']);
+    expect(calls.map((call) => call['action']), ['review', 'discard']);
   });
 
   test(
@@ -257,6 +353,77 @@ void main() {
         throwsA(isA<RequestUnavailable>()),
       );
       expect(calls, hasLength(count));
+    },
+  );
+  test(
+    'batch consent matches exact body, settings and purpose only once',
+    () async {
+      final source = await requests.captureSource('profile:7');
+      final candidate = await requests.captureSource('provider-rule:fixture');
+      final store = SourceReviewBatchStore.forRequests(requests);
+      const mapping = <String, Object?>{'type': 'file', 'path': 'rules.txt'};
+      final settingsHash = SourceAcceptance.fingerprint(mapping);
+      final root = SourceReview(
+        source: source,
+        key: source.key,
+        identity: 'root',
+        bodyHash: 'raw',
+        label: 'fixture',
+        origin: '',
+        kind: 'profile',
+        reasons: const [],
+        routing: 'source',
+      );
+      SourceReview review({String body = 'exact', String? settings}) =>
+          SourceReview(
+            source: candidate,
+            key: candidate.key,
+            bodyHash: body,
+            settingsHash: settings ?? settingsHash,
+            label: 'fixture',
+            origin: '',
+            kind: 'provider-rule',
+            reasons: const [],
+            routing: 'source',
+          );
+      store.accept(root, [
+        SourceReviewBatchEntry(
+          review: review(),
+          keys: {candidate.key},
+          body: const [1, 2, 3],
+        ),
+      ], const SourceReviewDecision(automatic: false, routing: 'source'));
+      expect(store.decision(review(body: 'changed')), isNull);
+      expect(store.decision(review(settings: 'changed')), isNull);
+      expect(store.decision(review()), isNotNull);
+      expect(store.decision(review()), isNull);
+      expect(
+        store.material(
+          root.key,
+          candidate.key,
+          'provider-rule',
+          mapping,
+          source.client,
+        ),
+        [1, 2, 3],
+      );
+      expect(
+        store.material(
+          'profile:8',
+          candidate.key,
+          'provider-rule',
+          mapping,
+          source.client,
+        ),
+        isNull,
+      );
+      store.validateRoot(
+        root.key,
+        'new identity',
+        root.bodyHash,
+        source.client,
+      );
+      expect(store.isEmpty, isTrue);
     },
   );
 }

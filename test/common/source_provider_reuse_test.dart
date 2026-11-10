@@ -14,9 +14,71 @@ class _Native extends Mock implements Service {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  for (final scenario in ['reuse', 'http', 'file']) {
+  test(
+    'cached bundle is validated once without retrieving provider bodies',
+    () async {
+      final core = _Core();
+      final requests = Request.scoped(native: _Native(), isAndroid: false);
+      final calls = <Map<String, Object?>>[];
+      const rootUse = {'key': 'config:7', 'kind': 'config', 'digest': 'root'};
+      const providerUse = {
+        'key': 'provider-proxy:A',
+        'kind': 'provider-proxy',
+        'digest': 'nodes',
+      };
+      when(() => core.sourceAcceptance(any())).thenAnswer((invocation) async {
+        final input = Map<String, Object?>.from(
+          invocation.positionalArguments.single as Map,
+        );
+        calls.add(input);
+        return switch (input['action']) {
+          'reuseCachedProviders' => {
+            'status': 'accepted',
+            'use': rootUse,
+            'uses': [providerUse],
+            'providerMaterials': [
+              {'name': 'A', 'use': providerUse},
+            ],
+            'materialLeases': ['nodes-lease'],
+          },
+          'releaseMaterial' => {'status': 'released'},
+          _ => throw StateError('Unexpected per-provider call'),
+        };
+      });
+      final bundle =
+          await SourceAcceptance(
+            core: CoreController.scoped(core),
+            requests: requests,
+          ).completeProviders(
+            root: const AcceptedSourceRevision(
+              use: rootUse,
+              routing: 'source',
+              materialHash: 'root-body',
+              providers: [
+                {'key': 'provider-proxy:A'},
+              ],
+            ),
+            dependencies: const [],
+            source: await requests.captureSource('application-config'),
+            automatic: true,
+            reuseAccepted: true,
+            isCurrent: () async => true,
+          );
+      expect(bundle.materials.single['name'], 'A');
+      expect(bundle.sources.single.key, 'provider-proxy:A');
+      await bundle.release();
+      await bundle.release();
+      expect(calls.map((call) => call['action']), [
+        'reuseCachedProviders',
+        'releaseMaterial',
+      ]);
+    },
+  );
+
+  for (final scenario in ['reuse', 'http', 'file', 'http-failure']) {
     final reuse = scenario == 'reuse';
     final file = scenario == 'file';
+    final failure = scenario == 'http-failure';
     test(
       'provider completion uses offline material before session: $scenario',
       () async {
@@ -28,6 +90,7 @@ void main() {
         );
         final calls = <Map<String, Object?>>[];
         final nativeCalls = <Map<String, Object?>>[];
+        final downloads = <bool>[];
         when(() => native.requestControl(any())).thenAnswer((invocation) async {
           final input =
               invocation.positionalArguments.single as Map<String, Object?>;
@@ -56,8 +119,12 @@ void main() {
             invocation.positionalArguments.single as Map,
           );
           calls.add(input);
+          if (failure && input['action'] == 'fetchProvider') {
+            throw StateError('controlled download failure');
+          }
           return switch (input['action']) {
-            'reuseProvider' => {
+            'reuseCachedProviders' => {'status': 'missing'},
+            'reuseCachedProvider' => {
               'status': 'reused',
               'bodyBase64': base64Encode(utf8.encode('proxies: []')),
               'materialLease': 'reuse-lease',
@@ -104,17 +171,34 @@ void main() {
             },
           ],
         );
+        if (failure) {
+          await expectLater(
+            acceptance.completeProviders(
+              root: root,
+              dependencies: const [],
+              source: await requests.captureSource('application-config'),
+              automatic: false,
+              onDownloading: downloads.add,
+              isCurrent: () async => true,
+            ),
+            throwsA(isA<StateError>()),
+          );
+          expect(downloads, [true, false]);
+          return;
+        }
         final bundle = await acceptance.completeProviders(
           root: root,
           dependencies: const [],
           source: await requests.captureSource('application-config'),
           automatic: false,
           reuseAccepted: reuse,
+          onDownloading: downloads.add,
           isCurrent: () async => true,
         );
         expect(bundle.materials.single['use'], use);
+        expect(downloads, reuse || file ? isEmpty : [true, false]);
         expect(
-          calls.where((call) => call['action'] == 'reuseProvider'),
+          calls.where((call) => call['action'] == 'reuseCachedProvider'),
           hasLength(reuse ? 1 : 0),
         );
         expect(

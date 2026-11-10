@@ -307,7 +307,8 @@ func changeProxyOwned(params *ChangeProxyParams, expected *controllerConfigMutat
 	if expected != nil && !expected.valid() {
 		return &ChangeProxyResult{Message: errConfigSuperseded.Error()}
 	}
-	if pendingConfig != nil && configFact.Phase != "ready" {
+	inactiveSelector := configFact.Phase == "installed" && !configFact.BusinessActive && params.Owner != 0 && lookupProxy(params.GroupName) != nil && lookupProxy(params.GroupName).Type() == constant.Selector
+	if pendingConfig != nil && configFact.Phase != "ready" && !inactiveSelector {
 		return &ChangeProxyResult{Message: errConfigNotApplied.Error()}
 	}
 	if params.Owner != 0 && (params.Owner != configFact.Owner || params.Token != configFact.Token) {
@@ -351,6 +352,10 @@ func changeProxyOwned(params *ChangeProxyParams, expected *controllerConfigMutat
 	} else if err := selector.Set(params.ProxyName); err != nil {
 		return &ChangeProxyResult{Message: err.Error()}
 	}
+	automatic := lookupProxy(params.GroupName).Type() == constant.URLTest || lookupProxy(params.GroupName).Type() == constant.Fallback
+	if params.Transient && automatic {
+		rememberTransientSelectionLocked(params.GroupName, params.ProxyName, owner, selector)
+	}
 	changed := selector.Now() != before
 	refreshRouteLocked(false)
 	checkpointMu.Unlock()
@@ -365,7 +370,9 @@ func changeProxyOwned(params *ChangeProxyParams, expected *controllerConfigMutat
 	}
 	configFact.Version = configFactSequence.Add(1)
 	checkpointMu.Unlock()
-	err = saveAcceptedConfigChanges(nil, nil)
+	if !params.Transient || !automatic {
+		err = saveAcceptedConfigChanges(nil, nil)
+	}
 	configMu.Unlock()
 	if err != nil {
 		return &ChangeProxyResult{Message: err.Error(), Changed: changed}

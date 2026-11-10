@@ -111,6 +111,10 @@ class NamedUrlDialog extends StatefulWidget {
   final RequestMode requestMode;
   final String? requestProxy;
   final ValueChanged<(RequestMode, String?)>? onRequestRouteChanged;
+  final ValueChanged<({String label, String url})>? onSubmit;
+  final String? submitText;
+  final String? errorText;
+  final bool requestRouteCollapsible;
 
   const NamedUrlDialog({
     super.key,
@@ -122,6 +126,10 @@ class NamedUrlDialog extends StatefulWidget {
     this.requestMode = RequestMode.auto,
     this.requestProxy,
     this.onRequestRouteChanged,
+    this.onSubmit,
+    this.submitText,
+    this.errorText,
+    this.requestRouteCollapsible = true,
   });
 
   @override
@@ -175,10 +183,17 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
       return;
     }
     widget.onRequestRouteChanged?.call((_requestMode, _requestProxy));
-    Navigator.of(context).pop<({String label, String url})>((
+    final value = (
       label: _labelController.text.trim(),
       url: _urlController.text.trim(),
-    ));
+    );
+    final submit = widget.onSubmit;
+    if (submit != null) {
+      FocusScope.of(context).unfocus();
+      submit(value);
+    } else {
+      Navigator.of(context).pop<({String label, String url})>(value);
+    }
   }
 
   @override
@@ -195,7 +210,7 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
         ),
         TextButton(
           onPressed: _handleSubmit,
-          child: Text(appLocalizations.submit),
+          child: Text(widget.submitText ?? appLocalizations.submit),
         ),
       ],
       child: Form(
@@ -204,6 +219,11 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
         child: Wrap(
           runSpacing: 16,
           children: [
+            if (widget.errorText != null)
+              Text(
+                widget.errorText!,
+                style: TextStyle(color: context.colorScheme.error),
+              ),
             TextFormField(
               controller: _labelController,
               validator: widget.labelValidator,
@@ -234,6 +254,7 @@ class _NamedUrlDialogState extends State<NamedUrlDialog> {
             ),
             if (widget.onRequestRouteChanged != null)
               RequestRouteFields(
+                collapsible: widget.requestRouteCollapsible,
                 mode: _requestMode,
                 proxy: _requestProxy,
                 onChanged: (value) => setState(() {

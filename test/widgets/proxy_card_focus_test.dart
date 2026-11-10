@@ -1,3 +1,5 @@
+import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -131,6 +133,69 @@ void main() {
       context?.findAncestorWidgetOfExactType<ProxyCard>()?.key,
       const ValueKey('proxy 1'),
     );
+  });
+
+  testWidgets('pending nodes show waiting before replacing their old values', (
+    tester,
+  ) async {
+    final pending = container.read(pendingDelayTestsProvider.notifier);
+    final first = delayTestKey(_testUrl, 'proxy 0');
+    final second = delayTestKey(_testUrl, 'proxy 1');
+    pending.apply(acquired: [first, second], started: [second]);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: TestApp(
+          homeBuilder: (child) => Scaffold(body: child),
+          child: Column(
+            children: [
+              for (var index = 0; index < 2; index++)
+                SizedBox(
+                  height: 120,
+                  child: ProxyCard(
+                    groupName: 'group',
+                    testUrl: _testUrl,
+                    proxy: Proxy(name: 'proxy $index', type: 'Shadowsocks'),
+                    groupType: GroupType.Selector,
+                    type: ProxyCardType.shrink,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Waiting'), findsOneWidget);
+    expect(find.text('Waiting for result'), findsOneWidget);
+    expect(find.text('123 ms'), findsNothing);
+    container
+        .read(delayDataSourceProvider.notifier)
+        .setDelay(const Delay(url: _testUrl, name: 'proxy 0', value: 28));
+    pending.apply(released: [first], finished: [second]);
+    await tester.pumpAndSettle();
+    expect(find.text('28 ms'), findsOneWidget);
+    expect(find.text('456 ms'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('failed tests show a reason and can be retried', (tester) async {
+    container
+        .read(delayTestFailuresProvider.notifier)
+        .set(
+          delayTestKey(_testUrl, 'proxy 0'),
+          const RequestUnavailable('delay_test_no_result'),
+        );
+    await pumpCards(tester, ProxyCardType.shrink);
+    expect(find.text('Unavailable'), findsOneWidget);
+    expect(find.text('123 ms'), findsNothing);
+    expect(find.text('456 ms'), findsOneWidget);
+    expect(
+      find.byTooltip(AppLocalizations.current.delayTestNoResult),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Unavailable'));
+    expect(_RecordingProxiesAction.tested, ['proxy 0']);
   });
 
   testWidgets('enter on the delay control runs the delay test', (tester) async {

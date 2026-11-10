@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/tunnel"
 )
@@ -316,21 +315,8 @@ func mergeAcceptedOverrides(manifest *ConfigManifest, params *UpdateParams) erro
 func checkpointSelectionsLocked() (map[string]string, error) {
 	picks, _ := readPicks()
 	for name, proxy := range tunnel.AllProxies() {
-		if _, ok := proxy.Adapter().(outboundgroup.SelectAble); !ok || proxy.Type() == C.Selector {
-			continue
-		}
-		data, err := proxy.Adapter().MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		var state struct {
-			Fixed *string `json:"fixed"`
-		}
-		if err := json.Unmarshal(data, &state); err != nil {
-			return nil, err
-		}
-		if state.Fixed != nil {
-			picks[name] = *state.Fixed
+		if proxy.Type() != C.Selector {
+			delete(picks, name)
 		}
 	}
 	return picks, nil

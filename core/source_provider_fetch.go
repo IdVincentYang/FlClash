@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"os"
 	"reflect"
@@ -90,11 +91,18 @@ func sourceProviderHeaders(mapping map[string]any) (mh.Header, error) {
 
 func fetchSourceProviderMaterial(home string, request sourceAcceptanceRequest) ([]byte, error) {
 	configMu.Lock()
-	if !isInit.Load() || !sourceAcceptanceCurrent(request) || request.Use == nil {
+	preview := request.Action == "previewProvider"
+	if !isInit.Load() || !sourceAcceptanceCurrent(request) || (!preview && request.Use == nil) || (preview && request.Parent == nil) {
 		configMu.Unlock()
 		return nil, errSourceSuperseded
 	}
-	plans, err := acceptedSourceProviderPlans(home, *request.Use, request.MaterialHash)
+	plansForRequest := func() ([]sourceProviderPlan, error) {
+		if preview {
+			return previewSourceProviderPlans(home, request.Body, request.Parent.Key, request.Uses)
+		}
+		return acceptedSourceProviderPlans(home, *request.Use, request.MaterialHash)
+	}
+	plans, err := plansForRequest()
 	registry := appRequests
 	configMu.Unlock()
 	if err != nil {
@@ -102,7 +110,7 @@ func fetchSourceProviderMaterial(home string, request sourceAcceptanceRequest) (
 	}
 	var plan *sourceProviderPlan
 	for i := range plans {
-		if plans[i].Key == request.Key && plans[i].Name == request.ProviderName && plans[i].Kind == request.Kind {
+		if (preview || plans[i].Key == request.Key) && plans[i].Name == request.ProviderName && plans[i].Kind == request.Kind {
 			plan = &plans[i]
 			break
 		}
@@ -112,7 +120,19 @@ func fetchSourceProviderMaterial(home string, request sourceAcceptanceRequest) (
 	}
 	var body []byte
 	var lease *appRequestLease
-	if plan.Mapping["type"] == "file" {
+	local := plan.Mapping["type"] == "file"
+	if preview && plan.Origin != nil && !local {
+		path, ok := plan.Mapping["path"].(string)
+		if !ok || !C.Path.IsSafePath(C.Path.Resolve(path)) {
+			return nil, errSourceReview
+		}
+		if info, err := os.Stat(C.Path.Resolve(path)); err == nil {
+			local = info.Mode().IsRegular()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	if local {
 		if requestscope.BeginHook == nil || requestscope.OwnerHook == nil || requestscope.ResourceHook == nil ||
 			reflect.ValueOf(requestscope.BeginHook).Pointer() != reflect.ValueOf(registry.begin).Pointer() ||
 			reflect.ValueOf(requestscope.OwnerHook).Pointer() != reflect.ValueOf(registry.currentOwner).Pointer() ||
@@ -130,7 +150,7 @@ func fetchSourceProviderMaterial(home string, request sourceAcceptanceRequest) (
 		configMu.Lock()
 		current := registry == appRequests && home == C.Path.HomeDir() && sourceAcceptanceCurrent(request)
 		if current {
-			_, err = acceptedSourceProviderPlans(home, *request.Use, request.MaterialHash)
+			_, err = plansForRequest()
 			current = err == nil
 		}
 		configMu.Unlock()
@@ -192,13 +212,13 @@ func fetchSourceProviderMaterial(home string, request sourceAcceptanceRequest) (
 	if err := requestWriterError(); err != nil {
 		return nil, err
 	}
-	if plan.Mapping["type"] == "file" {
+	if local {
 		marker, err := readRequestRecoveryMarker(home)
 		if err != nil || marker != nil {
 			return nil, errSourceReview
 		}
 	}
-	if _, err := acceptedSourceProviderPlans(home, *request.Use, request.MaterialHash); err != nil {
+	if _, err := plansForRequest(); err != nil {
 		return nil, err
 	}
 	return body, nil

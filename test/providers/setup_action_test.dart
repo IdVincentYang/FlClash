@@ -112,6 +112,7 @@ class TestSetupAction extends SetupAction {
 
   int trafficResets = 0;
   int applyProfileCalls = 0;
+  final sourceReviewCalls = <bool>[];
   bool blockCoreCalls = false;
   Error? coreRunningError;
   int authorizeCalls = 0;
@@ -145,12 +146,13 @@ class TestSetupAction extends SetupAction {
   Future<bool> applyProfile({
     bool silence = false,
     bool force = false,
-    bool allowSourceReview = true,
+    bool allowSourceReview = false,
     bool allowBootstrap = false,
     Map<String, Object?>? expectedRun,
     int? setupSequence,
   }) async {
     applyProfileCalls++;
+    sourceReviewCalls.add(allowSourceReview);
     if (requestedRunning &&
         !ref.read(safeModeProvider) &&
         !ref.read(suspendProvider)) {
@@ -282,15 +284,41 @@ void main() {
       expect(container.read(runTimeProvider), isNull);
     });
 
-    test('an initialize request bypasses the init gate', () async {
-      await container
-          .read(setupActionProvider.notifier)
-          .setRunning(true, initialize: true);
+    test(
+      'an initialize request bypasses the init gate without authorizing a modal',
+      () async {
+        container.read(appVisibleProvider.notifier).value = true;
+        await container
+            .read(setupActionProvider.notifier)
+            .setRunning(true, initialize: true);
 
-      expect(action.coreRunningCalls, [true]);
-      expect(action.applyProfileCalls, 1);
-      expect(globalState.needInitStatus, isFalse);
-    });
+        expect(action.coreRunningCalls, [true]);
+        expect(action.applyProfileCalls, 1);
+        expect(globalState.needInitStatus, isFalse);
+        expect(action.sourceReviewCalls, [false]);
+      },
+    );
+
+    test(
+      'bootstrap initialization never requests foreground source review',
+      () async {
+        await container
+            .read(setupActionProvider.notifier)
+            .setRunning(true, initialize: true, source: 'bootstrap');
+
+        expect(action.applyProfileCalls, 1);
+        expect(action.sourceReviewCalls, [false]);
+      },
+    );
+
+    for (final visible in [false, true]) {
+      test('a UI start only allows review while visible: $visible', () async {
+        markInitialized();
+        container.read(appVisibleProvider.notifier).value = visible;
+        await container.read(setupActionProvider.notifier).setRunning(true);
+        expect(action.sourceReviewCalls, [visible]);
+      });
+    }
 
     test('safe mode runs the profile but never touches the listener', () async {
       final scopedAction = TestSetupAction();
@@ -575,6 +603,7 @@ void main() {
 
       expect(action.coreRunningCalls, [true]);
       expect(globalState.needInitStatus, isFalse);
+      expect(action.sourceReviewCalls, [false]);
     });
 
     test('only applies the profile when autoRun is disabled', () async {
@@ -586,6 +615,7 @@ void main() {
 
       expect(action.coreRunningCalls, isEmpty);
       expect(action.applyProfileCalls, 1);
+      expect(action.sourceReviewCalls, [false]);
     });
   });
 

@@ -94,6 +94,7 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
     rules: rules,
     proxyGroups: proxyGroups,
     customProxies: customProxies,
+    localGroups: profile?.localGroups ?? const [],
     profileId: profileId,
     profileLastUpdateDate: profileLastUpdateDate,
     overwriteType: overwriteType,

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/common/managed_material.dart';
+import 'package:fl_clash/common/local_proxy_groups.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:crypto/crypto.dart';
@@ -375,10 +376,17 @@ Future<ProfileComposition> _makeProfileComposition(
     throw const FormatException('sourceOwnRoutingRematchDenied');
   }
   rawConfig['rules'] = rules;
+  if (data.policySelection != null &&
+      data.localGroups.any((group) => group.enabled)) {
+    throw const LocalProxyGroupProblem('managed');
+  }
   final yaml = await _encodeYaml(
-    data.policySelection == null
-        ? Map<String, dynamic>.from(rawConfig)
-        : managedFinalProfile(data),
+    mergeLocalProxyGroups(
+      data.policySelection == null
+          ? Map<String, dynamic>.from(rawConfig)
+          : managedFinalProfile(data),
+      data.localGroups,
+    ),
   );
   return (
     yaml: yaml,
@@ -407,6 +415,8 @@ Map<String, Object?> _compositionLedger(
   final localRevision = hash({
     'rules': data.rules.map((rule) => rule.rawValue).toList(),
     'default': data.matchTarget,
+    if (data.localGroups.isNotEmpty)
+      'groups': data.localGroups.map((group) => group.toJson()).toList(),
   });
   final addedRevision = hash(
     data.addedRules.map((rule) => rule.rawValue).toList(),

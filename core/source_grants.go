@@ -52,11 +52,12 @@ type SourceGrant struct {
 }
 
 type sourcePurposeGrant struct {
-	Automatic bool                   `json:"automatic"`
-	UseEpoch  uint64                 `json:"useEpoch"`
-	Contract  string                 `json:"contract,omitempty"`
-	Accepted  []string               `json:"accepted"`
-	BoundUses map[string][]SourceUse `json:"boundUses,omitempty"`
+	Automatic    bool                   `json:"automatic"`
+	UseEpoch     uint64                 `json:"useEpoch"`
+	Contract     string                 `json:"contract,omitempty"`
+	Accepted     []string               `json:"accepted"`
+	BoundUses    map[string][]SourceUse `json:"boundUses,omitempty"`
+	ReviewBundle *sourceReviewBundle    `json:"reviewBundle,omitempty"`
 }
 
 func sourcePurpose(key string) string {
@@ -294,6 +295,7 @@ func withdrawSourcePermission(home, key, incarnation string, revision uint64, st
 		purpose.Automatic = false
 		if stopUse {
 			purpose.UseEpoch++
+			purpose.ReviewBundle = nil
 			purpose.Accepted = nil
 			purpose.BoundUses = nil
 		}

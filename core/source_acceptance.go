@@ -16,11 +16,15 @@ import (
 )
 
 type sourceAcceptanceRequest struct {
+	Pattern           string                     `json:"pattern,omitempty"`
+	Names             []string                   `json:"names,omitempty"`
 	Action            string                     `json:"action"`
 	Key               string                     `json:"key"`
 	Identity          string                     `json:"identity"`
 	Kind              string                     `json:"kind"`
 	Body              string                     `json:"body"`
+	Preview           string                     `json:"preview,omitempty"`
+	Bundle            bool                       `json:"bundle,omitempty"`
 	Settings          string                     `json:"settings"`
 	Source            ConfigSourceTicket         `json:"source"`
 	Candidate         string                     `json:"candidate"`
@@ -45,6 +49,8 @@ type sourceAcceptanceRequest struct {
 	Provider          map[string]any             `json:"provider,omitempty"`
 	Parent            *SourceUse                 `json:"parent,omitempty"`
 	ExpectedConfig    *ConfigFence               `json:"expectedConfig,omitempty"`
+	LocalGroupsBefore []sourceLocalGroup         `json:"localGroupsBefore,omitempty"`
+	LocalGroups       []sourceLocalGroup         `json:"localGroups,omitempty"`
 	Input             *ConfigInputRequest        `json:"input,omitempty"`
 	MaterialLease     string                     `json:"materialLease,omitempty"`
 	MaterialOperation string                     `json:"materialOperation,omitempty"`
@@ -56,24 +62,29 @@ type sourceAcceptanceRequest struct {
 }
 
 type sourceAcceptanceResult struct {
-	Status        string                  `json:"status"`
-	Candidate     string                  `json:"candidate,omitempty"`
-	Reasons       []string                `json:"reasons,omitempty"`
-	Use           *SourceUse              `json:"use,omitempty"`
-	Uses          []SourceUse             `json:"uses,omitempty"`
-	Grant         *SourceGrant            `json:"grant,omitempty"`
-	MaterialHash  string                  `json:"materialHash,omitempty"`
-	Routing       string                  `json:"routing,omitempty"`
-	Document      map[string]any          `json:"document,omitempty"`
-	Details       *sourceReviewDetails    `json:"details,omitempty"`
-	Previous      *sourceReviewDetails    `json:"previous,omitempty"`
-	RuleContract  *sourceRuleContract     `json:"ruleContract,omitempty"`
-	Providers     []sourceProviderPlan    `json:"providers,omitempty"`
-	BodyBase64    string                  `json:"bodyBase64,omitempty"`
-	Config        *ConfigFence            `json:"config,omitempty"`
-	MaterialLease string                  `json:"materialLease,omitempty"`
-	Receipt       string                  `json:"receipt,omitempty"`
-	Recovery      *sourceRecoverySnapshot `json:"recovery,omitempty"`
+	Matches           []string                 `json:"matches,omitempty"`
+	PatternError      string                   `json:"patternError,omitempty"`
+	Status            string                   `json:"status"`
+	Candidate         string                   `json:"candidate,omitempty"`
+	Reasons           []string                 `json:"reasons,omitempty"`
+	Use               *SourceUse               `json:"use,omitempty"`
+	Uses              []SourceUse              `json:"uses,omitempty"`
+	Grant             *SourceGrant             `json:"grant,omitempty"`
+	MaterialHash      string                   `json:"materialHash,omitempty"`
+	Routing           string                   `json:"routing,omitempty"`
+	Document          map[string]any           `json:"document,omitempty"`
+	Details           *sourceReviewDetails     `json:"details,omitempty"`
+	Previous          *sourceReviewDetails     `json:"previous,omitempty"`
+	RuleContract      *sourceRuleContract      `json:"ruleContract,omitempty"`
+	Providers         []sourceProviderPlan     `json:"providers,omitempty"`
+	BodyBase64        string                   `json:"bodyBase64,omitempty"`
+	Config            *ConfigFence             `json:"config,omitempty"`
+	MaterialLease     string                   `json:"materialLease,omitempty"`
+	ProviderMaterials []SourceProviderMaterial `json:"providerMaterials,omitempty"`
+	MaterialLeases    []string                 `json:"materialLeases,omitempty"`
+	Receipt           string                   `json:"receipt,omitempty"`
+	SelectedMap       map[string]string        `json:"selectedMap,omitempty"`
+	Recovery          *sourceRecoverySnapshot  `json:"recovery,omitempty"`
 }
 
 type sourceReviewCandidate struct {
@@ -166,6 +177,15 @@ func handleSourceAcceptance(call *MethodCall, response MethodResponse) {
 	if !decodeMethodArguments(call, response, &request) {
 		return
 	}
+	if request.Action == "matchLocalNodes" {
+		matches, err := matchLocalNodes(request.Pattern, request.Names)
+		result := sourceAcceptanceResult{Status: "matched", Matches: matches}
+		if err != nil {
+			result.PatternError = err.Error()
+		}
+		response.success(result)
+		return
+	}
 	if request.Action != "withdraw" && request.Action != "reset" && request.Action != "inspect" && request.Action != "discard" && request.Action != "releaseMaterial" && request.Action != "releaseMaterialApproval" {
 		if err := requestWriterError(); err != nil {
 			response.failure(err.Error(), err.Error(), nil)
@@ -176,7 +196,7 @@ func handleSourceAcceptance(call *MethodCall, response MethodResponse) {
 		response.success(adoptSourceInlineRequest(request.Input))
 		return
 	}
-	if request.Action == "fetchProvider" {
+	if request.Action == "fetchProvider" || request.Action == "previewProvider" {
 		body, err := fetchSourceProviderMaterial(C.Path.HomeDir(), request)
 		if err != nil {
 			response.failure("source_material_unavailable", "Provider material is unavailable", nil)
@@ -218,7 +238,16 @@ func handleSourceAcceptance(call *MethodCall, response MethodResponse) {
 	}
 	var result sourceAcceptanceResult
 	var err error
-	if request.Action == "review" || request.Action == "accept" || request.Action == "approveMaterial" {
+	if request.Action == "resolveLocalGroups" {
+		result, err := resolvedLocalGroupConfig(C.Path.HomeDir(), request)
+		if err != nil {
+			response.failure("local_groups_invalid", err.Error(), nil)
+		} else {
+			response.success(result)
+		}
+		return
+	}
+	if request.Action == "review" || request.Action == "accept" || request.Action == "approveMaterial" || request.Action == "approveLocalGroups" {
 		if err := collectSourceMaterialsLocked(C.Path.HomeDir()); err != nil {
 			response.failure("source_permissions_unavailable", err.Error(), nil)
 			return
@@ -228,7 +257,13 @@ func handleSourceAcceptance(call *MethodCall, response MethodResponse) {
 			return
 		}
 	}
-	if request.Action == "inspectProvider" {
+	if request.Action == "approveLocalGroups" {
+		result, err = approveLocalSourceGroups(C.Path.HomeDir(), request)
+	} else if request.Action == "preview" {
+		result, err = previewSourceReview(C.Path.HomeDir(), request)
+	} else if request.Action == "previewCachedProvider" {
+		result, err = previewCachedSourceProvider(C.Path.HomeDir(), request)
+	} else if request.Action == "inspectProvider" {
 		result, err = inspectSourceProviderRequest(request)
 	} else {
 		result, err = sourceAcceptance(C.Path.HomeDir(), request)
@@ -237,8 +272,17 @@ func handleSourceAcceptance(call *MethodCall, response MethodResponse) {
 		result.Providers, err = acceptedSourceProviderPlans(C.Path.HomeDir(), *result.Use, result.MaterialHash)
 	}
 	if err != nil {
+		for _, lease := range result.MaterialLeases {
+			releaseSourceMaterialLease(lease, request.Source.Client)
+		}
 		code := "source_content_invalid"
 		switch {
+		case errors.Is(err, errLocalGroupAmbiguous):
+			code = "local_groups_ambiguous"
+		case errors.Is(err, errLocalGroupInUse):
+			code = "local_groups_in_use"
+		case errors.Is(err, errLocalGroups):
+			code = "local_groups_invalid"
 		case errors.Is(err, errRequestWriterUnknown):
 			code = err.Error()
 		case errors.Is(err, errSourceBudget):
@@ -313,7 +357,11 @@ func sourceAcceptance(home string, request sourceAcceptanceRequest) (sourceAccep
 			return sourceAcceptanceResult{}, err
 		}
 		return sourceAcceptanceResult{Status: "inspected", Grant: permissions.Grants[request.Key]}, nil
-	case "reuseProvider":
+	case "status":
+		return sourceSubscriptionStatus(home, request)
+	case "reuseCachedProvider":
+		return reuseCachedSourceProvider(home, request)
+	case "reuseProvider", "reuseReviewedProvider":
 		return reuseSourceProviderMaterial(home, request)
 	case "review":
 		if request.MaterialOperation != "" {
@@ -324,6 +372,8 @@ func sourceAcceptance(home string, request sourceAcceptanceRequest) (sourceAccep
 		return reviewSourceCandidate(home, request)
 	case "approveMaterial":
 		return approveSourceMaterial(home, request)
+	case "reuseCachedProviders":
+		return reuseCachedSourceProviders(home, request)
 	case "bindProviders":
 		if request.Use == nil || request.Use.Key != request.Key || request.Kind != "config" {
 			return sourceAcceptanceResult{}, errSourceReview
@@ -331,6 +381,11 @@ func sourceAcceptance(home string, request sourceAcceptanceRequest) (sourceAccep
 		use, err := bindSourceProviderMaterials(home, *request.Use, request.MaterialHash, request.ProviderMaterials)
 		if err != nil {
 			return sourceAcceptanceResult{}, err
+		}
+		if request.Bundle {
+			if err := rememberSourceReviewBundle(home, *request.Use, use, request.MaterialHash, request.ProviderMaterials); err != nil {
+				return sourceAcceptanceResult{}, err
+			}
 		}
 		uses, err := sourceCompositionUses(home, use)
 		if err != nil {
@@ -515,6 +570,9 @@ func reviewSourceCandidate(home string, request sourceAcceptanceRequest) (source
 			if !sourceUseAllowed(permissions, use) {
 				return sourceAcceptanceResult{}, errSourceUseRevoked
 			}
+			if request.Action == "status" {
+				return sourceAcceptanceResult{Status: "accepted", Use: &use}, nil
+			}
 			materialHash, err := sealSourceObject(home, body, sourceCandidateMax)
 			if err != nil {
 				return sourceAcceptanceResult{}, err
@@ -549,6 +607,9 @@ func reviewSourceCandidate(home string, request sourceAcceptanceRequest) (source
 				reasons = append(reasons, "source_bindings_changed")
 			}
 			if len(reasons) == 0 {
+				if request.Action == "status" {
+					return sourceAcceptanceResult{Status: "maintenanceAllowed"}, nil
+				}
 				if _, err := sealSourceObject(home, body, sourceCandidateMax); err != nil {
 					return sourceAcceptanceResult{}, err
 				}
@@ -560,6 +621,9 @@ func reviewSourceCandidate(home string, request sourceAcceptanceRequest) (source
 				return sourceAcceptanceResult{Status: "accepted", Use: &use, MaterialHash: inputHash(body), Routing: request.Routing}, nil
 			}
 		}
+	}
+	if request.Action == "status" {
+		return sourceAcceptanceResult{Status: "reviewRequired", Reasons: reasons}, nil
 	}
 	used, count := len(body), 1
 	for key, candidate := range pendingSourceReviews {

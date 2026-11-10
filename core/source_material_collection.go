@@ -148,6 +148,12 @@ func collectSourceMaterialsLocked(home string) error {
 	}
 	for _, grant := range permissions.Grants {
 		for _, purpose := range grant.Purposes {
+			if bundle := purpose.ReviewBundle; bundle != nil && sourceUseAllowed(permissions, bundle.Bound) {
+				keep[bundle.BodyHash] = true
+				for _, material := range bundle.Materials {
+					keep[material.MaterialHash] = true
+				}
+			}
 			if purpose.Contract != "" {
 				keep[purpose.Contract] = true
 			}

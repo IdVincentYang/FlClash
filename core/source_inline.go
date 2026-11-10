@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -124,6 +125,7 @@ func adoptSourceInlineRequest(request *ConfigInputRequest) ConfigApplyResult {
 		result := configResult("applied", p.receipt, err)
 		if err != nil {
 			result.Status = "deferred"
+			result.RequiresFullApply = errors.Is(err, errSourceForeground)
 			if errors.Is(err, errSourceSuperseded) {
 				result.Status = "superseded"
 			}
@@ -199,16 +201,16 @@ func adoptSourceInlineLocked(p *preparedConfig, request *ConfigInputRequest) ([]
 	}
 	if graphChanged || rulesChanged {
 		if reason := sourceInlineReaderReason(); reason != "" {
-			return nil, errors.New("foreground apply required: " + reason)
+			return nil, fmt.Errorf("%w: %s", errSourceForeground, reason)
 		}
 		if graphChanged {
 			if reason := sourceNodeFactoryRisk(map[string]any{"proxies": next.Proxy}); reason != "" {
-				return nil, errors.New("foreground apply required: " + reason)
+				return nil, fmt.Errorf("%w: %s", errSourceForeground, reason)
 			}
 		}
 	}
 	if (graphChanged || rulesChanged) && (p.sourceRetiredCount >= sourceRetiredGenerationLimit || p.sourceRetiredBytes+len(p.bytes)+len(body) > sourceMaterialTotal) {
-		return nil, errSourceBudget
+		return nil, fmt.Errorf("%w: %w", errSourceForeground, errSourceBudget)
 	}
 	var graph *sourceInlineGraph
 	var rules []C.Rule
@@ -239,7 +241,7 @@ func adoptSourceInlineLocked(p *preparedConfig, request *ConfigInputRequest) ([]
 	manifest.SelectedMap, err = checkpointSelectionsLocked()
 	if graph != nil && err == nil {
 		for name, proxy := range graph.proxies {
-			if _, valid := proxy.Adapter().(outboundgroup.SelectAble); valid {
+			if _, valid := proxy.Adapter().(*outboundgroup.Selector); valid {
 				if group, valid := proxy.Adapter().(outboundgroup.ProxyGroup); valid {
 					manifest.SelectedMap[name] = group.Now()
 				}

@@ -8,6 +8,7 @@ import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -78,6 +79,10 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
         minutes: int.parse(_autoUpdateDurationController.text),
       ),
     );
+    if (_fileData == null && profile == widget.profile) {
+      Navigator.of(context).pop();
+      return;
+    }
     final profilesAction = ref.read(profilesActionProvider.notifier);
     final appLocalizations = context.appLocalizations;
     final rename = await profilesAction.providerRename(widget.profile, profile);
@@ -136,6 +141,11 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
           }
         }),
       );
+    }
+    if (mounted &&
+        (_fileData != null || !hasUpdate) &&
+        ref.read(currentProfileIdProvider) == profile.id) {
+      _setupAction.applyProfileDebounce();
     }
     if (mounted) {
       Navigator.of(context).pop();
@@ -245,7 +255,6 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     _fileInfoNotifier.dispose();
     _autoUpdateDurationController.dispose();
     super.dispose();
-    _setupAction.autoApplyProfile();
   }
 
   @override

@@ -27,6 +27,7 @@ import (
 )
 
 type ConfigManifest struct {
+	LocalGroups       []sourceLocalGroup         `json:"localGroups,omitempty"`
 	RuleLedger        *SourceRuleLedger          `json:"ruleLedger,omitempty"`
 	ProviderMaterials []SourceProviderMaterial   `json:"providerMaterials,omitempty"`
 	SourceUses        []SourceUse                `json:"sourceUses,omitempty"`
@@ -118,11 +119,12 @@ type ConfigFact struct {
 }
 
 type ConfigApplyResult struct {
-	Status     string             `json:"status"`
-	Message    string             `json:"message,omitempty"`
-	Receipt    ConfigReceipt      `json:"receipt"`
-	CoreParams *ServiceCoreParams `json:"coreParams,omitempty"`
-	Fact       ConfigFact         `json:"fact"`
+	Status            string             `json:"status"`
+	Message           string             `json:"message,omitempty"`
+	RequiresFullApply bool               `json:"requiresFullApply,omitempty"`
+	Receipt           ConfigReceipt      `json:"receipt"`
+	CoreParams        *ServiceCoreParams `json:"coreParams,omitempty"`
+	Fact              ConfigFact         `json:"fact"`
 }
 
 type configOperation struct {
@@ -254,31 +256,39 @@ func operationRunValidLocked(op *configOperation) bool {
 	return state.ProcessEpoch != "" && state.ProcessEpoch == expected.ProcessEpoch && state.IntentRevision == expected.IntentRevision && state.IntentRunning == expected.IntentRunning && state.Paused == expected.Paused && (!op.request.Active || state.IntentRunning && !state.Paused && state.Phase != "failed")
 }
 
-func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig, string, error) {
+func readConfigManifest(home, id string) (ConfigManifest, error) {
 	var manifest ConfigManifest
 	if !validInputID(id) {
-		return manifest, nil, nil, "", errors.New("invalid input identifier")
+		return manifest, errors.New("invalid input identifier")
 	}
 	data, err := os.ReadFile(filepath.Join(inputDirectory(home), id+".json"))
 	if err != nil {
-		return manifest, nil, nil, "", err
+		return manifest, err
 	}
 	if len(data) > 4<<20 || inputHash(data) != id {
-		return manifest, nil, nil, "", errors.New("input manifest digest mismatch")
+		return manifest, errors.New("input manifest digest mismatch")
 	}
 	if err = json.Unmarshal(data, &manifest); err != nil {
-		return manifest, nil, nil, "", err
+		return manifest, err
 	}
 	if manifest.Version != 1 && manifest.Version != 2 || features.Android && manifest.Version != 2 || !validInputID(manifest.YAMLSHA256) || len(manifest.Dependencies) == 0 {
-		return manifest, nil, nil, "", errors.New("invalid input manifest")
+		return manifest, errors.New("invalid input manifest")
 	}
 	if receipt := manifest.ManagedMaterials; receipt != nil {
 		if manifest.ManagedPolicy == nil || receipt.Version != 1 || receipt.ProfileID == nil || *receipt.ProfileID < 0 || manifest.ProfileID == nil || *receipt.ProfileID != *manifest.ProfileID ||
 			!validInputID(receipt.OriginSHA256) || !validInputID(receipt.RawSHA256) || !validInputID(receipt.MaterialSHA256) || !validInputID(receipt.BindingsSHA256) {
-			return manifest, nil, nil, "", errors.New("invalid managed material receipt")
+			return manifest, errors.New("invalid managed material receipt")
 		}
 	}
-	data, err = os.ReadFile(filepath.Join(inputDirectory(home), manifest.YAMLSHA256+".yaml"))
+	return manifest, nil
+}
+
+func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig, string, error) {
+	manifest, err := readConfigManifest(home, id)
+	if err != nil {
+		return manifest, nil, nil, "", err
+	}
+	data, err := os.ReadFile(filepath.Join(inputDirectory(home), manifest.YAMLSHA256+".yaml"))
 	if err != nil {
 		return manifest, nil, nil, "", err
 	}
@@ -305,6 +315,9 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 		return manifest, nil, nil, "", err
 	}
 	if err = validateSourceProviderMaterials(home, manifest, raw); err != nil {
+		return manifest, nil, nil, "", err
+	}
+	if err = validateLocalGroupMaterials(home, manifest, raw); err != nil {
 		return manifest, nil, nil, "", err
 	}
 	return manifest, slices.Clone(data), raw, parsedSHA, nil

@@ -22,6 +22,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_app.dart';
+import '../helpers/test_config_state.dart';
 import '../helpers/test_profiles.dart';
 
 class _Native extends Mock implements Service {}
@@ -92,6 +93,7 @@ void main() {
       overrides: [
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesActionProvider.overrideWith(() => _Profiles(client)),
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(TestProfiles.new),
         currentProfileIdProvider.overrideWithBuild((_, _) => null),
       ],

@@ -38,7 +38,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     // A rejected profile stays selected on purpose: silently reverting to
     // the previous one hides the error and looks like the switch was lost.
     ref.listenManual(currentProfileIdProvider, (prev, next) {
-      if (prev == next) return;
+      if (prev == next || !ref.read(initProvider)) return;
       runAfterFrame(() {
         unawaited(ref.read(setupActionProvider.notifier).fullSetup());
       });
