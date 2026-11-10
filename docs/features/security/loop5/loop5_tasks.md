@@ -1,15 +1,15 @@
 # Loop 5 任务清单：Android 构建与装包来源
 
 本清单细化[阶段Plan](loop5_plan.md)，只维护一个任务层级。M1负责设计／实现评审与后续远端收尾，D-02负责当前调查、设计和获派任务的实施／自验／本地交付；联系与授权沿用既有独立聊天。
-阶段拆解及L5-T01／T02设计和实现均经M1评审通过，已交付并完成任务记录收尾；T02由M普通fork推送并独立核实远端`efd0a5fc9d9054627528598ec92ea17f5fcf3270`。用户2026-11-06授权连续完成Loop5后续任务，用户2026-11-07明确延期[原EasyTier缺口](../deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)后，T03按调整范围交付于`041c39d9b976bac068499d8896ba21910d67815e`，定稿取回核同后完成当前任务记录清理；M普通fork推送并独立核实`44ff3ddffce549cc4d570ef63697cd5883ba8d5d`，T04已通过完整实现评审并本地交付于`90593590095743dd2c3ba9aa528b999bed666082`，I1／I2均闭合，定稿取回核同后完成任务记录收尾，待M远端核实；T05待接续。各项分别经过M设计及实现评审、D本地交付与M远端核实后接续，不恢复其它Loop或no-Core例外。实际输入及证据边界见[来源基线](../android_build_sources.md)，已交付定稿保留在对应提交历史中。
+阶段拆解及L5-T01／T02设计和实现均经M1评审通过，已交付并完成任务记录收尾；T02由M普通fork推送并独立核实远端`efd0a5fc9d9054627528598ec92ea17f5fcf3270`。用户2026-11-06授权连续完成Loop5后续任务，用户2026-11-07明确延期[原EasyTier缺口](../deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)后，T03按调整范围交付于`041c39d9b976bac068499d8896ba21910d67815e`，定稿取回核同后完成当前任务记录清理；M普通fork推送并独立核实`44ff3ddffce549cc4d570ef63697cd5883ba8d5d`，T04已通过完整实现评审并本地交付于`90593590095743dd2c3ba9aa528b999bed666082`，I1／I2均闭合，定稿取回核同后完成任务记录收尾，M已普通fork推送并独立核实`e947c0374b9f091e300c1d76c91ac1af9cf97cd0`；用户2026-11-08取消T05及本轮后续，T01–T04已交付，T05未交付且不再继续。各项分别经过M设计及实现评审、D本地交付与M远端核实后接续，不恢复其它Loop或no-Core例外。实际输入及证据边界见[来源基线](../android_build_sources.md)，已交付定稿保留在对应提交历史中。
 
 | 编号 | 目标及验收出口 | 依赖 | 当前状态 |
 | --- | --- | --- | --- |
 | L5-T01 | [实际构建／装包来源基线](../android_build_sources.md)：覆盖执行、获取、生成、装包及未装入对象，交付可复核关系与只读对账入口；unknown显式保留，供Loop4／后续任务使用 | 当前获审APK及其构建证据、锁文件、已交付Core载体及Geo基线 | 已交付、M收尾完成；历史[Plan](https://github.com/IdVincentYang/FlClash/blob/6d6387b37cd038a396be36aa62c661deb690ecde/docs/features/security/loop5/l5_t01_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/6d6387b37cd038a396be36aa62c661deb690ecde/docs/features/security/loop5/l5_t01_result.md) |
 | L5-T02 | [工具及发布工件获取校验](../android_build_sources.md#工具接受与受管构建)：实际工具选择、发布身份、固定引用及依赖验证有明确依据，错误工件被拒，正常解析／构建可继续 | T01实际对象及获取链 | 已交付、M记录收尾完成；历史[Plan](https://github.com/IdVincentYang/FlClash/blob/ff0a7e0be259dad941306699b59c82529ce3be54/docs/features/security/loop5/l5_t02_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/ff0a7e0be259dad941306699b59c82529ce3be54/docs/features/security/loop5/l5_t02_result.md) |
 | L5-T03 | [运行组件与生成来源](../android_build_sources.md#受管原包的源码对应)：实际Dart／JVM／Go／Rust／JNI及嵌入执行代码的源码／生成关系和保留依据 | T01装包闭包；身份认证事实复用T02 | 按用户调整范围已交付，记录收尾完成；[原EasyTier缺口明确延期](../deferred_security_items.md#loop5-t03-easytier-wasm-源码与生成对应)。历史[Plan](https://github.com/IdVincentYang/FlClash/blob/041c39d9b976bac068499d8896ba21910d67815e/docs/features/security/loop5/l5_t03_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/041c39d9b976bac068499d8896ba21910d67815e/docs/features/security/loop5/l5_t03_result.md) |
-| L5-T04 | [构建执行、缓存与CI约束](../android_build_sources.md#构建执行与发布边界)：不合资格缓存不能混入，构建与发布权限分离，正常本地流程不执行未获准上传 | T01真实消费者；T02接受的工具／工件身份 | 已本地交付、M记录收尾完成，待远端核实；历史[Plan](https://github.com/IdVincentYang/FlClash/blob/90593590095743dd2c3ba9aa528b999bed666082/docs/features/security/loop5/l5_t04_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/90593590095743dd2c3ba9aa528b999bed666082/docs/features/security/loop5/l5_t04_result.md) |
-| L5-T05 | [最终Android制品对账](#l5-t05-最终android制品对账)：实际源码、工具、生成物、native／DEX／资产及签名绑定正常产物，正反例与剩余限制交Loop4／Loop7 | T01–T04实际成果及未决项处置 | 待前置交付，不以当前APK重跑冒充已完成 |
+| L5-T04 | [构建执行、缓存与CI约束](../android_build_sources.md#构建执行与发布边界)：不合资格缓存不能混入，构建与发布权限分离，正常本地流程不执行未获准上传 | T01真实消费者；T02接受的工具／工件身份 | 已交付、M收尾及远端核实e947c03完成；历史[Plan](https://github.com/IdVincentYang/FlClash/blob/90593590095743dd2c3ba9aa528b999bed666082/docs/features/security/loop5/l5_t04_plan.md)／[Result](https://github.com/IdVincentYang/FlClash/blob/90593590095743dd2c3ba9aa528b999bed666082/docs/features/security/loop5/l5_t04_result.md) |
+| L5-T05 | [最终Android制品对账](#l5-t05-最终android制品对账)：实际源码、工具、生成物、native／DEX／资产及签名绑定正常产物，正反例与剩余限制交Loop4／Loop7 | T01–T04实际成果及未决项处置 | 用户取消；未交付，本轮不再继续，见[中止记录](loop5_plan.md#中止记录) |
 
 ## L5-T03 运行组件与生成来源闭环
 
@@ -29,6 +29,8 @@
 只在项目约束内设计，仍须保正常构建／官方同步；不修改宿主网络、全局缓存或读取真实密钥。
 
 ## L5-T05 最终Android制品对账
+
+本项已由用户取消，未交付；以下保留原目标，不代表验收通过或后续执行授权。
 
 复用未变证据，仅按实际增量构建最小ARM64 dev release，核全部native、DEX/R8、资源、公开签名身份及源输入，区分可解释strip／签名差异与错误工件。
 汇总T02–T04的正常及反例，不为报告重跑所有历史矩阵；提供本地复现入口和变更后复核规则。
