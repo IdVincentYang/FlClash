@@ -5,7 +5,7 @@
 用户从活动中的 App 或 Target Host 发现问题，就地调整对应范围的策略，再观察新连接的结果。
 
 本文维护需求、UI 关系和核心功能边界，供具体页面实现时细化。三层聚合页面与快捷规则操作尚未实现；
-现有能力见[实现基础](#实现基础)，后续安排见[计划入口](network_activity_plan.md)。
+现有能力见[实现基础](#实现基础)，功能依赖与顺序见[Plan](network_activity_plan.md)，实现分解见[Tasks](network_activity_tasks.md)。
 
 ## 入口与三层 UI
 
