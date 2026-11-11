@@ -4,9 +4,10 @@
 把应用是否由 FlClash 接管、接管后的分流，以及实际网络活动放进同一套 UI。
 用户从活动中的 App 或 Target Host 发现问题，就地调整对应范围的策略，再观察新连接的结果。
 
-本文维护需求、UI 关系和核心功能边界，供具体页面实现时细化。三层聚合页面与快捷规则操作尚未实现；
+本文维护需求、UI 关系和核心功能边界，供具体页面实现时细化。已实现内存汇总与第一层应用活动只读页；
+目标列表／详情页与快捷规则操作尚未实现。
 现有能力见[实现基础](#实现基础)，功能依赖与顺序见[Plan](network_activity_plan.md)，实现分解见[Tasks](network_activity_tasks.md)。
-已实现的连接观测结构和覆盖边界见 [Design](network_activity_design.md)，不代表三层 UI 已交付。
+已实现的连接观测、汇总、第一层页面及覆盖边界见 [Design](network_activity_design.md)，不代表完整三层 UI 已交付。
 
 ## 入口与三层 UI
 
@@ -98,7 +99,7 @@ Target Host 以可识别的域名为主，无域名时展示 IP，不能猜测�
 | 能力 | 当前覆盖及新增需求 |
 | --- | --- |
 | 应用接管范围 | [Access control](../../../lib/views/access.dart)已有范围设置；需接入三层 UI，保持同一设置来源 |
-| 网络活动数据 | [Live connections](../../../lib/views/connection/connections.dart)读取当前连接；[Requests](../../../lib/providers/app.dart)有近期内存缓冲；尚无三层聚合页面 |
+| 网络活动数据 | [Live connections](../../../lib/views/connection/connections.dart)读取当前连接；[Requests](../../../lib/providers/app.dart)有近期内存缓冲；另有统一的有界汇总和 [应用活动只读页](../../../lib/views/application_activity.dart)，目标列表／详情尚未交付 |
 | 应用与目标匹配 | Core 已有应用识别及组合规则基础；需补应用策略、Host 例外的持久配置、采用反馈与就地编辑 |
 | 分组目标 | 沿用[订阅组与自建组](../proxies/local_groups_design.md)的可用范围与失效处理，不引入跨订阅节点池 |
 

@@ -6,6 +6,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/about.dart';
 import 'package:fl_clash/views/access.dart';
+import 'package:fl_clash/views/application_activity.dart';
 import 'package:fl_clash/views/backup_and_restore.dart';
 import 'package:fl_clash/views/config/general.dart';
 import 'package:fl_clash/views/hotkey.dart';
@@ -89,6 +90,13 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       ),
     );
     final items = [
+      if (widget.isAndroid ?? system.isAndroid)
+        ListItem.open(
+          leading: const GlyphIcon(AppGlyphs.appsList),
+          title: Text(context.appLocalizations.applicationNetwork),
+          subtitle: Text(context.appLocalizations.applicationNetworkDesc),
+          widget: const ApplicationActivityView(),
+        ),
       Consumer(
         builder: (_, ref, _) {
           final state = ref.watch(moreToolsSelectorStateProvider);

@@ -80,3 +80,39 @@ python3 android/tests/device/network_activity/run_device.py \
 
 baseline 验证流量与事件路径，明确不要求新增 observation。对照不是旧正式 APK 的完整回归，
 只比较本次采集增量。额外维护大缓存、长期压力和真机耗电仍需另行验证。
+
+## 应用活动页面验证
+
+02 的页面检查使用普通 Gradle 调试签名 APK，不运行 instrumentation 或修改生产入口。
+沿用上述设备许可与客户端构建，在专属本地目录启动受控订阅及回声服务：
+
+```bash
+python3 android/tests/device/network_activity/activity_fixture.py \
+  --out build/verification/na-t01-02/device
+```
+
+读取该目录 ports.json 的 URL，通过正常 Profiles → Add profile → URL 导入并审核合成来源，
+选择使用；保留来源的 dns.enable=false、ntp.enable=false，DNS override 关闭。
+安装 a.apk、b.apk；使用既有 Access control 的仅选中模式，只接管这两个受控客户端，避免改变其它 App 的路径。
+正常 Start 后先在应用网络页确认“正在观察 VPN 活动”，再按 run_device.py 的客户端启动方式
+传入该文件的 directPort／proxyPort、count 和 holdMillis；Start 请求发出不等于 VPN 已就绪。
+客户端自己的 socket-facts.json、服务器 received／proxied 与实际应用页面分别核对，不以页面数字作为唯一依据。
+
+在客户端联网时打开 Tools → 应用网络，检查两个 App 的计数、UID、直连／代理出口与规则；
+运行 short=true 的额外批次，检查回前台后的近期计数及观察缺口。
+展开某个 App 后让另一个 App 产生新活动，核对排序变化不会迁移展开状态。
+再检查当前活跃／全部应用、应用搜索、返回、停止后的保留结果和进程重启后的清空。
+结束时正常 Stop，停止测试客户端与本地服务，再清理合成订阅及测试包；不要关闭用户的模拟器或其它应用。
+服务收到 SIGINT／SIGTERM 时把独立收包记录写入指定目录。
+
+主机还可回放 01 的真实 JNI 记录，验证生产解码后的同一汇总模型：
+
+```bash
+FLCLASH_ANDROID_OBSERVATION_EVENTS="$PWD/build/verification/na-t01-01/device-candidate/events.jsonl" \
+  flutter test test/common/application_activity_test.dart
+```
+
+页面 widget、根部订阅及生命周期测试分别在 test/widgets/application_activity_test.dart、
+test/manager/application_activity_manager_test.dart 和 test/providers/application_activity_test.dart。
+实际覆盖与失败在 [02 Result](../../../../docs/features/network_activity/na_t01_02_result.md)记录；
+这些验证不代表 03、04 的目标页面或后续编辑功能已交付。

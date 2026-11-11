@@ -312,6 +312,15 @@ and available configuration facts independently of the process-rule lookup switc
 structured, user-scoped candidates instead of caching the first package. The outward metadata copy keeps legacy
 Requests readable without rewriting the metadata already used for routing. Snapshot reads never resolve an owner again.
 
+Android CoreManager also holds the application activity provider's subscription independently of navigation.
+The observer waits for bootstrap's existing initProvider before reading native/configuration dependencies, then seeds
+from the bounded Requests buffer when observation begins. Its bounded in-memory store merges request events with
+complete, context-fenced foreground connection snapshots;
+failures and background gaps never become zero active connections. App, App-plus-Host and cross-App Host queries share
+the same retained facts. The read-only Tools application network page consumes those queries and the existing package
+directory without requesting service transitions or source acceptance. See the application network design above for
+retention, lifecycle and observation limits.
+
 Go event delivery is intentionally non-blocking:
 
 - Loaded-provider, geo-update, and route-changed events use a state queue that never evicts; the rules for it are under

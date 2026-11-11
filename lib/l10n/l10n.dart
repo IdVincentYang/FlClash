@@ -9682,6 +9682,296 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Application network`
+  String get applicationNetwork {
+    return Intl.message(
+      'Application network',
+      name: 'applicationNetwork',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `View observed app activity, rules and exits`
+  String get applicationNetworkDesc {
+    return Intl.message(
+      'View observed app activity, rules and exits',
+      name: 'applicationNetworkDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recent activity`
+  String get activityRecent {
+    return Intl.message(
+      'Recent activity',
+      name: 'activityRecent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Active now`
+  String get activityActive {
+    return Intl.message(
+      'Active now',
+      name: 'activityActive',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `All apps`
+  String get activityAllApps {
+    return Intl.message(
+      'All apps',
+      name: 'activityAllApps',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observing VPN activity`
+  String get activityObserving {
+    return Intl.message(
+      'Observing VPN activity',
+      name: 'activityObserving',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observation paused · retained activity`
+  String get activityPaused {
+    return Intl.message(
+      'Observation paused · retained activity',
+      name: 'activityPaused',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking active connections…`
+  String get activityChecking {
+    return Intl.message(
+      'Checking active connections…',
+      name: 'activityChecking',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not refresh · active state unconfirmed`
+  String get activitySnapshotFailed {
+    return Intl.message(
+      'Could not refresh · active state unconfirmed',
+      name: 'activitySnapshotFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observation has gaps`
+  String get activityIncomplete {
+    return Intl.message(
+      'Observation has gaps',
+      name: 'activityIncomplete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This run · latest {count} observed connections`
+  String activityRetention(Object count) {
+    return Intl.message(
+      'This run · latest $count observed connections',
+      name: 'activityRetention',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Active {active} · Observed {count}`
+  String activityCounts(Object active, Object count) {
+    return Intl.message(
+      'Active $active · Observed $count',
+      name: 'activityCounts',
+      desc: '',
+      args: [active, count],
+    );
+  }
+
+  /// `Last activity: {time}`
+  String activityLast(Object time) {
+    return Intl.message(
+      'Last activity: $time',
+      name: 'activityLast',
+      desc: '',
+      args: [time],
+    );
+  }
+
+  /// `Unconfirmed`
+  String get activityPending {
+    return Intl.message(
+      'Unconfirmed',
+      name: 'activityPending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No activity observed yet`
+  String get activityNoObserved {
+    return Intl.message(
+      'No activity observed yet',
+      name: 'activityNoObserved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No confirmed active connections`
+  String get activityNoActive {
+    return Intl.message(
+      'No confirmed active connections',
+      name: 'activityNoActive',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No matching apps`
+  String get activityNoMatches {
+    return Intl.message(
+      'No matching apps',
+      name: 'activityNoMatches',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unknown app`
+  String get activityUnknownApp {
+    return Intl.message(
+      'Unknown app',
+      name: 'activityUnknownApp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Shared application identity`
+  String get activitySharedUid {
+    return Intl.message(
+      'Shared application identity',
+      name: 'activitySharedUid',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Current settings: exclude this app`
+  String get activityExcludedSetting {
+    return Intl.message(
+      'Current settings: exclude this app',
+      name: 'activityExcludedSetting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Current settings: include this app`
+  String get activityIncludedSetting {
+    return Intl.message(
+      'Current settings: include this app',
+      name: 'activityIncludedSetting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN capture observed for these connections`
+  String get activityVpnObserved {
+    return Intl.message(
+      'VPN capture observed for these connections',
+      name: 'activityVpnObserved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observed rules`
+  String get activityRules {
+    return Intl.message(
+      'Observed rules',
+      name: 'activityRules',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observed exit paths`
+  String get activityExits {
+    return Intl.message(
+      'Observed exit paths',
+      name: 'activityExits',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `App directory unavailable; observed activity is still shown.`
+  String get activityCatalogueUnavailable {
+    return Intl.message(
+      'App directory unavailable; observed activity is still shown.',
+      name: 'activityCatalogueUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Loading app names…`
+  String get activityLoadingApps {
+    return Intl.message(
+      'Loading app names…',
+      name: 'activityLoadingApps',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only traffic observed by FlClash is included. Counts refer to retained connections, not HTTP requests or complete history. Records stay in memory and reset when the process restarts. Background suspension, event delivery gaps or the retention limit can omit activity. Current access settings do not prove which settings a running VPN has adopted.`
+  String get activityScopeHelp {
+    return Intl.message(
+      'Only traffic observed by FlClash is included. Counts refer to retained connections, not HTTP requests or complete history. Records stay in memory and reset when the process restarts. Background suspension, event delivery gaps or the retention limit can omit activity. Current access settings do not prove which settings a running VPN has adopted.',
+      name: 'activityScopeHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Rules bypassed in Global or Direct mode`
+  String get activityRulesBypassed {
+    return Intl.message(
+      'Rules bypassed in Global or Direct mode',
+      name: 'activityRulesBypassed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observation scope`
+  String get activityObservationScope {
+    return Intl.message(
+      'Observation scope',
+      name: 'activityObservationScope',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

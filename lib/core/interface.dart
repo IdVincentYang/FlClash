@@ -390,11 +390,13 @@ abstract class CoreHandlerInterface with CoreInterface {
     );
     final connections = data?['connections'];
     if (connections is! List) {
-      return [];
+      throw const FormatException('Connection snapshot is incomplete');
     }
     return connections
-        .whereType<Map>()
-        .map((item) => TrackerInfo.fromJson(Map<String, Object?>.from(item)))
+        .map(
+          (item) =>
+              TrackerInfo.fromJson(Map<String, Object?>.from(item as Map)),
+        )
         .toList();
   }
 

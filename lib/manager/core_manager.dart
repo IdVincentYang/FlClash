@@ -6,6 +6,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/route_state.dart';
@@ -14,8 +15,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class CoreManager extends ConsumerStatefulWidget {
   final Widget child;
+  final bool? isAndroid;
 
-  const CoreManager({super.key, required this.child});
+  const CoreManager({super.key, required this.child, this.isAndroid});
 
   @override
   ConsumerState<CoreManager> createState() => _CoreContainerState();
@@ -34,6 +36,9 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   void initState() {
     super.initState();
     coreEventManager.addListener(this);
+    if (widget.isAndroid ?? system.isAndroid) {
+      ref.listenManual(applicationActivityProvider, (_, _) {});
+    }
     ref.read(updatingActionProvider.notifier);
     // A rejected profile stays selected on purpose: silently reverting to
     // the previous one hides the error and looks like the switch was lost.
