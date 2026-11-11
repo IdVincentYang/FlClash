@@ -22,6 +22,6 @@
 [受管材料更新](managed_updates_design.md)（见[使用指南](managed_updates_guide.md)）；
 [服务与接管范围](android_service_design.md)及[操作指南](android_service_guide.md)。
 
-现有 Loops 过完一轮后再细化的新增需求：[网络活动与规则管理](../network_activity/network_activity_plan.md)。
+网络活动与应用分流：[需求概要](../network_activity/network_activity_overview.md)及[后续计划](../network_activity/network_activity_plan.md)。
 
 [来源接受与轻量追溯](source_acceptance_design.md)及[指南](source_acceptance_guide.md)：L2-T05 Android已完成本地交付与M对账；剩余风险保留。
