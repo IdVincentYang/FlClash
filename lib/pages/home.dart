@@ -77,9 +77,6 @@ class _HomeShell extends ConsumerWidget {
     final hasProfile = ref.watch(
       profilesProvider.select((profiles) => profiles.isNotEmpty),
     );
-    final isDashboard = ref.watch(
-      currentPageLabelProvider.select((label) => label == PageLabel.dashboard),
-    );
     return Material(
       color: context.colorScheme.surface,
       child: Column(
@@ -117,9 +114,7 @@ class _HomeShell extends ConsumerWidget {
                         onSelected: (index) {
                           _handleToPage(navigationItems[index].label, ref);
                         },
-                        trailing: hasProfile && isDashboard
-                            ? const StartButton()
-                            : null,
+                        trailing: hasProfile ? const StartButton() : null,
                       ),
                     ),
                   ),
@@ -130,21 +125,37 @@ class _HomeShell extends ConsumerWidget {
           AnimatedVisibility.bottomNavigation(
             visible: isMobile && !floating,
             child: _NavigationPadding(
-              child: NavigationBar(
-                destinations: [
-                  for (final (index, item) in navigationItems.indexed)
-                    NavigationDestination(
-                      icon: AnimatedGlyph(
-                        glyph: item.glyph,
-                        filled: index == state.currentIndex,
+              child: SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: NavigationBar(
+                        destinations: [
+                          for (final (index, item) in navigationItems.indexed)
+                            NavigationDestination(
+                              icon: AnimatedGlyph(
+                                glyph: item.glyph,
+                                filled: index == state.currentIndex,
+                              ),
+                              label: item.label.label,
+                            ),
+                        ],
+                        selectedIndex: state.currentIndex,
+                        onDestinationSelected: (index) {
+                          _handleToPage(navigationItems[index].label, ref);
+                        },
                       ),
-                      label: item.label.label,
                     ),
-                ],
-                selectedIndex: state.currentIndex,
-                onDestinationSelected: (index) {
-                  _handleToPage(navigationItems[index].label, ref);
-                },
+                    if (hasProfile)
+                      const Padding(
+                        padding: EdgeInsetsDirectional.only(start: 8, end: 16),
+                        child: StartButton(compact: true),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

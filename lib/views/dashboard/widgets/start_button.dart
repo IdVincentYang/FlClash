@@ -51,9 +51,10 @@ class RunTimeText extends StatelessWidget {
 }
 
 class StartButton extends ConsumerStatefulWidget {
-  const StartButton({super.key, this.isAndroid});
+  const StartButton({super.key, this.isAndroid, this.compact = false});
 
   final bool? isAndroid;
+  final bool compact;
 
   @override
   ConsumerState<StartButton> createState() => _StartButtonState();
@@ -221,7 +222,7 @@ class _StartButtonState extends ConsumerState<StartButton>
         : suspended
         ? appLocalizations.suspended
         : null;
-    if (NavigationDock.isDocked(context)) {
+    if (widget.compact || NavigationDock.isDocked(context)) {
       return BreathingFill(
         active: actualRunning && !suspend,
         child: FloatingActionButton(

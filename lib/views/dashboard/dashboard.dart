@@ -185,6 +185,7 @@ class _DashboardViewState extends ConsumerState<DashboardView>
     final hasProfile = ref.watch(
       profilesProvider.select((state) => state.isNotEmpty),
     );
+    final isMobile = ref.watch(isMobileViewProvider);
     final spacing = cardSpacing;
     final children = [
       ...dashboardState.dashboardWidgets
@@ -197,7 +198,9 @@ class _DashboardViewState extends ConsumerState<DashboardView>
       (isEdit) => CommonScaffold(
         title: context.appLocalizations.dashboard,
         actions: _buildActions(isEdit),
-        floatingActionButton: hasProfile ? const StartButton() : null,
+        floatingActionButton: hasProfile && !isMobile
+            ? const StartButton()
+            : null,
         body: Align(
           alignment: Alignment.topCenter,
           // SingleChildScrollView snaps a bounce back to its edge whenever a

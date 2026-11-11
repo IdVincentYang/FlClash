@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../helpers/glyph_finders.dart';
 import '../helpers/test_app.dart';
 
 const _mobileSize = Size(400, 800);
@@ -26,6 +27,20 @@ final _lens = find.descendant(
   matching: find.byType(PositionedDirectional),
 );
 const _addLabel = 'Add';
+
+class _ConnectionControl extends CommonAction {
+  final targets = <bool>[];
+
+  @override
+  void build() {}
+
+  @override
+  void toggleRunning() {
+    final running = !ref.read(runControlProvider);
+    targets.add(running);
+    ref.read(runTimeProvider.notifier).value = running ? 1000 : null;
+  }
+}
 
 IconButtonData _addAction({bool isLoading = false}) {
   return IconButtonData(
@@ -48,6 +63,8 @@ Future<ProviderContainer> _pumpHome(
   WidgetTester tester, {
   List<Override> overrides = const [],
   bool settle = true,
+  bool floating = true,
+  List<NavigationItem>? navigationItems,
 }) async {
   tester.view.physicalSize = _mobileSize;
   tester.view.devicePixelRatio = 1;
@@ -61,23 +78,26 @@ Future<ProviderContainer> _pumpHome(
       ...overrides,
       navigationItemsStateProvider.overrideWithValue(
         NavigationItemsState(
-          value: [
-            NavigationItem(
-              glyph: AppGlyphs.dashboard,
-              label: PageLabel.dashboard,
-              builder: (_) => _page('dashboard'),
-            ),
-            NavigationItem(
-              glyph: AppGlyphs.profiles,
-              label: PageLabel.profiles,
-              builder: (_) => _page('profiles', primaryAction: _addAction()),
-            ),
-            NavigationItem(
-              glyph: AppGlyphs.tools,
-              label: PageLabel.tools,
-              builder: (_) => _page('tools'),
-            ),
-          ],
+          value:
+              navigationItems ??
+              [
+                NavigationItem(
+                  glyph: AppGlyphs.dashboard,
+                  label: PageLabel.dashboard,
+                  builder: (_) => _page('dashboard'),
+                ),
+                NavigationItem(
+                  glyph: AppGlyphs.profiles,
+                  label: PageLabel.profiles,
+                  builder: (_) =>
+                      _page('profiles', primaryAction: _addAction()),
+                ),
+                NavigationItem(
+                  glyph: AppGlyphs.tools,
+                  label: PageLabel.tools,
+                  builder: (_) => _page('tools'),
+                ),
+              ],
         ),
       ),
     ],
@@ -85,6 +105,9 @@ Future<ProviderContainer> _pumpHome(
   addTearDown(container.dispose);
   globalState.container = container;
   container.read(viewSizeProvider.notifier).value = _mobileSize;
+  container
+      .read(appSettingProvider.notifier)
+      .update((state) => state.copyWith(floatingNavigationBar: floating));
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -124,13 +147,14 @@ void main() {
     addTearDown(() => navigationPort = null);
   });
 
-  testWidgets('the start button holds the end of the dock on the dashboard', (
+  testWidgets('the start button keeps its position across dock destinations', (
     tester,
   ) async {
     final container = await _pumpHome(tester);
 
     final bar = tester.getRect(find.byType(FloatingNavigationBar));
     final button = tester.getRect(find.byType(FloatingActionButton));
+    final control = tester.state(find.byType(StartButton));
     expect(find.byType(StartButton), findsOneWidget);
     expect(button.width, button.height);
     expect(button.height, bar.height);
@@ -145,12 +169,81 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(container.read(currentPageLabelProvider), PageLabel.tools);
-    expect(find.byType(StartButton), findsNothing);
-    final alone = tester.getRect(find.byType(FloatingNavigationBar));
-    expect(alone.center.dx, _mobileSize.width / 2);
-    expect(alone.width, lessThan(_mobileSize.width - 40));
+    expect(find.byType(StartButton), findsOneWidget);
+    expect(tester.state(find.byType(StartButton)), same(control));
+    expect(tester.getRect(find.byType(FloatingNavigationBar)), bar);
+    expect(tester.getRect(find.byType(FloatingActionButton)), button);
     expect(tester.takeException(), isNull);
   });
+
+  for (final floating in [true, false]) {
+    testWidgets(
+      'all primary tabs share one working control with floating=$floating',
+      (tester) async {
+        final control = _ConnectionControl();
+        const destinations = [
+          (PageLabel.dashboard, AppGlyphs.dashboard),
+          (PageLabel.proxies, AppGlyphs.proxies),
+          (PageLabel.profiles, AppGlyphs.profiles),
+          (PageLabel.tools, AppGlyphs.tools),
+        ];
+        final container = await _pumpHome(
+          tester,
+          floating: floating,
+          navigationItems: [
+            for (final (label, glyph) in destinations)
+              NavigationItem(
+                glyph: glyph,
+                label: label,
+                builder: (_) => _page(label.name),
+              ),
+          ],
+          overrides: [commonActionProvider.overrideWith(() => control)],
+        );
+        final bar = find.byType(
+          floating ? FloatingNavigationBar : NavigationBar,
+        );
+        final button = find.descendant(
+          of: find.byType(StartButton),
+          matching: find.byType(FloatingActionButton),
+        );
+        final buttonRect = tester.getRect(button);
+        final barRect = tester.getRect(bar);
+        final buttonState = tester.state(find.byType(StartButton));
+        for (final (label, glyph) in destinations) {
+          await tester.tap(
+            find.descendant(of: bar, matching: find.byGlyph(glyph)),
+          );
+          await tester.pumpAndSettle();
+          expect(container.read(currentPageLabelProvider), label);
+          expect(find.byType(StartButton), findsOneWidget);
+          expect(tester.state(find.byType(StartButton)), same(buttonState));
+          expect(tester.getRect(button), buttonRect);
+          expect(tester.getRect(bar), barRect);
+          await tester.tap(button);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(container.read(runControlProvider), isTrue);
+          expect(tester.getRect(button), buttonRect);
+          expect(tester.getRect(bar), barRect);
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+          expect(container.read(runControlProvider), isFalse);
+        }
+        expect(control.targets, [
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('a tap that just misses the bar still reaches it', (
     tester,
