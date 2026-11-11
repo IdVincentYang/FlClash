@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'clash_config.dart';
+import 'connection_observation.dart';
 
 part 'generated/common.freezed.dart';
 
@@ -118,6 +119,7 @@ abstract class TrackerInfo with _$TrackerInfo {
     required String rule,
     required String rulePayload,
     Map<String, Object?>? provenance,
+    ConnectionObservation? observation,
     int? downloadSpeed,
     int? uploadSpeed,
   }) = _TrackerInfo;

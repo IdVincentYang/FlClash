@@ -1019,6 +1019,7 @@ func init() {
 		notifyProbeRoute(c)
 		var data any = c
 		if features.Android {
+			connectionObservations.bind(c.Info(), bindSourceTracker(c.Info()))
 			data = sourceTrackerViewOf(c.Info())
 		}
 		sendMessage(Message{

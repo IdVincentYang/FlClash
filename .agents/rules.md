@@ -177,6 +177,8 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
 - The Android bridge resolves an owner in two steps — `resolve_uid` then `resolve_package` — because mihomo fills
   `metadata.Uid` from a procfs lookup that Android Q closed off. Collapsing them back into one call that returns only a
   package name is what left every connection reporting uid 0, so `UID` rules matched nothing.
+  The package callback now returns structured identity JSON; only a unique current-user candidate becomes a process
+  name. Preserve ambiguous/unknown states and never infer a known owner from the legacy metadata UID default.
 - The desktop delivery path in `core/server.go` must not report failures through `logError`. A log event is published to
   the log subscriber, batched, and handed back to `send`, so a send failure reported that way feeds itself; use
   `logDeliveryError`, which writes to stderr and latches until a frame gets through or the next connection is installed.

@@ -23,7 +23,7 @@ import (
 // whether tunNew was reached; the options built below never enable the
 // tun features whose validation runs before tunNew, so New cannot fail
 // before taking ownership of dupFd.
-func Start(fd int, stack string, address, dns string) *sing_tun.Listener {
+func Start(fd int, stack string, address, dns string, observe func(constant.Tunnel) constant.Tunnel) *sing_tun.Listener {
 	var prefix4 []netip.Prefix
 	var prefix6 []netip.Prefix
 	tunStack, ok := constant.StackTypeMapping[strings.ToLower(stack)]
@@ -84,7 +84,7 @@ func Start(fd int, stack string, address, dns string) *sing_tun.Listener {
 		FileDescriptor:      dupFd,
 	}
 
-	listener, err := sing_tun.New(options, tunnel.Tunnel)
+	listener, err := sing_tun.New(options, observe(tunnel.Tunnel))
 
 	if err != nil {
 		log.Errorln("TUN: %v", err)

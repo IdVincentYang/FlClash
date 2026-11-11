@@ -6,6 +6,7 @@
 
 本文维护需求、UI 关系和核心功能边界，供具体页面实现时细化。三层聚合页面与快捷规则操作尚未实现；
 现有能力见[实现基础](#实现基础)，功能依赖与顺序见[Plan](network_activity_plan.md)，实现分解见[Tasks](network_activity_tasks.md)。
+已实现的连接观测结构和覆盖边界见 [Design](network_activity_design.md)，不代表三层 UI 已交付。
 
 ## 入口与三层 UI
 

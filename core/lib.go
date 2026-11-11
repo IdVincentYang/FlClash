@@ -63,7 +63,9 @@ func (th *TunHandler) start(fd int, stack, address, dns string) bool {
 	// on this very goroutine — an RLock taken while this one holds the write
 	// lock deadlocks the start outright. Nothing is lost by dropping it: both
 	// hooks return early until th.listener is set, which is below.
-	tunListener := t.Start(fd, stack, address, dns)
+	tunListener := t.Start(fd, stack, address, dns, func(base constant.Tunnel) constant.Tunnel {
+		return connectionObservationTunnel{observableTunnel: base.(observableTunnel), capture: th.observeConnection}
+	})
 
 	th.mu.Lock()
 	defer th.mu.Unlock()
@@ -128,13 +130,16 @@ func (th *TunHandler) handleProtect(fd int) error {
 	return nil
 }
 
-func (th *TunHandler) handleResolveProcess(source, target net.Addr) (int, string) {
+func (th *TunHandler) handleResolveApplication(source, target net.Addr, expected *connectionCapture) applicationIdentity {
 	th.mu.RLock()
 	defer th.mu.RUnlock()
 
 	// A released callback is a null jobject, and JNI aborts on a call through one.
 	if th.listener == nil || th.callback == nil {
-		return -1, ""
+		return unknownApplication("serviceUnavailable")
+	}
+	if expected != nil && (th.serviceID != expected.ServiceID || th.protectGeneration != expected.Generation) {
+		return unknownApplication("serviceChanged")
 	}
 	var protocol int
 	switch source.Network() {
@@ -142,17 +147,44 @@ func (th *TunHandler) handleResolveProcess(source, target net.Addr) (int, string
 		protocol = syscall.IPPROTO_UDP
 	case "tcp", "tcp4", "tcp6":
 		protocol = syscall.IPPROTO_TCP
+	default:
+		return unknownApplication("unsupported")
 	}
 	var uid int
+	method := "androidUid"
 	if sdkVersion.Load() < 29 {
+		method = "procfs"
 		uid = platform.QuerySocketUidFromProcFs(source, target)
 	} else {
 		uid = resolveUid(th.callback, protocol, source.String(), target.String())
 	}
 	if uid < 0 {
-		return -1, ""
+		return unknownApplication("unknown")
 	}
-	return uid, resolvePackage(th.callback, uid)
+	return decodeApplicationIdentity(uid, resolvePackage(th.callback, uid), method)
+}
+
+func (th *TunHandler) observeConnection(metadata *constant.Metadata) {
+	if connectionObservations.hasPending(metadata) {
+		return
+	}
+	th.mu.RLock()
+	capture := connectionCapture{Status: "vpn", ServiceID: th.serviceID, Generation: th.protectGeneration}
+	ready := th.listener != nil && th.callback != nil
+	th.mu.RUnlock()
+	if !ready {
+		return
+	}
+	connectionObservations.remember(metadata, connectionIngress{capture: capture, configuration: observedConfiguration(), resolve: func(metadata *constant.Metadata) applicationIdentity {
+		return th.resolveApplication(metadata, &capture)
+	}})
+}
+
+func (th *TunHandler) resolveApplication(metadata *constant.Metadata, expected *connectionCapture) applicationIdentity {
+	if metadata.RawSrcAddr == nil || metadata.RawDstAddr == nil {
+		return unknownApplication("unsupported")
+	}
+	return th.handleResolveApplication(metadata.RawSrcAddr, metadata.RawDstAddr, expected)
 }
 
 var (
@@ -183,16 +215,12 @@ func installHooks() {
 			if th == nil {
 				return "", process.ErrInvalidNetwork
 			}
-			src, dst := metadata.RawSrcAddr, metadata.RawDstAddr
-			if src == nil || dst == nil {
-				return "", process.ErrInvalidNetwork
+			identity := th.resolveApplication(metadata, connectionObservations.captureFor(metadata))
+			connectionObservations.remember(metadata, connectionIngress{identity: &identity})
+			if identity.UID != nil {
+				metadata.Uid = *identity.UID
 			}
-			// Everywhere else mihomo fills Uid from its own procfs lookup, the one Android took away.
-			uid, packageName := th.handleResolveProcess(src, dst)
-			if uid >= 0 {
-				metadata.Uid = uint32(uid)
-			}
-			return packageName, nil
+			return identity.packageName(), nil
 		}
 	})
 }

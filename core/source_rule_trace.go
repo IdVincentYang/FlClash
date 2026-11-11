@@ -305,11 +305,14 @@ func bindSourceTracker(info *statistic.TrackerInfo) sourceRuleProvenance {
 
 type sourceTrackerView struct {
 	*statistic.TrackerInfo
-	Provenance sourceRuleProvenance `json:"provenance"`
+	Metadata    *C.Metadata           `json:"metadata"`
+	Provenance  sourceRuleProvenance  `json:"provenance"`
+	Observation connectionObservation `json:"observation"`
 }
 
 func sourceTrackerViewOf(info *statistic.TrackerInfo) sourceTrackerView {
-	return sourceTrackerView{TrackerInfo: info, Provenance: bindSourceTracker(info)}
+	observed := connectionObservations.view(info)
+	return sourceTrackerView{TrackerInfo: info, Metadata: observed.metadata, Provenance: bindSourceTracker(info), Observation: observed.observation}
 }
 
 type sourceConnectionSnapshot struct {

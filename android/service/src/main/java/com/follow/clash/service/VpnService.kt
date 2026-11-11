@@ -7,6 +7,8 @@ import android.net.ProxyInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.Process
+import android.os.UserHandle
 import android.util.Log
 import androidx.core.content.getSystemService
 import com.follow.clash.common.AccessControlMode
@@ -26,7 +28,6 @@ import com.follow.clash.service.models.getIpv6RouteAddress
 import com.follow.clash.service.models.toCIDR
 import com.follow.clash.service.modules.ServiceModules
 import java.net.InetSocketAddress
-import java.util.concurrent.ConcurrentHashMap
 import android.net.VpnService as SystemVpnService
 
 class VpnService : SystemVpnService(), ManagedService, RequestProtection {
@@ -79,7 +80,12 @@ class VpnService : SystemVpnService(), ManagedService, RequestProtection {
     private val connectivity by lazy {
         getSystemService<ConnectivityManager>()
     }
-    private val uidPackageNameMap = ConcurrentHashMap<Int, String>()
+    private val uidPackages by lazy {
+        UidPackageResolver(
+            isCurrentUser = { UserHandle.getUserHandleForUid(it) == Process.myUserHandle() },
+            packagesForUid = packageManager::getPackagesForUid,
+        )
+    }
 
     private fun resolveUid(
         protocol: Int,
@@ -92,16 +98,7 @@ class VpnService : SystemVpnService(), ManagedService, RequestProtection {
         return connectivity?.getConnectionOwnerUid(protocol, source, target) ?: -1
     }
 
-    private fun resolvePackage(uid: Int): String {
-        val cached = uidPackageNameMap[uid]
-        if (cached != null) return cached
-        val packageName = packageManager
-            .getPackagesForUid(uid)
-            ?.firstOrNull()
-            ?.takeIf { it.isNotEmpty() }
-            .orEmpty()
-        return uidPackageNameMap.putIfAbsent(uid, packageName) ?: packageName
-    }
+    private fun resolvePackage(uid: Int): String = uidPackages.resolve(uid).toJson()
 
     private val VpnOptions.tunAddress
         get(): String = buildString {

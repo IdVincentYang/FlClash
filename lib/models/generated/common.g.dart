@@ -87,6 +87,11 @@ _TrackerInfo _$TrackerInfoFromJson(Map<String, dynamic> json) => _TrackerInfo(
   rule: json['rule'] as String,
   rulePayload: json['rulePayload'] as String,
   provenance: json['provenance'] as Map<String, dynamic>?,
+  observation: json['observation'] == null
+      ? null
+      : ConnectionObservation.fromJson(
+          json['observation'] as Map<String, dynamic>,
+        ),
   downloadSpeed: (json['downloadSpeed'] as num?)?.toInt(),
   uploadSpeed: (json['uploadSpeed'] as num?)?.toInt(),
 );
@@ -102,6 +107,7 @@ Map<String, dynamic> _$TrackerInfoToJson(_TrackerInfo instance) =>
       'rule': instance.rule,
       'rulePayload': instance.rulePayload,
       'provenance': instance.provenance,
+      'observation': instance.observation,
       'downloadSpeed': instance.downloadSpeed,
       'uploadSpeed': instance.uploadSpeed,
     };

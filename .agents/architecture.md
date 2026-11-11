@@ -305,6 +305,13 @@ directions. The envelope is the only JSON serialization layer: keep arguments, r
 values rather than embedding pre-encoded JSON strings. Plain domain strings, such as country codes or provider contents,
 remain strings.
 
+Android TUN request events and connection snapshots include an optional versioned `observation`, described in
+the [application network design](../docs/features/network_activity/network_activity_design.md).
+The parent Go TUN wrapper records socket/service context, and the original Tracker join freezes application identity
+and available configuration facts independently of the process-rule lookup switch. UID package resolution returns
+structured, user-scoped candidates instead of caching the first package. The outward metadata copy keeps legacy
+Requests readable without rewriting the metadata already used for routing. Snapshot reads never resolve an owner again.
+
 Go event delivery is intentionally non-blocking:
 
 - Loaded-provider, geo-update, and route-changed events use a state queue that never evicts; the rules for it are under

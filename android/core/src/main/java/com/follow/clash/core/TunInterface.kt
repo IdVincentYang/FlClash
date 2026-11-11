@@ -10,5 +10,6 @@ interface TunInterface {
     /** Returns the uid owning the connection, or -1 when the system will not name it. */
     fun resolveUid(protocol: Int, source: String, target: String): Int
 
+    /** JSON identity result: status, userScope and candidate packages; never a first-package guess. */
     fun resolvePackage(uid: Int): String
 }

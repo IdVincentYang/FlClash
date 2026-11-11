@@ -2,8 +2,8 @@
 
 需求入口：NA-T01，[Overview](network_activity_overview.md)维护业务范围与三层 UI。
 本 Plan 给出功能依赖、建议实现顺序及验证出口，[Tasks](network_activity_tasks.md)管理具体任务和状态。
-当前仅完成规划，尚未实施或派工；页面布局和控件交互在对应任务开工时细化。
-规划输入为 c8a883e，应用源码仍为 a22b673。
+用户已授权实施 01，具体状态及验证入口由 Tasks 维护；页面布局和控件交互在对应任务开工时细化。
+规划输入为 c8a883e，01 的实施基线为 048e99b。
 
 ## 目标与实施边界
 
@@ -91,10 +91,11 @@ flowchart TD
 
 ## 文档与交付安排
 
-本轮修订本 Plan，新增 network_activity_tasks.md，并在 Overview 补充任务入口；不创建空的逐任务文档。
+本 Plan 与 network_activity_tasks.md 共同管理交付，Overview 提供需求入口；不创建空的逐任务文档。
 开工时按需补对应的任务 Plan，先细化该任务影响的规则、数据边界和 UI，再写实现与测试。
 需求变化回到 Overview；任务状态只在 Tasks 更新，避免多份清单分别维护。
 
 对应模块实现交付时，逐步维护 network_activity_design.md，记录已实现的详细结构、流程及限制；
 实际职责变化同步 .agents/architecture.md，验证结果绑定实际提交并由 Tasks 链接，不预写通过结论。
-这些实现文档本轮不创建。版本库交付沿用[官方同步约定](../../../CONTRIBUTING.md)。
+01 已按上述职责建立实现 Design 和验证 Result；后续任务继续按实际增量维护。
+版本库交付沿用[官方同步约定](../../../CONTRIBUTING.md)。

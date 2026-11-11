@@ -4,12 +4,10 @@ package platform
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"unsafe"
 )
@@ -52,12 +50,17 @@ func QuerySocketUidFromProcFs(source, _ net.Addr) int {
 	}
 
 	uid := doQuery(path+"6", sIP, sPort)
-	if uid == -1 {
-		sIP = sIP.To4()
-		if sIP == nil {
+	if uid == ambiguousSocketUID {
+		return -1
+	}
+	if ipv4 := sIP.To4(); ipv4 != nil {
+		other := doQuery(path, ipv4, sPort)
+		if other == ambiguousSocketUID || uid >= 0 && other >= 0 && uid != other {
 			return -1
 		}
-		uid = doQuery(path, sIP, sPort)
+		if other >= 0 {
+			uid = other
+		}
 	}
 
 	return uid
@@ -80,57 +83,20 @@ func localAddressColumn(sIP net.IP, sPort int) []byte {
 	return append(column, encodedPort[:]...)
 }
 
-func column(row []byte, index int) []byte {
-	for i := 0; ; i++ {
-		row = bytes.TrimLeft(row, " \t")
-		if len(row) == 0 {
-			return nil
-		}
-		end := bytes.IndexAny(row, " \t")
-		if end < 0 {
-			end = len(row)
-		}
-		if i == index {
-			return row[:end]
-		}
-		row = row[end:]
-	}
-}
-
 func doQuery(path string, sIP net.IP, sPort int) int {
 	file, err := os.Open(path)
 	if err != nil {
-		return -1
+		if os.IsNotExist(err) {
+			return -1
+		}
+		return ambiguousSocketUID
 	}
 
 	defer func(file *os.File) {
 		_ = file.Close()
 	}(file)
 
-	local := localAddressColumn(sIP, sPort)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		row := scanner.Bytes()
-
-		if !bytes.EqualFold(local, column(row, netIndexOfLocal)) {
-			continue
-		}
-
-		uidColumn := column(row, netIndexOfUid)
-		if uidColumn == nil {
-			return -1
-		}
-
-		uid, err := strconv.Atoi(string(uidColumn))
-		if err != nil {
-			return -1
-		}
-
-		return uid
-	}
-
-	return -1
+	return uniqueSocketUID(file, localAddressColumn(sIP, sPort), netIndexOfLocal, netIndexOfUid)
 }
 
 func nativeEndianIP(ip net.IP) []byte {

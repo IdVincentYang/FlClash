@@ -63,6 +63,23 @@ class _RecordingCoreHandler extends CoreHandlerInterface {
             'chains': ['DIRECT'],
             'rule': 'DIRECT',
             'rulePayload': '',
+            'observation': {
+              'version': 1,
+              'runtimeEpoch': 'connection-runtime',
+              'application': {
+                'status': 'known',
+                'uid': 10123,
+                'userScope': 'current',
+                'packages': ['test.app'],
+                'method': 'androidUid',
+              },
+              'capture': {
+                'status': 'vpn',
+                'serviceId': 'test-service',
+                'generation': 7,
+              },
+              'configuration': {'status': 'known', 'inputId': 'test-input'},
+            },
           },
         ],
       },
@@ -326,6 +343,11 @@ void main() {
       ),
     );
     expect((await handler.getConnections()).single.id, 'connection-1');
+    final observed = (await handler.getConnections()).single.observation!;
+    expect(observed.application.packageName, 'test.app');
+    expect(observed.application.uid, 10123);
+    expect(observed.capture.isVpn, isTrue);
+    expect(observed.configuration.inputId, 'test-input');
     expect(await handler.getConnectionCount(), 3);
     expect((await handler.getExternalProviders()).single.name, 'provider-1');
     expect(
