@@ -41,6 +41,14 @@ require their own authorization. If a normal push is rejected, inspect the remot
 changes and resolve the divergence without rewriting shared history. Report the
 actual remote commit after a successful push.
 
+## Android development delivery
+
+During development, the user authorizes installing the latest tested APK directly
+onto the already-running AVD with a data-preserving replacement install. This is
+the default delivery; no additional installation confirmation is needed.
+Export a copy to `~/Downloads` only when the user explicitly requests a package.
+This does not authorize clearing application data or starting another AVD.
+
 ## Branch and change shape
 
 1. Keep `main` aligned with `upstream/main`; advance it with fast-forward only.
