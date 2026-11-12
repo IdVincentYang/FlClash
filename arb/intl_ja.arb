@@ -1178,5 +1178,6 @@
   "sourceUseLoadedNodes": "読込済みノードのみ確認",
   "sourcePartialImportHint": "すべてのソースを試行しましたが、一部が失敗しました。後で確認するために保存するか、読込済みノードのみを確認できます。",
   "sourceLoadedNodesReviewHint": "読み込み済みノードと単一のプロキシグループのみを使います。元のルーティング、グループ、DNS、外部ソースは除外されます。接続テストは未実施です。自動更新はオフです。元のURLから完全な設定を取得して確認するには、手動で更新してください。",
-  "sourceConfigParsed": "解析済み・関連ソースは別途確認"
+  "sourceConfigParsed": "解析済み・関連ソースは別途確認",
+  "localGroupsSelectNodeHelp": "ノードをタップするとすぐに切り替わります。保存は不要です。"
 }

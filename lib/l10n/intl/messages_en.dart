@@ -1151,6 +1151,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "localGroupsScope": m35,
     "localGroupsSearch": MessageLookupByLibrary.simpleMessage("Search nodes"),
+    "localGroupsSelectNodeHelp": MessageLookupByLibrary.simpleMessage(
+      "Tap a node to switch immediately. No save is needed.",
+    ),
     "localGroupsSource": MessageLookupByLibrary.simpleMessage(
       "Subscription groups (read-only)",
     ),

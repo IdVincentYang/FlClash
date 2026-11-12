@@ -1178,5 +1178,6 @@
   "sourceUseLoadedNodes": "Review loaded nodes only",
   "sourcePartialImportHint": "All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.",
   "sourceLoadedNodesReviewHint": "Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.",
-  "sourceConfigParsed": "Parsed · associated sources checked separately"
+  "sourceConfigParsed": "Parsed · associated sources checked separately",
+  "localGroupsSelectNodeHelp": "Tap a node to switch immediately. No save is needed."
 }

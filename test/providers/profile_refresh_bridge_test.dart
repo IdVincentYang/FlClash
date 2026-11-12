@@ -3360,13 +3360,28 @@ void main() {
     skip: executable == null,
   );
 
-  for (final outcome in ['early', 'pending', 'nodes', 'cancel-nodes']) {
-    test('URL partial import preserves authority and uses explicit $outcome', () async {
-      await existingService();
+  for (final scenario in [
+    (outcome: 'early', first: false),
+    (outcome: 'pending', first: false),
+    (outcome: 'nodes', first: false),
+    (outcome: 'cancel-nodes', first: false),
+    (outcome: 'pending', first: true),
+    (outcome: 'nodes', first: true),
+  ]) {
+    final outcome = scenario.outcome;
+    test('URL partial import $outcome first=${scenario.first}', () async {
+      if (scenario.first) {
+        container.read(currentProfileIdProvider.notifier).value = null;
+      } else {
+        await existingService();
+      }
+      Future<List<int>> permissionBytes() async {
+        final file = File('${root.path}/source-acceptance/permissions.json');
+        return await file.exists() ? file.readAsBytes() : [];
+      }
+
       final previous = await core.getConfigState();
-      final permissions = await File(
-        '${root.path}/source-acceptance/permissions.json',
-      ).readAsBytes();
+      final permissions = await permissionBytes();
       received.clear();
       core.sourceActions.clear();
       core.calls.clear();
@@ -3393,6 +3408,9 @@ void main() {
         reviewPresentation: (
           present: (child) async {
             final dialog = child as SourceReviewDialog;
+            if (scenario.first) {
+              expect(container.read(currentProfileIdProvider), isNull);
+            }
             presentations++;
             if (outcome == 'early') {
               return const SourceReviewDecision(
@@ -3434,12 +3452,7 @@ void main() {
       if (outcome == 'cancel-nodes' || outcome == 'early') {
         await expectLater(work, throwsA(isA<RequestUnavailable>()));
         expect((await store.profilesDao.query().get()).map((p) => p.id), [1]);
-        expect(
-          await File(
-            '${root.path}/source-acceptance/permissions.json',
-          ).readAsBytes(),
-          permissions,
-        );
+        expect(await permissionBytes(), permissions);
         return;
       }
       expect((await work)?.materialSaved, true);
@@ -3447,6 +3460,10 @@ void main() {
         (p) => p.id != 1,
       );
       expect(row.url, 'http://127.0.0.1:${server.port}/partial');
+      expect(
+        container.read(currentProfileIdProvider),
+        scenario.first ? (outcome == 'pending' ? null : row.id) : 1,
+      );
       expect((await core.getConfigState()).fence, previous.fence);
       expect(core.calls, isNot(contains(CoreMethod.activateConfig)));
       final raw = await File(
@@ -3459,12 +3476,7 @@ void main() {
           SourceReviewStatus.required,
         );
         expect(core.sourceActions, isNot(contains('approveMaterial')));
-        expect(
-          await File(
-            '${root.path}/source-acceptance/permissions.json',
-          ).readAsBytes(),
-          permissions,
-        );
+        expect(await permissionBytes(), permissions);
       } else {
         final map = jsonDecode(raw) as Map;
         expect((map['proxies'] as List).map((p) => p['name']), [

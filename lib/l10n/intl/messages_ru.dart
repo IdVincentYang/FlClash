@@ -1192,6 +1192,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "localGroupsScope": m35,
     "localGroupsSearch": MessageLookupByLibrary.simpleMessage("Поиск узлов"),
+    "localGroupsSelectNodeHelp": MessageLookupByLibrary.simpleMessage(
+      "Нажмите узел для немедленного переключения. Сохранять не нужно.",
+    ),
     "localGroupsSource": MessageLookupByLibrary.simpleMessage(
       "Группы подписки (только чтение)",
     ),

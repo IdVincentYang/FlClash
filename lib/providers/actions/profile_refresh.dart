@@ -534,6 +534,14 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       try {
         if (!_refreshDisposed) {
           await ref.read(profilesProvider.notifier).publishRefresh();
+          if (job.importing &&
+              !pendingReview &&
+              ref.read(currentProfileIdProvider) == null) {
+            final profiles = ref.read(profilesProvider);
+            if (profiles.length == 1 && profiles.single.id == profile.id) {
+              ref.read(currentProfileIdProvider.notifier).value = profile.id;
+            }
+          }
         }
       } catch (_) {
         result = const ProfileRefreshResult(

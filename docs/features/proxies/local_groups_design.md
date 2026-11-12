@@ -207,3 +207,9 @@ Core 的热采用结果新增可选 requiresFullApply 标志，仅对明确要�
 收尾补充外部节点提供者的完整应用回退场景：使用已接受的 provider 材料完成保存，保持原选择，未读取待审新规则，也未再次下载来源。分组桥接专项重新运行 10 项全部通过；静态分析仍无错误、无警告，仅保留既有 42 条 info。
 
 最终 ARM64 Release 通过 APK v2 签名校验，于 2026-11-10 14:51:25 使用 adb install -r 覆盖安装到 emulator-5554，保留数据。包名 com.follow.clash.dev，版本 0.8.99，versionCode 2026113005；首次安装时间仍为 2026-11-04 21:11:29。安装后未再次打开应用或执行 Save。前述唯一一次获准的 Save 已在诊断版本中完成，没有增加真实订阅重试次数。APK 为 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk，SHA256 为 b7d5c37e4ba189bbe684976c88eb8cf39a81deb336d5f522ecd95c41e6eda0c1。复用既有构建缓存，没有创建 Loop 验证副本。
+
+## 导入节点快照的默认组
+
+“仅使用已加载节点”导入生成 Imported nodes，作为该快照显式 MATCH 的默认出口，名称冲突时附加序号。
+它按普通订阅 Selector 展示，不属于自建组编辑；详情点击一个节点即请求切换当前出口，无需另行保存。
+代理连接由全局 Start 控制。完整订阅重新下载并审核后，按其自己的分组和规则使用。

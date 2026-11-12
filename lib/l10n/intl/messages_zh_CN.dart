@@ -853,6 +853,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsSaving": MessageLookupByLibrary.simpleMessage("正在检查并保存分组…"),
     "localGroupsScope": m35,
     "localGroupsSearch": MessageLookupByLibrary.simpleMessage("搜索节点"),
+    "localGroupsSelectNodeHelp": MessageLookupByLibrary.simpleMessage(
+      "点击节点即可切换，无需保存。",
+    ),
     "localGroupsSource": MessageLookupByLibrary.simpleMessage("订阅分组（只读）"),
     "localGroupsSourceUnavailable": MessageLookupByLibrary.simpleMessage(
       "当前已审核配置或来源许可不可用，请在订阅中检查来源权限。",

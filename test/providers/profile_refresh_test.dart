@@ -243,6 +243,53 @@ void main() {
     },
   );
 
+  test(
+    'the first successful import becomes current, later imports keep it',
+    () async {
+      final first = profile(41, 'first');
+      expect(
+        (await action.updateProfile(first, importing: true)).materialSaved,
+        true,
+      );
+      expect(container.read(currentProfileIdProvider), first.id);
+      final next = profile(42, 'second');
+      expect(
+        (await action.updateProfile(next, importing: true)).materialSaved,
+        true,
+      );
+      expect(container.read(currentProfileIdProvider), first.id);
+    },
+  );
+
+  test(
+    'import does not choose from an existing unselected profile list',
+    () async {
+      await put([profile(43, 'existing')]);
+      expect(
+        (await action.updateProfile(
+          profile(44, 'later'),
+          importing: true,
+        )).materialSaved,
+        true,
+      );
+      expect(container.read(currentProfileIdProvider), isNull);
+    },
+  );
+
+  test(
+    'an explicit selection during the first download is preserved',
+    () async {
+      final gate = held['first-held'] = Completer<void>();
+      final incoming = profile(45, 'first-held');
+      final work = action.updateProfile(incoming, importing: true);
+      await _until(() => received.contains('/first-held'));
+      container.read(currentProfileIdProvider.notifier).value = 999;
+      gate.complete();
+      expect((await work).materialSaved, true);
+      expect(container.read(currentProfileIdProvider), 999);
+    },
+  );
+
   test('cancelled URL import cannot save a late download', () async {
     final incoming = profile(21, 'import-held');
     final gate = held['/import-held'] = Completer<void>();

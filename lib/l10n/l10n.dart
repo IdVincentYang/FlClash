@@ -10022,6 +10022,16 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Tap a node to switch immediately. No save is needed.`
+  String get localGroupsSelectNodeHelp {
+    return Intl.message(
+      'Tap a node to switch immediately. No save is needed.',
+      name: 'localGroupsSelectNodeHelp',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

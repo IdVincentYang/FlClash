@@ -555,6 +555,26 @@ void main() {
     expect(find.text('Preferred node: Node A'), findsOneWidget);
     expect(find.text('Restore automatic'), findsNothing);
   });
+  testWidgets(
+    'subscription selector switches immediately without an edit or save step',
+    (tester) async {
+      await pump(tester, const LocalGroupsView());
+      await tester.tap(find.text('Main'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Tap a node to switch immediately. No save is needed.'),
+        findsOneWidget,
+      );
+      expect(find.text('Preferred node: Node A'), findsOneWidget);
+      await tester.tap(find.text('Node B'));
+      await tester.pumpAndSettle();
+      expect(proxyActions.changes, ['Main:Node B']);
+      expect(find.text('Preferred node: Node B'), findsOneWidget);
+      expect(find.text('Save'), findsNothing);
+      expect(actions.writes, isEmpty);
+    },
+  );
+
   testWidgets('disabled group display retains its saved members', (
     tester,
   ) async {

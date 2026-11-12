@@ -954,6 +954,8 @@ class _LocalGroupDetailState extends ConsumerState<LocalGroupDetail> {
             if (exit.isNotEmpty && exit != selected)
               Text(l.localGroupsActualExit(exit)),
             if (group.type.isComputedSelected) Text(l.localGroupsTransientHelp),
+            if (group.type == GroupType.Selector)
+              Text(l.localGroupsSelectNodeHelp),
             const SizedBox(height: 12),
             for (final node in group.all)
               Card(

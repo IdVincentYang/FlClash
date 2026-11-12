@@ -934,6 +934,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsSaving": MessageLookupByLibrary.simpleMessage("グループを確認して保存中…"),
     "localGroupsScope": m35,
     "localGroupsSearch": MessageLookupByLibrary.simpleMessage("ノードを検索"),
+    "localGroupsSelectNodeHelp": MessageLookupByLibrary.simpleMessage(
+      "ノードをタップするとすぐに切り替わります。保存は不要です。",
+    ),
     "localGroupsSource": MessageLookupByLibrary.simpleMessage(
       "サブスクリプショングループ（読み取り専用）",
     ),
