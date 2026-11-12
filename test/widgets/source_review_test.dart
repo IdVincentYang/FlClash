@@ -475,4 +475,66 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets(
+    'URL import with nodes remains available when source DNS is incomplete',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final loading = SourceReviewLoading();
+      addTearDown(loading.dispose);
+      await loading.load([
+        SourceReviewLoadItem(
+          key: 'missing',
+          label: 'Domestic DNS',
+          kind: 'provider-rule',
+        ),
+      ], (_, _) async => throw StateError('controlled failure'));
+      SourceReviewDecision? decision;
+      await tester.pumpWidget(
+        TestApp(
+          overrides: [
+            viewSizeProvider.overrideWithBuild((_, _) => const Size(400, 900)),
+          ],
+          child: Scaffold(
+            body: SourceReviewDialog(
+              review: review,
+              loading: loading,
+              allowPartialImport: true,
+              canUseAvailableConfiguration: () => true,
+              partialChanges: () => {
+                'nodesOnly': true,
+                'missing': ['Domestic DNS'],
+                'blocked': ['dns', 'sub-rules'],
+              },
+              onDecision: (value) => decision = value,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Why the full source configuration is unavailable'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Required dependencies prevent a partial configuration'),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('The loaded nodes can be used.'),
+        findsOneWidget,
+      );
+      final button = find.widgetWithText(
+        TextButton,
+        'Review available configuration',
+      );
+      expect(tester.widget<TextButton>(button).onPressed, isNotNull);
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      expect(decision?.importChoice, SourceImportChoice.availableConfiguration);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }

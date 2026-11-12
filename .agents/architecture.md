@@ -144,8 +144,12 @@ source attempt has settled. Frontend imports, refreshes and existing
 subscription reviews can instead review a partial configuration retaining
 available rules, groups, DNS and verified provider bodies. Parent Go projects
 the missing-provider dependencies without factories or grants; the dialog
-discloses removed rules/groups and the explicit default exit. Critical or
-unproven dependencies block this choice. `ProfileReviewContext` carries
+discloses removed rules/groups and the explicit default exit. When this source
+configuration is incomplete, new URL imports can still use an independent
+snapshot of parsed nodes with one explicit proxy exit and app network settings.
+This keeps source DNS or complex-rule failures out of node-import eligibility;
+the review discloses the omitted source configuration. Existing subscription
+reviews retain their critical-dependency checks. `ProfileReviewContext` carries
 operation-local provider bytes into the second review; normal source checks,
 acceptance and material commits remain authoritative. The URL is retained with
 automatic refresh disabled, and manual refresh restores the original complete

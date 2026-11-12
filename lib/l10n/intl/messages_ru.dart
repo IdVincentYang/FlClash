@@ -2307,6 +2307,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceConfigParsed": MessageLookupByLibrary.simpleMessage(
       "Разобрано · связанные источники проверяются отдельно",
     ),
+    "sourceConfigurationUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Почему полная конфигурация источника недоступна",
+    ),
     "sourceDeclaredCapabilities": m78,
     "sourceDefaultExit": m79,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
@@ -2355,6 +2358,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceNoPermissions": MessageLookupByLibrary.simpleMessage(
       "Нет принятых разрешений источника.",
+    ),
+    "sourceNodeImportHint": MessageLookupByLibrary.simpleMessage(
+      "Загруженные узлы доступны. Используются сетевые настройки приложения и одна группа прокси; правила, DNS и исходные группы источника не применяются. Исходный URL сохранён, автообновление выключено. Обновите вручную для повторной проверки полной конфигурации.",
     ),
     "sourceNodeUse": MessageLookupByLibrary.simpleMessage(
       "Узлы, используемые как provider",

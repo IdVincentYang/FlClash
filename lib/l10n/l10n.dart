@@ -10072,6 +10072,26 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Why the full source configuration is unavailable`
+  String get sourceConfigurationUnavailable {
+    return Intl.message(
+      'Why the full source configuration is unavailable',
+      name: 'sourceConfigurationUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The loaded nodes can be used. This configuration uses app network settings and one proxy group; source rules, DNS and original groups are not applied. The original URL is kept and automatic refresh is off. Update manually to retry the complete configuration.`
+  String get sourceNodeImportHint {
+    return Intl.message(
+      'The loaded nodes can be used. This configuration uses app network settings and one proxy group; source rules, DNS and original groups are not applied. The original URL is kept and automatic refresh is off. Update manually to retry the complete configuration.',
+      name: 'sourceNodeImportHint',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

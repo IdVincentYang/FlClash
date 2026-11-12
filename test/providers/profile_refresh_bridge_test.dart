@@ -3432,15 +3432,29 @@ void main() {
   );
 
   for (final scenario in [
-    (outcome: 'early', first: false),
-    (outcome: 'pending', first: false),
-    (outcome: 'configuration', first: false),
-    (outcome: 'cancel-configuration', first: false),
-    (outcome: 'pending', first: true),
-    (outcome: 'configuration', first: true),
+    (outcome: 'early', first: false, blocker: ''),
+    (outcome: 'pending', first: false, blocker: ''),
+    (outcome: 'configuration', first: false, blocker: ''),
+    (outcome: 'cancel-configuration', first: false, blocker: ''),
+    (outcome: 'pending', first: true, blocker: ''),
+    (outcome: 'configuration', first: true, blocker: ''),
+    for (final blocker in [
+      'dns',
+      'logical',
+      'sub-rules',
+      'no-default',
+      'external-only',
+      'one-node',
+    ])
+      (outcome: 'configuration', first: true, blocker: blocker),
+    (outcome: 'pending', first: true, blocker: 'empty'),
+    (outcome: 'cancel-configuration', first: true, blocker: 'dns'),
   ]) {
     final outcome = scenario.outcome;
-    test('URL partial import $outcome first=${scenario.first}', () async {
+    final nodeFallback = scenario.blocker.isNotEmpty;
+    final name =
+        'URL partial import $outcome first=${scenario.first} blocker=${scenario.blocker}';
+    test(name, () async {
       if (scenario.first) {
         container.read(currentProfileIdProvider.notifier).value = null;
       } else {
@@ -3470,6 +3484,40 @@ void main() {
           'proxies: [{name: external, type: socks5, server: 127.0.0.1, port: 10}]\n';
       responses['/available'] = 'available.invalid\n';
       statuses['/missing'] = 503;
+      if (nodeFallback) {
+        var material = responses['/partial']!;
+        if (scenario.blocker == 'logical') {
+          material = material.replaceFirst(
+            '"MATCH,Source"',
+            '"AND,((NETWORK,TCP),(RULE-SET,Available)),Source", "MATCH,Source"',
+          );
+        } else if (scenario.blocker == 'sub-rules') {
+          material += 'sub-rules: {inner: ["MATCH,Source"]}\n';
+        } else if (scenario.blocker == 'no-default') {
+          material = material.replaceFirst(', "MATCH,Source"', '');
+        } else {
+          material = material.replaceFirst(
+            'dns: {nameserver: [https://1.1.1.1/dns-query]}',
+            'dns: {nameserver: [https://1.1.1.1/dns-query], nameserver-policy: {"rule-set:Domestic": [https://1.1.1.1/dns-query]}}',
+          );
+        }
+        if (scenario.blocker == 'empty' ||
+            scenario.blocker == 'external-only') {
+          material = material.replaceFirst(
+            'proxies: [{name: inline, type: socks5, server: 127.0.0.1, port: 9}]',
+            'proxies: []',
+          );
+          material = material.replaceFirst('proxies: [inline], ', '');
+        }
+        if (scenario.blocker == 'empty') {
+          responses['/loaded'] = 'proxies: []\n';
+        }
+        if (scenario.blocker == 'one-node') {
+          statuses['/loaded'] = 503;
+          statuses['/available'] = 503;
+        }
+        responses['/partial'] = material;
+      }
       container.read(appVisibleProvider.notifier).value = true;
       var presentations = 0;
       final task = ProfileImportTask(onPhase: (_) {});
@@ -3500,7 +3548,10 @@ void main() {
               expect(received.where((x) => x == '/missing'), hasLength(1));
               expect(received.where((x) => x == '/loaded'), hasLength(1));
               expect(received.where((x) => x == '/available'), hasLength(1));
-              expect(dialog.canUseAvailableConfiguration!(), true);
+              expect(
+                dialog.canUseAvailableConfiguration!(),
+                scenario.blocker != 'empty',
+              );
               return SourceReviewDecision(
                 automatic: false,
                 routing: 'source',
@@ -3515,9 +3566,13 @@ void main() {
             expect(received.where((x) => x == '/missing'), hasLength(1));
             expect(received.where((x) => x == '/loaded'), hasLength(1));
             expect(received.where((x) => x == '/available'), hasLength(1));
-            expect(dialog.partialConfiguration!.changes['removedRules'], [
-              'RULE-SET,Domestic,DIRECT',
-            ]);
+            if (nodeFallback) {
+              expect(dialog.partialConfiguration!.changes['nodesOnly'], true);
+            } else {
+              expect(dialog.partialConfiguration!.changes['removedRules'], [
+                'RULE-SET,Domestic,DIRECT',
+              ]);
+            }
             return outcome == 'cancel-configuration'
                 ? null
                 : const SourceReviewDecision(
@@ -3530,7 +3585,10 @@ void main() {
       );
       if (outcome == 'cancel-configuration' || outcome == 'early') {
         await expectLater(work, throwsA(isA<RequestUnavailable>()));
-        expect((await store.profilesDao.query().get()).map((p) => p.id), [1]);
+        expect(
+          (await store.profilesDao.query().get()).map((p) => p.id),
+          scenario.first ? <int>[] : [1],
+        );
         expect(await permissionBytes(), permissions);
         return;
       }
@@ -3558,18 +3616,31 @@ void main() {
         expect(await permissionBytes(), permissions);
       } else {
         final map = jsonDecode(raw) as Map;
-        expect((map['proxies'] as List).map((p) => p['name']), ['inline']);
-        expect(map['rules'], [
-          'DOMAIN,first.invalid,DIRECT',
-          'RULE-SET,Available,Source',
-          'MATCH,Source',
-        ]);
-        expect((map['proxy-groups'] as List).single['name'], 'Source');
-        expect((map['rule-providers'] as Map).keys, ['Available']);
-        expect((map['proxy-providers'] as Map).keys, ['loaded']);
-        expect(map['dns'], {
-          'nameserver': ['https://1.1.1.1/dns-query'],
-        });
+        if (nodeFallback) {
+          expect(map.keys.toSet(), {'proxies', 'proxy-groups', 'rules'});
+          expect(
+            (map['proxies'] as List).map((p) => p['name']),
+            scenario.blocker == 'external-only'
+                ? ['external']
+                : scenario.blocker == 'one-node'
+                ? ['inline']
+                : ['inline', 'external'],
+          );
+          expect(map['rules'], ['MATCH,Imported nodes']);
+        } else {
+          expect((map['proxies'] as List).map((p) => p['name']), ['inline']);
+          expect(map['rules'], [
+            'DOMAIN,first.invalid,DIRECT',
+            'RULE-SET,Available,Source',
+            'MATCH,Source',
+          ]);
+          expect((map['proxy-groups'] as List).single['name'], 'Source');
+          expect((map['rule-providers'] as Map).keys, ['Available']);
+          expect((map['proxy-providers'] as Map).keys, ['loaded']);
+          expect(map['dns'], {
+            'nameserver': ['https://1.1.1.1/dns-query'],
+          });
+        }
         expect(row.autoUpdate, false);
         expect(
           await profiles.sourceReviewStatus(row),
@@ -3589,45 +3660,52 @@ void main() {
         expect(await setup.applyProfile(force: true), true);
         expect(received, isEmpty);
         expect(confirmations, isEmpty);
+        if (nodeFallback) return;
         received.clear();
-        var updateReviews = 0;
-        final updateConfirmation = Provider<SourceConfirmation>(
-          (ref) =>
-              (review) => confirmSourceReview(
-                ref,
-                review,
-                present: (child) async {
-                  updateReviews++;
-                  final dialog = child as SourceReviewDialog;
-                  await dialog.loadRelated!(dialog.review.routing);
-                  expect(dialog.allowPartialImport, false);
-                  return SourceReviewDecision(
-                    automatic: false,
-                    routing: 'source',
-                    importChoice: dialog.loading!.ready
-                        ? SourceImportChoice.complete
-                        : SourceImportChoice.availableConfiguration,
-                  );
-                },
-              ),
-        );
-        expect(
-          (await profiles.updateProfile(
-            row,
-            confirm: container.read(updateConfirmation),
-          )).materialSaved,
-          true,
-        );
-        expect(updateReviews, greaterThan(0));
-        expect(
-          await File(await appPath.getProfilePath('${row.id}')).readAsString(),
-          raw,
-        );
-        expect(received.where((x) => x == '/missing'), hasLength(1));
-        expect(received.where((x) => x == '/loaded'), isEmpty);
-        expect(received.where((x) => x == '/available'), isEmpty);
-        received.clear();
+        if (!nodeFallback) {
+          var updateReviews = 0;
+          final updateConfirmation = Provider<SourceConfirmation>(
+            (ref) =>
+                (review) => confirmSourceReview(
+                  ref,
+                  review,
+                  present: (child) async {
+                    updateReviews++;
+                    final dialog = child as SourceReviewDialog;
+                    await dialog.loadRelated!(dialog.review.routing);
+                    expect(dialog.allowPartialImport, false);
+                    return SourceReviewDecision(
+                      automatic: false,
+                      routing: 'source',
+                      importChoice: dialog.loading!.ready
+                          ? SourceImportChoice.complete
+                          : SourceImportChoice.availableConfiguration,
+                    );
+                  },
+                ),
+          );
+          expect(
+            (await profiles.updateProfile(
+              row,
+              confirm: container.read(updateConfirmation),
+            )).materialSaved,
+            true,
+          );
+          expect(updateReviews, greaterThan(0));
+          expect(
+            await File(
+              await appPath.getProfilePath('${row.id}'),
+            ).readAsString(),
+            raw,
+          );
+          expect(received.where((x) => x == '/missing'), hasLength(1));
+          expect(received.where((x) => x == '/loaded'), isEmpty);
+          expect(received.where((x) => x == '/available'), isEmpty);
+          received.clear();
+        }
         statuses['/missing'] = 200;
+        statuses['/loaded'] = 200;
+        statuses['/available'] = 200;
         responses['/missing'] = 'example.invalid\n';
         final confirmation = Provider<SourceConfirmation>(
           (ref) =>
@@ -3658,8 +3736,14 @@ void main() {
           responses['/partial'],
         );
         expect(received.where((x) => x == '/missing'), hasLength(1));
-        expect(received.where((x) => x == '/loaded'), isEmpty);
-        expect(received.where((x) => x == '/available'), isEmpty);
+        expect(
+          received.where((x) => x == '/loaded'),
+          hasLength(nodeFallback ? 1 : 0),
+        );
+        expect(
+          received.where((x) => x == '/available'),
+          hasLength(nodeFallback ? 1 : 0),
+        );
       }
     }, skip: executable == null);
   }

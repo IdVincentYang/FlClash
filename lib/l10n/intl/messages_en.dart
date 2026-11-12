@@ -2220,6 +2220,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceConfigParsed": MessageLookupByLibrary.simpleMessage(
       "Parsed · associated sources checked separately",
     ),
+    "sourceConfigurationUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Why the full source configuration is unavailable",
+    ),
     "sourceDeclaredCapabilities": m78,
     "sourceDefaultExit": m79,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
@@ -2268,6 +2271,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceNoPermissions": MessageLookupByLibrary.simpleMessage(
       "No accepted source permissions.",
+    ),
+    "sourceNodeImportHint": MessageLookupByLibrary.simpleMessage(
+      "The loaded nodes can be used. This configuration uses app network settings and one proxy group; source rules, DNS and original groups are not applied. The original URL is kept and automatic refresh is off. Update manually to retry the complete configuration.",
     ),
     "sourceNodeUse": MessageLookupByLibrary.simpleMessage(
       "Nodes used as a provider",

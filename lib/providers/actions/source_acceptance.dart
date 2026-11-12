@@ -240,7 +240,12 @@ Future<SourceReviewDecision?> confirmSourceReview(
       SourceReviewDialog(review: review, onDecision: presentation?.onDecision),
     );
   }
-  final draft = _SubscriptionReviewDraft(ref, root, triggering: review);
+  final draft = _SubscriptionReviewDraft(
+    ref,
+    root,
+    triggering: review,
+    importing: importing,
+  );
   try {
     final decision = await show(
       SourceReviewDialog(
@@ -316,8 +321,14 @@ SourceAcceptance _sourceAcceptance(
 );
 
 class _SubscriptionReviewDraft {
-  _SubscriptionReviewDraft(this.ref, this.root, {this.triggering});
+  _SubscriptionReviewDraft(
+    this.ref,
+    this.root, {
+    this.triggering,
+    required this.importing,
+  });
   final SourceReview? triggering;
+  final bool importing;
   final Ref ref;
   final SourceReview root;
   final sessions = <RequestSession>{};
@@ -325,6 +336,7 @@ class _SubscriptionReviewDraft {
   final _verifiedBodies = <String, List<int>>{};
   final _materials = <String, List<int>>{};
   final _availableNodeNames = <String>{};
+  final _nodeDocuments = <String, Map<String, Object?>>{};
   Map<String, Object?>? _document;
   Map<String, Map<String, Object?>> _plans = {};
   PartialProfileConfiguration? partial;
@@ -371,6 +383,20 @@ class _SubscriptionReviewDraft {
         materials: Map.unmodifiable(_materials),
         changes: partialChanges,
       );
+    } else if (importing) {
+      final nodes = loadedNodesProfile(_nodeDocuments.values);
+      if (nodes != null) {
+        partialChanges = {
+          'nodesOnly': true,
+          'missing': partialChanges['missing'],
+          'blocked': partialChanges['blocked'],
+        };
+        partial = PartialProfileConfiguration(
+          body: nodes,
+          materials: const {},
+          changes: partialChanges,
+        );
+      }
     }
   }
 
@@ -422,6 +448,7 @@ class _SubscriptionReviewDraft {
     loading.reset();
     _materials.clear();
     _availableNodeNames.clear();
+    _nodeDocuments.clear();
     partial = null;
     partialChanges = const {};
     _application = await root.source!.owner.captureSource('application-config');
@@ -456,6 +483,7 @@ class _SubscriptionReviewDraft {
     );
     final document = Map<String, dynamic>.from(description['document'] as Map);
     _document = document;
+    _nodeDocuments[root.key] = document;
     late ({String yaml, String md5}) composition;
     if (selected?.usesMaterials == true) {
       var material = boundedMaterialCopy(document);
@@ -681,6 +709,9 @@ class _SubscriptionReviewDraft {
         _materials[SourceAcceptance.fingerprint([plan['kind'], mapping])] =
             frozen;
         if (plan['kind'] == 'provider-proxy' && details['document'] is Map) {
+          _nodeDocuments[key] = Map<String, Object?>.from(
+            details['document'] as Map,
+          );
           for (final node
               in (details['document'] as Map)['proxies'] as List? ?? const []) {
             if (node is Map && node['name'] is String) {
@@ -712,7 +743,7 @@ class _SubscriptionReviewDraft {
       },
     );
     if (!await valid()) throw const RequestUnavailable('request_cancelled');
-    if (root.profileReview != null) await _preparePartial();
+    if (importing || root.profileReview != null) await _preparePartial();
     return loading.items
         .where((item) => item.entry != null)
         .map((item) => item.entry!.review)

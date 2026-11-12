@@ -1815,6 +1815,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceConfigParsed": MessageLookupByLibrary.simpleMessage(
       "解析済み・関連ソースは別途確認",
     ),
+    "sourceConfigurationUnavailable": MessageLookupByLibrary.simpleMessage(
+      "完全なソース設定を利用できない理由",
+    ),
     "sourceDeclaredCapabilities": m78,
     "sourceDefaultExit": m79,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
@@ -1857,6 +1860,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceNoPermissions": MessageLookupByLibrary.simpleMessage(
       "承認済みのソース権限はありません。",
+    ),
+    "sourceNodeImportHint": MessageLookupByLibrary.simpleMessage(
+      "読み込んだノードを利用できます。アプリのネットワーク設定と1つのプロキシグループを使い、ソースのルール、DNS、元のグループは適用しません。元の URL を保持し、自動更新を停止します。手動更新で完全な設定を再試行できます。",
     ),
     "sourceNodeUse": MessageLookupByLibrary.simpleMessage("providerとして使うノード"),
     "sourceNotDeclared": MessageLookupByLibrary.simpleMessage("このソースでは未指定"),

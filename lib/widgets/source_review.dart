@@ -304,7 +304,8 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
           Text(widget.review.label),
           if (partial) Text(l10n.sourcePartialImportHint),
           if (widget.partialConfiguration != null) ...[
-            Text(l10n.sourcePartialConfigurationHint),
+            if (widget.partialConfiguration!.changes['nodesOnly'] != true)
+              Text(l10n.sourcePartialConfigurationHint),
             _SourcePartialChanges(
               changes: widget.partialConfiguration!.changes,
             ),
@@ -488,15 +489,19 @@ class _SourcePartialChanges extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.appLocalizations;
+    final nodesOnly = changes['nodesOnly'] == true;
     final sections = {
       'missing': l.sourcePartialMissing,
       'removedRules': l.sourcePartialRules,
       'removedGroups': l.sourcePartialGroups,
-      'blocked': l.sourcePartialBlocked,
+      'blocked': nodesOnly
+          ? l.sourceConfigurationUnavailable
+          : l.sourcePartialBlocked,
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (nodesOnly) Text(l.sourceNodeImportHint),
         for (final section in sections.entries)
           if (changes[section.key] case final List items
               when items.isNotEmpty) ...[

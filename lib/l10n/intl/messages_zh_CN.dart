@@ -1638,6 +1638,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceConfigParsed": MessageLookupByLibrary.simpleMessage(
       "已解析 · 关联来源需分别核验",
     ),
+    "sourceConfigurationUnavailable": MessageLookupByLibrary.simpleMessage(
+      "完整来源配置暂不可用的原因",
+    ),
     "sourceDeclaredCapabilities": m78,
     "sourceDefaultExit": m79,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
@@ -1673,6 +1676,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "无法加载关联数据源。请检查其地址、网络连接和请求出口，然后重试。",
     ),
     "sourceNoPermissions": MessageLookupByLibrary.simpleMessage("尚无已接受的来源权限。"),
+    "sourceNodeImportHint": MessageLookupByLibrary.simpleMessage(
+      "已获取的节点可以使用。此配置使用应用网络设置和一个代理分组，暂不采用来源的规则、DNS 和原分组。保留原 URL，关闭自动更新；手动更新可重试完整配置。",
+    ),
     "sourceNodeUse": MessageLookupByLibrary.simpleMessage("作为 provider 使用的节点"),
     "sourceNotDeclared": MessageLookupByLibrary.simpleMessage("此来源未声明"),
     "sourceNotDelegated": MessageLookupByLibrary.simpleMessage("尚未委托自动维护。"),

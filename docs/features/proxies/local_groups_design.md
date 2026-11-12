@@ -210,7 +210,8 @@ Core 的热采用结果新增可选 requiresFullApply 标志，仅对明确要�
 
 ## 导入节点快照的默认组
 
-旧版“仅使用已加载节点”导入生成的 Imported nodes 继续作为其快照显式 MATCH 的默认出口。
-当前部分来源导入保留可用原分组及规则，不再生成此组；见[来源审核说明](../security/source_acceptance_guide.md)。
+节点配置中的 Imported nodes 作为显式 MATCH 的默认代理出口。
+新 URL 导入优先保留可用原分组及规则；完整配置暂不可用时，仍可用已加载节点生成此组，
+见[来源审核说明](../security/source_acceptance_guide.md)。
 它按普通订阅 Selector 展示，不属于自建组编辑；详情点击一个节点即请求切换当前出口，无需另行保存。
 代理连接由全局 Start 控制。完整订阅重新下载并审核后，按其自己的分组和规则使用。
