@@ -17,7 +17,6 @@ import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/common/source_review_loading.dart';
 import 'package:fl_clash/common/local_proxy_groups.dart';
 import 'package:fl_clash/common/profile_import.dart';
-import 'package:fl_clash/common/profile_import_projection.dart';
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/database/database.dart';

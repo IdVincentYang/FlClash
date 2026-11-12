@@ -386,6 +386,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
           sourceKind = 'provider-proxy';
         }
       }
+      final reviewContext = job.automatic || sourceKind != 'profile'
+          ? null
+          : job.importTask?.review ?? ProfileReviewContext();
       Future<SourceMaterialApproval?> reviewMaterial() =>
           _reviewProfileMaterial(
             confirm: job.confirm ?? ref.read(sourceConfirmationProvider),
@@ -397,14 +400,13 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
             session: session,
             source: materialSource,
             automatic: job.automatic,
+            profileReview: reviewContext,
             isCurrent: () => _refreshRowCurrent(job),
           );
       try {
         approval = await reviewMaterial();
       } on ProfileImportAlternative catch (choice) {
-        if (!job.importing ||
-            job.importTask == null ||
-            sourceKind != 'profile') {
+        if (reviewContext == null || sourceKind != 'profile') {
           rethrow;
         }
         if (!await _refreshRowCurrent(job) ||
@@ -414,14 +416,15 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
             )) {
           throw const RequestUnavailable('request_cancelled');
         }
-        final nodes = choice.loadedNodes;
-        if (nodes == null) {
+        final configuration = choice.configuration;
+        if (configuration == null) {
+          if (!job.importing) rethrow;
           pendingReview = true;
         } else {
-          job.importTask!.usingLoadedNodes = true;
+          reviewContext.partial = configuration;
           await staged.close();
-          staged = await RequestFile.stage(utf8.encode(nodes));
-          job.importTask!.report(ProfileImportPhase.reviewing);
+          staged = await RequestFile.stage(utf8.encode(configuration.body));
+          job.importTask?.report(ProfileImportPhase.reviewing);
           approval = await reviewMaterial();
         }
       }
@@ -496,7 +499,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
                   ),
                   profile.id.toString(),
                 ]),
-          autoUpdate: job.importTask?.usingLoadedNodes == true
+          autoUpdate: reviewContext?.partial != null
               ? false
               : (row ?? profile).autoUpdate,
           subscriptionInfo: SubscriptionInfo.fromHeaderValues(

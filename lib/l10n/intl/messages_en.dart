@@ -2258,9 +2258,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("Waiting"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("Ready"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("Verifying…"),
-    "sourceLoadedNodesReviewHint": MessageLookupByLibrary.simpleMessage(
-      "Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.",
-    ),
     "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("Local policy"),
     "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
       "Only proven changes within this revision’s capabilities may update automatically. Other changes stay pending. Existing connections stay on their original sockets; resource limits can delay adoption.",
@@ -2290,8 +2287,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
       "Turn off to exclude source routing, listeners and tunnels. Your own rules need an explicit unmatched-traffic target; empty rules never restore source routing. DNS and node groups remain independent uses.",
     ),
+    "sourcePartialBlocked": MessageLookupByLibrary.simpleMessage(
+      "Required dependencies prevent a partial configuration",
+    ),
+    "sourcePartialConfigurationHint": MessageLookupByLibrary.simpleMessage(
+      "Partial configuration: retains available rules, groups, DNS and accepted source content. Review disabled items and the default exit before accepting. The original URL is kept; automatic refresh is off. Update manually to restore the complete configuration.",
+    ),
+    "sourcePartialGroups": MessageLookupByLibrary.simpleMessage(
+      "Groups to disable",
+    ),
     "sourcePartialImportHint": MessageLookupByLibrary.simpleMessage(
-      "All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.",
+      "All sources have been attempted. Available content is retained; missing dependencies are listed below. Retry failed sources or review the available configuration.",
+    ),
+    "sourcePartialMissing": MessageLookupByLibrary.simpleMessage(
+      "Unavailable sources",
+    ),
+    "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
+      "Rules to disable (other rules keep their order)",
     ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "Each action applies to the displayed use. Stopping automatic maintenance keeps accepted content. Stopping use closes affected connections and disables replay; other uses keep their own permissions.",
@@ -2370,8 +2382,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
       "An effective change could not be classified safely.",
     ),
-    "sourceUseLoadedNodes": MessageLookupByLibrary.simpleMessage(
-      "Review loaded nodes only",
+    "sourceUseAvailableConfiguration": MessageLookupByLibrary.simpleMessage(
+      "Review available configuration",
     ),
     "sourceUseRouting": MessageLookupByLibrary.simpleMessage(
       "Use source routing rules",

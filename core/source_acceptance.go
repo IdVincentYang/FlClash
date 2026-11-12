@@ -46,6 +46,7 @@ type sourceAcceptanceRequest struct {
 	MaterialHash      string                     `json:"materialHash,omitempty"`
 	ProviderName      string                     `json:"providerName,omitempty"`
 	ProviderMaterials []SourceProviderMaterial   `json:"providerMaterials,omitempty"`
+	MissingProviders  []sourceProviderPlan       `json:"missingProviders,omitempty"`
 	Provider          map[string]any             `json:"provider,omitempty"`
 	Parent            *SourceUse                 `json:"parent,omitempty"`
 	ExpectedConfig    *ConfigFence               `json:"expectedConfig,omitempty"`
@@ -62,29 +63,30 @@ type sourceAcceptanceRequest struct {
 }
 
 type sourceAcceptanceResult struct {
-	Matches           []string                 `json:"matches,omitempty"`
-	PatternError      string                   `json:"patternError,omitempty"`
-	Status            string                   `json:"status"`
-	Candidate         string                   `json:"candidate,omitempty"`
-	Reasons           []string                 `json:"reasons,omitempty"`
-	Use               *SourceUse               `json:"use,omitempty"`
-	Uses              []SourceUse              `json:"uses,omitempty"`
-	Grant             *SourceGrant             `json:"grant,omitempty"`
-	MaterialHash      string                   `json:"materialHash,omitempty"`
-	Routing           string                   `json:"routing,omitempty"`
-	Document          map[string]any           `json:"document,omitempty"`
-	Details           *sourceReviewDetails     `json:"details,omitempty"`
-	Previous          *sourceReviewDetails     `json:"previous,omitempty"`
-	RuleContract      *sourceRuleContract      `json:"ruleContract,omitempty"`
-	Providers         []sourceProviderPlan     `json:"providers,omitempty"`
-	BodyBase64        string                   `json:"bodyBase64,omitempty"`
-	Config            *ConfigFence             `json:"config,omitempty"`
-	MaterialLease     string                   `json:"materialLease,omitempty"`
-	ProviderMaterials []SourceProviderMaterial `json:"providerMaterials,omitempty"`
-	MaterialLeases    []string                 `json:"materialLeases,omitempty"`
-	Receipt           string                   `json:"receipt,omitempty"`
-	SelectedMap       map[string]string        `json:"selectedMap,omitempty"`
-	Recovery          *sourceRecoverySnapshot  `json:"recovery,omitempty"`
+	Matches           []string                    `json:"matches,omitempty"`
+	PatternError      string                      `json:"patternError,omitempty"`
+	Status            string                      `json:"status"`
+	Candidate         string                      `json:"candidate,omitempty"`
+	Reasons           []string                    `json:"reasons,omitempty"`
+	Use               *SourceUse                  `json:"use,omitempty"`
+	Uses              []SourceUse                 `json:"uses,omitempty"`
+	Grant             *SourceGrant                `json:"grant,omitempty"`
+	MaterialHash      string                      `json:"materialHash,omitempty"`
+	Routing           string                      `json:"routing,omitempty"`
+	Document          map[string]any              `json:"document,omitempty"`
+	Details           *sourceReviewDetails        `json:"details,omitempty"`
+	Previous          *sourceReviewDetails        `json:"previous,omitempty"`
+	RuleContract      *sourceRuleContract         `json:"ruleContract,omitempty"`
+	Providers         []sourceProviderPlan        `json:"providers,omitempty"`
+	BodyBase64        string                      `json:"bodyBase64,omitempty"`
+	Config            *ConfigFence                `json:"config,omitempty"`
+	MaterialLease     string                      `json:"materialLease,omitempty"`
+	ProviderMaterials []SourceProviderMaterial    `json:"providerMaterials,omitempty"`
+	MaterialLeases    []string                    `json:"materialLeases,omitempty"`
+	Receipt           string                      `json:"receipt,omitempty"`
+	SelectedMap       map[string]string           `json:"selectedMap,omitempty"`
+	Recovery          *sourceRecoverySnapshot     `json:"recovery,omitempty"`
+	Partial           *sourcePartialConfiguration `json:"partial,omitempty"`
 }
 
 type sourceReviewCandidate struct {
@@ -261,6 +263,8 @@ func handleSourceAcceptance(call *MethodCall, response MethodResponse) {
 		result, err = approveLocalSourceGroups(C.Path.HomeDir(), request)
 	} else if request.Action == "preview" {
 		result, err = previewSourceReview(C.Path.HomeDir(), request)
+	} else if request.Action == "previewPartialConfiguration" {
+		result, err = previewPartialSourceConfiguration(request)
 	} else if request.Action == "previewCachedProvider" {
 		result, err = previewCachedSourceProvider(C.Path.HomeDir(), request)
 	} else if request.Action == "inspectProvider" {

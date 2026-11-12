@@ -339,7 +339,7 @@ void main() {
   });
   for (final choice in [
     SourceImportChoice.savePending,
-    SourceImportChoice.loadedNodes,
+    SourceImportChoice.availableConfiguration,
   ]) {
     testWidgets('partial import waits for every attempt then returns $choice', (
       tester,
@@ -362,7 +362,7 @@ void main() {
               review: review,
               loading: loading,
               allowPartialImport: true,
-              canUseLoadedNodes: () => true,
+              canUseAvailableConfiguration: () => true,
               onDecision: (value) => decision = value,
               loadRelated: (_) async {
                 await loading.load(
@@ -394,7 +394,7 @@ void main() {
       expect(calls, ['0', '1', '2', '3']);
       expect(loading.settled, isFalse);
       expect(find.text('Save for later review'), findsNothing);
-      expect(find.text('Review loaded nodes only'), findsNothing);
+      expect(find.text('Review available configuration'), findsNothing);
       expect(
         tester
             .widget<TextButton>(
@@ -410,11 +410,11 @@ void main() {
       expect(calls, ['0', '1', '2', '3', '4']);
       expect(loading.settled, isTrue);
       expect(find.text('Save for later review'), findsOneWidget);
-      expect(find.text('Review loaded nodes only'), findsOneWidget);
+      expect(find.text('Review available configuration'), findsOneWidget);
       expect(find.text('Accept this revision'), findsNothing);
       final text = choice == SourceImportChoice.savePending
           ? 'Save for later review'
-          : 'Review loaded nodes only';
+          : 'Review available configuration';
       await tester.ensureVisible(find.text(text));
       await tester.tap(find.text(text));
       expect(decision?.importChoice, choice);
@@ -422,4 +422,57 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+
+  testWidgets(
+    'existing review lists critical dependencies and disables partial acceptance',
+    (tester) async {
+      final loading = SourceReviewLoading();
+      addTearDown(loading.dispose);
+      await loading.load([
+        SourceReviewLoadItem(
+          key: 'missing',
+          label: 'Missing',
+          kind: 'provider-rule',
+        ),
+      ], (_, _) async => throw StateError('controlled failure'));
+      await tester.pumpWidget(
+        TestApp(
+          overrides: [
+            viewSizeProvider.overrideWithBuild((_, _) => const Size(400, 900)),
+          ],
+          child: Scaffold(
+            body: SourceReviewDialog(
+              review: review,
+              loading: loading,
+              allowPartialConfiguration: true,
+              canUseAvailableConfiguration: () => false,
+              partialChanges: () => {
+                'missing': ['Missing'],
+                'blocked': ['dns', 'rules:MATCH'],
+              },
+              onDecision: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Save for later review'), findsNothing);
+      expect(
+        find.text('Required dependencies prevent a partial configuration'),
+        findsOneWidget,
+      );
+      expect(find.text('dns'), findsOneWidget);
+      expect(find.text('rules:MATCH'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Review available configuration'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('Accept this revision'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }

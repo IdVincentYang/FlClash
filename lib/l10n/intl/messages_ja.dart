@@ -1847,9 +1847,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("待機中"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("準備完了"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("検証中…"),
-    "sourceLoadedNodesReviewHint": MessageLookupByLibrary.simpleMessage(
-      "読み込み済みノードと単一のプロキシグループのみを使います。元のルーティング、グループ、DNS、外部ソースは除外されます。接続テストは未実施です。自動更新はオフです。元のURLから完全な設定を取得して確認するには、手動で更新してください。",
-    ),
     "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("ローカルポリシー"),
     "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
       "この版の機能範囲内と確認できる変更だけを自動更新します。他の変更は確認待ちになります。既存接続は元のソケットを使い続け、資源の上限により適用が遅れる場合があります。",
@@ -1875,8 +1872,19 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
       "オフにするとソースの規則、リスナー、トンネルを除外します。独自規則には未一致通信の出口を明示する必要があります。空の規則でソース規則は復元されません。DNSとグループは別々に承認します。",
     ),
+    "sourcePartialBlocked": MessageLookupByLibrary.simpleMessage(
+      "次の必須依存関係が不足しているため部分設定を生成できません",
+    ),
+    "sourcePartialConfigurationHint": MessageLookupByLibrary.simpleMessage(
+      "部分設定：利用可能なルール、グループ、DNS、承認済みソースを保持します。承認前に無効化される項目と既定の経路を確認してください。元の URL を保持し、自動更新を停止します。手動更新で完全な設定を復元できます。",
+    ),
+    "sourcePartialGroups": MessageLookupByLibrary.simpleMessage("無効化されるグループ"),
     "sourcePartialImportHint": MessageLookupByLibrary.simpleMessage(
-      "すべてのソースを試行しましたが、一部が失敗しました。後で確認するために保存するか、読込済みノードのみを確認できます。",
+      "すべてのソースを試行しました。利用可能な内容は保持されます。不足する依存関係を以下に示します。失敗したソースを再試行するか、利用可能な設定を確認してください。",
+    ),
+    "sourcePartialMissing": MessageLookupByLibrary.simpleMessage("利用できないソース"),
+    "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
+      "無効化されるルール（他のルールの順序は保持）",
     ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "操作は表示された用途だけに適用されます。自動保守の停止は承認済みの内容を保持します。使用の停止は影響する接続を閉じ、再適用を無効にします。他の用途の権限は維持されます。",
@@ -1939,7 +1947,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
       "安全に分類できない有効な変更があります。",
     ),
-    "sourceUseLoadedNodes": MessageLookupByLibrary.simpleMessage("読込済みノードのみ確認"),
+    "sourceUseAvailableConfiguration": MessageLookupByLibrary.simpleMessage(
+      "利用可能な設定を確認",
+    ),
     "sourceUseRouting": MessageLookupByLibrary.simpleMessage("ソースのルーティング規則を使用"),
     "specialProxy": MessageLookupByLibrary.simpleMessage("特殊プロキシ"),
     "specialRules": MessageLookupByLibrary.simpleMessage("特殊ルール"),

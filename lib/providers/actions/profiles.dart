@@ -469,17 +469,34 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     }
     if (choice == null) return;
     if (choice.action == SourcePermissionAction.review) {
-      await _reviewProfileSource(
-        confirm: confirm ?? ref.read(sourceConfirmationProvider),
-        core: _core,
-        requests: requestClient,
-        profile: profile,
-        path: await appPath.getProfilePath(profile.id.toString()),
-        source: source,
-        forceReview: true,
-        isCurrent: isCurrent == null ? null : () async => isCurrent(),
-      );
-      await _completeSubscriptionReview(profile);
+      final reviewContext = ProfileReviewContext();
+      try {
+        await _reviewProfileSource(
+          confirm: confirm ?? ref.read(sourceConfirmationProvider),
+          profileReview: reviewContext,
+          core: _core,
+          requests: requestClient,
+          profile: profile,
+          path: await appPath.getProfilePath(profile.id.toString()),
+          source: source,
+          forceReview: true,
+          isCurrent: isCurrent == null ? null : () async => isCurrent(),
+        );
+        await _completeSubscriptionReview(profile);
+      } on ProfileImportAlternative catch (choice) {
+        final configuration = choice.configuration;
+        if (configuration == null ||
+            !await requestClient.sourceCurrent(source)) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        reviewContext.partial = configuration;
+        await importFile(
+          profile.copyWith(autoUpdate: false),
+          utf8.encode(configuration.body),
+          profileReview: reviewContext,
+          expectedSource: source,
+        );
+      }
       if (ref.mounted &&
           expectedRun != null &&
           ref.read(currentProfileIdProvider) == profile.id) {
@@ -772,12 +789,17 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     Profile profile,
     List<int> bytes, {
     Iterable<int> renameIn = const [],
+    SourceConfirmation? confirm,
+    ProfileReviewContext? profileReview,
+    RequestSource? expectedSource,
   }) async {
     final staged = await RequestFile.stage(bytes);
     SourceMaterialApproval? approval;
     try {
       approval = await _reviewProfileMaterial(
-        confirm: ref.read(sourceConfirmationProvider),
+        confirm: confirm ?? ref.read(sourceConfirmationProvider),
+        profileReview: profileReview,
+        source: expectedSource,
         core: _core,
         requests: requestClient,
         profile: profile,
@@ -816,7 +838,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       } else {
         await requestClient.mutate(persist);
       }
-      await _completeSubscriptionReview(profile);
+      await _completeSubscriptionReview(profile, confirm: confirm);
     } finally {
       await approval?.release();
       await staged.close();
@@ -878,7 +900,6 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
                 review,
                 presentation: reviewPresentation,
                 importing: true,
-                loadedNodesSnapshot: importTask.usingLoadedNodes,
               ),
       );
     }

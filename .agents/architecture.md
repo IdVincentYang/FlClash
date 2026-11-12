@@ -140,8 +140,16 @@ URL imports keep one modal from the name/URL form through preparation, download,
 Their advanced request route fields remain expanded, without changing the collapsible fields on other screens.
 `SourceReviewPresentation` embeds the existing review widget in that surface; its decision callback advances the import
 instead of popping the route. Only new URL imports may save unaccepted material for later review after every associated
-source attempt has settled. Alternatively, an explicit loaded-node snapshot is reviewed again through the same authority
-and commit path, without source routing or external dependencies. It retains the URL with automatic refresh disabled.
+source attempt has settled. Frontend imports, refreshes and existing
+subscription reviews can instead review a partial configuration retaining
+available rules, groups, DNS and verified provider bodies. Parent Go projects
+the missing-provider dependencies without factories or grants; the dialog
+discloses removed rules/groups and the explicit default exit. Critical or
+unproven dependencies block this choice. `ProfileReviewContext` carries
+operation-local provider bytes into the second review; normal source checks,
+acceptance and material commits remain authoritative. The URL is retained with
+automatic refresh disabled, and manual refresh restores the original complete
+source through review.
 Queued/loading/verifying/retrying sources keep all acceptance and alternative actions unavailable.
 `ProfileImportTask` cancels its queued or active refresh job when the user returns or leaves,
 and the refresh guards recheck it before persistence. Failures restore the retained form; saving blocks back navigation

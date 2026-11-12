@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/common/source_review_loading.dart';
+import 'package:fl_clash/common/profile_import.dart';
 import 'package:fl_clash/widgets/dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -109,11 +110,17 @@ class SourceReviewDialog extends StatefulWidget {
     this.routingEditable = true,
     this.onDecision,
     this.allowPartialImport = false,
-    this.loadedNodesSnapshot = false,
-    this.canUseLoadedNodes,
+    this.allowPartialConfiguration = false,
+    this.partialConfiguration,
+    this.partialChanges,
+    this.canUseAvailableConfiguration,
+    this.retrySource,
   });
-  final bool allowPartialImport, loadedNodesSnapshot;
-  final bool Function()? canUseLoadedNodes;
+  final bool allowPartialImport, allowPartialConfiguration;
+  final PartialProfileConfiguration? partialConfiguration;
+  final Map<String, Object?> Function()? partialChanges;
+  final bool Function()? canUseAvailableConfiguration;
+  final Future<void> Function(String)? retrySource;
   final SourceReview review;
   final Future<List<SourceReview>> Function(String routing)? loadRelated;
   final SourceReviewLoading? loading;
@@ -189,6 +196,20 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
     }
   }
 
+  Future<void> _retrySource(String key) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await (widget.retrySource?.call(key) ?? widget.loading!.retry(key));
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.appLocalizations;
@@ -225,7 +246,7 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
       _ => l10n.sourceUnknownChanged,
     };
     final partial =
-        widget.allowPartialImport &&
+        (widget.allowPartialImport || widget.allowPartialConfiguration) &&
         !_loading &&
         _error == null &&
         widget.loading?.settled == true &&
@@ -248,15 +269,16 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
       actions: [
         TextButton(onPressed: () => _finish(null), child: Text(l10n.cancel)),
         if (partial) ...[
+          if (widget.allowPartialImport)
+            TextButton(
+              onPressed: () => alternative(SourceImportChoice.savePending),
+              child: Text(l10n.sourceSavePending),
+            ),
           TextButton(
-            onPressed: () => alternative(SourceImportChoice.savePending),
-            child: Text(l10n.sourceSavePending),
-          ),
-          TextButton(
-            onPressed: widget.canUseLoadedNodes?.call() == true
-                ? () => alternative(SourceImportChoice.loadedNodes)
+            onPressed: widget.canUseAvailableConfiguration?.call() == true
+                ? () => alternative(SourceImportChoice.availableConfiguration)
                 : null,
-            child: Text(l10n.sourceUseLoadedNodes),
+            child: Text(l10n.sourceUseAvailableConfiguration),
           ),
         ],
         if (!partial)
@@ -281,13 +303,24 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
         children: [
           Text(widget.review.label),
           if (partial) Text(l10n.sourcePartialImportHint),
-          if (widget.loadedNodesSnapshot)
-            Text(l10n.sourceLoadedNodesReviewHint),
+          if (widget.partialConfiguration != null) ...[
+            Text(l10n.sourcePartialConfigurationHint),
+            _SourcePartialChanges(
+              changes: widget.partialConfiguration!.changes,
+            ),
+          ],
+          if (partial)
+            _SourcePartialChanges(
+              changes: widget.partialChanges?.call() ?? const {},
+            ),
           if (widget.review.origin.isNotEmpty) Text(widget.review.origin),
           if (widget.loadRelated != null) ...[
             const SizedBox(height: 12),
             if (widget.loading != null && widget.loading!.items.isNotEmpty) ...[
-              _SourceReviewProgress(loading: widget.loading!),
+              _SourceReviewProgress(
+                loading: widget.loading!,
+                onRetry: _retrySource,
+              ),
             ] else if (_loading) ...[
               Text(l10n.sourceBatchPreparing),
               const LinearProgressIndicator(),
@@ -448,9 +481,41 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
   }
 }
 
+class _SourcePartialChanges extends StatelessWidget {
+  const _SourcePartialChanges({required this.changes});
+  final Map<String, Object?> changes;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.appLocalizations;
+    final sections = {
+      'missing': l.sourcePartialMissing,
+      'removedRules': l.sourcePartialRules,
+      'removedGroups': l.sourcePartialGroups,
+      'blocked': l.sourcePartialBlocked,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final section in sections.entries)
+          if (changes[section.key] case final List items
+              when items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(section.value),
+            for (final item in items) SelectableText('$item'),
+          ],
+        if (changes['defaultTarget'] case final String target
+            when target.isNotEmpty)
+          Text(l.sourceDefaultExit(target)),
+      ],
+    );
+  }
+}
+
 class _SourceReviewProgress extends StatelessWidget {
-  const _SourceReviewProgress({required this.loading});
+  const _SourceReviewProgress({required this.loading, required this.onRetry});
   final SourceReviewLoading loading;
+  final Future<void> Function(String) onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -509,7 +574,7 @@ class _SourceReviewProgress extends StatelessWidget {
                   ),
                   TextButton(
                     key: ValueKey('retry:${item.key}'),
-                    onPressed: () => unawaited(loading.retry(item.key)),
+                    onPressed: () => unawaited(onRetry(item.key)),
                     child: Text(l10n.retry),
                   ),
                 ],

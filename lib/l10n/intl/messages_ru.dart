@@ -2343,9 +2343,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("Ожидание"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("Готово"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("Проверка…"),
-    "sourceLoadedNodesReviewHint": MessageLookupByLibrary.simpleMessage(
-      "Снимок содержит только загруженные узлы и одну группу прокси. Исходные правила, группы, DNS и внешние источники исключены. Доступность узлов не проверялась. Автообновление отключено; обновите подписку вручную, чтобы загрузить и проверить полную конфигурацию с исходного URL.",
-    ),
     "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage(
       "Локальная политика",
     ),
@@ -2377,8 +2374,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
       "Отключение исключает правила, слушатели и туннели источника. Для своих правил нужно явно выбрать выход для остального трафика. Пустые правила не восстанавливают правила источника. DNS и группы разрешаются отдельно.",
     ),
+    "sourcePartialBlocked": MessageLookupByLibrary.simpleMessage(
+      "Обязательные зависимости препятствуют созданию частичной конфигурации",
+    ),
+    "sourcePartialConfigurationHint": MessageLookupByLibrary.simpleMessage(
+      "Частичная конфигурация сохраняет доступные правила, группы, DNS и одобренные источники. Проверьте отключаемые элементы и маршрут по умолчанию. Исходный URL сохранён, автообновление выключено. Обновите вручную для восстановления полной конфигурации.",
+    ),
+    "sourcePartialGroups": MessageLookupByLibrary.simpleMessage(
+      "Отключаемые группы",
+    ),
     "sourcePartialImportHint": MessageLookupByLibrary.simpleMessage(
-      "Все источники проверены, часть недоступна. Сохраните для проверки позже или проверьте только загруженные узлы.",
+      "Все источники проверены. Доступное содержимое сохраняется; отсутствующие зависимости перечислены ниже. Повторите загрузку или проверьте доступную конфигурацию.",
+    ),
+    "sourcePartialMissing": MessageLookupByLibrary.simpleMessage(
+      "Недоступные источники",
+    ),
+    "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
+      "Отключаемые правила (порядок остальных сохраняется)",
     ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "Каждое действие относится только к указанному использованию. Остановка автоматического обслуживания сохраняет принятые данные. Прекращение использования закрывает затронутые соединения и запрещает повторное применение. Разрешения других способов использования сохраняются.",
@@ -2465,8 +2477,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
       "Есть действующее изменение, которое нельзя безопасно классифицировать.",
     ),
-    "sourceUseLoadedNodes": MessageLookupByLibrary.simpleMessage(
-      "Проверить только загруженные узлы",
+    "sourceUseAvailableConfiguration": MessageLookupByLibrary.simpleMessage(
+      "Проверить доступную конфигурацию",
     ),
     "sourceUseRouting": MessageLookupByLibrary.simpleMessage(
       "Использовать правила источника",

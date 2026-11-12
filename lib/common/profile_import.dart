@@ -4,7 +4,7 @@ class ProfileImportTask {
   ProfileImportTask({required this.onPhase});
 
   final void Function(ProfileImportPhase) onPhase;
-  bool usingLoadedNodes = false;
+  final review = ProfileReviewContext();
   bool _cancelled = false;
   void Function()? _cancel;
 
@@ -27,6 +27,21 @@ class ProfileImportTask {
 }
 
 class ProfileImportAlternative implements Exception {
-  const ProfileImportAlternative({this.loadedNodes});
-  final String? loadedNodes;
+  const ProfileImportAlternative({this.configuration});
+  final PartialProfileConfiguration? configuration;
+}
+
+class ProfileReviewContext {
+  PartialProfileConfiguration? partial;
+}
+
+class PartialProfileConfiguration {
+  const PartialProfileConfiguration({
+    required this.body,
+    required this.materials,
+    required this.changes,
+  });
+  final String body;
+  final Map<String, List<int>> materials;
+  final Map<String, Object?> changes;
 }

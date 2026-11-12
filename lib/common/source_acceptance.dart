@@ -6,6 +6,7 @@ import 'package:fl_clash/core/method.dart';
 
 import 'request.dart';
 import 'print.dart';
+import 'profile_import.dart';
 import '../enum/enum.dart';
 import '../models/profile.dart';
 import '../models/config_state.dart';
@@ -34,7 +35,7 @@ class SourcePermission {
   final bool automatic;
 }
 
-enum SourceImportChoice { complete, savePending, loadedNodes }
+enum SourceImportChoice { complete, savePending, availableConfiguration }
 
 class SourceReviewDecision {
   const SourceReviewDecision({
@@ -68,6 +69,7 @@ class SourceReview {
     this.forceReview = false,
     this.subscriptionKey,
     this.binaryMaterial,
+    this.profileReview,
   });
   final String label, origin, kind, routing;
   final List<String> reasons;
@@ -81,6 +83,7 @@ class SourceReview {
   final bool forceReview;
   final String? subscriptionKey;
   final List<int>? binaryMaterial;
+  final ProfileReviewContext? profileReview;
 }
 
 class AcceptedSourceRevision {
@@ -217,11 +220,13 @@ class SourceAcceptance {
     required this.core,
     required this.requests,
     this.confirm,
+    this.profileReview,
   });
 
   final CoreController core;
   final Request requests;
   final SourceConfirmation? confirm;
+  final ProfileReviewContext? profileReview;
 
   static String fingerprint(Object? value) =>
       sha256.convert(utf8.encode(json.encode(value))).toString();
@@ -617,6 +622,7 @@ class SourceAcceptance {
             label: label,
             origin: displayOrigin(location),
             kind: kind,
+            profileReview: profileReview,
             reasons: List<String>.from(result['reasons'] as List? ?? const []),
             routing: result['routing'] as String? ?? 'source',
             script: kind == 'script' ? body : null,

@@ -154,7 +154,6 @@ Future<SourceReviewDecision?> confirmSourceReview(
   Future<SourceReviewDecision?> Function(Widget child)? present,
   SourceReviewPresentation? presentation,
   bool importing = false,
-  bool loadedNodesSnapshot = false,
 }) async {
   final show =
       presentation?.present ??
@@ -227,6 +226,7 @@ Future<SourceReviewDecision?> confirmSourceReview(
       key: rootSource.key,
       identity: _profileSourceIdentity(profile),
       material: body,
+      profileReview: review.profileReview,
       bodyHash: sha256.convert(utf8.encode(body)).toString(),
       settings: settings,
       settingsHash: SourceAcceptance.fingerprint(settings),
@@ -247,11 +247,15 @@ Future<SourceReviewDecision?> confirmSourceReview(
         review: root,
         loadRelated: draft.collect,
         loading: draft.loading,
-        routingEditable: !isComposition && !loadedNodesSnapshot,
+        routingEditable:
+            !isComposition && review.profileReview?.partial == null,
         onDecision: presentation?.onDecision,
         allowPartialImport: importing,
-        loadedNodesSnapshot: loadedNodesSnapshot,
-        canUseLoadedNodes: () => draft.loadedNodes != null,
+        allowPartialConfiguration: review.profileReview != null,
+        partialChanges: () => draft.partialChanges,
+        partialConfiguration: review.profileReview?.partial,
+        canUseAvailableConfiguration: () => draft.partial != null,
+        retrySource: draft.retry,
       ),
     );
     if (decision == null) return null;
@@ -259,17 +263,24 @@ Future<SourceReviewDecision?> confirmSourceReview(
       throw const RequestUnavailable('request_cancelled');
     }
     if (decision.importChoice != SourceImportChoice.complete) {
-      if (!importing || !draft.loading.settled || draft.loading.ready) {
+      if ((!importing && review.profileReview == null) ||
+          !draft.loading.settled ||
+          draft.loading.ready) {
         throw const RequestUnavailable('request_cancelled');
       }
-      if (decision.importChoice == SourceImportChoice.loadedNodes &&
-          draft.loadedNodes == null) {
+      if (decision.importChoice == SourceImportChoice.availableConfiguration &&
+          draft.partial == null) {
         throw const RequestUnavailable('request_cancelled');
+      }
+      if (decision.importChoice == SourceImportChoice.savePending &&
+          !importing) {
+        throw const RequestUnavailable('source_review_required');
       }
       store.clear();
       throw ProfileImportAlternative(
-        loadedNodes: decision.importChoice == SourceImportChoice.loadedNodes
-            ? draft.loadedNodes
+        configuration:
+            decision.importChoice == SourceImportChoice.availableConfiguration
+            ? draft.partial
             : null,
       );
     }
@@ -296,7 +307,13 @@ SourceAcceptance _sourceAcceptance(
   CoreController core,
   Request requests, {
   SourceConfirmation? confirm,
-}) => SourceAcceptance(core: core, requests: requests, confirm: confirm);
+  ProfileReviewContext? profileReview,
+}) => SourceAcceptance(
+  core: core,
+  requests: requests,
+  confirm: confirm,
+  profileReview: profileReview,
+);
 
 class _SubscriptionReviewDraft {
   _SubscriptionReviewDraft(this.ref, this.root, {this.triggering});
@@ -306,16 +323,55 @@ class _SubscriptionReviewDraft {
   final sessions = <RequestSession>{};
   final loading = SourceReviewLoading();
   final _verifiedBodies = <String, List<int>>{};
-  final _nodeDocuments = <String, Map<String, Object?>>{};
-  String? _loadedNodes;
-  bool _nodesPrepared = false;
-  String? get loadedNodes {
-    if (!loading.settled) return null;
-    if (!_nodesPrepared) {
-      _loadedNodes = loadedNodesProfile(_nodeDocuments.values);
-      _nodesPrepared = true;
+  final _materials = <String, List<int>>{};
+  final _availableNodeNames = <String>{};
+  Map<String, Object?>? _document;
+  Map<String, Map<String, Object?>> _plans = {};
+  PartialProfileConfiguration? partial;
+  Map<String, Object?> partialChanges = const {};
+
+  Future<void> retry(String key) async {
+    partial = null;
+    partialChanges = const {};
+    await loading.retry(key);
+    await _preparePartial();
+  }
+
+  Future<void> _preparePartial() async {
+    final generation = _generation;
+    partial = null;
+    partialChanges = const {};
+    if (!loading.settled || loading.ready || _document == null) return;
+    final missing = [
+      for (final item in loading.items)
+        if (item.phase == SourceReviewLoadPhase.failed) _plans[item.key]!,
+    ];
+    final result = await ref.read(coreHandlerProvider).sourceAcceptance({
+      'action': 'previewPartialConfiguration',
+      'key': root.key,
+      'kind': 'profile',
+      'source': {
+        'client': root.source!.client ?? '',
+        'dataset': root.source!.snapshot['dataset'] ?? 0,
+        'sources': {root.key: root.source!.snapshot['sourceRevision'] ?? 0},
+      },
+      'body': jsonEncode(_document),
+      'missingProviders': missing,
+      'names': _availableNodeNames.toList(),
+    });
+    if (generation != _generation ||
+        !await current() ||
+        result['status'] != 'partial') {
+      throw const RequestUnavailable('request_cancelled');
     }
-    return _loadedNodes;
+    partialChanges = Map<String, Object?>.from(result['partial'] as Map);
+    if (result['document'] is Map) {
+      partial = PartialProfileConfiguration(
+        body: jsonEncode(result['document']),
+        materials: Map.unmodifiable(_materials),
+        changes: partialChanges,
+      );
+    }
   }
 
   List<SourceReviewBatchEntry> get entries => loading.ready
@@ -364,8 +420,10 @@ class _SubscriptionReviewDraft {
     }
     sessions.clear();
     loading.reset();
-    _nodeDocuments.clear();
-    _nodesPrepared = false;
+    _materials.clear();
+    _availableNodeNames.clear();
+    partial = null;
+    partialChanges = const {};
     _application = await root.source!.owner.captureSource('application-config');
     Future<bool> valid() async => generation == _generation && await current();
     final source = root.source!;
@@ -397,7 +455,7 @@ class _SubscriptionReviewDraft {
       ref.read(patchClashConfigProvider),
     );
     final document = Map<String, dynamic>.from(description['document'] as Map);
-    _nodeDocuments[root.key] = document;
+    _document = document;
     late ({String yaml, String md5}) composition;
     if (selected?.usesMaterials == true) {
       var material = boundedMaterialCopy(document);
@@ -490,7 +548,7 @@ class _SubscriptionReviewDraft {
         ),
       ),
     ];
-    final plans = <String, Map<String, Object?>>{
+    final plans = _plans = <String, Map<String, Object?>>{
       for (final item in finalDescription['providers'] as List? ?? const [])
         (item as Map)['key'] as String: Map<String, Object?>.from(item),
     };
@@ -536,12 +594,21 @@ class _SubscriptionReviewDraft {
         try {
           final verified =
               _verifiedBodies[cacheKey] ??
-              await service.previewCachedProvider(
-                root: source,
-                configuration: composition.yaml,
-                plan: plan,
-                origins: origins,
-              );
+              root
+                  .profileReview
+                  ?.partial
+                  ?.materials[SourceAcceptance.fingerprint([
+                plan['kind'],
+                mapping,
+              ])] ??
+              (triggerMatches
+                  ? null
+                  : await service.previewCachedProvider(
+                      root: source,
+                      configuration: composition.yaml,
+                      plan: plan,
+                      origins: origins,
+                    ));
           cached = verified != null;
           body =
               verified ??
@@ -611,11 +678,15 @@ class _SubscriptionReviewDraft {
             64 * 1024 * 1024) {
           _verifiedBodies[cacheKey] = frozen;
         }
+        _materials[SourceAcceptance.fingerprint([plan['kind'], mapping])] =
+            frozen;
         if (plan['kind'] == 'provider-proxy' && details['document'] is Map) {
-          _nodesPrepared = false;
-          _nodeDocuments[key] = Map<String, Object?>.from(
-            details['document'] as Map,
-          );
+          for (final node
+              in (details['document'] as Map)['proxies'] as List? ?? const []) {
+            if (node is Map && node['name'] is String) {
+              _availableNodeNames.add(node['name'] as String);
+            }
+          }
         }
         return SourceReviewBatchEntry(
           keys: {
@@ -641,6 +712,7 @@ class _SubscriptionReviewDraft {
       },
     );
     if (!await valid()) throw const RequestUnavailable('request_cancelled');
+    if (root.profileReview != null) await _preparePartial();
     return loading.items
         .where((item) => item.entry != null)
         .map((item) => item.entry!.review)
@@ -705,9 +777,15 @@ Future<SourceMaterialApproval?> _reviewProfileMaterial({
   String kind = 'profile',
   Future<bool> Function()? isCurrent,
   SourceConfirmation? confirm,
+  ProfileReviewContext? profileReview,
 }) async {
   if (!requests.requiresSourceAcceptance) return null;
-  return _sourceAcceptance(core, requests, confirm: confirm).reviewMaterial(
+  return _sourceAcceptance(
+    core,
+    requests,
+    confirm: confirm,
+    profileReview: profileReview,
+  ).reviewMaterial(
     source: source ?? await requests.captureSource('profile:${profile.id}'),
     identity: _profileSourceIdentity(profile),
     settings: _profileSourceSettings(profile),
@@ -770,10 +848,16 @@ Future<AcceptedSourceRevision?> _reviewProfileSource({
   String kind = 'profile',
   Future<bool> Function()? isCurrent,
   SourceConfirmation? confirm,
+  ProfileReviewContext? profileReview,
 }) async {
   if (!requests.requiresSourceAcceptance) return null;
-  final accepted = await _sourceAcceptance(core, requests, confirm: confirm)
-      .review(
+  final accepted =
+      await _sourceAcceptance(
+        core,
+        requests,
+        confirm: confirm,
+        profileReview: profileReview,
+      ).review(
         source: source ?? await requests.captureSource('profile:${profile.id}'),
         identity: _profileSourceIdentity(profile),
         settings: _profileSourceSettings(profile),

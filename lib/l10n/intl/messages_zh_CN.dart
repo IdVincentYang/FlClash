@@ -1664,9 +1664,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("等待中"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("已就绪"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("正在核验…"),
-    "sourceLoadedNodesReviewHint": MessageLookupByLibrary.simpleMessage(
-      "已加载节点快照：仅使用下列节点和一个代理组，排除原订阅分流、分组、DNS 与外部来源。节点尚未测试连通性。自动更新已关闭；以后手动更新此订阅，可从原 URL 下载并审核完整配置。",
-    ),
     "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("本地策略"),
     "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
       "仅已证明处于此版本能力范围内的变化可自动更新，其它变化保持待确认。已有连接继续使用原 socket；资源预算可能延后采用。",
@@ -1688,8 +1685,19 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
       "关闭后排除来源分流、监听和隧道。自有规则必须明确未匹配流量的出口；清空规则不会恢复来源分流。DNS 和节点组分别授权。",
     ),
+    "sourcePartialBlocked": MessageLookupByLibrary.simpleMessage(
+      "以下必要依赖缺失，无法生成部分配置",
+    ),
+    "sourcePartialConfigurationHint": MessageLookupByLibrary.simpleMessage(
+      "部分配置：保留可用规则、分组、DNS 和已审核的来源内容。接受前请检查停用项及默认出口。保留原订阅 URL，关闭自动刷新；手动更新可恢复完整配置。",
+    ),
+    "sourcePartialGroups": MessageLookupByLibrary.simpleMessage("将停用的分组"),
     "sourcePartialImportHint": MessageLookupByLibrary.simpleMessage(
-      "所有来源均已尝试，部分失败。可保存待补齐，或单独审核已加载节点。",
+      "所有来源均已尝试。保留可用内容，下方列出缺失依赖。可重试失败来源，或审核可用配置。",
+    ),
+    "sourcePartialMissing": MessageLookupByLibrary.simpleMessage("不可用来源"),
+    "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
+      "将停用的规则（其它规则保留原顺序）",
     ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "每项操作仅影响所列用途。停止自动维护会保留已接受内容；停止使用会关闭受影响连接并取消重放资格。其他用途保留各自权限。",
@@ -1748,7 +1756,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
       "存在无法安全分类的有效变化。",
     ),
-    "sourceUseLoadedNodes": MessageLookupByLibrary.simpleMessage("仅审核已加载节点"),
+    "sourceUseAvailableConfiguration": MessageLookupByLibrary.simpleMessage(
+      "审核可用配置",
+    ),
     "sourceUseRouting": MessageLookupByLibrary.simpleMessage("使用来源分流规则"),
     "specialProxy": MessageLookupByLibrary.simpleMessage("特殊代理"),
     "specialRules": MessageLookupByLibrary.simpleMessage("特殊规则"),

@@ -1175,9 +1175,13 @@
   "activityRulesBypassed": "グローバル・直接モードではルールは適用されません",
   "activityObservationScope": "観測の範囲",
   "sourceSavePending": "後で確認するため保存",
-  "sourceUseLoadedNodes": "読込済みノードのみ確認",
-  "sourcePartialImportHint": "すべてのソースを試行しましたが、一部が失敗しました。後で確認するために保存するか、読込済みノードのみを確認できます。",
-  "sourceLoadedNodesReviewHint": "読み込み済みノードと単一のプロキシグループのみを使います。元のルーティング、グループ、DNS、外部ソースは除外されます。接続テストは未実施です。自動更新はオフです。元のURLから完全な設定を取得して確認するには、手動で更新してください。",
+  "sourcePartialImportHint": "すべてのソースを試行しました。利用可能な内容は保持されます。不足する依存関係を以下に示します。失敗したソースを再試行するか、利用可能な設定を確認してください。",
   "sourceConfigParsed": "解析済み・関連ソースは別途確認",
-  "localGroupsSelectNodeHelp": "ノードをタップするとすぐに切り替わります。保存は不要です。"
+  "localGroupsSelectNodeHelp": "ノードをタップするとすぐに切り替わります。保存は不要です。",
+  "sourceUseAvailableConfiguration": "利用可能な設定を確認",
+  "sourcePartialConfigurationHint": "部分設定：利用可能なルール、グループ、DNS、承認済みソースを保持します。承認前に無効化される項目と既定の経路を確認してください。元の URL を保持し、自動更新を停止します。手動更新で完全な設定を復元できます。",
+  "sourcePartialMissing": "利用できないソース",
+  "sourcePartialRules": "無効化されるルール（他のルールの順序は保持）",
+  "sourcePartialGroups": "無効化されるグループ",
+  "sourcePartialBlocked": "次の必須依存関係が不足しているため部分設定を生成できません"
 }

@@ -9983,31 +9983,11 @@ class AppLocalizations {
     );
   }
 
-  /// `Review loaded nodes only`
-  String get sourceUseLoadedNodes {
-    return Intl.message(
-      'Review loaded nodes only',
-      name: 'sourceUseLoadedNodes',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.`
+  /// `All sources have been attempted. Available content is retained; missing dependencies are listed below. Retry failed sources or review the available configuration.`
   String get sourcePartialImportHint {
     return Intl.message(
-      'All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.',
+      'All sources have been attempted. Available content is retained; missing dependencies are listed below. Retry failed sources or review the available configuration.',
       name: 'sourcePartialImportHint',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.`
-  String get sourceLoadedNodesReviewHint {
-    return Intl.message(
-      'Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.',
-      name: 'sourceLoadedNodesReviewHint',
       desc: '',
       args: [],
     );
@@ -10028,6 +10008,66 @@ class AppLocalizations {
     return Intl.message(
       'Tap a node to switch immediately. No save is needed.',
       name: 'localGroupsSelectNodeHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review available configuration`
+  String get sourceUseAvailableConfiguration {
+    return Intl.message(
+      'Review available configuration',
+      name: 'sourceUseAvailableConfiguration',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Partial configuration: retains available rules, groups, DNS and accepted source content. Review disabled items and the default exit before accepting. The original URL is kept; automatic refresh is off. Update manually to restore the complete configuration.`
+  String get sourcePartialConfigurationHint {
+    return Intl.message(
+      'Partial configuration: retains available rules, groups, DNS and accepted source content. Review disabled items and the default exit before accepting. The original URL is kept; automatic refresh is off. Update manually to restore the complete configuration.',
+      name: 'sourcePartialConfigurationHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unavailable sources`
+  String get sourcePartialMissing {
+    return Intl.message(
+      'Unavailable sources',
+      name: 'sourcePartialMissing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Rules to disable (other rules keep their order)`
+  String get sourcePartialRules {
+    return Intl.message(
+      'Rules to disable (other rules keep their order)',
+      name: 'sourcePartialRules',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Groups to disable`
+  String get sourcePartialGroups {
+    return Intl.message(
+      'Groups to disable',
+      name: 'sourcePartialGroups',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Required dependencies prevent a partial configuration`
+  String get sourcePartialBlocked {
+    return Intl.message(
+      'Required dependencies prevent a partial configuration',
+      name: 'sourcePartialBlocked',
       desc: '',
       args: [],
     );
