@@ -10,11 +10,12 @@ import (
 )
 
 type sourcePartialConfiguration struct {
-	Missing       []string `json:"missing"`
-	RemovedRules  []string `json:"removedRules"`
-	RemovedGroups []string `json:"removedGroups"`
-	Blocked       []string `json:"blocked"`
-	DefaultTarget string   `json:"defaultTarget"`
+	Missing         []string `json:"missing"`
+	RemovedRules    []string `json:"removedRules"`
+	RemovedGroups   []string `json:"removedGroups"`
+	RemovedSettings []string `json:"removedSettings"`
+	Blocked         []string `json:"blocked"`
+	DefaultTarget   string   `json:"defaultTarget"`
 }
 
 func previewPartialSourceConfiguration(request sourceAcceptanceRequest) (sourceAcceptanceResult, error) {
@@ -121,8 +122,9 @@ func previewPartialSourceConfiguration(request sourceAcceptanceRequest) (sourceA
 	keptRules := make([]any, 0, len(rules))
 	for index, rule := range rules {
 		kind, payload, target, _ := RC.ParseRulePayload(rule, true)
-		unavailable := removed[target] || kind == "RULE-SET" && missingRules[payload]
-		if slices.Contains([]string{"NOT", "AND", "OR", "SUB-RULE"}, kind) && strings.Contains(strings.ToUpper(payload), "RULE-SET") && len(missingRules) != 0 {
+		missing, parseError := partialRuleUsesMissing(kind, payload, missingRules)
+		unavailable := removed[target] || missing
+		if parseError != nil {
 			changes.Blocked = append(changes.Blocked, rule)
 		}
 		if kind == "MATCH" {
@@ -144,6 +146,9 @@ func previewPartialSourceConfiguration(request sourceAcceptanceRequest) (sourceA
 		changes.Blocked = append(changes.Blocked, "rules:MATCH")
 	}
 	document["rules"] = keptRules
+	if err := omitMissingSourceDNSPolicies(document, missingRules, changes); err != nil {
+		return sourceAcceptanceResult{}, err
+	}
 	for field, value := range document {
 		if slices.Contains([]string{"rules", "sub-rules"}, field) {
 			continue
@@ -190,10 +195,7 @@ func partialSourceHasMissingReference(value any, rules, proxies map[string]bool)
 			}
 		}
 		kind, payload, _, _ := RC.ParseRulePayload(value, true)
-		if kind == "RULE-SET" && rules[payload] {
-			return true
-		}
-		if slices.Contains([]string{"NOT", "AND", "OR", "SUB-RULE"}, kind) && strings.Contains(strings.ToUpper(payload), "RULE-SET") && len(rules) != 0 {
+		if missing, err := partialRuleUsesMissing(kind, payload, rules); missing || err != nil {
 			return true
 		}
 		if strings.Contains(value, "#") {

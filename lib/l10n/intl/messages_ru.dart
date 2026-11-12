@@ -2398,6 +2398,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
       "Отключаемые правила (порядок остальных сохраняется)",
     ),
+    "sourcePartialSettings": MessageLookupByLibrary.simpleMessage(
+      "Отключаемые политики DNS",
+    ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "Каждое действие относится только к указанному использованию. Остановка автоматического обслуживания сохраняет принятые данные. Прекращение использования закрывает затронутые соединения и запрещает повторное применение. Разрешения других способов использования сохраняются.",
     ),

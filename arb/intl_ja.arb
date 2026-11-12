@@ -1185,5 +1185,6 @@
   "sourcePartialGroups": "無効化されるグループ",
   "sourcePartialBlocked": "次の必須依存関係が不足しているため部分設定を生成できません",
   "sourceConfigurationUnavailable": "完全なソース設定を利用できない理由",
-  "sourceNodeImportHint": "読み込んだノードを利用できます。アプリのネットワーク設定と1つのプロキシグループを使い、ソースのルール、DNS、元のグループは適用しません。元の URL を保持し、自動更新を停止します。手動更新で完全な設定を再試行できます。"
+  "sourceNodeImportHint": "読み込んだノードを利用できます。アプリのネットワーク設定と1つのプロキシグループを使い、ソースのルール、DNS、元のグループは適用しません。元の URL を保持し、自動更新を停止します。手動更新で完全な設定を再試行できます。",
+  "sourcePartialSettings": "無効化される DNS ポリシー"
 }

@@ -10092,6 +10092,16 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `DNS policies to disable`
+  String get sourcePartialSettings {
+    return Intl.message(
+      'DNS policies to disable',
+      name: 'sourcePartialSettings',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

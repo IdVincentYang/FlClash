@@ -1892,6 +1892,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
       "無効化されるルール（他のルールの順序は保持）",
     ),
+    "sourcePartialSettings": MessageLookupByLibrary.simpleMessage(
+      "無効化される DNS ポリシー",
+    ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "操作は表示された用途だけに適用されます。自動保守の停止は承認済みの内容を保持します。使用の停止は影響する接続を閉じ、再適用を無効にします。他の用途の権限は維持されます。",
     ),

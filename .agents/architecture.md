@@ -143,17 +143,20 @@ instead of popping the route. Only new URL imports may save unaccepted material 
 source attempt has settled. Frontend imports, refreshes and existing
 subscription reviews can instead review a partial configuration retaining
 available rules, groups, DNS and verified provider bodies. Parent Go projects
-the missing-provider dependencies without factories or grants; the dialog
-discloses removed rules/groups and the explicit default exit. When this source
-configuration is incomplete, new URL imports can still use an independent
-snapshot of parsed nodes with one explicit proxy exit and app network settings.
-This keeps source DNS or complex-rule failures out of node-import eligibility;
-the review discloses the omitted source configuration. Existing subscription
-reviews retain their critical-dependency checks. `ProfileReviewContext` carries
-operation-local provider bytes into the second review; normal source checks,
-acceptance and material commits remain authoritative. The URL is retained with
-automatic refresh disabled, and manual refresh restores the original complete
-source through review.
+the missing-provider dependencies without factories or grants. Logical rule
+references are inspected with the native grammar; unrelated AND/OR/NOT rules
+remain intact and affected rules are removed whole. DNS policy entries depending
+on missing RuleSets are omitted without discarding other policies or groups. The
+dialog discloses disabled rules, groups, DNS policies and the default exit. When
+this source configuration is incomplete, new URL imports can still use an
+independent snapshot of parsed nodes with one explicit proxy exit and app
+network settings. This keeps source DNS or complex-rule failures out of
+node-import eligibility; the review discloses the omitted source configuration.
+Existing subscription reviews retain their critical-dependency checks.
+`ProfileReviewContext` carries operation-local provider bytes into the second
+review; normal source checks, acceptance and material commits remain
+authoritative. The URL is retained with automatic refresh disabled, and manual
+refresh restores the original complete source through review.
 Queued/loading/verifying/retrying sources keep all acceptance and alternative actions unavailable.
 `ProfileImportTask` cancels its queued or active refresh job when the user returns or leaves,
 and the refresh guards recheck it before persistence. Failures restore the retained form; saving blocks back navigation

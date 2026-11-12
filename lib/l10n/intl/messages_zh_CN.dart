@@ -1705,6 +1705,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
       "将停用的规则（其它规则保留原顺序）",
     ),
+    "sourcePartialSettings": MessageLookupByLibrary.simpleMessage(
+      "将停用的 DNS 策略",
+    ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "每项操作仅影响所列用途。停止自动维护会保留已接受内容；停止使用会关闭受影响连接并取消重放资格。其他用途保留各自权限。",
     ),

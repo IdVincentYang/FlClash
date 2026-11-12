@@ -494,6 +494,7 @@ class _SourcePartialChanges extends StatelessWidget {
       'missing': l.sourcePartialMissing,
       'removedRules': l.sourcePartialRules,
       'removedGroups': l.sourcePartialGroups,
+      'removedSettings': l.sourcePartialSettings,
       'blocked': nodesOnly
           ? l.sourceConfigurationUnavailable
           : l.sourcePartialBlocked,

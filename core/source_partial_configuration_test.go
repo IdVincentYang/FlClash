@@ -69,7 +69,6 @@ rules: ["DOMAIN,a.invalid,Parent", "MATCH,Default"]
 
 func TestPartialSourceBlocksCriticalOrUnprovenDependencies(t *testing.T) {
 	for _, test := range []struct{ name, extra, rules string }{
-		{"dns", "dns: {nameserver-policy: {'rule-set:missing': 1.1.1.1}}", "MATCH,DIRECT"},
 		{"sniffer", "sniffer: {skip-domain: ['rule-set:missing']}", "MATCH,DIRECT"},
 		{"nested", "", "NOT,((RULE-SET,missing)),DIRECT"},
 		{"sub-rules", "sub-rules: {inner: ['MATCH,DIRECT']}", "MATCH,DIRECT"},
@@ -88,6 +87,74 @@ func TestPartialSourceBlocksCriticalOrUnprovenDependencies(t *testing.T) {
 		result := partialFixture(t, body, "provider-proxy", "missing")
 		if result.Document != nil || len(result.Partial.Blocked) == 0 {
 			t.Fatal("missing default acquired an implicit DIRECT", result)
+		}
+	}
+}
+
+func TestPartialSourceKeepsIndependentLogicalRulesAndDisablesWholeDependentRules(t *testing.T) {
+	body := `rule-providers:
+  missing: {type: http, url: https://example.invalid/missing, behavior: domain, format: text}
+  loaded: {type: http, url: https://example.invalid/loaded, behavior: domain, format: text}
+rules:
+  - AND,((RULE-SET,loaded),(NETWORK,TCP)),DIRECT
+  - OR,((RULE-SET,loaded),(NOT,((RULE-SET,missing)))),REJECT
+  - NOT,((RULE-SET,missing)),DIRECT
+  - AND,((DOMAIN-REGEX,exampleRULE-SET.invalid),(RULE-SET,loaded)),DIRECT
+  - MATCH,REJECT
+`
+	result := partialFixture(t, body, "provider-rule", "missing")
+	if result.Document == nil || len(result.Partial.Blocked) != 0 {
+		t.Fatal(result)
+	}
+	rules, _ := sourceStrings(result.Document["rules"])
+	if len(rules) != 3 || len(result.Partial.RemovedRules) != 2 || !strings.Contains(rules[0], "RULE-SET,loaded") || !strings.Contains(rules[1], "DOMAIN-REGEX") || rules[2] != "MATCH,REJECT" {
+		t.Fatal(rules, result.Partial)
+	}
+}
+
+func TestPartialSourceRemovesOnlyDNSPoliciesReferencingMissingContent(t *testing.T) {
+	body := `rule-providers:
+  missing: {type: http, url: https://example.invalid/missing, behavior: domain, format: text}
+  loaded: {type: http, url: https://example.invalid/loaded, behavior: domain, format: text}
+dns:
+  nameserver: [127.0.0.1:9]
+  proxy-server-nameserver: [127.0.0.1:10]
+  nameserver-policy:
+    'before.invalid': 127.0.0.1:11
+    'rule-set:missing': 127.0.0.1:12
+    'rule-set:loaded': 127.0.0.1:13
+    'after.invalid': 127.0.0.1:14
+  proxy-server-nameserver-policy:
+    'rule-set:missing': 127.0.0.1:15
+rules: ['RULE-SET,loaded,DIRECT', 'MATCH,REJECT']
+`
+	result := partialFixture(t, body, "provider-rule", "missing")
+	if result.Document == nil || len(result.Partial.RemovedSettings) != 2 || len(result.Partial.Blocked) != 0 || len(result.Partial.RemovedRules) != 0 {
+		t.Fatal(result)
+	}
+	dns := result.Document["dns"].(map[string]any)
+	encoded, _ := json.Marshal(dns)
+	if strings.Contains(string(encoded), "rule-set:missing") || !strings.Contains(string(encoded), "rule-set:loaded") || !strings.Contains(string(encoded), "127.0.0.1:9") || dns["proxy-server-nameserver-policy"] != nil {
+		t.Fatal(string(encoded))
+	}
+	positions := []int{}
+	for _, key := range []string{"before.invalid", "rule-set:loaded", "after.invalid"} {
+		positions = append(positions, strings.Index(string(encoded), key))
+	}
+	if positions[0] < 0 || positions[0] >= positions[1] || positions[1] >= positions[2] {
+		t.Fatal("unaffected DNS policies changed order", string(encoded))
+	}
+}
+
+func TestPartialSourceKeepsEmptyAndNullDNSPolicies(t *testing.T) {
+	for _, policy := range []string{"null", "{}"} {
+		body := "rule-providers: {missing: {type: http, url: https://example.invalid/missing, behavior: domain, format: text}}\ndns: {nameserver-policy: " + policy + "}\nrules: ['MATCH,REJECT']\n"
+		result := partialFixture(t, body, "provider-rule", "missing")
+		if result.Document == nil || len(result.Partial.RemovedSettings) != 0 {
+			t.Fatal(result)
+		}
+		if _, present := result.Document["dns"].(map[string]any)["nameserver-policy"]; !present {
+			t.Fatal("unaffected DNS field removed")
 		}
 	}
 }

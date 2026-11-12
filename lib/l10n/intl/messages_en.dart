@@ -2311,6 +2311,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourcePartialRules": MessageLookupByLibrary.simpleMessage(
       "Rules to disable (other rules keep their order)",
     ),
+    "sourcePartialSettings": MessageLookupByLibrary.simpleMessage(
+      "DNS policies to disable",
+    ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "Each action applies to the displayed use. Stopping automatic maintenance keeps accepted content. Stopping use closes affected connections and disables replay; other uses keep their own permissions.",
     ),

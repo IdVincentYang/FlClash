@@ -8,6 +8,7 @@ import 'package:fl_clash/common/local_proxy_groups.dart';
 import 'package:fl_clash/common/profile_import.dart';
 import 'package:fl_clash/common/config_input.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
+import 'package:fl_clash/common/source_review_loading.dart';
 import 'package:fl_clash/common/policy_selection.dart';
 import 'package:fl_clash/common/managed_material.dart';
 import 'package:fl_clash/common/policy_draft.dart';
@@ -3431,6 +3432,161 @@ void main() {
     skip: executable == null,
   );
 
+  test(
+    '53 of 55 sources retain groups, independent logical rules and DNS policies',
+    () async {
+      container.read(currentProfileIdProvider.notifier).value = null;
+      const groupNames = ['Entry', 'Streaming', 'Fallback'];
+      final sourceRules = [
+        for (var i = 0; i < 55; i++) 'RULE-SET,rule-$i,Entry',
+        'AND,((RULE-SET,rule-0),(RULE-SET,rule-1)),Entry',
+        'NOT,((RULE-SET,rule-7)),REJECT',
+        'MATCH,Fallback',
+      ];
+      responses['/batch-55'] = jsonEncode({
+        'proxies': [
+          {
+            'name': 'only-node',
+            'type': 'socks5',
+            'server': '127.0.0.1',
+            'port': 9,
+          },
+        ],
+        'proxy-groups': [
+          for (final name in groupNames)
+            {
+              'name': name,
+              'type': 'select',
+              'proxies': ['only-node'],
+            },
+        ],
+        'rule-providers': {
+          for (var i = 0; i < 55; i++)
+            'rule-$i': {
+              'type': 'http',
+              'url': 'http://127.0.0.1:${server.port}/rule/$i',
+              'proxy': 'DIRECT',
+              'format': 'text',
+              'behavior': 'domain',
+            },
+        },
+        'dns': {
+          'enable': true,
+          'listen': '127.0.0.1:0',
+          'nameserver': ['127.0.0.1:9'],
+          'nameserver-policy': {
+            'rule-set:rule-7': '127.0.0.1:10',
+            'rule-set:rule-13': '127.0.0.1:11',
+            '*.example.invalid': '127.0.0.1:12',
+          },
+        },
+        'rules': sourceRules,
+      });
+      for (var i = 0; i < 55; i++) {
+        responses['/rule/$i'] = 'fixture-$i.invalid\n';
+      }
+      statuses['/rule/7'] = 503;
+      statuses['/rule/11'] = 503;
+      container.read(appVisibleProvider.notifier).value = true;
+      var reviews = 0;
+      final result = await profiles.addProfileFormURL(
+        'http://127.0.0.1:${server.port}/batch-55',
+        label: 'Batch fixture',
+        mode: RequestMode.direct,
+        confirmed: true,
+        importTask: ProfileImportTask(onPhase: (_) {}),
+        reviewPresentation: (
+          present: (child) async {
+            final dialog = child as SourceReviewDialog;
+            reviews++;
+            await dialog.loadRelated!(dialog.review.routing);
+            if (reviews == 1) {
+              final sources = dialog.loading!.items.where(
+                (item) => item.kind == 'provider-rule',
+              );
+              expect(sources, hasLength(55));
+              expect(
+                sources.where(
+                  (item) => item.phase == SourceReviewLoadPhase.ready,
+                ),
+                hasLength(53),
+              );
+              expect(dialog.canUseAvailableConfiguration!(), true);
+              return const SourceReviewDecision(
+                automatic: false,
+                routing: 'source',
+                importChoice: SourceImportChoice.availableConfiguration,
+              );
+            }
+            expect(dialog.loading!.ready, true);
+            expect(
+              dialog.partialConfiguration!.changes['nodesOnly'],
+              isNot(true),
+            );
+            expect(
+              dialog.partialConfiguration!.changes['blocked'],
+              anyOf(isNull, isEmpty),
+            );
+            expect(
+              dialog.partialConfiguration!.changes['removedRules'],
+              hasLength(3),
+            );
+            expect(
+              dialog.partialConfiguration!.changes['removedSettings'],
+              hasLength(1),
+            );
+            return const SourceReviewDecision(
+              automatic: false,
+              routing: 'source',
+            );
+          },
+          onDecision: (_) {},
+        ),
+      );
+      expect(result!.materialSaved, true);
+      expect(reviews, 2);
+      final row = (await store.profilesDao.query().get()).single;
+      final body =
+          jsonDecode(
+                await File(
+                  await appPath.getProfilePath('${row.id}'),
+                ).readAsString(),
+              )
+              as Map;
+      expect(
+        (body['proxy-groups'] as List).map((group) => group['name']),
+        groupNames,
+      );
+      expect((body['rule-providers'] as Map), hasLength(53));
+      expect(
+        body['rules'],
+        sourceRules.where(
+          (rule) =>
+              !rule.contains('rule-7,') &&
+              !rule.contains('rule-11,') &&
+              !rule.startsWith('NOT,'),
+        ),
+      );
+      expect((body['dns'] as Map)['nameserver-policy'], {
+        'rule-set:rule-13': '127.0.0.1:11',
+        '*.example.invalid': '127.0.0.1:12',
+      });
+      for (var i = 0; i < 55; i++) {
+        expect(received.where((path) => path == '/rule/$i'), hasLength(1));
+      }
+      received.clear();
+      SourceReviewBatchStore.forRequests(client).clear();
+      expect(await setup.applyProfile(force: true), true);
+      expect((await core.getProxies()).proxies.keys, containsAll(groupNames));
+      expect(
+        (await core.getProxies()).proxies.keys,
+        isNot(contains('Imported nodes')),
+      );
+      expect(received, isEmpty);
+    },
+    skip: executable == null,
+  );
+
   for (final scenario in [
     (outcome: 'early', first: false, blocker: ''),
     (outcome: 'pending', first: false, blocker: ''),
@@ -3451,7 +3607,10 @@ void main() {
     (outcome: 'cancel-configuration', first: true, blocker: 'dns'),
   ]) {
     final outcome = scenario.outcome;
-    final nodeFallback = scenario.blocker.isNotEmpty;
+    final nodeFallback = const {
+      'sub-rules',
+      'no-default',
+    }.contains(scenario.blocker);
     final name =
         'URL partial import $outcome first=${scenario.first} blocker=${scenario.blocker}';
     test(name, () async {
@@ -3484,7 +3643,7 @@ void main() {
           'proxies: [{name: external, type: socks5, server: 127.0.0.1, port: 10}]\n';
       responses['/available'] = 'available.invalid\n';
       statuses['/missing'] = 503;
-      if (nodeFallback) {
+      if (scenario.blocker.isNotEmpty) {
         var material = responses['/partial']!;
         if (scenario.blocker == 'logical') {
           material = material.replaceFirst(
@@ -3511,6 +3670,7 @@ void main() {
         }
         if (scenario.blocker == 'empty') {
           responses['/loaded'] = 'proxies: []\n';
+          material = material.replaceFirst(', "MATCH,Source"', '');
         }
         if (scenario.blocker == 'one-node') {
           statuses['/loaded'] = 503;
@@ -3569,9 +3729,14 @@ void main() {
             if (nodeFallback) {
               expect(dialog.partialConfiguration!.changes['nodesOnly'], true);
             } else {
-              expect(dialog.partialConfiguration!.changes['removedRules'], [
-                'RULE-SET,Domestic,DIRECT',
-              ]);
+              expect(
+                dialog.partialConfiguration!.changes['nodesOnly'],
+                isNot(true),
+              );
+              expect(
+                dialog.partialConfiguration!.changes['removedRules'],
+                contains('RULE-SET,Domestic,DIRECT'),
+              );
             }
             return outcome == 'cancel-configuration'
                 ? null
@@ -3628,15 +3793,26 @@ void main() {
           );
           expect(map['rules'], ['MATCH,Imported nodes']);
         } else {
-          expect((map['proxies'] as List).map((p) => p['name']), ['inline']);
+          expect(
+            (map['proxies'] as List).map((p) => p['name']),
+            scenario.blocker == 'external-only' ? <String>[] : ['inline'],
+          );
           expect(map['rules'], [
             'DOMAIN,first.invalid,DIRECT',
-            'RULE-SET,Available,Source',
+            if (scenario.blocker != 'one-node') 'RULE-SET,Available,Source',
+            if (scenario.blocker == 'logical')
+              'AND,((NETWORK,TCP),(RULE-SET,Available)),Source',
             'MATCH,Source',
           ]);
           expect((map['proxy-groups'] as List).single['name'], 'Source');
-          expect((map['rule-providers'] as Map).keys, ['Available']);
-          expect((map['proxy-providers'] as Map).keys, ['loaded']);
+          expect(
+            (map['rule-providers'] as Map).keys,
+            scenario.blocker == 'one-node' ? <String>[] : ['Available'],
+          );
+          expect(
+            (map['proxy-providers'] as Map).keys,
+            scenario.blocker == 'one-node' ? <String>[] : ['loaded'],
+          );
           expect(map['dns'], {
             'nameserver': ['https://1.1.1.1/dns-query'],
           });
@@ -3660,7 +3836,7 @@ void main() {
         expect(await setup.applyProfile(force: true), true);
         expect(received, isEmpty);
         expect(confirmations, isEmpty);
-        if (nodeFallback) return;
+        if (scenario.blocker.isNotEmpty) return;
         received.clear();
         if (!nodeFallback) {
           var updateReviews = 0;
