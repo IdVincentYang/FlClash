@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:fl_clash/common/application_activity.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/providers/config_state.dart';
 import 'package:fl_clash/state.dart';
@@ -203,23 +204,55 @@ void main() {
     },
   );
 
-  testWidgets(
-    'row expansion shows actual paths and current settings without edits',
-    (tester) async {
-      await pump(tester);
-      await tester.tap(find.text('Browser A'));
-      await tester.pumpAndSettle();
-      expect(find.text('Observed exit paths (2)'), findsOneWidget);
-      expect(find.text('node-b → Proxy'), findsOneWidget);
-      expect(find.text('Current settings: include this app'), findsOneWidget);
-      expect(
-        find.text('VPN capture observed for these connections'),
-        findsOneWidget,
-      );
-      expect(find.text('Save'), findsNothing);
-      await screenshot(tester, 'expanded');
-    },
-  );
+  testWidgets('rows show summaries without expansion or detail controls', (
+    tester,
+  ) async {
+    await pump(tester);
+    expect(find.byType(ExpansionTile), findsNothing);
+    await tester.tap(find.text('Browser A'));
+    await tester.pumpAndSettle();
+    expect(find.text('Observed exit paths (2)'), findsNothing);
+    expect(find.text('Current settings: include this app'), findsNothing);
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('Active 1 · Observed 2'), findsOneWidget);
+    await screenshot(tester, 'summaries');
+  });
+
+  testWidgets('background and retention gaps do not show an alarm', (
+    tester,
+  ) async {
+    final initial = _activity();
+    await pump(
+      tester,
+      activity: ApplicationActivityState(
+        connections: initial.connections,
+        observing: true,
+        hasSnapshot: true,
+        interrupted: true,
+        truncated: true,
+      ),
+    );
+    expect(find.text('Observation has gaps'), findsNothing);
+    expect(find.text('Active 1 · Observed 2'), findsOneWidget);
+  });
+
+  testWidgets('unknown identity uses an application placeholder', (
+    tester,
+  ) async {
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: DateTime.now());
+    store.addEvent(activityConnection('unknown', status: 'notObserved'));
+    await pump(tester, activity: store.snapshot());
+    expect(find.text('Unknown app'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is GlyphIcon && widget.glyph == AppGlyphs.application,
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(ExpansionTile), findsNothing);
+  });
 
   testWidgets('catalogue failure leaves activity visible and provides retry', (
     tester,
@@ -274,13 +307,11 @@ void main() {
     await pump(tester, activity: store.snapshot());
     expect(find.text('Shared application identity'), findsOneWidget);
     expect(find.text('Browser A'), findsNothing);
-    await tester.tap(find.text('Shared application identity'));
-    await tester.pumpAndSettle();
-    expect(find.text('test.app.a\ntest.app.b'), findsOneWidget);
+    expect(find.byType(ExpansionTile), findsNothing);
   });
 
   testWidgets(
-    'expanded rows follow app identity when recent activity reorders them',
+    'activity updates keep each summary with the correct application',
     (tester) async {
       final now = DateTime.utc(2026, 11, 11, 2);
       final store = ApplicationActivityStore()
@@ -295,22 +326,38 @@ void main() {
         ),
       );
       await pump(tester, activity: store.snapshot());
-      await tester.tap(find.text('Mail B'));
-      await tester.pumpAndSettle();
       store.addEvent(
         activityConnection('new-a', start: now.add(const Duration(seconds: 2))),
       );
       (container.read(applicationActivityProvider.notifier) as _Activity)
           .replace(store.snapshot());
       await tester.pumpAndSettle();
-      ExpansionTile tile(String label) => tester.widget<ExpansionTile>(
-        find.ancestor(
-          of: find.text(label),
-          matching: find.byType(ExpansionTile),
-        ),
+      final browser = find.ancestor(
+        of: find.text('Browser A'),
+        matching: find.byType(ListTile),
       );
-      expect(tile('Mail B').controller!.isExpanded, true);
-      expect(tile('Browser A').controller!.isExpanded, false);
+      final mail = find.ancestor(
+        of: find.text('Mail B'),
+        matching: find.byType(ListTile),
+      );
+      expect(
+        find.descendant(
+          of: browser,
+          matching: find.text('Active Unconfirmed · Observed 2'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: mail,
+          matching: find.text('Active Unconfirmed · Observed 1'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(browser).dy,
+        lessThan(tester.getTopLeft(mail).dy),
+      );
     },
   );
 

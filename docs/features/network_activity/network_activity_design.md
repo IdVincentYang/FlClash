@@ -5,7 +5,8 @@
 
 ## 职责与数据路径
 
-`VpnService` 提供系统 socket UID 查询及当前用户内的包名候选解析；Core 保留实际匹配规则、
+`VpnService` 提供系统 socket UID 查询及当前用户内的包名候选解析；TUN 与同机 HTTP／HTTPS 代理连接共用识别，
+Core 保留实际匹配规则、
 出口链和来源追溯，在既有 request 事件与 getConnections 快照上附加版本化 observation。
 Dart 的 `TrackerInfo.observation` 使用不可变模型消费这些事实，不新增数据库或事件文件。
 
@@ -46,6 +47,11 @@ Native 模块与 Go 库须一起构建交付。
 | notObserved | 没有保留下可关联的入口事实；也用于观测保留上限以外的快照 |
 | method | 成功 UID 的查询来源为 androidUid 或 procfs；没有可用结果时可为 unavailable |
 
+VPN HTTP proxy 使部分应用直接连接本机代理，绕过 TUN 入口。这类 HTTP／HTTPS TCP 连接在 Tracker 加入时，
+使用客户端与本机监听器的原始 socket 地址查询归属；两端必须均为回环地址，不能把 LAN 远端客户端归到本机 App。
+查询仍核对原 VPN 服务及保护代次，只做一次，不在快照读取时回填。接管证据记为 localProxy，不伪装成 TUN 捕获。
+这条路径没有 TUN 入口时的配置戳；配置归属只采用原匹配器能够证明的事实，不套用当前配置。
+
 没有 App 规则、find-process-mode 为 off 时，TUN 连接加入统计器仍会尝试识别应用。
 若既有进程规则查找已解析同一 socket，观测复用其结果。查询持有原 TunHandler 的读锁并核对服务代次，
 关闭回调须取得写锁，避免查询释放后的 JNI 对象。
@@ -68,7 +74,7 @@ processEpoch 是不同字段，不随单次切换订阅或 VPN 重建而充当�
 | TrackerInfo.id／start／metadata | 原连接 ID、开始时间、Host／IP、协议和端口；不猜测 Host，不采集 HTTPS 路径或正文 |
 | TrackerInfo.rule／rulePayload／chains | 原匹配器和实际建连返回的规则、payload、逻辑出口链；不是当前分组选择或外部出口 IP 测量 |
 | observation.application | 本次 socket 查询结果及其识别状态 |
-| observation.capture | vpn 表示有进入 TUN 的证据，并保留 serviceId／generation；unknown 不等于未接管 |
+| observation.capture | vpn 表示进入 TUN；localProxy 表示同机代理 socket；均保留 serviceId／generation，unknown 不等于未接管 |
 | observation.configuration | 已证明的 ConfigInput inputId、模式及可选路由版本；status=known 证明 inputId，不能据此假定每个可选字段都存在 |
 | TrackerInfo.provenance | 原来源追溯；版本已知与规则来源已知是不同结论 |
 
@@ -133,15 +139,16 @@ Core getConnections 的缺失列表、非列表或任一不完整条目均为读
 
 Android 的 Tools 顶部提供“应用网络”入口。ApplicationActivityView 只读取汇总，
 支持近期活动、当前活跃、全部应用三种范围及应用搜索，断开时仍能打开并查看保留结果。
-页面不启动代理、下载订阅或接受来源；后两层目标页面尚未接入，条目只在本页展开摘要。
+页面不启动代理、下载订阅或接受来源；后两层目标页面尚未接入，条目只显示摘要，不提供展开或详情跳转。
 
-每个 App 显示名称／图标、活跃与近期连接数、最近活动和出口概况；展开查看身份、规则及出口摘要。
+每个 App 显示名称／图标、活跃与近期连接数、最近活动和出口概况；占位图标为单个应用窗口轮廓。
+身份、接管证据及规则／出口明细留给后续应用目标页面；观察缺口保留在内部事实中，不再显示常驻告警。
 多规则／多出口独立保留，规则模式外有证据时标为未使用规则，缺失事实保持未知。
-应用按最近活动排序，列表按应用身份定位子项，每行使用独立的展开状态及 PageStorage key，排序不能串行。
-规则／出口展开最多预览三项并显示总项数；完整目标排查由后续页面提供。
+应用按最近活动排序，列表按应用身份定位子项，更新后计数与摘要不能串到其它应用。
+摘要显示首种出口及其它出口数量；完整目标排查由后续页面提供。
 
 全部应用复用 packagesProvider、SystemAction 与原安装应用 API；目录只在页面需要时加载，
 加载／权限不足／失败不遮住已取得的网络活动，可以单独重试。空目录的更新不重复触发自身读取。
 包目录更新仍沿 AndroidManager 的原通知链，不建立第二份安装应用缓存或自动请求权限。
-当前接管设置的包含／排除说明与连接的 VPN 接管证据分开显示，不能把设置显示为已采用状态。
+接管设置与历史连接证据仍保持独立，后续详情页不能把当前设置显示为历史连接已采用的状态。
 页面没有接管开关、分流编辑、清空或假保存按钮；这些操作仍按 Tasks 的功能边界推进。

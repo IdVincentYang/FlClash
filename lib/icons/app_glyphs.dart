@@ -1893,6 +1893,15 @@ abstract final class AppGlyphs {
     ], role: GlyphRole.line),
   ]);
 
+  static const application = Glyph([
+    GlyphBox(3.5, 3.5, 20.5, 20.5, 4),
+    GlyphPolyline([
+      GlyphVertex(3.8, 8.5),
+      GlyphVertex(20.2, 8.5),
+    ], role: GlyphRole.detail),
+    GlyphCircle(7, 6, 0.6, role: GlyphRole.detail, solid: true),
+  ]);
+
   static const appsList = Glyph([
     GlyphBox(3.5, 3.3, 6.9, 6.7, 1),
     GlyphBox(3.5, 10.3, 6.9, 13.7, 1),

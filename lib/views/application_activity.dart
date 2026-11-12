@@ -1,10 +1,8 @@
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
-import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,9 +30,6 @@ class _ApplicationActivityViewState
     final l10n = context.appLocalizations;
     final activity = ref.watch(applicationActivityProvider);
     final catalogue = ref.watch(applicationCatalogueProvider);
-    final access = ref.watch(
-      vpnSettingProvider.select((value) => value.accessControlProps),
-    );
     final packages = {
       for (final package in catalogue.asData?.value.packages ?? <Package>[])
         package.packageName: package,
@@ -123,13 +118,6 @@ class _ApplicationActivityViewState
                     l10n.activityRetention(activity.capacity),
                     style: context.textTheme.bodySmall,
                   ),
-                  if (activity.interrupted || activity.truncated) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.activityIncomplete,
-                      style: TextStyle(color: context.colorScheme.error),
-                    ),
-                  ],
                 ],
               ),
             );
@@ -205,7 +193,6 @@ class _ApplicationActivityViewState
             label: _label(entry.value.package, entry.value.activity),
             package: entry.value.package,
             activity: entry.value.activity,
-            access: access,
           );
         },
       ),
@@ -222,89 +209,36 @@ class _ApplicationActivityViewState
   }
 }
 
-class _ApplicationActivityRow extends StatefulWidget {
+class _ApplicationActivityRow extends StatelessWidget {
   const _ApplicationActivityRow({
     super.key,
     required this.label,
     this.package,
     this.activity,
-    required this.access,
   });
   final String label;
   final Package? package;
   final AppActivity? activity;
-  final AccessControlProps access;
-
-  @override
-  State<_ApplicationActivityRow> createState() =>
-      _ApplicationActivityRowState();
-}
-
-class _ApplicationActivityRowState extends State<_ApplicationActivityRow> {
-  final _controller = ExpansibleController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    final label = widget.label;
-    final package = widget.package;
-    final activity = widget.activity;
-    final access = widget.access;
     final l10n = context.appLocalizations;
-    final identity = activity?.application;
-    final packageName = package?.packageName ?? identity?.packageName;
+    final packageName =
+        package?.packageName ?? activity?.application.packageName;
     final totals = activity?.totals;
-    final included = packageName == null
-        ? null
-        : !access.enable ||
-              switch (access.mode) {
-                AccessControlMode.acceptSelected => access.acceptList.contains(
-                  packageName,
-                ),
-                AccessControlMode.rejectSelected => !access.rejectList.contains(
-                  packageName,
-                ),
-              };
     final paths = totals?.exitPaths ?? [];
-    final rules = totals?.rules.toList() ?? [];
-    final rulesBypassed =
-        totals != null &&
-        totals.connections.every(
-          (item) =>
-              item.info.rule.isEmpty &&
-              const {
-                'global',
-                'direct',
-              }.contains(item.info.observation?.configuration.mode),
-        );
     return Card.filled(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        key: PageStorageKey(activity?.key ?? packageName),
-        controller: _controller,
-        trailing: ListenableBuilder(
-          listenable: _controller,
-          builder: (context, _) => AnimatedRotation(
-            turns: _controller.isExpanded ? 0.5 : 0,
-            duration: commonDuration,
-            child: const GlyphIcon(AppGlyphs.chevronDown),
-          ),
-        ),
-        shape: AppShape.xl,
-        collapsedShape: AppShape.xl,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
         leading: packageName == null
-            ? const GlyphIcon(AppGlyphs.appsList)
+            ? const GlyphIcon(AppGlyphs.application, size: 40)
             : PackageIcon(
                 packageName: packageName,
                 size: 40,
-                placeholder: const GlyphIcon(AppGlyphs.appsList),
+                placeholder: const GlyphIcon(AppGlyphs.application, size: 40),
               ),
         title: Text(label),
         subtitle: Column(
@@ -334,58 +268,6 @@ class _ApplicationActivityRowState extends State<_ApplicationActivityRow> {
               ),
           ],
         ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (packageName != null) Text(packageName),
-                  if (identity?.uid != null) Text('UID ${identity!.uid}'),
-                  if (identity?.status == 'ambiguous')
-                    Text(identity!.packages.join('\n')),
-                  if (included != null)
-                    Text(
-                      included
-                          ? l10n.activityIncludedSetting
-                          : l10n.activityExcludedSetting,
-                    ),
-                  if (totals?.connections.any(
-                        (item) => item.info.observation?.capture.isVpn == true,
-                      ) ==
-                      true)
-                    Text(l10n.activityVpnObserved),
-                  if (rules.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      '${l10n.activityRules} (${rules.length})',
-                      style: context.textTheme.labelLarge,
-                    ),
-                    for (final rule in rules.take(3))
-                      Text(
-                        rule.$1.isEmpty
-                            ? rulesBypassed
-                                  ? l10n.activityRulesBypassed
-                                  : l10n.unknown
-                            : '${rule.$1} ${rule.$2}'.trim(),
-                      ),
-                  ],
-                  if (paths.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      '${l10n.activityExits} (${paths.length})',
-                      style: context.textTheme.labelLarge,
-                    ),
-                    for (final path in paths.take(3))
-                      Text(path.isEmpty ? l10n.unknown : path.join(' → ')),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

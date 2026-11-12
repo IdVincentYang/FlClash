@@ -324,19 +324,24 @@ directions. The envelope is the only JSON serialization layer: keep arguments, r
 values rather than embedding pre-encoded JSON strings. Plain domain strings, such as country codes or provider contents,
 remain strings.
 
-Android TUN request events and connection snapshots include an optional versioned `observation`, described in
+Android TUN and same-device HTTP/HTTPS proxy observations accompany request events and connection snapshots, described in
 the [application network design](../docs/features/network_activity/network_activity_design.md).
 The parent Go TUN wrapper records socket/service context, and the original Tracker join freezes application identity
 and available configuration facts independently of the process-rule lookup switch. UID package resolution returns
 structured, user-scoped candidates instead of caching the first package. The outward metadata copy keeps legacy
 Requests readable without rewriting the metadata already used for routing. Snapshot reads never resolve an owner again.
+Loopback HTTP/HTTPS sockets that bypass TUN are resolved once at Tracker join through the active Android service;
+both raw endpoints must be loopback TCP addresses. Their capture status is `localProxy`, not `vpn`, and they do not
+inherit a current configuration stamp without matcher evidence.
 
 Android CoreManager also holds the application activity provider's subscription independently of navigation.
 The observer waits for bootstrap's existing initProvider before reading native/configuration dependencies, then seeds
 from the bounded Requests buffer when observation begins. Its bounded in-memory store merges request events with
 complete, context-fenced foreground connection snapshots;
 failures and background gaps never become zero active connections. App, App-plus-Host and cross-App Host queries share
-the same retained facts. The read-only Tools application network page consumes those queries and the existing package
+the same retained facts. The read-only Tools application network page shows non-expanding app summaries with
+application-window placeholders;
+observation gaps remain internal rather than a persistent warning. It consumes the queries and existing package
 directory without requesting service transitions or source acceptance. See the application network design above for
 retention, lifecycle and observation limits.
 
