@@ -12,7 +12,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/metacubex/mihomo/constant"
 )
+
+func localProxyConnectionIngress(_ *constant.Metadata) connectionIngress {
+	return connectionIngress{}
+}
 
 type ipcConn interface {
 	io.ReadWriteCloser

@@ -68,6 +68,15 @@ func newConnectionObservationStore() *connectionObservationStore {
 
 var connectionObservations = newConnectionObservationStore()
 
+func isLoopbackProxyConnection(metadata *C.Metadata) bool {
+	if metadata == nil || metadata.NetWork != C.TCP || (metadata.Type != C.HTTP && metadata.Type != C.HTTPS) {
+		return false
+	}
+	source, sourceOK := metadata.RawSrcAddr.(*net.TCPAddr)
+	target, targetOK := metadata.RawDstAddr.(*net.TCPAddr)
+	return sourceOK && targetOK && source != nil && target != nil && source.IP.IsLoopback() && target.IP.IsLoopback() && source.Port > 0 && target.Port > 0
+}
+
 func sameConnectionIngress(left, right *C.Metadata) bool {
 	if left == right {
 		return true
@@ -173,6 +182,9 @@ func (s *connectionObservationStore) bind(info *statistic.TrackerInfo, provenanc
 		ingress = connectionIngress{}
 	}
 	s.Unlock()
+	if ingress.metadata == nil {
+		ingress = localProxyConnectionIngress(info.Metadata)
+	}
 
 	observation := unknownConnectionObservation()
 	observation.RuntimeEpoch = configRuntimeEpoch

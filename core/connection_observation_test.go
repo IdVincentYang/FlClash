@@ -250,3 +250,30 @@ func BenchmarkConnectionObservation(b *testing.B) {
 		})
 	}
 }
+
+func TestLoopbackProxyObservationUsesClientSocket(t *testing.T) {
+	for _, kind := range []C.Type{C.HTTP, C.HTTPS} {
+		for _, ip := range []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback} {
+			metadata := &C.Metadata{NetWork: C.TCP, Type: kind,
+				RawSrcAddr: &net.TCPAddr{IP: ip, Port: 32001},
+				RawDstAddr: &net.TCPAddr{IP: ip, Port: 7890}}
+			if !isLoopbackProxyConnection(metadata) {
+				t.Fatal("local HTTP proxy client was excluded", kind, ip)
+			}
+		}
+	}
+	for _, metadata := range []*C.Metadata{
+		nil,
+		{NetWork: C.UDP, Type: C.HTTP},
+		{NetWork: C.TCP, Type: C.TUN},
+		{NetWork: C.TCP, Type: C.INNER},
+		{NetWork: C.TCP, Type: C.HTTP},
+		{NetWork: C.TCP, Type: C.HTTP, RawSrcAddr: (*net.TCPAddr)(nil), RawDstAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 7890}},
+		{NetWork: C.TCP, Type: C.HTTP, RawSrcAddr: &net.TCPAddr{IP: net.IPv4(192, 0, 2, 1), Port: 32001}, RawDstAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 7890}},
+		{NetWork: C.TCP, Type: C.HTTP, RawSrcAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 32001}, RawDstAddr: &net.TCPAddr{IP: net.IPv4(192, 0, 2, 1), Port: 7890}},
+	} {
+		if isLoopbackProxyConnection(metadata) {
+			t.Fatal("unproven local proxy socket admitted", metadata)
+		}
+	}
+}

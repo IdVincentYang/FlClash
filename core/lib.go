@@ -180,6 +180,23 @@ func (th *TunHandler) observeConnection(metadata *constant.Metadata) {
 	}})
 }
 
+func localProxyConnectionIngress(metadata *constant.Metadata) connectionIngress {
+	th := activeTunHandler.Load()
+	if th == nil || !isLoopbackProxyConnection(metadata) {
+		return connectionIngress{}
+	}
+	th.mu.RLock()
+	capture := connectionCapture{Status: "localProxy", ServiceID: th.serviceID, Generation: th.protectGeneration}
+	ready := th.listener != nil && th.callback != nil
+	th.mu.RUnlock()
+	if !ready {
+		return connectionIngress{}
+	}
+	return connectionIngress{capture: capture, resolve: func(metadata *constant.Metadata) applicationIdentity {
+		return th.resolveApplication(metadata, &capture)
+	}}
+}
+
 func (th *TunHandler) resolveApplication(metadata *constant.Metadata, expected *connectionCapture) applicationIdentity {
 	if metadata.RawSrcAddr == nil || metadata.RawDstAddr == nil {
 		return unknownApplication("unsupported")
