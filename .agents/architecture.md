@@ -139,7 +139,11 @@ Request/source tickets, ConfigInput and ServiceState keep their existing distinc
 URL imports keep one modal from the name/URL form through preparation, download, bundled source review and saving.
 Their advanced request route fields remain expanded, without changing the collapsible fields on other screens.
 `SourceReviewPresentation` embeds the existing review widget in that surface; its decision callback advances the import
-instead of popping the route. `ProfileImportTask` cancels its queued or active refresh job when the user returns or leaves,
+instead of popping the route. Only new URL imports may save unaccepted material for later review after every associated
+source attempt has settled. Alternatively, an explicit loaded-node snapshot is reviewed again through the same authority
+and commit path, without source routing or external dependencies. It retains the URL with automatic refresh disabled.
+Queued/loading/verifying/retrying sources keep all acceptance and alternative actions unavailable.
+`ProfileImportTask` cancels its queued or active refresh job when the user returns or leaves,
 and the refresh guards recheck it before persistence. Failures restore the retained form; saving blocks back navigation
 until the result is known, and a successful material save closes the import and add-method chooser together. Other import
 entry points and source permission authority retain their existing behavior.

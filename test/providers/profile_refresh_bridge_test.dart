@@ -3360,6 +3360,174 @@ void main() {
     skip: executable == null,
   );
 
+  for (final outcome in ['early', 'pending', 'nodes', 'cancel-nodes']) {
+    test('URL partial import preserves authority and uses explicit $outcome', () async {
+      await existingService();
+      final previous = await core.getConfigState();
+      final permissions = await File(
+        '${root.path}/source-acceptance/permissions.json',
+      ).readAsBytes();
+      received.clear();
+      core.sourceActions.clear();
+      core.calls.clear();
+      responses['/partial'] =
+          'proxies: [{name: inline, type: socks5, server: 127.0.0.1, port: 9}]\n'
+          'proxy-providers:\n'
+          '  loaded: {type: http, url: "http://127.0.0.1:${server.port}/loaded", proxy: DIRECT}\n'
+          'proxy-groups: [{name: Source, type: select, proxies: [inline], use: [loaded]}]\n'
+          'rule-providers:\n'
+          '  Domestic: {type: http, url: "http://127.0.0.1:${server.port}/missing", proxy: DIRECT, format: text, behavior: domain}\n'
+          'rules: ["RULE-SET,Domestic,DIRECT", "MATCH,Source"]\n';
+      responses['/loaded'] =
+          'proxies: [{name: external, type: socks5, server: 127.0.0.1, port: 10}]\n';
+      statuses['/missing'] = 503;
+      container.read(appVisibleProvider.notifier).value = true;
+      var presentations = 0;
+      final task = ProfileImportTask(onPhase: (_) {});
+      final work = profiles.addProfileFormURL(
+        'http://127.0.0.1:${server.port}/partial',
+        label: 'Partial fixture',
+        mode: RequestMode.direct,
+        confirmed: true,
+        importTask: task,
+        reviewPresentation: (
+          present: (child) async {
+            final dialog = child as SourceReviewDialog;
+            presentations++;
+            if (outcome == 'early') {
+              return const SourceReviewDecision(
+                automatic: false,
+                routing: 'source',
+              );
+            }
+            await dialog.loadRelated!(dialog.review.routing);
+            expect(dialog.loading!.settled, true);
+            expect(core.sourceActions, isNot(contains('approveMaterial')));
+            if (presentations == 1) {
+              expect(dialog.loading!.ready, false);
+              expect(received.where((x) => x == '/missing'), hasLength(1));
+              expect(received.where((x) => x == '/loaded'), hasLength(1));
+              expect(dialog.canUseLoadedNodes!(), true);
+              return SourceReviewDecision(
+                automatic: false,
+                routing: 'source',
+                importChoice: outcome == 'pending'
+                    ? SourceImportChoice.savePending
+                    : SourceImportChoice.loadedNodes,
+              );
+            }
+            expect(dialog.loadedNodesSnapshot, true);
+            expect(dialog.routingEditable, false);
+            expect(dialog.loading!.ready, true);
+            expect(received.where((x) => x == '/missing'), hasLength(1));
+            expect(received.where((x) => x == '/loaded'), hasLength(1));
+            return outcome == 'cancel-nodes'
+                ? null
+                : const SourceReviewDecision(
+                    automatic: false,
+                    routing: 'source',
+                  );
+          },
+          onDecision: (_) {},
+        ),
+      );
+      if (outcome == 'cancel-nodes' || outcome == 'early') {
+        await expectLater(work, throwsA(isA<RequestUnavailable>()));
+        expect((await store.profilesDao.query().get()).map((p) => p.id), [1]);
+        expect(
+          await File(
+            '${root.path}/source-acceptance/permissions.json',
+          ).readAsBytes(),
+          permissions,
+        );
+        return;
+      }
+      expect((await work)?.materialSaved, true);
+      final row = (await store.profilesDao.query().get()).singleWhere(
+        (p) => p.id != 1,
+      );
+      expect(row.url, 'http://127.0.0.1:${server.port}/partial');
+      expect((await core.getConfigState()).fence, previous.fence);
+      expect(core.calls, isNot(contains(CoreMethod.activateConfig)));
+      final raw = await File(
+        await appPath.getProfilePath('${row.id}'),
+      ).readAsString();
+      if (outcome == 'pending') {
+        expect(raw, responses['/partial']);
+        expect(
+          await profiles.sourceReviewStatus(row),
+          SourceReviewStatus.required,
+        );
+        expect(core.sourceActions, isNot(contains('approveMaterial')));
+        expect(
+          await File(
+            '${root.path}/source-acceptance/permissions.json',
+          ).readAsBytes(),
+          permissions,
+        );
+      } else {
+        final map = jsonDecode(raw) as Map;
+        expect((map['proxies'] as List).map((p) => p['name']), [
+          'inline',
+          'external',
+        ]);
+        expect(map['rules'], ['MATCH,Imported nodes']);
+        expect(map.keys.toSet(), {'proxies', 'proxy-groups', 'rules'});
+        expect(row.autoUpdate, false);
+        expect(
+          await profiles.sourceReviewStatus(row),
+          SourceReviewStatus.ready,
+        );
+        SourceReviewBatchStore.forRequests(client).clear();
+        final source = await client.captureSource('profile:${row.id}');
+        final grant = await SourceAcceptance(
+          core: CoreController.scoped(core),
+          requests: client,
+        ).permissions(source: source, kind: 'profile');
+        expect(grant.single.acceptedCount, greaterThan(0));
+        expect(grant.single.automatic, false);
+        received.clear();
+        confirmations.clear();
+        container.read(currentProfileIdProvider.notifier).value = row.id;
+        expect(await setup.applyProfile(force: true), true);
+        expect(received, isEmpty);
+        expect(confirmations, isEmpty);
+        statuses['/missing'] = 200;
+        responses['/missing'] = 'example.invalid\n';
+        final confirmation = Provider<SourceConfirmation>(
+          (ref) =>
+              (review) => confirmSourceReview(
+                ref,
+                review,
+                present: (child) async {
+                  final dialog = child as SourceReviewDialog;
+                  await dialog.loadRelated!(dialog.review.routing);
+                  expect(dialog.loading!.ready, true);
+                  expect(dialog.allowPartialImport, false);
+                  return const SourceReviewDecision(
+                    automatic: false,
+                    routing: 'source',
+                  );
+                },
+              ),
+        );
+        expect(
+          (await profiles.updateProfile(
+            row,
+            confirm: container.read(confirmation),
+          )).materialSaved,
+          true,
+        );
+        expect(
+          await File(await appPath.getProfilePath('${row.id}')).readAsString(),
+          responses['/partial'],
+        );
+        expect(received.where((x) => x == '/missing'), hasLength(1));
+        expect(received.where((x) => x == '/loaded'), hasLength(1));
+      }
+    }, skip: executable == null);
+  }
+
   testWidgets(
     'subscription batch cancels safely then accepts once and reuses persisted sources',
     (tester) async {

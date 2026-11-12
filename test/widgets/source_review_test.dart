@@ -337,4 +337,89 @@ void main() {
     await tester.pumpAndSettle();
     expect(decision?.automatic, isFalse);
   });
+  for (final choice in [
+    SourceImportChoice.savePending,
+    SourceImportChoice.loadedNodes,
+  ]) {
+    testWidgets('partial import waits for every attempt then returns $choice', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final loading = SourceReviewLoading();
+      addTearDown(loading.dispose);
+      final gates = {for (var i = 0; i < 5; i++) '$i': Completer<void>()};
+      final calls = <String>[];
+      SourceReviewDecision? decision;
+      await tester.pumpWidget(
+        TestApp(
+          overrides: [
+            viewSizeProvider.overrideWithBuild((_, _) => const Size(400, 900)),
+          ],
+          child: Scaffold(
+            body: SourceReviewDialog(
+              review: review,
+              loading: loading,
+              allowPartialImport: true,
+              canUseLoadedNodes: () => true,
+              onDecision: (value) => decision = value,
+              loadRelated: (_) async {
+                await loading.load(
+                  [
+                    for (var i = 0; i < 5; i++)
+                      SourceReviewLoadItem(
+                        key: '$i',
+                        label: '$i',
+                        kind: 'provider-rule',
+                      ),
+                  ],
+                  (key, _) async {
+                    calls.add(key);
+                    await gates[key]!.future;
+                    if (key == '0') throw StateError('synthetic failure');
+                    return SourceReviewBatchEntry(keys: {key}, review: review);
+                  },
+                );
+                return [];
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(calls, ['0', '1', '2']);
+      gates['0']!.complete();
+      await tester.pump();
+      expect(calls, ['0', '1', '2', '3']);
+      expect(loading.settled, isFalse);
+      expect(find.text('Save for later review'), findsNothing);
+      expect(find.text('Review loaded nodes only'), findsNothing);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Accept this revision'),
+            )
+            .onPressed,
+        isNull,
+      );
+      for (final gate in gates.values) {
+        if (!gate.isCompleted) gate.complete();
+      }
+      await tester.pumpAndSettle();
+      expect(calls, ['0', '1', '2', '3', '4']);
+      expect(loading.settled, isTrue);
+      expect(find.text('Save for later review'), findsOneWidget);
+      expect(find.text('Review loaded nodes only'), findsOneWidget);
+      expect(find.text('Accept this revision'), findsNothing);
+      final text = choice == SourceImportChoice.savePending
+          ? 'Save for later review'
+          : 'Review loaded nodes only';
+      await tester.ensureVisible(find.text(text));
+      await tester.tap(find.text(text));
+      expect(decision?.importChoice, choice);
+      expect(decision?.automatic, isFalse);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 }

@@ -1173,5 +1173,10 @@
   "activityLoadingApps": "Loading app names…",
   "activityScopeHelp": "Only traffic observed by FlClash is included. Counts refer to retained connections, not HTTP requests or complete history. Records stay in memory and reset when the process restarts. Background suspension, event delivery gaps or the retention limit can omit activity. Current access settings do not prove which settings a running VPN has adopted.",
   "activityRulesBypassed": "Rules bypassed in Global or Direct mode",
-  "activityObservationScope": "Observation scope"
+  "activityObservationScope": "Observation scope",
+  "sourceSavePending": "Save for later review",
+  "sourceUseLoadedNodes": "Review loaded nodes only",
+  "sourcePartialImportHint": "All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.",
+  "sourceLoadedNodesReviewHint": "Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.",
+  "sourceConfigParsed": "Parsed · associated sources checked separately"
 }

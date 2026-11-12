@@ -331,6 +331,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       application: ProfileApplicationOutcome.superseded,
     );
     var saved = false;
+    var pendingReview = false;
     try {
       if (!await _refreshRowCurrent(job, requireDue: true)) return;
       if (job.expectedSource != null &&
@@ -385,31 +386,60 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
           sourceKind = 'provider-proxy';
         }
       }
-      approval = await _reviewProfileMaterial(
-        confirm: job.confirm ?? ref.read(sourceConfirmationProvider),
-        core: _core,
-        requests: requestClient,
-        profile: profile,
-        kind: sourceKind,
-        path: staged.staged.path,
-        session: session,
-        source: materialSource,
-        automatic: job.automatic,
-        isCurrent: () => _refreshRowCurrent(job),
-      );
+      Future<SourceMaterialApproval?> reviewMaterial() =>
+          _reviewProfileMaterial(
+            confirm: job.confirm ?? ref.read(sourceConfirmationProvider),
+            core: _core,
+            requests: requestClient,
+            profile: profile,
+            kind: sourceKind,
+            path: staged!.staged.path,
+            session: session,
+            source: materialSource,
+            automatic: job.automatic,
+            isCurrent: () => _refreshRowCurrent(job),
+          );
+      try {
+        approval = await reviewMaterial();
+      } on ProfileImportAlternative catch (choice) {
+        if (!job.importing ||
+            job.importTask == null ||
+            sourceKind != 'profile') {
+          rethrow;
+        }
+        if (!await _refreshRowCurrent(job) ||
+            !await requestClient.materialSessionCurrent(
+              session,
+              materialSource,
+            )) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        final nodes = choice.loadedNodes;
+        if (nodes == null) {
+          pendingReview = true;
+        } else {
+          job.importTask!.usingLoadedNodes = true;
+          await staged.close();
+          staged = await RequestFile.stage(utf8.encode(nodes));
+          job.importTask!.report(ProfileImportPhase.reviewing);
+          approval = await reviewMaterial();
+        }
+      }
       job.importTask?.report(ProfileImportPhase.saving);
       final validation = await _core.validateConfig(staged.staged.path);
       if (validation.isNotEmpty) {
         throw const RequestUnavailable('profile_invalid');
       }
-      preflight = await ref
-          .read(setupActionProvider.notifier)
-          .preflightPolicyMaterial(
-            profile.id,
-            staged.staged.path,
-            requestClient,
-            approval: approval,
-          );
+      preflight = pendingReview
+          ? null
+          : await ref
+                .read(setupActionProvider.notifier)
+                .preflightPolicyMaterial(
+                  profile.id,
+                  staged.staged.path,
+                  requestClient,
+                  approval: approval,
+                );
       final incoming = staged;
       final target = await appPath.getProfilePath(profile.id.toString());
       job.committing = true;
@@ -466,6 +496,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
                   ),
                   profile.id.toString(),
                 ]),
+          autoUpdate: job.importTask?.usingLoadedNodes == true
+              ? false
+              : (row ?? profile).autoUpdate,
           subscriptionInfo: SubscriptionInfo.fromHeaderValues(
             response.headers['subscription-userinfo'],
           ),
@@ -488,7 +521,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       job.savedSource = await requestClient.captureSource(
         'profile:${profile.id}',
       );
-      if (!job.automatic) {
+      if (!job.automatic && !pendingReview) {
         await _completeSubscriptionReview(profile, confirm: job.confirm);
       }
       retry.failures = 0;

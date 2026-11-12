@@ -9972,6 +9972,56 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Save for later review`
+  String get sourceSavePending {
+    return Intl.message(
+      'Save for later review',
+      name: 'sourceSavePending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review loaded nodes only`
+  String get sourceUseLoadedNodes {
+    return Intl.message(
+      'Review loaded nodes only',
+      name: 'sourceUseLoadedNodes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.`
+  String get sourcePartialImportHint {
+    return Intl.message(
+      'All sources have been attempted; some failed. Save for later review, or review only the loaded nodes.',
+      name: 'sourcePartialImportHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.`
+  String get sourceLoadedNodesReviewHint {
+    return Intl.message(
+      'Loaded-node snapshot: uses the nodes below with a single proxy group. Original routing, groups, DNS and external sources are excluded. Nodes have not been connectivity-tested. Automatic refresh is off; update this subscription manually to review the complete configuration from its original URL.',
+      name: 'sourceLoadedNodesReviewHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Parsed · associated sources checked separately`
+  String get sourceConfigParsed {
+    return Intl.message(
+      'Parsed · associated sources checked separately',
+      name: 'sourceConfigParsed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

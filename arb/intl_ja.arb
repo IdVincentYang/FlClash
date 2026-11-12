@@ -1173,5 +1173,10 @@
   "activityLoadingApps": "アプリ名を読み込み中…",
   "activityScopeHelp": "FlClash が観測した通信のみを表示します。件数は保持中の接続数で、HTTP リクエスト数や完全な履歴ではありません。記録はメモリ内に保持され、プロセス再起動でリセットされます。バックグラウンド停止、イベント欠落、保持上限により通信が抜ける場合があります。現在の設定が実行中の VPN に反映済みとは限りません。",
   "activityRulesBypassed": "グローバル・直接モードではルールは適用されません",
-  "activityObservationScope": "観測の範囲"
+  "activityObservationScope": "観測の範囲",
+  "sourceSavePending": "後で確認するため保存",
+  "sourceUseLoadedNodes": "読込済みノードのみ確認",
+  "sourcePartialImportHint": "すべてのソースを試行しましたが、一部が失敗しました。後で確認するために保存するか、読込済みノードのみを確認できます。",
+  "sourceLoadedNodesReviewHint": "読み込み済みノードと単一のプロキシグループのみを使います。元のルーティング、グループ、DNS、外部ソースは除外されます。接続テストは未実施です。自動更新はオフです。元のURLから完全な設定を取得して確認するには、手動で更新してください。",
+  "sourceConfigParsed": "解析済み・関連ソースは別途確認"
 }

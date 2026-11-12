@@ -153,6 +153,8 @@ Future<SourceReviewDecision?> confirmSourceReview(
   SourceReview review, {
   Future<SourceReviewDecision?> Function(Widget child)? present,
   SourceReviewPresentation? presentation,
+  bool importing = false,
+  bool loadedNodesSnapshot = false,
 }) async {
   final show =
       presentation?.present ??
@@ -245,13 +247,34 @@ Future<SourceReviewDecision?> confirmSourceReview(
         review: root,
         loadRelated: draft.collect,
         loading: draft.loading,
-        routingEditable: !isComposition,
+        routingEditable: !isComposition && !loadedNodesSnapshot,
         onDecision: presentation?.onDecision,
+        allowPartialImport: importing,
+        loadedNodesSnapshot: loadedNodesSnapshot,
+        canUseLoadedNodes: () => draft.loadedNodes != null,
       ),
     );
     if (decision == null) return null;
     if (!await draft.current()) {
       throw const RequestUnavailable('request_cancelled');
+    }
+    if (decision.importChoice != SourceImportChoice.complete) {
+      if (!importing || !draft.loading.settled || draft.loading.ready) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      if (decision.importChoice == SourceImportChoice.loadedNodes &&
+          draft.loadedNodes == null) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      store.clear();
+      throw ProfileImportAlternative(
+        loadedNodes: decision.importChoice == SourceImportChoice.loadedNodes
+            ? draft.loadedNodes
+            : null,
+      );
+    }
+    if (!draft.loading.ready || draft.loading.busy) {
+      throw const RequestUnavailable('source_review_required');
     }
     store.accept(root, draft.entries, decision);
     if (isComposition) {
@@ -283,6 +306,18 @@ class _SubscriptionReviewDraft {
   final sessions = <RequestSession>{};
   final loading = SourceReviewLoading();
   final _verifiedBodies = <String, List<int>>{};
+  final _nodeDocuments = <String, Map<String, Object?>>{};
+  String? _loadedNodes;
+  bool _nodesPrepared = false;
+  String? get loadedNodes {
+    if (!loading.settled) return null;
+    if (!_nodesPrepared) {
+      _loadedNodes = loadedNodesProfile(_nodeDocuments.values);
+      _nodesPrepared = true;
+    }
+    return _loadedNodes;
+  }
+
   List<SourceReviewBatchEntry> get entries => loading.ready
       ? loading.items.map((item) => item.entry!).toList()
       : const [];
@@ -329,6 +364,8 @@ class _SubscriptionReviewDraft {
     }
     sessions.clear();
     loading.reset();
+    _nodeDocuments.clear();
+    _nodesPrepared = false;
     _application = await root.source!.owner.captureSource('application-config');
     Future<bool> valid() async => generation == _generation && await current();
     final source = root.source!;
@@ -360,6 +397,7 @@ class _SubscriptionReviewDraft {
       ref.read(patchClashConfigProvider),
     );
     final document = Map<String, dynamic>.from(description['document'] as Map);
+    _nodeDocuments[root.key] = document;
     late ({String yaml, String md5}) composition;
     if (selected?.usesMaterials == true) {
       var material = boundedMaterialCopy(document);
@@ -572,6 +610,12 @@ class _SubscriptionReviewDraft {
                 frozen.length <=
             64 * 1024 * 1024) {
           _verifiedBodies[cacheKey] = frozen;
+        }
+        if (plan['kind'] == 'provider-proxy' && details['document'] is Map) {
+          _nodesPrepared = false;
+          _nodeDocuments[key] = Map<String, Object?>.from(
+            details['document'] as Map,
+          );
         }
         return SourceReviewBatchEntry(
           keys: {

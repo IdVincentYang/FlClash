@@ -877,6 +877,8 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
                 ref,
                 review,
                 presentation: reviewPresentation,
+                importing: true,
+                loadedNodesSnapshot: importTask.usingLoadedNodes,
               ),
       );
     }

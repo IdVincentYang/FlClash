@@ -4,6 +4,7 @@ class ProfileImportTask {
   ProfileImportTask({required this.onPhase});
 
   final void Function(ProfileImportPhase) onPhase;
+  bool usingLoadedNodes = false;
   bool _cancelled = false;
   void Function()? _cancel;
 
@@ -23,4 +24,9 @@ class ProfileImportTask {
     _cancel?.call();
     _cancel = null;
   }
+}
+
+class ProfileImportAlternative implements Exception {
+  const ProfileImportAlternative({this.loadedNodes});
+  final String? loadedNodes;
 }

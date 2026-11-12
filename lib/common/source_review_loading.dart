@@ -42,6 +42,14 @@ class SourceReviewLoading extends ChangeNotifier {
       _items.isNotEmpty &&
       _items.every((item) => item.phase == SourceReviewLoadPhase.ready);
   bool get busy => _active != 0 || _queue.isNotEmpty;
+  bool get settled =>
+      _items.isNotEmpty &&
+      !busy &&
+      _items.every(
+        (item) =>
+            item.phase == SourceReviewLoadPhase.ready ||
+            item.phase == SourceReviewLoadPhase.failed,
+      );
 
   void reset() {
     _generation++;

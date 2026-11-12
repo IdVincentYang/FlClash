@@ -2301,6 +2301,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceCodeChanged": MessageLookupByLibrary.simpleMessage(
       "Код скрипта изменился.",
     ),
+    "sourceConfigParsed": MessageLookupByLibrary.simpleMessage(
+      "Разобрано · связанные источники проверяются отдельно",
+    ),
     "sourceDeclaredCapabilities": m78,
     "sourceDefaultExit": m79,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
@@ -2337,6 +2340,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("Ожидание"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("Готово"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("Проверка…"),
+    "sourceLoadedNodesReviewHint": MessageLookupByLibrary.simpleMessage(
+      "Снимок содержит только загруженные узлы и одну группу прокси. Исходные правила, группы, DNS и внешние источники исключены. Доступность узлов не проверялась. Автообновление отключено; обновите подписку вручную, чтобы загрузить и проверить полную конфигурацию с исходного URL.",
+    ),
     "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage(
       "Локальная политика",
     ),
@@ -2367,6 +2373,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
       "Отключение исключает правила, слушатели и туннели источника. Для своих правил нужно явно выбрать выход для остального трафика. Пустые правила не восстанавливают правила источника. DNS и группы разрешаются отдельно.",
+    ),
+    "sourcePartialImportHint": MessageLookupByLibrary.simpleMessage(
+      "Все источники проверены, часть недоступна. Сохраните для проверки позже или проверьте только загруженные узлы.",
     ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "Каждое действие относится только к указанному использованию. Остановка автоматического обслуживания сохраняет принятые данные. Прекращение использования закрывает затронутые соединения и запрещает повторное применение. Разрешения других способов использования сохраняются.",
@@ -2423,6 +2432,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceRuleSetUse": MessageLookupByLibrary.simpleMessage(
       "Содержимое RuleSet",
     ),
+    "sourceSavePending": MessageLookupByLibrary.simpleMessage(
+      "Сохранить для проверки позже",
+    ),
     "sourceScriptScope": MessageLookupByLibrary.simpleMessage(
       "Код может читать конфигурацию и писать в console. До принятия он не выполняется. Результат проверяется отдельно: принятие кода не разрешает любой его результат.",
     ),
@@ -2449,6 +2461,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
       "Есть действующее изменение, которое нельзя безопасно классифицировать.",
+    ),
+    "sourceUseLoadedNodes": MessageLookupByLibrary.simpleMessage(
+      "Проверить только загруженные узлы",
     ),
     "sourceUseRouting": MessageLookupByLibrary.simpleMessage(
       "Использовать правила источника",

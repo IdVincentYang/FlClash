@@ -34,8 +34,15 @@ class SourcePermission {
   final bool automatic;
 }
 
+enum SourceImportChoice { complete, savePending, loadedNodes }
+
 class SourceReviewDecision {
-  const SourceReviewDecision({required this.automatic, required this.routing});
+  const SourceReviewDecision({
+    required this.automatic,
+    required this.routing,
+    this.importChoice = SourceImportChoice.complete,
+  });
+  final SourceImportChoice importChoice;
   final bool automatic;
   final String routing;
 }
@@ -629,7 +636,8 @@ class SourceAcceptance {
             ],
           ),
         );
-        if (decision == null) {
+        if (decision == null ||
+            decision.importChoice != SourceImportChoice.complete) {
           throw const RequestUnavailable('source_review_required');
         }
         await check();

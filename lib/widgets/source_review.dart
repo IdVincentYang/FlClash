@@ -108,7 +108,12 @@ class SourceReviewDialog extends StatefulWidget {
     this.loading,
     this.routingEditable = true,
     this.onDecision,
+    this.allowPartialImport = false,
+    this.loadedNodesSnapshot = false,
+    this.canUseLoadedNodes,
   });
+  final bool allowPartialImport, loadedNodesSnapshot;
+  final bool Function()? canUseLoadedNodes;
   final SourceReview review;
   final Future<List<SourceReview>> Function(String routing)? loadRelated;
   final SourceReviewLoading? loading;
@@ -219,6 +224,19 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
       'automatic_maintenance_not_delegated' => l10n.sourceNotDelegated,
       _ => l10n.sourceUnknownChanged,
     };
+    final partial =
+        widget.allowPartialImport &&
+        !_loading &&
+        _error == null &&
+        widget.loading?.settled == true &&
+        !widget.loading!.ready;
+    void alternative(SourceImportChoice choice) => _finish(
+      SourceReviewDecision(
+        automatic: false,
+        routing: _sourceRouting ? 'source' : 'own',
+        importChoice: choice,
+      ),
+    );
     return CommonDialog(
       title: widget.loadRelated != null
           ? l10n.sourceSubscriptionReview
@@ -229,26 +247,42 @@ class _SourceReviewDialogState extends State<SourceReviewDialog> {
           : l10n.sourceReviewTitle,
       actions: [
         TextButton(onPressed: () => _finish(null), child: Text(l10n.cancel)),
-        TextButton(
-          onPressed:
-              _loading ||
-                  _error != null ||
-                  widget.loading != null && !widget.loading!.ready
-              ? null
-              : () => _finish(
-                  SourceReviewDecision(
-                    automatic: script == null && _automatic,
-                    routing: _sourceRouting ? 'source' : 'own',
+        if (partial) ...[
+          TextButton(
+            onPressed: () => alternative(SourceImportChoice.savePending),
+            child: Text(l10n.sourceSavePending),
+          ),
+          TextButton(
+            onPressed: widget.canUseLoadedNodes?.call() == true
+                ? () => alternative(SourceImportChoice.loadedNodes)
+                : null,
+            child: Text(l10n.sourceUseLoadedNodes),
+          ),
+        ],
+        if (!partial)
+          TextButton(
+            onPressed:
+                _loading ||
+                    _error != null ||
+                    widget.loading != null && !widget.loading!.ready
+                ? null
+                : () => _finish(
+                    SourceReviewDecision(
+                      automatic: script == null && _automatic,
+                      routing: _sourceRouting ? 'source' : 'own',
+                    ),
                   ),
-                ),
-          child: Text(l10n.sourceAcceptRevision),
-        ),
+            child: Text(l10n.sourceAcceptRevision),
+          ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(widget.review.label),
+          if (partial) Text(l10n.sourcePartialImportHint),
+          if (widget.loadedNodesSnapshot)
+            Text(l10n.sourceLoadedNodesReviewHint),
           if (widget.review.origin.isNotEmpty) Text(widget.review.origin),
           if (widget.loadRelated != null) ...[
             const SizedBox(height: 12),
@@ -432,7 +466,7 @@ class _SourceReviewProgress extends StatelessWidget {
       children: [
         Text(l10n.sourceRelatedSourcesCount(sources.length)),
         Text(l10n.sourceLoadProgress(ready, sources.length)),
-        if (!loading.ready)
+        if (!loading.settled)
           LinearProgressIndicator(
             value: sources.isEmpty ? null : ready / sources.length,
           ),
@@ -458,7 +492,11 @@ class _SourceReviewProgress extends StatelessWidget {
                   SourceReviewLoadPhase.loading => l10n.sourceLoadDownloading,
                   SourceReviewLoadPhase.parsing => l10n.sourceLoadVerifying,
                   SourceReviewLoadPhase.ready =>
-                    item.cached ? l10n.sourceLoadCached : l10n.sourceLoadReady,
+                    item.kind == 'config'
+                        ? l10n.sourceConfigParsed
+                        : item.cached
+                        ? l10n.sourceLoadCached
+                        : l10n.sourceLoadReady,
                   SourceReviewLoadPhase.failed => l10n.sourceLoadFailed,
                 }),
                 if (item.phase == SourceReviewLoadPhase.loading ||

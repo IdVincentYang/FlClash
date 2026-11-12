@@ -47,19 +47,25 @@ void main() {
           }
         },
       );
+      expect(loading.settled, isFalse);
       expect(calls.keys, ['0', '1', '2']);
       expect(loading.items.last.phase, SourceReviewLoadPhase.queued);
       gates['0']!.complete();
       await Future<void>.delayed(Duration.zero);
+      expect(loading.items.first.phase, SourceReviewLoadPhase.failed);
+      expect(loading.settled, isFalse);
       expect(calls.keys, ['0', '1', '2', '3']);
       for (final gate in gates.values) {
         if (!gate.isCompleted) gate.complete();
       }
       await batch;
       expect(loading.ready, isFalse);
+      expect(loading.settled, isTrue);
       expect(loading.items.first.phase, SourceReviewLoadPhase.failed);
       expect(loading.items.skip(1).every((item) => item.entry != null), isTrue);
-      await loading.retry('0');
+      final retry = loading.retry('0');
+      expect(loading.settled, isFalse);
+      await retry;
       expect(loading.ready, isTrue);
       expect(calls, {'0': 2, '1': 1, '2': 1, '3': 1});
       expect(maximum, 3);

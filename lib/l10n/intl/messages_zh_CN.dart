@@ -1632,6 +1632,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "节点能力或节点组绑定发生变化。",
     ),
     "sourceCodeChanged": MessageLookupByLibrary.simpleMessage("脚本的精确代码发生变化。"),
+    "sourceConfigParsed": MessageLookupByLibrary.simpleMessage(
+      "已解析 · 关联来源需分别核验",
+    ),
     "sourceDeclaredCapabilities": m78,
     "sourceDefaultExit": m79,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
@@ -1658,6 +1661,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("等待中"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("已就绪"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("正在核验…"),
+    "sourceLoadedNodesReviewHint": MessageLookupByLibrary.simpleMessage(
+      "已加载节点快照：仅使用下列节点和一个代理组，排除原订阅分流、分组、DNS 与外部来源。节点尚未测试连通性。自动更新已关闭；以后手动更新此订阅，可从原 URL 下载并审核完整配置。",
+    ),
     "sourceLocalPolicy": MessageLookupByLibrary.simpleMessage("本地策略"),
     "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
       "仅已证明处于此版本能力范围内的变化可自动更新，其它变化保持待确认。已有连接继续使用原 socket；资源预算可能延后采用。",
@@ -1678,6 +1684,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceOwnRoutingHint": MessageLookupByLibrary.simpleMessage(
       "关闭后排除来源分流、监听和隧道。自有规则必须明确未匹配流量的出口；清空规则不会恢复来源分流。DNS 和节点组分别授权。",
+    ),
+    "sourcePartialImportHint": MessageLookupByLibrary.simpleMessage(
+      "所有来源均已尝试，部分失败。可保存待补齐，或单独审核已加载节点。",
     ),
     "sourcePermissionEffects": MessageLookupByLibrary.simpleMessage(
       "每项操作仅影响所列用途。停止自动维护会保留已接受内容；停止使用会关闭受影响连接并取消重放资格。其他用途保留各自权限。",
@@ -1720,6 +1729,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceRuleDelegation": m85,
     "sourceRuleOrigin": MessageLookupByLibrary.simpleMessage("规则来源"),
     "sourceRuleSetUse": MessageLookupByLibrary.simpleMessage("RuleSet 内容"),
+    "sourceSavePending": MessageLookupByLibrary.simpleMessage("保存待补齐"),
     "sourceScriptScope": MessageLookupByLibrary.simpleMessage(
       "此代码可读取配置并写入 console。接受前不会执行，输出另行审查；接受代码不等于接受其任意输出。",
     ),
@@ -1735,6 +1745,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceUnknownChanged": MessageLookupByLibrary.simpleMessage(
       "存在无法安全分类的有效变化。",
     ),
+    "sourceUseLoadedNodes": MessageLookupByLibrary.simpleMessage("仅审核已加载节点"),
     "sourceUseRouting": MessageLookupByLibrary.simpleMessage("使用来源分流规则"),
     "specialProxy": MessageLookupByLibrary.simpleMessage("特殊代理"),
     "specialRules": MessageLookupByLibrary.simpleMessage("特殊规则"),
