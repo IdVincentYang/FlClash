@@ -1218,5 +1218,6 @@
   "localGroupsGlobal": "Global custom groups",
   "localGroupsUnbound": "Not added to this subscription",
   "localGroupsNoMatchingNodes": "No matching nodes in this subscription.",
-  "localGroupsInUseProfile": "This group is in use by {name}. Select another node there first."
+  "localGroupsInUseProfile": "This group is in use by {name}. Select another node there first.",
+  "localGroupsLoadFailed": "Could not load saved groups. Retry."
 }

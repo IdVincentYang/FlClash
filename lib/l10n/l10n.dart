@@ -10417,6 +10417,16 @@ class AppLocalizations {
       args: [name],
     );
   }
+
+  /// `Could not load saved groups. Retry.`
+  String get localGroupsLoadFailed {
+    return Intl.message(
+      'Could not load saved groups. Retry.',
+      name: 'localGroupsLoadFailed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

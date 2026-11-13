@@ -869,6 +869,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "请输入有效的 HTTP(S) 测速地址。",
     ),
     "localGroupsLimit": MessageLookupByLibrary.simpleMessage("分组或成员数量超出限制。"),
+    "localGroupsLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "无法读取已保存的分组，请重试。",
+    ),
     "localGroupsLoadFirst": MessageLookupByLibrary.simpleMessage(
       "请先使用此订阅并完成来源审核，以加载可选节点。",
     ),

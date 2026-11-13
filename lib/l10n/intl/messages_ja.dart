@@ -955,6 +955,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsLimit": MessageLookupByLibrary.simpleMessage(
       "グループ数またはメンバー数が上限を超えています。",
     ),
+    "localGroupsLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "保存済みのグループを読み込めませんでした。再試行してください。",
+    ),
     "localGroupsLoadFirst": MessageLookupByLibrary.simpleMessage(
       "このサブスクリプションを使用し、ソースの確認を完了してノードを読み込んでください。",
     ),

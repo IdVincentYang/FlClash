@@ -1224,6 +1224,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsLimit": MessageLookupByLibrary.simpleMessage(
       "Превышено ограничение числа групп или участников.",
     ),
+    "localGroupsLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось загрузить сохранённые группы. Повторите попытку.",
+    ),
     "localGroupsLoadFirst": MessageLookupByLibrary.simpleMessage(
       "Выберите эту подписку и подтвердите источники для загрузки узлов.",
     ),

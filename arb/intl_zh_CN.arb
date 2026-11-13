@@ -1218,5 +1218,6 @@
   "localGroupsGlobal": "全局自建分组",
   "localGroupsUnbound": "尚未加入此订阅",
   "localGroupsNoMatchingNodes": "当前订阅中没有匹配的节点。",
-  "localGroupsInUseProfile": "订阅“{name}”正在使用此分组，请先在那里选择其他节点。"
+  "localGroupsInUseProfile": "订阅“{name}”正在使用此分组，请先在那里选择其他节点。",
+  "localGroupsLoadFailed": "无法读取已保存的分组，请重试。"
 }

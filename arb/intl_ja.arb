@@ -1218,5 +1218,6 @@
   "localGroupsGlobal": "グローバルカスタムグループ",
   "localGroupsUnbound": "このサブスクリプションには未追加",
   "localGroupsNoMatchingNodes": "このサブスクリプションに一致するノードがありません。",
-  "localGroupsInUseProfile": "{name} がこのグループを使用中です。先に別のノードを選択してください。"
+  "localGroupsInUseProfile": "{name} がこのグループを使用中です。先に別のノードを選択してください。",
+  "localGroupsLoadFailed": "保存済みのグループを読み込めませんでした。再試行してください。"
 }

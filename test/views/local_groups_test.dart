@@ -12,6 +12,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/source_review_status.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/views/proxies/local_groups.dart';
 import 'package:fl_clash/views/proxies/proxies.dart';
 import 'package:fl_clash/views/proxies/tab.dart';
@@ -183,27 +184,31 @@ void main() {
   late ProviderContainer container;
   late _Profiles actions;
   late _GlobalGroups globalGroups;
+  Stream<List<LocalProxyGroup>> Function()? loadLibrary;
   late _ProxyActions proxyActions;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     actions = _Profiles();
     globalGroups = _GlobalGroups();
+    loadLibrary = null;
     proxyActions = _ProxyActions();
     container = ProviderContainer(
       overrides: [
         profilesActionProvider.overrideWith(() => actions),
         globalGroupsActionProvider.overrideWith(() => globalGroups),
         globalLocalGroupsProvider.overrideWith(
-          (ref) => Stream.value(
-            globalGroups.library ??
-                ref
-                    .watch(currentProfileProvider)
-                    ?.localGroups
-                    .map(globalGroupDefinition)
-                    .toList() ??
-                const [],
-          ),
+          (ref) =>
+              loadLibrary?.call() ??
+              Stream.value(
+                globalGroups.library ??
+                    ref
+                        .watch(currentProfileProvider)
+                        ?.localGroups
+                        .map(globalGroupDefinition)
+                        .toList() ??
+                    const [],
+              ),
         ),
         proxiesActionProvider.overrideWith(() => proxyActions),
         coreHandlerProvider.overrideWithValue(_RegexCore()),
@@ -857,6 +862,137 @@ void main() {
     expect(container.read(groupsProvider).first.now, 'Node A');
     expect(find.byType(LocalGroupRoutingView), findsNothing);
   });
+
+  testWidgets(
+    'cold Proxies menu opens references while the library is still loading',
+    (tester) async {
+      final loaded = Completer<List<LocalProxyGroup>>();
+      loadLibrary = () => Stream.fromFuture(loaded.future);
+      await pump(tester, const ProxiesView());
+      await tester.tap(find.byTooltip('More').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage group references'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(CommonDialog), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      loaded.complete([
+        const LocalProxyGroup(
+          id: 7,
+          name: 'Mine',
+          nodes: ['Node A'],
+          global: true,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mine'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LocalGroupRoutingView), findsOneWidget);
+      expect(find.widgetWithText(CheckboxListTile, 'Main'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('references entry reports a read failure and retries in place', (
+    tester,
+  ) async {
+    var attempts = 0;
+    loadLibrary = () => ++attempts == 1
+        ? Stream.error(StateError('database unavailable'))
+        : Stream.value([
+            const LocalProxyGroup(
+              id: 7,
+              name: 'Mine',
+              nodes: ['Node A'],
+              global: true,
+            ),
+          ]);
+    await pump(tester, const ProxiesView());
+    await tester.tap(find.byTooltip('More').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage group references'));
+    await tester.pumpAndSettle();
+    expect(find.text('Could not load saved groups. Retry.'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mine'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LocalGroupRoutingView), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'cancelling a pending references entry does not open it after loading',
+    (tester) async {
+      final loaded = Completer<List<LocalProxyGroup>>();
+      loadLibrary = () => Stream.fromFuture(loaded.future);
+      await pump(tester, const ProxiesView());
+      await tester.tap(find.byTooltip('More').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage group references'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      loaded.complete([
+        const LocalProxyGroup(id: 7, name: 'Mine', global: true),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.byType(CommonDialog), findsNothing);
+      expect(find.byType(LocalGroupRoutingView), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('empty global library explains how to create a group', (
+    tester,
+  ) async {
+    await pump(tester, const ProxiesView());
+    await tester.tap(find.byTooltip('More').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage group references'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No custom groups yet. Create one in Group management.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'specific-group entry keeps a cold library alive until navigation completes',
+    (tester) async {
+      final loaded = Completer<List<LocalProxyGroup>>();
+      loadLibrary = () => Stream.fromFuture(loaded.future);
+      await pump(
+        tester,
+        Consumer(
+          builder: (context, ref, _) => Scaffold(
+            body: TextButton(
+              onPressed: () =>
+                  manageLocalGroupReferences(context, ref, groupName: 'Mine'),
+              child: const Text('Open references'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open references'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      loaded.complete([
+        const LocalProxyGroup(
+          id: 7,
+          name: 'Mine',
+          nodes: ['Node A'],
+          global: true,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.byType(LocalGroupRoutingView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'references can be added to multiple targets without switching selections',

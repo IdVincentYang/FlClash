@@ -10,86 +10,124 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+typedef _GroupReferenceChoice = ({List<LocalProxyGroup> definitions, int id});
+
 Future<void> manageLocalGroupReferences(
   BuildContext context,
   WidgetRef ref, {
   String? groupName,
 }) async {
   final profile = ref.read(currentProfileProvider);
-  if (profile == null) return;
-  final definitions = await ref.read(globalLocalGroupsProvider.future);
-  if (!context.mounted || ref.read(currentProfileIdProvider) != profile.id) {
+  if (profile == null) {
+    context.showSnackBar(context.appLocalizations.localGroupsLoadFirst);
     return;
   }
-  final available = [
-    for (final definition in definitions)
-      definition.copyWith(
-        parents:
-            profile.localGroups
-                .where((group) => group.id == definition.id)
-                .firstOrNull
-                ?.entrances
-                .toList() ??
-            const [],
-      ),
-  ];
-  if (available.isEmpty) {
-    await dialogs.showMessage(
-      context: context,
-      message: TextSpan(text: context.appLocalizations.localGroupsNoSaved),
-      cancelable: false,
-    );
-    return;
-  }
-  final chosen =
-      groupName ??
-      await dialogs.showCommonDialog<String>(
+  final subscription = ref.listenManual(globalLocalGroupsProvider, (_, _) {});
+  try {
+    _GroupReferenceChoice? choice;
+    if (groupName == null) {
+      choice = await dialogs.showCommonDialog<_GroupReferenceChoice>(
         context: context,
-        child: Builder(
-          builder: (context) => CommonDialog(
-            title: context.appLocalizations.localGroupsUse,
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.appLocalizations.cancel),
-              ),
-            ],
-            child: SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final group in available)
-                      ListTile(
-                        title: Text(group.name),
-                        subtitle: Text(
-                          context.appLocalizations.localGroupsReferences(
-                            group.entrances.length,
+        child: Consumer(
+          builder: (context, ref, _) {
+            final l = context.appLocalizations;
+            final library = ref.watch(globalLocalGroupsProvider);
+            return CommonDialog(
+              title: l.localGroupsUse,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l.cancel),
+                ),
+              ],
+              child: SizedBox(
+                width: 360,
+                child: library.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (_, _) => Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(l.localGroupsLoadFailed),
+                      TextButton(
+                        onPressed: () =>
+                            ref.invalidate(globalLocalGroupsProvider),
+                        child: Text(l.retry),
+                      ),
+                    ],
+                  ),
+                  data: (definitions) => definitions.isEmpty
+                      ? Text(l.localGroupsNoSaved)
+                      : SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final group in definitions)
+                                ListTile(
+                                  title: Text(group.name),
+                                  subtitle: Text(
+                                    l.localGroupsReferences(
+                                      profile.localGroups
+                                              .where(
+                                                (binding) =>
+                                                    binding.id == group.id,
+                                              )
+                                              .firstOrNull
+                                              ?.entrances
+                                              .length ??
+                                          0,
+                                    ),
+                                  ),
+                                  onTap: () => Navigator.of(context).pop((
+                                    definitions: definitions,
+                                    id: group.id,
+                                  )),
+                                ),
+                            ],
                           ),
                         ),
-                        onTap: () => Navigator.of(context).pop(group.name),
-                      ),
-                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       );
-  if (chosen == null || !context.mounted) return;
-  final local = available.where((group) => group.name == chosen).firstOrNull;
-  if (local == null || ref.read(currentProfileIdProvider) != profile.id) {
-    return;
+    } else {
+      final List<LocalProxyGroup> definitions;
+      try {
+        definitions = await ref.read(globalLocalGroupsProvider.future);
+      } catch (_) {
+        if (context.mounted) {
+          context.showSnackBar(context.appLocalizations.localGroupsLoadFailed);
+        }
+        return;
+      }
+      final local = definitions
+          .where((group) => group.name == groupName)
+          .firstOrNull;
+      if (!context.mounted) return;
+      if (local == null) {
+        context.showSnackBar(context.appLocalizations.localGroupsChanged);
+        return;
+      }
+      choice = (definitions: definitions, id: local.id);
+    }
+    if (choice == null || !context.mounted) return;
+    if (ref.read(currentProfileIdProvider) != profile.id) {
+      context.showSnackBar(context.appLocalizations.localGroupsChanged);
+      return;
+    }
+    await BaseNavigator.push(
+      context,
+      LocalGroupRoutingView(
+        profile: profile,
+        definitions: choice.definitions,
+        localId: choice.id,
+      ),
+    );
+  } finally {
+    subscription.close();
   }
-  await BaseNavigator.push(
-    context,
-    LocalGroupRoutingView(
-      profile: profile,
-      definitions: definitions,
-      localId: local.id,
-    ),
-  );
 }
 
 class LocalGroupRoutingView extends ConsumerStatefulWidget {

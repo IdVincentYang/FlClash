@@ -1176,6 +1176,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsLimit": MessageLookupByLibrary.simpleMessage(
       "The group or member limit was exceeded.",
     ),
+    "localGroupsLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not load saved groups. Retry.",
+    ),
     "localGroupsLoadFirst": MessageLookupByLibrary.simpleMessage(
       "Use this subscription and complete source review to load its nodes.",
     ),

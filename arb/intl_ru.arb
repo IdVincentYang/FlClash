@@ -1218,5 +1218,6 @@
   "localGroupsGlobal": "Глобальные пользовательские группы",
   "localGroupsUnbound": "Не добавлена в эту подписку",
   "localGroupsNoMatchingNodes": "В этой подписке нет подходящих узлов.",
-  "localGroupsInUseProfile": "Подписка {name} использует эту группу. Сначала выберите в ней другой узел."
+  "localGroupsInUseProfile": "Подписка {name} использует эту группу. Сначала выберите в ней другой узел.",
+  "localGroupsLoadFailed": "Не удалось загрузить сохранённые группы. Повторите попытку."
 }
