@@ -27,7 +27,7 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m2(active, count) => "活跃 ${active} · 近期 ${count} 次连接";
 
   static String m3(ip, country, time) =>
-      "检测出口：${ip} · ${country}\n检测时间：${time}\n点击重新检测。访问其他目标时可能使用不同出口。";
+      "节点出口：${ip} · ${country}\n检测时间：${time}\n检测服务：Cloudflare。点击重新检测。";
 
   static String m4(time) => "最近活动：${time}";
 

@@ -1223,7 +1223,7 @@
   "activityExitNotApplicable": "No proxy exit for this connection.",
   "activityExitInactive": "No active connections. Tap to check the node’s exit manually.",
   "activityExitChecking": "Checking proxy exit…",
-  "activityExitObserved": "Measured exit: {ip} · {country}\nChecked: {time}\nTap to check again. Other destinations may use a different exit.",
+  "activityExitObserved": "Node exit: {ip} · {country}\nChecked: {time}\nTest service: Cloudflare. Tap to check again.",
   "activityExitFailed": "Exit check failed. Tap to retry.",
   "activityExitNotChecked": "Proxy exit not checked. Tap to check.",
   "activityExitUnavailable": "Exit check is unavailable for this connection. Check that the proxy and node are ready.",

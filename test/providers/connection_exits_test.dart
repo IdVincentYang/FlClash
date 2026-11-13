@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:drift/native.dart';
+import 'package:fl_clash/database/connection_exits.dart';
+import 'package:fl_clash/providers/exit_cache.dart';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/request.dart';
@@ -20,6 +23,24 @@ import '../helpers/test_config_state.dart';
 
 class _Core extends Mock implements CoreHandlerInterface {}
 
+class _Disk extends ExitCacheDatabase {
+  _Disk() : super(NativeDatabase.memory());
+  Completer<void>? readGate;
+  bool failRead = false;
+  @override
+  Future<IpInfo?> lookup(String identity, String entryIp, DateTime now) async {
+    await readGate?.future;
+    if (failRead) throw StateError('unavailable');
+    return super.lookup(identity, entryIp, now);
+  }
+}
+
+class _Config extends TestConfigState {
+  _Config() : super(const ConfigFact(inputId: 'input-a'));
+  void replace(String input) =>
+      state = ConfigViewState(fact: ConfigFact(inputId: input));
+}
+
 class _Cache extends ConnectionExits {
   _Cache(this.client);
   final Request client;
@@ -28,6 +49,8 @@ class _Cache extends ConnectionExits {
   Request get requestClient => client;
   @override
   Duration get elapsed => time;
+  @override
+  DateTime get utcNow => DateTime.utc(2026, 11, 13).add(time);
 }
 
 class _Route extends RouteTracker {
@@ -47,16 +70,16 @@ class _Groups extends Groups {
       name: 'Main',
       type: GroupType.Selector,
       all: [
-        Proxy(name: 'A', type: 'ss'),
-        Proxy(name: 'B', type: 'ss'),
-        Proxy(name: 'C', type: 'ss'),
+        Proxy(name: 'A', type: 'ss', cacheIdentity: 'id-a'),
+        Proxy(name: 'B', type: 'ss', cacheIdentity: 'id-b'),
+        Proxy(name: 'C', type: 'ss', cacheIdentity: 'id-c'),
       ],
     ),
   ];
 }
 
-const a = ConnectionExitTarget('A', '8.8.8.8', 'input-a');
-const b = ConnectionExitTarget('B', '8.8.8.8', 'input-a');
+const a = ConnectionExitTarget('A', '8.8.8.8', 'input-a', 'id-a');
+const b = ConnectionExitTarget('B', '8.8.8.8', 'input-a', 'id-b');
 const route = RouteState(
   coreEpoch: 1,
   picksVersion: 1,
@@ -72,6 +95,8 @@ OutboundIpResult answer(String node, {int epoch = 1, String? error}) =>
       chains: [node],
       coreEpoch: epoch,
       picksVersion: 1,
+      entryIp: '8.8.8.8',
+      cacheIdentity: 'id-${node.toLowerCase()}',
       error: error,
     );
 
@@ -81,6 +106,7 @@ void main() {
   late _Cache cache;
   late IpTestRequest client;
   late ProviderContainer container;
+  late _Disk disk;
   final calls = <String>[];
 
   setUp(() async {
@@ -90,6 +116,7 @@ void main() {
       IpTestAdapter((_, _) async => ResponseBody.fromString('', 500)),
     );
     cache = _Cache(client);
+    disk = _Disk();
     when(() => core.outboundIp(any())).thenAnswer((call) async {
       final node =
           (call.positionalArguments.single as OutboundIpParams).proxyName;
@@ -98,12 +125,11 @@ void main() {
     });
     container = ProviderContainer(
       overrides: [
+        exitCacheDatabaseProvider.overrideWithValue(disk),
         connectionExitsProvider.overrideWith(() => cache),
         routeTrackerProvider.overrideWith(_Route.new),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-        configStateProvider.overrideWith(
-          () => TestConfigState(const ConfigFact(inputId: 'input-a')),
-        ),
+        configStateProvider.overrideWith(_Config.new),
         initProvider.overrideWithBuild((_, _) => true),
         appVisibleProvider.overrideWithBuild((_, _) => true),
         groupsProvider.overrideWith(_Groups.new),
@@ -117,6 +143,7 @@ void main() {
   tearDown(() async {
     await client.detach();
     container.dispose();
+    await disk.close();
   });
 
   test(
@@ -133,12 +160,12 @@ void main() {
       );
       cache.unwatch(a, automatic: true);
       cache.unwatch(a, automatic: true);
-      cache.time = const Duration(hours: 23, minutes: 59, seconds: 59);
+      cache.time = const Duration(days: 6, hours: 23, minutes: 59, seconds: 59);
       cache.watch(a, automatic: true);
       await pumpEventQueue();
       expect(calls, ['A']);
       cache.unwatch(a, automatic: true);
-      cache.time = const Duration(hours: 24);
+      cache.time = const Duration(days: 7);
       cache.watch(a, automatic: true);
       await pumpEventQueue();
       expect(calls, ['A', 'A']);
@@ -157,6 +184,110 @@ void main() {
       expect(container.read(connectionExitsProvider).keys, containsAll([a, b]));
     },
   );
+
+  test(
+    'disk reads finish before scheduling an automatic external request',
+    () async {
+      await disk.save(
+        a.identity,
+        a.entry,
+        IpInfo(ip: '1.1.1.1', countryCode: 'HK', checkedAt: cache.utcNow),
+      );
+      disk.readGate = Completer<void>();
+      cache.watch(a, automatic: true);
+      await pumpEventQueue();
+      expect(calls, isEmpty);
+      disk.readGate!.complete();
+      await pumpEventQueue();
+      expect(calls, isEmpty);
+      expect(
+        container.read(connectionExitsProvider)[a]?.value?.countryCode,
+        'HK',
+      );
+    },
+  );
+
+  test(
+    'a renamed node in another subscription reuses the global file record',
+    () async {
+      cache.watch(a, automatic: true);
+      await pumpEventQueue();
+      cache.unwatch(a, automatic: true);
+      (container.read(configStateProvider.notifier) as _Config).replace(
+        'input-b',
+      );
+      container.read(groupsProvider.notifier).value = const [
+        Group(
+          name: 'Different rules',
+          type: GroupType.Selector,
+          all: [Proxy(name: 'Renamed', type: 'ss', cacheIdentity: 'id-a')],
+        ),
+      ];
+      const renamed = ConnectionExitTarget(
+        'Renamed',
+        '8.8.8.8',
+        'input-b',
+        'id-a',
+      );
+      cache.watch(renamed, automatic: true);
+      await pumpEventQueue();
+      expect(calls, ['A']);
+      expect(
+        container.read(connectionExitsProvider)[renamed]?.value?.countryCode,
+        'HK',
+      );
+    },
+  );
+
+  test(
+    'a measurement is saved under its actual entry, never the old entry',
+    () async {
+      when(() => core.outboundIp(any())).thenAnswer((_) async {
+        calls.add('A');
+        return answer('A').copyWith(entryIp: '9.9.9.9');
+      });
+      cache.watch(a, automatic: true);
+      await pumpEventQueue();
+      expect(container.read(connectionExitsProvider)[a]?.value, isNull);
+      expect(await disk.lookup(a.identity, a.entry, cache.utcNow), isNull);
+      expect(await disk.lookup(a.identity, '9.9.9.9', cache.utcNow), isNotNull);
+      const actual = ConnectionExitTarget('A', '9.9.9.9', 'input-a', 'id-a');
+      cache.watch(actual, automatic: true);
+      await pumpEventQueue();
+      expect(calls, ['A']);
+      expect(container.read(connectionExitsProvider)[actual]?.value, isNotNull);
+    },
+  );
+
+  test(
+    'a failed forced refresh keeps the old flag and SQLite result',
+    () async {
+      cache.watch(a, automatic: true);
+      await pumpEventQueue();
+      final before = container.read(connectionExitsProvider)[a]!.value;
+      cache.time = const Duration(seconds: 6);
+      when(
+        () => core.outboundIp(any()),
+      ).thenAnswer((_) async => answer('A', error: 'timeout'));
+      cache.refresh(a);
+      await pumpEventQueue();
+      expect(
+        container.read(connectionExitsProvider)[a]?.phase,
+        ProbePhase.failed,
+      );
+      expect(container.read(connectionExitsProvider)[a]?.value, before);
+      expect(cache.isExpired(a), false);
+      expect(await disk.lookup(a.identity, a.entry, cache.utcNow), before);
+    },
+  );
+
+  test('a broken cache read does not block a scoped measurement', () async {
+    disk.failRead = true;
+    cache.watch(a, automatic: true);
+    await pumpEventQueue();
+    expect(calls, ['A']);
+    expect(container.read(connectionExitsProvider)[a]?.value, isNotNull);
+  });
 
   test(
     'inactive watch does nothing; manual refresh bypasses cache and coalesces clicks',
@@ -242,7 +373,7 @@ void main() {
   );
 
   test(
-    'route changes clear cached measurements and do not accept old epochs',
+    'route changes retain successful measurements without a new check',
     () async {
       cache.watch(a, automatic: true);
       await pumpEventQueue();
@@ -252,7 +383,9 @@ void main() {
         route.copyWith(hostEpoch: 2, live: false),
       );
       await pumpEventQueue();
-      expect(container.read(connectionExitsProvider), isEmpty);
+      expect(container.read(connectionExitsProvider)[a]?.value, isNotNull);
+      expect(await disk.lookup(a.identity, a.entry, cache.utcNow), isNotNull);
+      expect(calls, ['A']);
     },
   );
 
@@ -322,10 +455,14 @@ void main() {
     () {
       expect(
         connectionExitTarget(
-          activityConnection('current', exit: 'A'),
+          activityConnection(
+            'current',
+            exit: 'A',
+          ).copyWith(metadata: const Metadata(remoteDestination: '8.8.8.8')),
           'input-a',
+          identity: 'id-a',
         ),
-        const ConnectionExitTarget('A', '', 'input-a'),
+        a,
       );
       expect(
         connectionExitTarget(activityConnection('old', exit: 'A'), 'input-b'),

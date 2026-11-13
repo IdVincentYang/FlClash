@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:drift/native.dart';
+import 'package:fl_clash/database/connection_exits.dart';
+import 'package:fl_clash/providers/exit_cache.dart';
 import 'dart:ui' as ui;
 
 import 'package:fl_clash/common/application_activity.dart';
@@ -24,6 +28,17 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/application_activity.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_config_state.dart';
+
+class _ExitCache extends ExitCacheDatabase {
+  _ExitCache() : super(NativeDatabase.memory());
+  int cleanups = 0;
+  Completer<void>? gate;
+  @override
+  Future<void> cleanExpired(DateTime now) async {
+    cleanups++;
+    await gate?.future;
+  }
+}
 
 class _Activity extends ApplicationActivity {
   _Activity(this.value);
@@ -82,6 +97,7 @@ void main() {
     await loader.load();
   });
   late ProviderContainer container;
+  late _ExitCache cache;
 
   Future<void> pump(
     WidgetTester tester, {
@@ -97,8 +113,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    cache = _ExitCache();
+    addTearDown(cache.close);
     container = ProviderContainer(
       overrides: [
+        exitCacheDatabaseProvider.overrideWithValue(cache),
         configStateProvider.overrideWith(TestConfigState.new),
         applicationActivityProvider.overrideWith(
           () => _Activity(activity ?? _activity()),
@@ -179,6 +198,30 @@ void main() {
     (widget) =>
         widget is Text &&
         (widget.textSpan?.toPlainText().startsWith(prefix) ?? false),
+  );
+
+  testWidgets(
+    'opening and returning to App network starts nonblocking expiry cleanup',
+    (tester) async {
+      await pump(tester);
+      expect(cache.cleanups, 1);
+      cache.gate = Completer<void>();
+      final context = tester.element(find.byType(ApplicationActivityView));
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Child page')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Navigator.of(context).pop();
+      await tester.pumpAndSettle();
+      expect(cache.cleanups, 2);
+      expect(find.text('Browser A'), findsOneWidget);
+      cache.gate!.complete();
+      await tester.pump();
+    },
   );
 
   Future<void> toggleAll(WidgetTester tester) async {

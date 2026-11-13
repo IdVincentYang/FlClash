@@ -4036,7 +4036,7 @@ as int,
 /// @nodoc
 mixin _$OutboundIpResult {
 
- String get url; String get body; int get delay; List<String> get chains; String? get error;@JsonKey(name: 'core-epoch') int get coreEpoch;@JsonKey(name: 'picks-version') int get picksVersion;
+ String get url; String get body; int get delay; List<String> get chains;@JsonKey(name: 'entry-ip') String get entryIp;@JsonKey(name: 'cache-identity') String get cacheIdentity; String? get error;@JsonKey(name: 'core-epoch') int get coreEpoch;@JsonKey(name: 'picks-version') int get picksVersion;
 /// Create a copy of OutboundIpResult
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -4050,20 +4050,20 @@ $OutboundIpResultCopyWith<OutboundIpResult> get copyWith => _$OutboundIpResultCo
 @override
 bool operator ==(Object other) {
   final _this = this as OutboundIpResult;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is OutboundIpResult&&(identical(other.url, _this.url) || other.url == _this.url)&&(identical(other.body, _this.body) || other.body == _this.body)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&const DeepCollectionEquality().equals(other.chains, _this.chains)&&(identical(other.error, _this.error) || other.error == _this.error)&&(identical(other.coreEpoch, _this.coreEpoch) || other.coreEpoch == _this.coreEpoch)&&(identical(other.picksVersion, _this.picksVersion) || other.picksVersion == _this.picksVersion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is OutboundIpResult&&(identical(other.url, _this.url) || other.url == _this.url)&&(identical(other.body, _this.body) || other.body == _this.body)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&const DeepCollectionEquality().equals(other.chains, _this.chains)&&(identical(other.entryIp, _this.entryIp) || other.entryIp == _this.entryIp)&&(identical(other.cacheIdentity, _this.cacheIdentity) || other.cacheIdentity == _this.cacheIdentity)&&(identical(other.error, _this.error) || other.error == _this.error)&&(identical(other.coreEpoch, _this.coreEpoch) || other.coreEpoch == _this.coreEpoch)&&(identical(other.picksVersion, _this.picksVersion) || other.picksVersion == _this.picksVersion));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as OutboundIpResult;
-  return Object.hash(runtimeType,_this.url,_this.body,_this.delay,const DeepCollectionEquality().hash(_this.chains),_this.error,_this.coreEpoch,_this.picksVersion);
+  return Object.hash(runtimeType,_this.url,_this.body,_this.delay,const DeepCollectionEquality().hash(_this.chains),_this.entryIp,_this.cacheIdentity,_this.error,_this.coreEpoch,_this.picksVersion);
 }
 
 @override
 String toString() {
   final _this = this as OutboundIpResult;
-  return 'OutboundIpResult(url: ${_this.url}, body: ${_this.body}, delay: ${_this.delay}, chains: ${_this.chains}, error: ${_this.error}, coreEpoch: ${_this.coreEpoch}, picksVersion: ${_this.picksVersion})';
+  return 'OutboundIpResult(url: ${_this.url}, body: ${_this.body}, delay: ${_this.delay}, chains: ${_this.chains}, entryIp: ${_this.entryIp}, cacheIdentity: ${_this.cacheIdentity}, error: ${_this.error}, coreEpoch: ${_this.coreEpoch}, picksVersion: ${_this.picksVersion})';
 }
 
 
@@ -4074,7 +4074,7 @@ abstract mixin class $OutboundIpResultCopyWith<$Res>  {
   factory $OutboundIpResultCopyWith(OutboundIpResult value, $Res Function(OutboundIpResult) _then) = _$OutboundIpResultCopyWithImpl;
 @useResult
 $Res call({
- String url, String body, int delay, List<String> chains, String? error,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
+ String url, String body, int delay, List<String> chains,@JsonKey(name: 'entry-ip') String entryIp,@JsonKey(name: 'cache-identity') String cacheIdentity, String? error,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
 });
 
 
@@ -4091,13 +4091,15 @@ class _$OutboundIpResultCopyWithImpl<$Res>
 
 /// Create a copy of OutboundIpResult
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? url = null,Object? body = null,Object? delay = null,Object? chains = null,Object? error = freezed,Object? coreEpoch = null,Object? picksVersion = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? url = null,Object? body = null,Object? delay = null,Object? chains = null,Object? entryIp = null,Object? cacheIdentity = null,Object? error = freezed,Object? coreEpoch = null,Object? picksVersion = null,}) {
   return _then(OutboundIpResult(
 url: null == url ? _self.url : url // ignore: cast_nullable_to_non_nullable
 as String,body: null == body ? _self.body : body // ignore: cast_nullable_to_non_nullable
 as String,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
 as int,chains: null == chains ? _self.chains : chains // ignore: cast_nullable_to_non_nullable
-as List<String>,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as List<String>,entryIp: null == entryIp ? _self.entryIp : entryIp // ignore: cast_nullable_to_non_nullable
+as String,cacheIdentity: null == cacheIdentity ? _self.cacheIdentity : cacheIdentity // ignore: cast_nullable_to_non_nullable
+as String,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as String?,coreEpoch: null == coreEpoch ? _self.coreEpoch : coreEpoch // ignore: cast_nullable_to_non_nullable
 as int,picksVersion: null == picksVersion ? _self.picksVersion : picksVersion // ignore: cast_nullable_to_non_nullable
 as int,
@@ -4185,10 +4187,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String url,  String body,  int delay,  List<String> chains,  String? error, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String url,  String body,  int delay,  List<String> chains, @JsonKey(name: 'entry-ip')  String entryIp, @JsonKey(name: 'cache-identity')  String cacheIdentity,  String? error, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _OutboundIpResult() when $default != null:
-return $default(_that.url,_that.body,_that.delay,_that.chains,_that.error,_that.coreEpoch,_that.picksVersion);case _:
+return $default(_that.url,_that.body,_that.delay,_that.chains,_that.entryIp,_that.cacheIdentity,_that.error,_that.coreEpoch,_that.picksVersion);case _:
   return orElse();
 
 }
@@ -4206,10 +4208,10 @@ return $default(_that.url,_that.body,_that.delay,_that.chains,_that.error,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String url,  String body,  int delay,  List<String> chains,  String? error, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String url,  String body,  int delay,  List<String> chains, @JsonKey(name: 'entry-ip')  String entryIp, @JsonKey(name: 'cache-identity')  String cacheIdentity,  String? error, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)  $default,) {final _that = this;
 switch (_that) {
 case _OutboundIpResult():
-return $default(_that.url,_that.body,_that.delay,_that.chains,_that.error,_that.coreEpoch,_that.picksVersion);case _:
+return $default(_that.url,_that.body,_that.delay,_that.chains,_that.entryIp,_that.cacheIdentity,_that.error,_that.coreEpoch,_that.picksVersion);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -4226,10 +4228,10 @@ return $default(_that.url,_that.body,_that.delay,_that.chains,_that.error,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String url,  String body,  int delay,  List<String> chains,  String? error, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String url,  String body,  int delay,  List<String> chains, @JsonKey(name: 'entry-ip')  String entryIp, @JsonKey(name: 'cache-identity')  String cacheIdentity,  String? error, @JsonKey(name: 'core-epoch')  int coreEpoch, @JsonKey(name: 'picks-version')  int picksVersion)?  $default,) {final _that = this;
 switch (_that) {
 case _OutboundIpResult() when $default != null:
-return $default(_that.url,_that.body,_that.delay,_that.chains,_that.error,_that.coreEpoch,_that.picksVersion);case _:
+return $default(_that.url,_that.body,_that.delay,_that.chains,_that.entryIp,_that.cacheIdentity,_that.error,_that.coreEpoch,_that.picksVersion);case _:
   return null;
 
 }
@@ -4241,7 +4243,7 @@ return $default(_that.url,_that.body,_that.delay,_that.chains,_that.error,_that.
 @JsonSerializable()
 
 class _OutboundIpResult implements OutboundIpResult {
-  const _OutboundIpResult({this.url = '', this.body = '', this.delay = 0,  List<String> chains = const [], this.error, @JsonKey(name: 'core-epoch') this.coreEpoch = 0, @JsonKey(name: 'picks-version') this.picksVersion = 0}): _chains = chains;
+  const _OutboundIpResult({this.url = '', this.body = '', this.delay = 0,  List<String> chains = const [], @JsonKey(name: 'entry-ip') this.entryIp = '', @JsonKey(name: 'cache-identity') this.cacheIdentity = '', this.error, @JsonKey(name: 'core-epoch') this.coreEpoch = 0, @JsonKey(name: 'picks-version') this.picksVersion = 0}): _chains = chains;
   factory _OutboundIpResult.fromJson(Map<String, dynamic> json) => _$OutboundIpResultFromJson(json);
 
 @override@JsonKey() final  String url;
@@ -4254,6 +4256,8 @@ class _OutboundIpResult implements OutboundIpResult {
   return EqualUnmodifiableListView(_chains);
 }
 
+@override@JsonKey(name: 'entry-ip') final  String entryIp;
+@override@JsonKey(name: 'cache-identity') final  String cacheIdentity;
 @override final  String? error;
 @override@JsonKey(name: 'core-epoch') final  int coreEpoch;
 @override@JsonKey(name: 'picks-version') final  int picksVersion;
@@ -4271,18 +4275,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _OutboundIpResult&&(identical(other.url, url) || other.url == url)&&(identical(other.body, body) || other.body == body)&&(identical(other.delay, delay) || other.delay == delay)&&const DeepCollectionEquality().equals(other.chains, _chains)&&(identical(other.error, error) || other.error == error)&&(identical(other.coreEpoch, coreEpoch) || other.coreEpoch == coreEpoch)&&(identical(other.picksVersion, picksVersion) || other.picksVersion == picksVersion));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _OutboundIpResult&&(identical(other.url, url) || other.url == url)&&(identical(other.body, body) || other.body == body)&&(identical(other.delay, delay) || other.delay == delay)&&const DeepCollectionEquality().equals(other.chains, _chains)&&(identical(other.entryIp, entryIp) || other.entryIp == entryIp)&&(identical(other.cacheIdentity, cacheIdentity) || other.cacheIdentity == cacheIdentity)&&(identical(other.error, error) || other.error == error)&&(identical(other.coreEpoch, coreEpoch) || other.coreEpoch == coreEpoch)&&(identical(other.picksVersion, picksVersion) || other.picksVersion == picksVersion));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,url,body,delay,const DeepCollectionEquality().hash(_chains),error,coreEpoch,picksVersion);
+    return Object.hash(runtimeType,url,body,delay,const DeepCollectionEquality().hash(_chains),entryIp,cacheIdentity,error,coreEpoch,picksVersion);
 }
 
 @override
 String toString() {
-    return 'OutboundIpResult(url: $url, body: $body, delay: $delay, chains: $chains, error: $error, coreEpoch: $coreEpoch, picksVersion: $picksVersion)';
+    return 'OutboundIpResult(url: $url, body: $body, delay: $delay, chains: $chains, entryIp: $entryIp, cacheIdentity: $cacheIdentity, error: $error, coreEpoch: $coreEpoch, picksVersion: $picksVersion)';
 }
 
 
@@ -4293,7 +4297,7 @@ abstract mixin class _$OutboundIpResultCopyWith<$Res> implements $OutboundIpResu
   factory _$OutboundIpResultCopyWith(_OutboundIpResult value, $Res Function(_OutboundIpResult) _then) = __$OutboundIpResultCopyWithImpl;
 @override @useResult
 $Res call({
- String url, String body, int delay, List<String> chains, String? error,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
+ String url, String body, int delay, List<String> chains,@JsonKey(name: 'entry-ip') String entryIp,@JsonKey(name: 'cache-identity') String cacheIdentity, String? error,@JsonKey(name: 'core-epoch') int coreEpoch,@JsonKey(name: 'picks-version') int picksVersion
 });
 
 
@@ -4310,13 +4314,15 @@ class __$OutboundIpResultCopyWithImpl<$Res>
 
 /// Create a copy of OutboundIpResult
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? url = null,Object? body = null,Object? delay = null,Object? chains = null,Object? error = freezed,Object? coreEpoch = null,Object? picksVersion = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? url = null,Object? body = null,Object? delay = null,Object? chains = null,Object? entryIp = null,Object? cacheIdentity = null,Object? error = freezed,Object? coreEpoch = null,Object? picksVersion = null,}) {
   return _then(_OutboundIpResult(
 url: null == url ? _self.url : url // ignore: cast_nullable_to_non_nullable
 as String,body: null == body ? _self.body : body // ignore: cast_nullable_to_non_nullable
 as String,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
 as int,chains: null == chains ? _self._chains : chains // ignore: cast_nullable_to_non_nullable
-as List<String>,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as List<String>,entryIp: null == entryIp ? _self.entryIp : entryIp // ignore: cast_nullable_to_non_nullable
+as String,cacheIdentity: null == cacheIdentity ? _self.cacheIdentity : cacheIdentity // ignore: cast_nullable_to_non_nullable
+as String,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as String?,coreEpoch: null == coreEpoch ? _self.coreEpoch : coreEpoch // ignore: cast_nullable_to_non_nullable
 as int,picksVersion: null == picksVersion ? _self.picksVersion : picksVersion // ignore: cast_nullable_to_non_nullable
 as int,

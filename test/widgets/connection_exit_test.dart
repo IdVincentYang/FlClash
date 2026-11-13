@@ -13,6 +13,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 import '../helpers/application_activity.dart';
 import '../helpers/test_app.dart';
+import '../helpers/exit_groups.dart';
 import '../helpers/test_config_state.dart';
 
 class _Cache extends ConnectionExits {
@@ -20,6 +21,8 @@ class _Cache extends ConnectionExits {
   final watching = <ConnectionExitTarget, int>{};
   int forced = 0;
   bool releasedDuringManualCheck = false;
+  void show(ConnectionExitTarget target, ConnectionExitEntry value) =>
+      state = {...state, target: value};
   @override
   Map<ConnectionExitTarget, ConnectionExitEntry> build() => const {};
   @override
@@ -69,6 +72,9 @@ void main() {
     cache = _Cache();
     container = ProviderContainer(
       overrides: [
+        groupsProvider.overrideWith(
+          () => TestExitGroups(List.generate(30, (index) => 'Node $index')),
+        ),
         connectionExitsProvider.overrideWith(() => cache),
         configStateProvider.overrideWith(
           () => TestConfigState(const ConfigFact(inputId: 'input-a')),
@@ -98,7 +104,14 @@ void main() {
               itemBuilder: (context, index) => ListTile(
                 title: Text('App $index'),
                 leading: ConnectionExitIcon(
-                  info: activityConnection('$index', exit: 'Node $index'),
+                  info: activityConnection('$index', exit: 'Node $index')
+                      .copyWith(
+                        metadata: const Metadata(
+                          network: 'tcp',
+                          host: 'example.test',
+                          remoteDestination: '8.8.8.8',
+                        ),
+                      ),
                   active: active,
                 ),
               ),
@@ -150,7 +163,7 @@ void main() {
       await pump(tester, active: active, count: 1);
       await settle(tester);
       expect(cache.queried, isEmpty);
-      expect(cache.watching, isEmpty);
+      expect(cache.watching, hasLength(1));
       await tester.tap(find.byType(IconButton).last);
       await tester.pump();
       expect(cache.forced, 1);
@@ -187,6 +200,53 @@ void main() {
     await settle(tester);
     expect(cache.queried, ['Node 0']);
   });
+
+  testWidgets('refresh overlays the corner while preserving the cached flag', (
+    tester,
+  ) async {
+    await pump(tester, count: 1);
+    await settle(tester);
+    final target = cache.watching.keys.single;
+    final previous = container.read(connectionExitsProvider)[target];
+    cache.show(
+      target,
+      ConnectionExitEntry.pending(ProbePhase.probing, previous),
+    );
+    await tester.pump();
+    expect(find.text('🇭🇰'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(tester.getSize(find.byType(CircularProgressIndicator)).width, 10);
+    cache.show(
+      target,
+      ConnectionExitEntry(ProbePhase.failed, value: previous!.value),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('🇭🇰'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets(
+    'ended connections can display a stored flag without an automatic check',
+    (tester) async {
+      await pump(tester, active: false, count: 1);
+      await settle(tester);
+      final target = cache.watching.keys.single;
+      cache.show(
+        target,
+        ConnectionExitEntry(
+          ProbePhase.fresh,
+          value: IpInfo(
+            ip: '1.1.1.1',
+            countryCode: 'HK',
+            checkedAt: DateTime(2026, 11, 13),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('🇭🇰'), findsOneWidget);
+      expect(cache.queried, isEmpty);
+    },
+  );
 
   testWidgets(
     'backgrounding detaches demand until foreground and visible again',

@@ -2,11 +2,12 @@
   "base_commit": "8597778c7df410ebe88c57e59eaab32d203156df",
   "base_tree": "fe7ea5e2e222794eb118f71f6d3512e036a619f1",
   "changed_blobs": {
-    "adapter/adapter.go": "f26fdba45550d29e36bffa260c5c558539852dfd",
+    "adapter/adapter.go": "6392c395a4d3d8f1566886d65f5a631f63396415",
+    "adapter/cache_identity_test.go": "c30f2f8c49f938554e5d4b06c119befeb4a85def",
     "adapter/inbound/auth.go": "282b89b08bebccf6993b8efc89ad6857b2ba28e7",
     "adapter/inbound/ipfilter.go": "65dbbbfe7bb00576fc21a89611f99c87037c8d12",
     "adapter/outboundgroup/fallback.go": "bde3877d215d9c1877dcbbbb4c8223ccce85a9eb",
-    "adapter/parser.go": "0ee6165512ef5b9c23a0e05a7c18831c8680b9cc",
+    "adapter/parser.go": "caf29cd461c1851955cc7749b690dd677fe7af4e",
     "adapter/provider/healthcheck.go": "12923655a4f223058349ac81887214b986541e69",
     "adapter/provider/provider.go": "0301b66d00e8a868f6d92f99b50a8b2ffaaab294",
     "adapter/provider/request_owner_test.go": "c28b1fff69e4ebe79db20f4a143604a013bf72a0",
@@ -54,9 +55,9 @@
     "tunnel/connection.go": "38e41947fc56331446b3f7c03f56628d5f19f4e4",
     "tunnel/tunnel.go": "6c0cb72860331ab34bdbf532eeb8fae6f9b9328e"
   },
-  "commit": "6c6e3e472bb246cc55f2e8577d9eddccc2623afc",
-  "commit_sha256": "41ddd40ef9d9e78341fa2d90930d9688e751350ae7e0ce2801f61142525d9fe8",
-  "patch_sha256": "ac046f82c5c9d719bbad7c4958f7eabe0573f7b769536a93e76e5900a71a181e",
+  "commit": "06af145eb170fca95b5c8fe3c97f43f83b9c0a55",
+  "commit_sha256": "e06f67c264c31cc850fd085c988012aec5c8108a9afd82a378051e33644111ab",
+  "patch_sha256": "b4db4fca6034842fbcb2a92d001ff46dd0b5e6e74d249a700ab7c9b6ef9f3c7f",
   "repository": "git@github.com:chen08209/Clash.Meta.git",
-  "tree": "f08a2ac1a2cd78649b4a144e4c3fb16318f96887"
+  "tree": "9666d28946522f1292a70bdcb3df4f3d6dfa8cae"
 }

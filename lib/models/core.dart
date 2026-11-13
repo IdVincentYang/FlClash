@@ -197,6 +197,8 @@ abstract class OutboundIpResult with _$OutboundIpResult {
     @Default('') String body,
     @Default(0) int delay,
     @Default([]) List<String> chains,
+    @JsonKey(name: 'entry-ip') @Default('') String entryIp,
+    @JsonKey(name: 'cache-identity') @Default('') String cacheIdentity,
     String? error,
     @JsonKey(name: 'core-epoch') @Default(0) int coreEpoch,
     @JsonKey(name: 'picks-version') @Default(0) int picksVersion,

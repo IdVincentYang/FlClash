@@ -6,6 +6,15 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 abstract final class AppGlyphs {
+  static const direct = Glyph([
+    GlyphPolyline([GlyphVertex(4, 12), GlyphVertex(20, 12)]),
+    GlyphPolyline([
+      GlyphVertex(14, 6),
+      GlyphVertex(20, 12),
+      GlyphVertex(14, 18),
+    ]),
+  ]);
+
   static const dashboard = Glyph([
     GlyphBox(3.5, 3.5, 10.5, 11.5, 2),
     GlyphBox(13.5, 3.5, 20.5, 9.5, 2),

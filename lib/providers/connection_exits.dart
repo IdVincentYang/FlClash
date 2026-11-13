@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fl_clash/common/ip_lookup.dart';
+import 'package:fl_clash/common/common.dart' show commonPrint;
+import 'package:fl_clash/database/connection_exits.dart';
 import 'package:fl_clash/common/local_proxy_groups.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
@@ -11,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'config_state.dart';
+import 'exit_cache.dart';
 import 'package:fl_clash/common/connection_address.dart';
 import 'core.dart';
 import 'routed_probe.dart';
@@ -18,23 +21,33 @@ import 'route_state.dart';
 
 @immutable
 class ConnectionExitTarget {
-  const ConnectionExitTarget(this.node, this.entry, this.configuration);
-  final String node, entry, configuration;
+  const ConnectionExitTarget(
+    this.node,
+    this.entry,
+    this.configuration, [
+    this.identity = '',
+  ]);
+  final String node, entry, configuration, identity;
   @override
   bool operator ==(Object other) =>
       other is ConnectionExitTarget &&
       node == other.node &&
       entry == other.entry &&
-      configuration == other.configuration;
+      configuration == other.configuration &&
+      identity == other.identity;
   @override
-  int get hashCode => Object.hash(node, entry, configuration);
+  int get hashCode => Object.hash(node, entry, configuration, identity);
 }
 
 ConnectionExitTarget? connectionExitTarget(
   TrackerInfo info,
-  String configuration,
-) {
-  if (configuration.isEmpty ||
+  String configuration, {
+  String identity = '',
+}) {
+  final entry = connectionProxyServerIp(info);
+  if (identity.isEmpty ||
+      entry == null ||
+      configuration.isEmpty ||
       info.observation?.configuration.status != 'known' ||
       info.observation?.configuration.inputId != configuration ||
       info.chains.isEmpty ||
@@ -49,8 +62,9 @@ ConnectionExitTarget? connectionExitTarget(
   }
   return ConnectionExitTarget(
     info.chains.first,
-    connectionProxyServerIp(info) ?? '',
+    entry,
     configuration,
+    identity,
   );
 }
 
@@ -84,7 +98,7 @@ final connectionExitsProvider =
 
 class ConnectionExits
     extends Notifier<Map<ConnectionExitTarget, ConnectionExitEntry>> {
-  static const cacheAge = Duration(days: 1);
+  static const cacheAge = ExitCacheDatabase.lifetime;
   static const failureAge = Duration(minutes: 1);
   static const manualInterval = Duration(seconds: 5);
   static const startInterval = Duration(seconds: 1);
@@ -94,7 +108,9 @@ class ConnectionExits
   final _automatic = <ConnectionExitTarget, int>{};
   final _queue = <ConnectionExitTarget>{};
   final _manual = <ConnectionExitTarget>{};
-  final _lastStart = <ConnectionExitTarget, Duration>{};
+  final _loaded = <ConnectionExitTarget>{};
+  final _loading = <ConnectionExitTarget>{};
+  final _lastStart = <({String identity, String entry}), Duration>{};
   ConnectionExitTarget? _running;
   int _sequence = 0;
   Duration? _lastLaunch;
@@ -107,6 +123,8 @@ class ConnectionExits
   Request get requestClient => request;
   @protected
   Duration get elapsed => _clock.elapsed;
+  @protected
+  DateTime get utcNow => DateTime.now().toUtc();
 
   @override
   Map<ConnectionExitTarget, ConnectionExitEntry> build() {
@@ -120,16 +138,19 @@ class ConnectionExits
               previous.proxied != next.proxied);
       _route = next;
       if (changed) {
-        _invalidate();
+        _cancelWork();
       } else if (!next.live) {
         _cancelWork();
       }
       _schedule();
     });
-    ref.listen(
-      configStateProvider.select((value) => value.fact.inputId),
-      (_, _) => _invalidate(),
-    );
+    ref.listen(configStateProvider.select((value) => value.fact.inputId), (
+      _,
+      _,
+    ) {
+      _cancelWork();
+      _schedule();
+    });
     ref.listen(groupsProvider, (_, _) => _schedule());
     ref.listen(appVisibleProvider, (_, visible) {
       if (!visible) _cancelWork();
@@ -148,26 +169,67 @@ class ConnectionExits
 
   bool _current(ConnectionExitTarget target) =>
       ref.read(configStateProvider).fact.inputId == target.configuration &&
-      localGroupNodes(
-        ref.read(groupsProvider),
-      ).any((node) => node.name == target.node);
+      localGroupNodes(ref.read(groupsProvider)).any(
+        (node) =>
+            node.name == target.node && node.cacheIdentity == target.identity,
+      );
   bool get _available =>
       ref.read(appVisibleProvider) &&
       ref.read(initProvider) &&
       _route.live &&
       _route.proxied;
-  bool _fresh(ConnectionExitEntry? entry) =>
-      entry?.completed != null &&
-      elapsed - entry!.completed! <
-          (entry.value == null ? failureAge : cacheAge);
-  bool isExpired(ConnectionExitTarget target) => !_fresh(state[target]);
+  bool _validValue(ConnectionExitEntry? entry) {
+    final checked = entry?.value?.checkedAt;
+    if (checked == null) return false;
+    final age = utcNow.difference(checked);
+    return !age.isNegative && age < cacheAge;
+  }
+
+  bool _fresh(ConnectionExitEntry? entry) => entry?.phase == ProbePhase.failed
+      ? entry?.completed != null && elapsed - entry!.completed! < failureAge
+      : _validValue(entry);
+  bool isExpired(ConnectionExitTarget target) => !_validValue(state[target]);
+
+  Future<void> _load(ConnectionExitTarget target) async {
+    if (_loaded.contains(target) || !_loading.add(target)) return;
+    IpInfo? value;
+    try {
+      value = await ref
+          .read(exitCacheDatabaseProvider)
+          .lookup(target.identity, target.entry, utcNow);
+    } catch (_) {
+      commonPrint.log('Exit cache read failed');
+    }
+    _loading.remove(target);
+    if (!ref.mounted || !_watchers.containsKey(target)) return;
+    _loaded.add(target);
+    if (value != null &&
+        !(state[target]?.value?.checkedAt?.isAfter(value.checkedAt!) ??
+            false)) {
+      final pending = state[target];
+      state = {
+        ...state,
+        target: ConnectionExitEntry(
+          pending?.busy == true ? pending!.phase : ProbePhase.fresh,
+          value: value,
+          completed: elapsed,
+        ),
+      };
+    }
+    _schedule();
+  }
+
+  ({String identity, String entry}) _key(ConnectionExitTarget target) =>
+      (identity: target.identity, entry: target.entry);
+
   String _requestKey(ConnectionExitTarget target) =>
-      'connectionExit:${jsonEncode([target.node, target.entry, target.configuration])}';
+      'connectionExit:${jsonEncode([target.node, target.entry, target.configuration, target.identity])}';
 
   void watch(ConnectionExitTarget target, {required bool automatic}) {
     if (!ref.mounted) return;
     _watchers[target] = (_watchers[target] ?? 0) + 1;
     if (automatic) _automatic[target] = (_automatic[target] ?? 0) + 1;
+    unawaited(_load(target));
     if (!_holdingRoute) {
       _holdingRoute = true;
       _tracker.attach();
@@ -189,6 +251,7 @@ class ConnectionExits
     remove(_watchers);
     if (automatic) remove(_automatic);
     if (!_watchers.containsKey(target)) {
+      _loaded.remove(target);
       _queue.remove(target);
       _manual.remove(target);
       if (_running == target) {
@@ -213,8 +276,12 @@ class ConnectionExits
         !_watchers.containsKey(target)) {
       return ExitRefreshResult.unavailable;
     }
-    if (_running == target) return ExitRefreshResult.coalesced;
-    final last = _lastStart[target];
+    if (_running case final running?
+        when running.identity == target.identity &&
+            running.entry == target.entry) {
+      return ExitRefreshResult.coalesced;
+    }
+    final last = _lastStart[_key(target)];
     if (last != null && elapsed - last < manualInterval) {
       return ExitRefreshResult.throttled;
     }
@@ -270,13 +337,6 @@ class ConnectionExits
     state = kept;
   }
 
-  void _invalidate() {
-    _cancelWork();
-    state = const {};
-    _lastStart.clear();
-    _schedule();
-  }
-
   void _schedule() {
     if (_scheduled || !ref.mounted) return;
     _scheduled = true;
@@ -295,6 +355,7 @@ class ConnectionExits
     }
     for (final target in _automatic.keys) {
       if (_watchers.containsKey(target) &&
+          _loaded.contains(target) &&
           _current(target) &&
           !_fresh(state[target]) &&
           _running != target &&
@@ -306,7 +367,10 @@ class ConnectionExits
       }
     }
     _queue.removeWhere((target) {
-      final removed = !_watchers.containsKey(target) || !_current(target);
+      final removed =
+          !_watchers.containsKey(target) ||
+          !_current(target) ||
+          (!_manual.contains(target) && _fresh(state[target]));
       if (removed) _manual.remove(target);
       return removed;
     });
@@ -322,7 +386,8 @@ class ConnectionExits
       ConnectionExitTarget? target;
       Duration? retry;
       for (final candidate in _queue) {
-        final last = _lastStart[candidate];
+        if (!_loaded.contains(candidate)) continue;
+        final last = _lastStart[_key(candidate)];
         final left = last == null
             ? Duration.zero
             : manualInterval - (elapsed - last);
@@ -333,13 +398,13 @@ class ConnectionExits
         if (retry == null || left < retry) retry = left;
       }
       if (target == null) {
-        _wake = Timer(retry ?? startInterval, _schedule);
+        if (retry != null) _wake = Timer(retry, _schedule);
         return;
       }
       _queue.remove(target);
       _running = target;
       _lastLaunch = elapsed;
-      _lastStart[target] = elapsed;
+      _lastStart[_key(target)] = elapsed;
       state = {
         ...state,
         target: ConnectionExitEntry.pending(ProbePhase.probing, state[target]),
@@ -353,9 +418,9 @@ class ConnectionExits
     for (final target in _automatic.keys) {
       final entry = state[target];
       if (!_current(target) || entry?.completed == null) continue;
-      final remaining =
-          (entry!.phase == ProbePhase.failed ? failureAge : cacheAge) -
-          (elapsed - entry.completed!);
+      final remaining = entry!.phase == ProbePhase.failed
+          ? failureAge - (elapsed - entry.completed!)
+          : cacheAge - utcNow.difference(entry.value!.checkedAt!);
       if (remaining > Duration.zero && (wake == null || remaining < wake)) {
         wake = remaining;
       }
@@ -364,7 +429,9 @@ class ConnectionExits
     if (_lastStart.length > cacheLimit) {
       for (final target in _lastStart.keys.toList()) {
         if (_lastStart.length <= cacheLimit) break;
-        if (!_watchers.containsKey(target)) _lastStart.remove(target);
+        if (!_watchers.keys.any((watched) => _key(watched) == target)) {
+          _lastStart.remove(target);
+        }
       }
     }
     if (state.length > cacheLimit) {
@@ -373,7 +440,9 @@ class ConnectionExits
         if (keep.length <= cacheLimit) break;
         if (!_watchers.containsKey(target)) {
           keep.remove(target);
-          _lastStart.remove(target);
+          if (!_watchers.keys.any((watched) => _key(watched) == _key(target))) {
+            _lastStart.remove(_key(target));
+          }
         }
       }
       state = keep;
@@ -388,6 +457,7 @@ class ConnectionExits
   }) async {
     IpInfo? value;
     String? reason;
+    final previous = state[target]?.value;
     bool current() =>
         ref.mounted &&
         _sequence == sequence &&
@@ -428,11 +498,46 @@ class ConnectionExits
       } else if (result == null ||
           result.chains.isEmpty ||
           result.chains.first != target.node ||
+          result.cacheIdentity != target.identity ||
           !_route.isFresh(stamp)) {
         reason = 'route-changed';
       } else {
         value = parseOutboundIp(result);
         reason = value == null ? result.error ?? 'invalid-response' : null;
+        final actual = publicIp(result.entryIp)?.address;
+        if (value != null && actual != null) {
+          value = value.copyWith(checkedAt: utcNow);
+          try {
+            await ref
+                .read(exitCacheDatabaseProvider)
+                .save(target.identity, actual, value);
+          } catch (_) {
+            commonPrint.log('Exit cache write failed');
+          }
+          if (!current()) {
+            _discard(target, sequence);
+            return;
+          }
+          for (final watched in _watchers.keys) {
+            if (watched.identity == target.identity &&
+                watched.entry == actual &&
+                watched != target) {
+              _loaded.add(watched);
+              state = {
+                ...state,
+                watched: ConnectionExitEntry(
+                  ProbePhase.fresh,
+                  value: value,
+                  completed: elapsed,
+                ),
+              };
+            }
+          }
+        }
+        if (actual == null || actual != target.entry) {
+          value = null;
+          reason = 'entry-changed';
+        }
       }
     } catch (_) {
       reason = 'probe-failed';
@@ -446,7 +551,7 @@ class ConnectionExits
       ...state,
       target: ConnectionExitEntry(
         value == null ? ProbePhase.failed : ProbePhase.fresh,
-        value: value,
+        value: value ?? previous,
         reason: reason,
         completed: elapsed,
       ),

@@ -247,7 +247,7 @@ func handleGetProxies() ProxiesData {
 
 // Proxy.MarshalJSON encodes each node twice, with history the host never reads.
 func proxyView(proxy constant.Proxy) any {
-	node := nodeView{Name: proxy.Name(), Type: proxy.Type().String()}
+	node := nodeView{Name: proxy.Name(), Type: proxy.Type().String(), CacheIdentity: proxyCacheIdentity(proxy)}
 	if !isProxyGroupType(proxy.Type()) {
 		return node
 	}

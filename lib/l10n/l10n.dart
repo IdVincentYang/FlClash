@@ -10458,10 +10458,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Measured exit: {ip} · {country}\nChecked: {time}\nTap to check again. Other destinations may use a different exit.`
+  /// `Node exit: {ip} · {country}\nChecked: {time}\nTest service: Cloudflare. Tap to check again.`
   String activityExitObserved(Object ip, Object country, Object time) {
     return Intl.message(
-      'Measured exit: $ip · $country\nChecked: $time\nTap to check again. Other destinations may use a different exit.',
+      'Node exit: $ip · $country\nChecked: $time\nTest service: Cloudflare. Tap to check again.',
       name: 'activityExitObserved',
       desc: '',
       args: [ip, country, time],

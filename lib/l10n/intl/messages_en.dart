@@ -27,7 +27,7 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m2(active, count) => "Active ${active} · Observed ${count}";
 
   static String m3(ip, country, time) =>
-      "Measured exit: ${ip} · ${country}\nChecked: ${time}\nTap to check again. Other destinations may use a different exit.";
+      "Node exit: ${ip} · ${country}\nChecked: ${time}\nTest service: Cloudflare. Tap to check again.";
 
   static String m4(time) => "Last activity: ${time}";
 

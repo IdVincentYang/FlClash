@@ -23,13 +23,15 @@ type OutboundIpParams struct {
 }
 
 type OutboundIpResult struct {
-	Url          string   `json:"url"`
-	Body         string   `json:"body"`
-	Delay        int64    `json:"delay"`
-	Chains       []string `json:"chains"`
-	Error        string   `json:"error,omitempty"`
-	CoreEpoch    uint64   `json:"core-epoch"`
-	PicksVersion uint64   `json:"picks-version"`
+	Url           string   `json:"url"`
+	Body          string   `json:"body"`
+	Delay         int64    `json:"delay"`
+	Chains        []string `json:"chains"`
+	Error         string   `json:"error,omitempty"`
+	CoreEpoch     uint64   `json:"core-epoch"`
+	PicksVersion  uint64   `json:"picks-version"`
+	EntryIP       string   `json:"entry-ip,omitempty"`
+	CacheIdentity string   `json:"cache-identity,omitempty"`
 }
 
 func handleOutboundIp(params *OutboundIpParams) *OutboundIpResult {
@@ -75,7 +77,11 @@ func handleOutboundIp(params *OutboundIpParams) *OutboundIpResult {
 	if ctx.Err() != nil {
 		return failure("cancelled")
 	}
-	return &OutboundIpResult{Url: outboundIPURL, Body: result.Body, Delay: result.Delay, Chains: result.Chains, CoreEpoch: result.CoreEpoch, PicksVersion: result.PicksVersion}
+	entry := ""
+	if address, err := netip.ParseAddr(result.entryIP); err == nil && publicIPAddress(result.entryIP) {
+		entry = address.Unmap().String()
+	}
+	return &OutboundIpResult{Url: outboundIPURL, Body: result.Body, Delay: result.Delay, Chains: result.Chains, CoreEpoch: result.CoreEpoch, PicksVersion: result.PicksVersion, EntryIP: entry, CacheIdentity: result.cacheIdentity}
 }
 
 var nonPublicIPPrefixes = []netip.Prefix{

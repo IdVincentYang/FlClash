@@ -1223,7 +1223,7 @@
   "activityExitNotApplicable": "この接続にはプロキシ出口がありません。",
   "activityExitInactive": "アクティブな接続がないため自動確認しません。タップすると出口を確認します。",
   "activityExitChecking": "プロキシ出口を確認中…",
-  "activityExitObserved": "確認した出口: {ip} · {country}\n確認日時: {time}\nタップして再確認します。宛先によって出口が異なる場合があります。",
+  "activityExitObserved": "ノードの出口: {ip} · {country}\n確認日時: {time}\n確認サービス: Cloudflare。タップして再確認。",
   "activityExitFailed": "出口の確認に失敗しました。タップして再試行します。",
   "activityExitNotChecked": "プロキシ出口は未確認です。タップして確認します。",
   "activityExitUnavailable": "この接続の出口を確認できません。プロキシとノードが利用可能か確認してください。",

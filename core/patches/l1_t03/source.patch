@@ -1,5 +1,5 @@
 diff --git a/adapter/adapter.go b/adapter/adapter.go
-index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c558539852dfd 100644
+index 22054f0709ef2193aa26a5ecb017142717237c1b..6392c395a4d3d8f1566886d65f5a631f63396415 100644
 --- a/adapter/adapter.go
 +++ b/adapter/adapter.go
 @@ -14,6 +14,7 @@ import (
@@ -10,15 +10,26 @@ index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c5585
  	C "github.com/metacubex/mihomo/constant"
  	"github.com/metacubex/mihomo/log"
  
-@@ -33,6 +34,7 @@ type internalProxyState struct {
+@@ -33,11 +34,15 @@ type internalProxyState struct {
  
  type Proxy struct {
  	C.ProxyAdapter
-+	owner   requestscope.Owner
- 	alive   atomic.Bool
- 	history *queue.Queue[C.DelayHistory]
- 	extra   xsync.Map[string, *internalProxyState]
-@@ -165,42 +167,61 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
+-	alive   atomic.Bool
+-	history *queue.Queue[C.DelayHistory]
+-	extra   xsync.Map[string, *internalProxyState]
++	cacheIdentity string
++	owner         requestscope.Owner
++	alive         atomic.Bool
++	history       *queue.Queue[C.DelayHistory]
++	extra         xsync.Map[string, *internalProxyState]
+ }
+ 
++func (p *Proxy) CacheIdentity() string { return p.cacheIdentity }
++
+ // Adapter implements C.Proxy
+ func (p *Proxy) Adapter() C.ProxyAdapter {
+ 	return p.ProxyAdapter
+@@ -165,42 +170,61 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
  // implements C.Proxy
  func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.IntRanges[uint16]) (t uint16, err error) {
  	var satisfied bool
@@ -95,19 +106,19 @@ index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c5585
 +				record.Delay = 0
 +				alive = false
 +			}
-+
+ 
 +			state.alive.Store(alive)
 +			state.history.Put(record)
 +			if state.history.Len() > defaultHistoriesNum {
 +				state.history.Pop()
 +			}
- 
++
 +			return nil
 +		})
  	}()
  
  	unifiedDelay := UnifiedDelay.Load()
-@@ -211,13 +232,29 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
+@@ -211,13 +235,29 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
  	}
  
  	start := time.Now()
@@ -141,7 +152,7 @@ index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c5585
  
  	req, err := http.NewRequest(http.MethodHead, url, nil)
  	if err != nil {
-@@ -282,9 +319,14 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
+@@ -282,9 +322,14 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
  	return
  }
  
@@ -157,6 +168,33 @@ index 22054f0709ef2193aa26a5ecb017142717237c1b..f26fdba45550d29e36bffa260c5c5585
  		history:      queue.New[C.DelayHistory](defaultHistoriesNum),
  		alive:        atomic.NewBool(true),
  	}
+diff --git a/adapter/cache_identity_test.go b/adapter/cache_identity_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..c30f2f8c49f938554e5d4b06c119befeb4a85def
+--- /dev/null
++++ b/adapter/cache_identity_test.go
+@@ -0,0 +1,21 @@
++package adapter
++
++import "testing"
++
++func TestCacheIdentityDescribesConnectionNotLabel(t *testing.T) {
++	parse := func(name, password string, port int, udp bool) string {
++		proxy, err := ParseProxy(map[string]any{"name": name, "type": "socks5", "server": "1.1.1.1", "port": port, "username": "user", "password": password, "udp": udp})
++		if err != nil {
++			t.Fatal(err)
++		}
++		defer proxy.Close()
++		return proxy.(*Proxy).CacheIdentity()
++	}
++	first := parse("one", "secret", 1080, false)
++	if len(first) != 64 || first != parse("renamed", "secret", 1080, true) {
++		t.Fatal("display name or UDP capability changed TCP cache identity")
++	}
++	if first == parse("one", "different", 1080, false) || first == parse("one", "secret", 1081, false) {
++		t.Fatal("different connection parameters shared an identity")
++	}
++}
 diff --git a/adapter/inbound/auth.go b/adapter/inbound/auth.go
 index 8317274687f0c334c5b90494ef5bee2114a1f530..282b89b08bebccf6993b8efc89ad6857b2ba28e7 100644
 --- a/adapter/inbound/auth.go
@@ -308,10 +346,18 @@ index 98aaf20a9d98522da3086e39064128ff5c89440e..bde3877d215d9c1877dcbbbb4c8223cc
  
  func (f *Fallback) ForceSet(name string) {
 diff --git a/adapter/parser.go b/adapter/parser.go
-index 68bccdbf283cdf54fcf54a8016cabbf89d736c6c..0ee6165512ef5b9c23a0e05a7c18831c8680b9cc 100644
+index 68bccdbf283cdf54fcf54a8016cabbf89d736c6c..caf29cd461c1851955cc7749b690dd677fe7af4e 100644
 --- a/adapter/parser.go
 +++ b/adapter/parser.go
-@@ -5,6 +5,7 @@ import (
+@@ -1,10 +1,15 @@
+ package adapter
+ 
+ import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
+ 	"fmt"
++	"maps"
  
  	"github.com/metacubex/mihomo/adapter/outbound"
  	"github.com/metacubex/mihomo/common/structure"
@@ -319,12 +365,21 @@ index 68bccdbf283cdf54fcf54a8016cabbf89d736c6c..0ee6165512ef5b9c23a0e05a7c18831c
  	C "github.com/metacubex/mihomo/constant"
  )
  
-@@ -246,17 +247,18 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
+@@ -246,17 +251,27 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
  	}
  
  	proxy = outbound.NewAutoCloseProxyAdapter(proxy)
 -	return NewProxy(proxy), nil
-+	return NewProxy(proxy, opt.RequestOwner), nil
++	parsed := NewProxy(proxy, opt.RequestOwner)
++	identity := maps.Clone(mapping)
++	for _, key := range []string{"name", "icon", "hidden", "udp"} {
++		delete(identity, key)
++	}
++	if encoded, encodeErr := json.Marshal(identity); encodeErr == nil {
++		digest := sha256.Sum256(encoded)
++		parsed.cacheIdentity = hex.EncodeToString(digest[:])
++	}
++	return parsed, nil
  }
  
  type proxyOption struct {
@@ -340,7 +395,7 @@ index 68bccdbf283cdf54fcf54a8016cabbf89d736c6c..0ee6165512ef5b9c23a0e05a7c18831c
  	for _, o := range options {
  		o(&opt)
  	}
-@@ -282,3 +284,7 @@ func WithProviderName(name string) ProxyOption {
+@@ -282,3 +297,7 @@ func WithProviderName(name string) ProxyOption {
  		opt.ProviderName = name
  	}
  }

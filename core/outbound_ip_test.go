@@ -1,13 +1,41 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/tunnel"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+type entryDiagnosticProxy struct{ *diagnosticProxy }
+
+func (p *entryDiagnosticProxy) CacheIdentity() string { return "connection-identity" }
+func (p *entryDiagnosticProxy) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
+	conn, err := p.diagnosticProxy.DialContext(ctx, metadata)
+	if err != nil {
+		return nil, err
+	}
+	return &entryDiagnosticConn{Conn: conn}, nil
+}
+
+type entryDiagnosticConn struct{ C.Conn }
+
+func (c *entryDiagnosticConn) RemoteDestination() string { return "::ffff:8.8.8.8" }
+
+func TestOutboundIPReportsActualEntryAndConnectionIdentity(t *testing.T) {
+	proxy := outboundFixture(t, func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, "ip=1.1.1.1\nloc=HK\n") }, true)
+	wrapped := &entryDiagnosticProxy{proxy}
+	tunnel.UpdateProxies(map[string]C.Proxy{"diagnostic-node": wrapped}, nil)
+	result := outboundCheck(1000)
+	if result.Error != "" || result.EntryIP != "8.8.8.8" || result.CacheIdentity != wrapped.CacheIdentity() {
+		t.Fatalf("entry or identity not captured: %+v", result)
+	}
+}
 
 func outboundFixture(t *testing.T, handler http.HandlerFunc, trusted bool, names ...string) *diagnosticProxy {
 	t.Helper()

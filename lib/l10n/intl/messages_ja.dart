@@ -27,7 +27,7 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m2(active, count) => "接続中 ${active}・観測 ${count} 件";
 
   static String m3(ip, country, time) =>
-      "確認した出口: ${ip} · ${country}\n確認日時: ${time}\nタップして再確認します。宛先によって出口が異なる場合があります。";
+      "ノードの出口: ${ip} · ${country}\n確認日時: ${time}\n確認サービス: Cloudflare。タップして再確認。";
 
   static String m4(time) => "最終通信：${time}";
 

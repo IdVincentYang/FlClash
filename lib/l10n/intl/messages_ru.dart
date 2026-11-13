@@ -28,7 +28,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Активных: ${active} · Наблюдалось: ${count}";
 
   static String m3(ip, country, time) =>
-      "Проверенный выход: ${ip} · ${country}\nВремя проверки: ${time}\nНажмите для повторной проверки. Другие адресаты могут использовать другой выход.";
+      "Выход узла: ${ip} · ${country}\nПроверено: ${time}\nСервис проверки: Cloudflare. Нажмите для повторной проверки.";
 
   static String m4(time) => "Последняя активность: ${time}";
 

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
+import 'package:fl_clash/providers/exit_cache.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 
@@ -22,11 +25,21 @@ class _ApplicationActivityViewState
     extends ConsumerState<ApplicationActivityView> {
   bool _showAllApps = false;
   String _query = '';
+  bool _wasCurrent = false;
 
   void _search(String value) => setState(() => _query = value);
 
   @override
   Widget build(BuildContext context) {
+    final current = ModalRoute.isCurrentOf(context) ?? true;
+    if (current && !_wasCurrent) {
+      scheduleMicrotask(() {
+        if (mounted) {
+          unawaited(cleanExitCache(ref.read(exitCacheDatabaseProvider)));
+        }
+      });
+    }
+    _wasCurrent = current;
     final l10n = context.appLocalizations;
     final activity = ref.watch(applicationActivityProvider);
     final catalogue = ref.watch(applicationCatalogueProvider);

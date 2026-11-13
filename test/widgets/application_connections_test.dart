@@ -29,6 +29,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../helpers/application_activity.dart';
 import '../helpers/test_app.dart';
+import '../helpers/exit_groups.dart';
 import '../helpers/test_config_state.dart';
 
 class _Activity extends ApplicationActivity {
@@ -69,6 +70,7 @@ class _Exits extends ConnectionExits {
   _Exits(this.core);
   final _Core core;
   final requests = <ConnectionExitTarget>[];
+  bool holdRefresh = false;
   @override
   Map<ConnectionExitTarget, ConnectionExitEntry> build() => const {};
   @override
@@ -108,6 +110,13 @@ class _Exits extends ConnectionExits {
   void unwatch(ConnectionExitTarget target, {required bool automatic}) {}
   @override
   ExitRefreshResult refresh(ConnectionExitTarget target) {
+    if (holdRefresh) {
+      state = {
+        ...state,
+        target: ConnectionExitEntry.pending(ProbePhase.probing, state[target]),
+      };
+      return ExitRefreshResult.accepted;
+    }
     _answer(target);
     return ExitRefreshResult.accepted;
   }
@@ -211,6 +220,11 @@ void main() {
     notifier = _Activity(store.snapshot());
     container = ProviderContainer(
       overrides: [
+        groupsProvider.overrideWith(
+          () => TestExitGroups(
+            store.snapshot().connections.map((item) => item.info.chains.first),
+          ),
+        ),
         configStateProvider.overrideWith(
           () => TestConfigState(const ConfigFact(inputId: 'input-a')),
         ),
@@ -320,10 +334,32 @@ void main() {
     expect(exits.requests, hasLength(1));
     expect(
       find.byTooltip(
-        'Measured exit: 8.210.0.1 · HK\nChecked: 2026-11-13 14:33:00\nTap to check again. Other destinations may use a different exit.',
+        'Node exit: 8.210.0.1 · HK\nChecked: 2026-11-13 14:33:00\nTest service: Cloudflare. Tap to check again.',
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('refresh keeps the flag and draws a small corner spinner', (
+    tester,
+  ) async {
+    store.addEvent(connection('refresh', exit: '🇭🇰 V香港 01'));
+    await pump(tester);
+    exits.holdRefresh = true;
+    await tester.tap(find.byType(ConnectionExitIcon));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('🇭🇰'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(CircularProgressIndicator)),
+      const Size(10, 10),
+    );
+    await screenshot(tester, 'refresh-cached-flag');
+    exits.holdRefresh = false;
+    exits.refresh(exits.requests.single);
+    await tester.pumpAndSettle();
+    expect(find.text('🇭🇰'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
   testWidgets(
@@ -416,7 +452,7 @@ void main() {
       expect(exits.requests, hasLength(1));
       expect(
         find.byTooltip(
-          'Measured exit: 8.210.0.1 · US\nChecked: 2026-11-13 14:33:00\nTap to check again. Other destinations may use a different exit.',
+          'Node exit: 8.210.0.1 · US\nChecked: 2026-11-13 14:33:00\nTest service: Cloudflare. Tap to check again.',
         ),
         findsOneWidget,
       );

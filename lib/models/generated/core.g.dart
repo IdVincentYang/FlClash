@@ -322,6 +322,8 @@ _OutboundIpResult _$OutboundIpResultFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      entryIp: json['entry-ip'] as String? ?? '',
+      cacheIdentity: json['cache-identity'] as String? ?? '',
       error: json['error'] as String?,
       coreEpoch: (json['core-epoch'] as num?)?.toInt() ?? 0,
       picksVersion: (json['picks-version'] as num?)?.toInt() ?? 0,
@@ -333,6 +335,8 @@ Map<String, dynamic> _$OutboundIpResultToJson(_OutboundIpResult instance) =>
       'body': instance.body,
       'delay': instance.delay,
       'chains': instance.chains,
+      'entry-ip': instance.entryIp,
+      'cache-identity': instance.cacheIdentity,
       'error': instance.error,
       'core-epoch': instance.coreEpoch,
       'picks-version': instance.picksVersion,

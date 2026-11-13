@@ -81,12 +81,14 @@ _Proxy _$ProxyFromJson(Map<String, dynamic> json) => _Proxy(
   name: json['name'] as String,
   type: json['type'] as String,
   now: json['now'] as String?,
+  cacheIdentity: json['cache-identity'] as String? ?? '',
 );
 
 Map<String, dynamic> _$ProxyToJson(_Proxy instance) => <String, dynamic>{
   'name': instance.name,
   'type': instance.type,
   'now': instance.now,
+  'cache-identity': instance.cacheIdentity,
 };
 
 _CustomProxy _$CustomProxyFromJson(Map<String, dynamic> json) => _CustomProxy(

@@ -38,9 +38,18 @@ var (
 )
 
 type probeRoute struct {
-	chains      []string
-	rule        string
-	rulePayload string
+	chains        []string
+	rule          string
+	rulePayload   string
+	entryIP       string
+	cacheIdentity string
+}
+
+func proxyCacheIdentity(proxy constant.Proxy) string {
+	if identified, ok := proxy.(interface{ CacheIdentity() string }); ok {
+		return identified.CacheIdentity()
+	}
+	return ""
 }
 
 // probeDialer opens one connection per dial, either pinned to a proxy or
@@ -83,7 +92,7 @@ func (d *probeDialer) dial(ctx context.Context, _ string, address string) (net.C
 		if err != nil {
 			return nil, err
 		}
-		d.remember(&routedConn{route: &probeRoute{chains: conn.Chains()}})
+		d.remember(&routedConn{route: &probeRoute{chains: conn.Chains(), entryIP: conn.RemoteDestination(), cacheIdentity: proxyCacheIdentity(proxy)}})
 		return requestscope.Track(ctx, conn, d.lease)
 	}
 	if err := awaitTunnel(ctx); err != nil {
@@ -323,6 +332,8 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 		result.Chains = route.chains
 		result.Rule = route.rule
 		result.RulePayload = route.rulePayload
+		result.entryIP = route.entryIP
+		result.cacheIdentity = route.cacheIdentity
 	}
 	if req.maxBody > 0 {
 		if req.policy == nil && !req.completeBody {

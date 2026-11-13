@@ -27,7 +27,6 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
   final _visibilityKey = UniqueKey();
   Timer? _stable;
   bool _visible = false, _automatic = false;
-  ConnectionExitTarget? _manualTarget;
   ConnectionExitTarget? _watched, _wanted;
   bool _currentRoute = false, _foreground = false;
   late ConnectionExits _cache;
@@ -50,10 +49,7 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
 
   void _sync() {
     if (!mounted) return;
-    final interested = widget.active == true || _manualTarget == _wanted;
-    final target = _visible && _currentRoute && _foreground && interested
-        ? _wanted
-        : null;
+    final target = _visible && _currentRoute && _foreground ? _wanted : null;
     if (target != _watched) {
       _unsubscribe();
       if (target != null) {
@@ -108,37 +104,80 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
     final configuration = ref.watch(
       configStateProvider.select((value) => value.fact.inputId),
     );
-    _wanted = connectionExitTarget(widget.info, configuration);
+    final nodes = ref.watch(groupsProvider).expand((group) => group.all);
+    final identity =
+        nodes
+            .where(
+              (node) =>
+                  widget.info.chains.isNotEmpty &&
+                  node.name == widget.info.chains.first,
+            )
+            .firstOrNull
+            ?.cacheIdentity ??
+        '';
+    _wanted = connectionExitTarget(
+      widget.info,
+      configuration,
+      identity: identity,
+    );
     scheduleMicrotask(_sync);
     final entry = ref.watch(
       connectionExitsProvider.select((values) => values[_wanted]),
     );
     final value = entry?.value;
     final fresh = _wanted != null && !_cache.isExpired(_wanted!);
-    final inactive = widget.active != true && _manualTarget != _wanted;
-    final message = _wanted == null
-        ? (widget.info.chains.isNotEmpty && widget.info.chains.first == 'DIRECT'
-              ? l.activityExitNotApplicable
-              : l.activityExitUnavailable)
-        : inactive
-        ? l.activityExitInactive
+    final inactive = widget.active != true;
+    final direct =
+        widget.info.chains.isNotEmpty && widget.info.chains.first == 'DIRECT';
+    final known = value != null && fresh;
+    final message = known
+        ? '${l.activityExitObserved(value.ip, value.countryCode, value.checkedAt?.showFull ?? '')}${entry?.phase == ProbePhase.failed ? '\n${l.activityExitFailed}' : ''}'
+        : _wanted == null
+        ? (direct ? l.activityExitNotApplicable : l.activityExitUnavailable)
         : entry?.busy == true
         ? l.activityExitChecking
-        : value != null && fresh
-        ? l.activityExitObserved(
-            value.ip,
-            value.countryCode,
-            value.checkedAt?.showFull ?? '',
-          )
         : entry?.phase == ProbePhase.failed
         ? l.activityExitFailed
+        : inactive
+        ? l.activityExitInactive
         : l.activityExitNotChecked;
     final Widget icon;
-    if (_wanted == null || inactive) {
-      icon = GlyphIcon(
-        AppGlyphs.block,
-        size: 22,
-        color: context.colorScheme.onSurfaceVariant,
+    if (known) {
+      icon = SizedBox(
+        width: 32,
+        height: 32,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Text(
+              value.countryCode.countryFlagEmoji,
+              style: const TextStyle(
+                fontSize: 24,
+                fontFamily: 'Apple Color Emoji',
+                fontFamilyFallback: ['Noto Color Emoji'],
+              ),
+            ),
+            if (entry?.busy == true)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: DecoratedBox(
+                  decoration: ShapeDecoration(
+                    shape: AppShape.circle,
+                    color: context.colorScheme.surface,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       );
     } else if (entry?.busy == true) {
       icon = const SizedBox(
@@ -146,18 +185,15 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
         height: 20,
         child: CircularProgressIndicator(strokeWidth: 2),
       );
-    } else if (value != null && fresh) {
-      icon = Text(
-        value.countryCode.countryFlagEmoji,
-        style: const TextStyle(
-          fontSize: 24,
-          fontFamily: 'Apple Color Emoji',
-          fontFamilyFallback: ['Noto Color Emoji'],
-        ),
-      );
     } else {
       icon = GlyphIcon(
-        entry?.phase == ProbePhase.failed ? AppGlyphs.error : AppGlyphs.proxies,
+        direct
+            ? AppGlyphs.direct
+            : entry?.phase == ProbePhase.failed
+            ? AppGlyphs.error
+            : _wanted == null
+            ? AppGlyphs.block
+            : AppGlyphs.proxies,
         size: 22,
         color: context.colorScheme.onSurfaceVariant,
       );
@@ -175,7 +211,6 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
         onPressed: _wanted == null
             ? null
             : () {
-                setState(() => _manualTarget = _wanted);
                 _visible = true;
                 _sync();
                 if (_watched != null) {

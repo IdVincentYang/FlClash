@@ -1,6 +1,8 @@
-tree f08a2ac1a2cd78649b4a144e4c3fb16318f96887
+tree 9666d28946522f1292a70bdcb3df4f3d6dfa8cae
 parent 8597778c7df410ebe88c57e59eaab32d203156df
-author Vincent <idvincentyang@gmail.com> 1792122394 +0800
-committer Vincent <idvincentyang@gmail.com> 1792122394 +0800
+author Vincent <idvincentyang@gmail.com> 1794581376 +0800
+committer Vincent <idvincentyang@gmail.com> 1794581376 +0800
 
-security: bind configuration activation and application requests
+feat: retain cumulative isolation and immutable proxy cache identities
+
+The proxy identity is a feature captured at ParseProxy, before adapters discard raw authentication and transport options. This is the single factory shared by configuration and provider reloads, including controller reloads; app-side snapshots cannot recover the same immutable connection identity.

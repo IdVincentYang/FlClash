@@ -353,11 +353,16 @@ shared-UID candidates without selecting one package. Unknown active states suspe
 Target rows navigate to ApplicationConnectionsView. Its stable per-connection rows retain app/host scope and return context;
 no search or host-level statistics are repeated. Addresses above the list are deduplicated from retained metadata only.
 ActivityConnectionSummary and connection ID/traffic reuse activityActiveStyle. Both page layers remain read-only.
-The new country icon means the proxy server address's local GeoIP country, not the website-observed exit. DIRECT may use
-an already measured, current DIRECT public-IP cache entry, without triggering a probe. Missing countries stay blank.
-connectionCountriesProvider batches literal addresses to the parent Go wrapper's lookupIpCountries RPC; a scoped,
-resource-locked MMDB reader avoids global-reader initialization/downloads and connection hot-path work. Address arguments
-are excluded from RPC logs. No new route, capture, lifecycle or source-acceptance owner is introduced.
+ConnectionExitIcon shows the node's measured Cloudflare exit country on visible target/connection rows. It queries
+ExitCacheDatabase (independent connection-exits.sqlite, Drift schema 1) before probing; SQLite stores successes for seven
+days under immutable connection-parameter fingerprint plus actual public entry IP. ParseProxy captures that SHA256
+identity before adapters discard authentication inputs, excluding labels and UDP capability; the parent Core returns
+only the fingerprint and the probe's actual entry IP. Neither subscription IDs nor whole configuration IDs key the disk
+cache. App-network entry/return launches coalesced background expiry cleanup. Profile refresh/switch and Core/network
+changes cancel work without deleting stored results. Ended connections can read a valid result without probing;
+refresh preserves the flag with a corner spinner, and failure preserves the old measurement. Route receipts and epochs
+still fence live work; there is no new route, capture, lifecycle or source-acceptance owner. The independent offline
+lookupIpCountries RPC remains available, but these icons do not use entry-IP GeoIP or node-name flags.
 
 Go event delivery is intentionally non-blocking:
 
