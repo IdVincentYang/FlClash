@@ -447,7 +447,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Сеть приложений",
     ),
     "applicationNetworkDesc": MessageLookupByLibrary.simpleMessage(
-      "Просмотр активности, правил и маршрутов приложений",
+      "Просмотр соединений, правил и маршрутов приложений",
     ),
     "appliedProfile": MessageLookupByLibrary.simpleMessage(
       "Активная конфигурация",

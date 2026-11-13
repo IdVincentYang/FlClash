@@ -194,6 +194,17 @@ void main() {
         activity: _activity(stopped: true),
         child: const ToolsView(isAndroid: true),
       );
+      final entry = tester.widget<ListTile>(
+        find.ancestor(
+          of: find.text('Application network'),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect((entry.leading! as GlyphIcon).glyph, AppGlyphs.application);
+      expect(
+        (entry.subtitle! as Text).data,
+        'View app connections, matching rules and exits',
+      );
       await tester.tap(find.text('Application network'));
       await tester.pumpAndSettle();
       expect(find.text('Observation paused · retained activity'), findsNothing);

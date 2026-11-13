@@ -92,7 +92,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     final items = [
       if (widget.isAndroid ?? system.isAndroid)
         ListItem.open(
-          leading: const GlyphIcon(AppGlyphs.appsList),
+          leading: const GlyphIcon(AppGlyphs.application),
           title: Text(context.appLocalizations.applicationNetwork),
           subtitle: Text(context.appLocalizations.applicationNetworkDesc),
           widget: const ApplicationActivityView(),

@@ -9693,10 +9693,10 @@ class AppLocalizations {
     );
   }
 
-  /// `View observed app activity, rules and exits`
+  /// `View app connections, matching rules and exits`
   String get applicationNetworkDesc {
     return Intl.message(
-      'View observed app activity, rules and exits',
+      'View app connections, matching rules and exits',
       name: 'applicationNetworkDesc',
       desc: '',
       args: [],

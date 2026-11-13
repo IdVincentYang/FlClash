@@ -351,7 +351,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "appendSystemDns": MessageLookupByLibrary.simpleMessage("システムDNSを追加"),
     "applicationNetwork": MessageLookupByLibrary.simpleMessage("アプリのネットワーク"),
     "applicationNetworkDesc": MessageLookupByLibrary.simpleMessage(
-      "観測したアプリの通信・ルール・出口を確認",
+      "アプリの接続・適用ルール・出口を確認",
     ),
     "appliedProfile": MessageLookupByLibrary.simpleMessage("適用中の設定"),
     "authentication": MessageLookupByLibrary.simpleMessage("認証"),

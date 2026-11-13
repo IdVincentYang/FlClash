@@ -1146,7 +1146,7 @@
   "profileImportDownloadFailed": "Не удалось загрузить подписку. Проверьте URL и маршрут запроса и повторите попытку.",
   "profileImportInvalid": "Загруженный файл не является допустимой подпиской. Проверьте URL.",
   "applicationNetwork": "Сеть приложений",
-  "applicationNetworkDesc": "Просмотр активности, правил и маршрутов приложений",
+  "applicationNetworkDesc": "Просмотр соединений, правил и маршрутов приложений",
   "activityCompactCounts": "Активных {active}/{count}",
   "activityShowAllApps": "Показать все приложения",
   "activitySearchApps": "Поиск по названию или пакету",

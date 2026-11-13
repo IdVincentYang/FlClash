@@ -334,7 +334,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "appendSystemDns": MessageLookupByLibrary.simpleMessage("追加系统DNS"),
     "applicationNetwork": MessageLookupByLibrary.simpleMessage("应用网络"),
     "applicationNetworkDesc": MessageLookupByLibrary.simpleMessage(
-      "查看已观察到的应用活动、规则和出口",
+      "查看应用连接、命中规则和出口",
     ),
     "appliedProfile": MessageLookupByLibrary.simpleMessage("实际生效配置"),
     "authentication": MessageLookupByLibrary.simpleMessage("认证"),
