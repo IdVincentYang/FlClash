@@ -133,12 +133,12 @@ void main() {
       );
       cache.unwatch(a, automatic: true);
       cache.unwatch(a, automatic: true);
-      cache.time = const Duration(minutes: 9);
+      cache.time = const Duration(hours: 23, minutes: 59, seconds: 59);
       cache.watch(a, automatic: true);
       await pumpEventQueue();
       expect(calls, ['A']);
       cache.unwatch(a, automatic: true);
-      cache.time = const Duration(minutes: 11);
+      cache.time = const Duration(hours: 24);
       cache.watch(a, automatic: true);
       await pumpEventQueue();
       expect(calls, ['A', 'A']);

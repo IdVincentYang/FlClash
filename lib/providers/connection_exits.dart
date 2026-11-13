@@ -84,7 +84,7 @@ final connectionExitsProvider =
 
 class ConnectionExits
     extends Notifier<Map<ConnectionExitTarget, ConnectionExitEntry>> {
-  static const cacheAge = Duration(minutes: 10);
+  static const cacheAge = Duration(days: 1);
   static const failureAge = Duration(minutes: 1);
   static const manualInterval = Duration(seconds: 5);
   static const startInterval = Duration(seconds: 1);
