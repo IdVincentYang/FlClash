@@ -371,3 +371,36 @@ func TestLocalGroupsCannotRemoveSelectedEntranceReference(t *testing.T) {
 		t.Fatal("changed the active selection")
 	}
 }
+
+func TestGlobalManualGroupsResolveOnlyCurrentMaterialAndRejectEmpty(t *testing.T) {
+	group := sourceLocalGroup{ID: 1, Name: "Portable", Type: "fallback", Global: true, Enabled: true, Nodes: []string{"a", "b"}, TestURL: "http://127.0.0.1/test"}
+	for _, name := range []string{"a", "b", "different"} {
+		raw, err := config.UnmarshalRawConfig([]byte("proxies: [{name: " + name + ", type: direct}]\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		manifest := ConfigManifest{Version: 2, LocalGroups: []sourceLocalGroup{group}}
+		groups, err := resolveLocalGroupMembers(t.TempDir(), manifest, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name == "different" && len(groups[0].members()) != 0 || name != "different" && strings.Join(groups[0].members(), ",") != name {
+			t.Fatal(groups)
+		}
+		raw.ProxyGroup = []map[string]any{localGroupDefinition(groups[0], map[string]bool{name: true})}
+		manifest.LocalGroups = groups
+		if err := validateLocalGroupMaterials(t.TempDir(), manifest, raw); err != nil {
+			t.Fatal(err)
+		}
+		if name == "different" {
+			members, _ := sourceStrings(raw.ProxyGroup[0]["proxies"])
+			if strings.Join(members, ",") != "REJECT" {
+				t.Fatal("empty global group did not reject", raw.ProxyGroup)
+			}
+		}
+		manifest.LocalGroups[0].MatchedNodes = []string{"forged"}
+		if err := validateLocalGroupMaterials(t.TempDir(), manifest, raw); err == nil {
+			t.Fatal("accepted members outside current material")
+		}
+	}
+}

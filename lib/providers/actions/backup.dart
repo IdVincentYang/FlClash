@@ -224,6 +224,7 @@ class BackupAction extends _$BackupAction {
           customProxies: data.customProxies,
           policyDrafts: data.policyDrafts,
           policySelections: data.policySelections,
+          globalGroups: data.globalGroups,
           isOverride: isOverride,
           beforeCommit: () async {
             await database.profilePolicySelectionsDao.requireSelections(

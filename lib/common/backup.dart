@@ -200,6 +200,7 @@ Future<MigrationData> readBackupArchive({
           .get(),
       database.profilePolicyDraftsDao.query().get(),
       database.profilePolicySelectionsDao.query().get(),
+      database.readGlobalGroups(),
     ]);
     final drafts = results[7].cast<ProfilePolicyDraft>();
     final selections = results[8].cast<ProfilePolicySelection>();
@@ -218,6 +219,7 @@ Future<MigrationData> readBackupArchive({
     return MigrationData(
       configMap: configMap,
       profiles: results[0].cast<Profile>(),
+      globalGroups: results[9].cast<LocalProxyGroup>(),
       scripts: results[1].cast<Script>(),
       rules: results[2].cast<Rule>(),
       links: results[3].cast<ProfileRuleLink>(),

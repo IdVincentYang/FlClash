@@ -9413,7 +9413,7 @@ $PatchClashConfigCopyWith<$Res> get realPatchConfig {
 /// @nodoc
 mixin _$MigrationData {
 
- Map<String, Object?>? get configMap; List<Rule> get rules; List<Script> get scripts; List<Profile> get profiles; List<ProfileRuleLink> get links; List<ProxyGroup> get proxyGroups; List<ClashProvider> get clashProviders; List<CustomProxy> get customProxies; List<ProfilePolicyDraft> get policyDrafts; List<ProfilePolicySelection> get policySelections;
+ Map<String, Object?>? get configMap; List<Rule> get rules; List<Script> get scripts; List<Profile> get profiles; List<LocalProxyGroup>? get globalGroups; List<ProfileRuleLink> get links; List<ProxyGroup> get proxyGroups; List<ClashProvider> get clashProviders; List<CustomProxy> get customProxies; List<ProfilePolicyDraft> get policyDrafts; List<ProfilePolicySelection> get policySelections;
 /// Create a copy of MigrationData
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -9425,20 +9425,20 @@ $MigrationDataCopyWith<MigrationData> get copyWith => _$MigrationDataCopyWithImp
 @override
 bool operator ==(Object other) {
   final _this = this as MigrationData;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MigrationData&&const DeepCollectionEquality().equals(other.configMap, _this.configMap)&&const DeepCollectionEquality().equals(other.rules, _this.rules)&&const DeepCollectionEquality().equals(other.scripts, _this.scripts)&&const DeepCollectionEquality().equals(other.profiles, _this.profiles)&&const DeepCollectionEquality().equals(other.links, _this.links)&&const DeepCollectionEquality().equals(other.proxyGroups, _this.proxyGroups)&&const DeepCollectionEquality().equals(other.clashProviders, _this.clashProviders)&&const DeepCollectionEquality().equals(other.customProxies, _this.customProxies)&&const DeepCollectionEquality().equals(other.policyDrafts, _this.policyDrafts)&&const DeepCollectionEquality().equals(other.policySelections, _this.policySelections));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MigrationData&&const DeepCollectionEquality().equals(other.configMap, _this.configMap)&&const DeepCollectionEquality().equals(other.rules, _this.rules)&&const DeepCollectionEquality().equals(other.scripts, _this.scripts)&&const DeepCollectionEquality().equals(other.profiles, _this.profiles)&&const DeepCollectionEquality().equals(other.globalGroups, _this.globalGroups)&&const DeepCollectionEquality().equals(other.links, _this.links)&&const DeepCollectionEquality().equals(other.proxyGroups, _this.proxyGroups)&&const DeepCollectionEquality().equals(other.clashProviders, _this.clashProviders)&&const DeepCollectionEquality().equals(other.customProxies, _this.customProxies)&&const DeepCollectionEquality().equals(other.policyDrafts, _this.policyDrafts)&&const DeepCollectionEquality().equals(other.policySelections, _this.policySelections));
 }
 
 
 @override
 int get hashCode {
   final _this = this as MigrationData;
-  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.configMap),const DeepCollectionEquality().hash(_this.rules),const DeepCollectionEquality().hash(_this.scripts),const DeepCollectionEquality().hash(_this.profiles),const DeepCollectionEquality().hash(_this.links),const DeepCollectionEquality().hash(_this.proxyGroups),const DeepCollectionEquality().hash(_this.clashProviders),const DeepCollectionEquality().hash(_this.customProxies),const DeepCollectionEquality().hash(_this.policyDrafts),const DeepCollectionEquality().hash(_this.policySelections));
+  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.configMap),const DeepCollectionEquality().hash(_this.rules),const DeepCollectionEquality().hash(_this.scripts),const DeepCollectionEquality().hash(_this.profiles),const DeepCollectionEquality().hash(_this.globalGroups),const DeepCollectionEquality().hash(_this.links),const DeepCollectionEquality().hash(_this.proxyGroups),const DeepCollectionEquality().hash(_this.clashProviders),const DeepCollectionEquality().hash(_this.customProxies),const DeepCollectionEquality().hash(_this.policyDrafts),const DeepCollectionEquality().hash(_this.policySelections));
 }
 
 @override
 String toString() {
   final _this = this as MigrationData;
-  return 'MigrationData(configMap: ${_this.configMap}, rules: ${_this.rules}, scripts: ${_this.scripts}, profiles: ${_this.profiles}, links: ${_this.links}, proxyGroups: ${_this.proxyGroups}, clashProviders: ${_this.clashProviders}, customProxies: ${_this.customProxies}, policyDrafts: ${_this.policyDrafts}, policySelections: ${_this.policySelections})';
+  return 'MigrationData(configMap: ${_this.configMap}, rules: ${_this.rules}, scripts: ${_this.scripts}, profiles: ${_this.profiles}, globalGroups: ${_this.globalGroups}, links: ${_this.links}, proxyGroups: ${_this.proxyGroups}, clashProviders: ${_this.clashProviders}, customProxies: ${_this.customProxies}, policyDrafts: ${_this.policyDrafts}, policySelections: ${_this.policySelections})';
 }
 
 
@@ -9449,7 +9449,7 @@ abstract mixin class $MigrationDataCopyWith<$Res>  {
   factory $MigrationDataCopyWith(MigrationData value, $Res Function(MigrationData) _then) = _$MigrationDataCopyWithImpl;
 @useResult
 $Res call({
- Map<String, Object?>? configMap, List<Rule> rules, List<Script> scripts, List<Profile> profiles, List<ProfileRuleLink> links, List<ProxyGroup> proxyGroups, List<ClashProvider> clashProviders, List<CustomProxy> customProxies, List<ProfilePolicyDraft> policyDrafts, List<ProfilePolicySelection> policySelections
+ Map<String, Object?>? configMap, List<Rule> rules, List<Script> scripts, List<Profile> profiles, List<LocalProxyGroup>? globalGroups, List<ProfileRuleLink> links, List<ProxyGroup> proxyGroups, List<ClashProvider> clashProviders, List<CustomProxy> customProxies, List<ProfilePolicyDraft> policyDrafts, List<ProfilePolicySelection> policySelections
 });
 
 
@@ -9466,13 +9466,14 @@ class _$MigrationDataCopyWithImpl<$Res>
 
 /// Create a copy of MigrationData
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? configMap = freezed,Object? rules = null,Object? scripts = null,Object? profiles = null,Object? links = null,Object? proxyGroups = null,Object? clashProviders = null,Object? customProxies = null,Object? policyDrafts = null,Object? policySelections = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? configMap = freezed,Object? rules = null,Object? scripts = null,Object? profiles = null,Object? globalGroups = freezed,Object? links = null,Object? proxyGroups = null,Object? clashProviders = null,Object? customProxies = null,Object? policyDrafts = null,Object? policySelections = null,}) {
   return _then(MigrationData(
 configMap: freezed == configMap ? _self.configMap : configMap // ignore: cast_nullable_to_non_nullable
 as Map<String, Object?>?,rules: null == rules ? _self.rules : rules // ignore: cast_nullable_to_non_nullable
 as List<Rule>,scripts: null == scripts ? _self.scripts : scripts // ignore: cast_nullable_to_non_nullable
 as List<Script>,profiles: null == profiles ? _self.profiles : profiles // ignore: cast_nullable_to_non_nullable
-as List<Profile>,links: null == links ? _self.links : links // ignore: cast_nullable_to_non_nullable
+as List<Profile>,globalGroups: freezed == globalGroups ? _self.globalGroups : globalGroups // ignore: cast_nullable_to_non_nullable
+as List<LocalProxyGroup>?,links: null == links ? _self.links : links // ignore: cast_nullable_to_non_nullable
 as List<ProfileRuleLink>,proxyGroups: null == proxyGroups ? _self.proxyGroups : proxyGroups // ignore: cast_nullable_to_non_nullable
 as List<ProxyGroup>,clashProviders: null == clashProviders ? _self.clashProviders : clashProviders // ignore: cast_nullable_to_non_nullable
 as List<ClashProvider>,customProxies: null == customProxies ? _self.customProxies : customProxies // ignore: cast_nullable_to_non_nullable
@@ -9563,10 +9564,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Map<String, Object?>? configMap,  List<Rule> rules,  List<Script> scripts,  List<Profile> profiles,  List<ProfileRuleLink> links,  List<ProxyGroup> proxyGroups,  List<ClashProvider> clashProviders,  List<CustomProxy> customProxies,  List<ProfilePolicyDraft> policyDrafts,  List<ProfilePolicySelection> policySelections)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Map<String, Object?>? configMap,  List<Rule> rules,  List<Script> scripts,  List<Profile> profiles,  List<LocalProxyGroup>? globalGroups,  List<ProfileRuleLink> links,  List<ProxyGroup> proxyGroups,  List<ClashProvider> clashProviders,  List<CustomProxy> customProxies,  List<ProfilePolicyDraft> policyDrafts,  List<ProfilePolicySelection> policySelections)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MigrationData() when $default != null:
-return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.links,_that.proxyGroups,_that.clashProviders,_that.customProxies,_that.policyDrafts,_that.policySelections);case _:
+return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.globalGroups,_that.links,_that.proxyGroups,_that.clashProviders,_that.customProxies,_that.policyDrafts,_that.policySelections);case _:
   return orElse();
 
 }
@@ -9584,10 +9585,10 @@ return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.l
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Map<String, Object?>? configMap,  List<Rule> rules,  List<Script> scripts,  List<Profile> profiles,  List<ProfileRuleLink> links,  List<ProxyGroup> proxyGroups,  List<ClashProvider> clashProviders,  List<CustomProxy> customProxies,  List<ProfilePolicyDraft> policyDrafts,  List<ProfilePolicySelection> policySelections)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Map<String, Object?>? configMap,  List<Rule> rules,  List<Script> scripts,  List<Profile> profiles,  List<LocalProxyGroup>? globalGroups,  List<ProfileRuleLink> links,  List<ProxyGroup> proxyGroups,  List<ClashProvider> clashProviders,  List<CustomProxy> customProxies,  List<ProfilePolicyDraft> policyDrafts,  List<ProfilePolicySelection> policySelections)  $default,) {final _that = this;
 switch (_that) {
 case _MigrationData():
-return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.links,_that.proxyGroups,_that.clashProviders,_that.customProxies,_that.policyDrafts,_that.policySelections);case _:
+return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.globalGroups,_that.links,_that.proxyGroups,_that.clashProviders,_that.customProxies,_that.policyDrafts,_that.policySelections);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -9604,10 +9605,10 @@ return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.l
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Map<String, Object?>? configMap,  List<Rule> rules,  List<Script> scripts,  List<Profile> profiles,  List<ProfileRuleLink> links,  List<ProxyGroup> proxyGroups,  List<ClashProvider> clashProviders,  List<CustomProxy> customProxies,  List<ProfilePolicyDraft> policyDrafts,  List<ProfilePolicySelection> policySelections)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Map<String, Object?>? configMap,  List<Rule> rules,  List<Script> scripts,  List<Profile> profiles,  List<LocalProxyGroup>? globalGroups,  List<ProfileRuleLink> links,  List<ProxyGroup> proxyGroups,  List<ClashProvider> clashProviders,  List<CustomProxy> customProxies,  List<ProfilePolicyDraft> policyDrafts,  List<ProfilePolicySelection> policySelections)?  $default,) {final _that = this;
 switch (_that) {
 case _MigrationData() when $default != null:
-return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.links,_that.proxyGroups,_that.clashProviders,_that.customProxies,_that.policyDrafts,_that.policySelections);case _:
+return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.globalGroups,_that.links,_that.proxyGroups,_that.clashProviders,_that.customProxies,_that.policyDrafts,_that.policySelections);case _:
   return null;
 
 }
@@ -9619,7 +9620,7 @@ return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.l
 
 
 class _MigrationData implements MigrationData {
-  const _MigrationData({ Map<String, Object?>? configMap,  List<Rule> rules = const [],  List<Script> scripts = const [],  List<Profile> profiles = const [],  List<ProfileRuleLink> links = const [],  List<ProxyGroup> proxyGroups = const [],  List<ClashProvider> clashProviders = const [],  List<CustomProxy> customProxies = const [],  List<ProfilePolicyDraft> policyDrafts = const [],  List<ProfilePolicySelection> policySelections = const []}): _configMap = configMap,_rules = rules,_scripts = scripts,_profiles = profiles,_links = links,_proxyGroups = proxyGroups,_clashProviders = clashProviders,_customProxies = customProxies,_policyDrafts = policyDrafts,_policySelections = policySelections;
+  const _MigrationData({ Map<String, Object?>? configMap,  List<Rule> rules = const [],  List<Script> scripts = const [],  List<Profile> profiles = const [],  List<LocalProxyGroup>? globalGroups,  List<ProfileRuleLink> links = const [],  List<ProxyGroup> proxyGroups = const [],  List<ClashProvider> clashProviders = const [],  List<CustomProxy> customProxies = const [],  List<ProfilePolicyDraft> policyDrafts = const [],  List<ProfilePolicySelection> policySelections = const []}): _configMap = configMap,_rules = rules,_scripts = scripts,_profiles = profiles,_globalGroups = globalGroups,_links = links,_proxyGroups = proxyGroups,_clashProviders = clashProviders,_customProxies = customProxies,_policyDrafts = policyDrafts,_policySelections = policySelections;
   
 
  final  Map<String, Object?>? _configMap;
@@ -9650,6 +9651,15 @@ class _MigrationData implements MigrationData {
   if (_profiles is EqualUnmodifiableListView) return _profiles;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_profiles);
+}
+
+ final  List<LocalProxyGroup>? _globalGroups;
+@override List<LocalProxyGroup>? get globalGroups {
+  final value = _globalGroups;
+  if (value == null) return null;
+  if (_globalGroups is EqualUnmodifiableListView) return _globalGroups;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(value);
 }
 
  final  List<ProfileRuleLink> _links;
@@ -9705,18 +9715,18 @@ _$MigrationDataCopyWith<_MigrationData> get copyWith => __$MigrationDataCopyWith
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _MigrationData&&const DeepCollectionEquality().equals(other.configMap, _configMap)&&const DeepCollectionEquality().equals(other.rules, _rules)&&const DeepCollectionEquality().equals(other.scripts, _scripts)&&const DeepCollectionEquality().equals(other.profiles, _profiles)&&const DeepCollectionEquality().equals(other.links, _links)&&const DeepCollectionEquality().equals(other.proxyGroups, _proxyGroups)&&const DeepCollectionEquality().equals(other.clashProviders, _clashProviders)&&const DeepCollectionEquality().equals(other.customProxies, _customProxies)&&const DeepCollectionEquality().equals(other.policyDrafts, _policyDrafts)&&const DeepCollectionEquality().equals(other.policySelections, _policySelections));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _MigrationData&&const DeepCollectionEquality().equals(other.configMap, _configMap)&&const DeepCollectionEquality().equals(other.rules, _rules)&&const DeepCollectionEquality().equals(other.scripts, _scripts)&&const DeepCollectionEquality().equals(other.profiles, _profiles)&&const DeepCollectionEquality().equals(other.globalGroups, _globalGroups)&&const DeepCollectionEquality().equals(other.links, _links)&&const DeepCollectionEquality().equals(other.proxyGroups, _proxyGroups)&&const DeepCollectionEquality().equals(other.clashProviders, _clashProviders)&&const DeepCollectionEquality().equals(other.customProxies, _customProxies)&&const DeepCollectionEquality().equals(other.policyDrafts, _policyDrafts)&&const DeepCollectionEquality().equals(other.policySelections, _policySelections));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_configMap),const DeepCollectionEquality().hash(_rules),const DeepCollectionEquality().hash(_scripts),const DeepCollectionEquality().hash(_profiles),const DeepCollectionEquality().hash(_links),const DeepCollectionEquality().hash(_proxyGroups),const DeepCollectionEquality().hash(_clashProviders),const DeepCollectionEquality().hash(_customProxies),const DeepCollectionEquality().hash(_policyDrafts),const DeepCollectionEquality().hash(_policySelections));
+    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_configMap),const DeepCollectionEquality().hash(_rules),const DeepCollectionEquality().hash(_scripts),const DeepCollectionEquality().hash(_profiles),const DeepCollectionEquality().hash(_globalGroups),const DeepCollectionEquality().hash(_links),const DeepCollectionEquality().hash(_proxyGroups),const DeepCollectionEquality().hash(_clashProviders),const DeepCollectionEquality().hash(_customProxies),const DeepCollectionEquality().hash(_policyDrafts),const DeepCollectionEquality().hash(_policySelections));
 }
 
 @override
 String toString() {
-    return 'MigrationData(configMap: $configMap, rules: $rules, scripts: $scripts, profiles: $profiles, links: $links, proxyGroups: $proxyGroups, clashProviders: $clashProviders, customProxies: $customProxies, policyDrafts: $policyDrafts, policySelections: $policySelections)';
+    return 'MigrationData(configMap: $configMap, rules: $rules, scripts: $scripts, profiles: $profiles, globalGroups: $globalGroups, links: $links, proxyGroups: $proxyGroups, clashProviders: $clashProviders, customProxies: $customProxies, policyDrafts: $policyDrafts, policySelections: $policySelections)';
 }
 
 
@@ -9727,7 +9737,7 @@ abstract mixin class _$MigrationDataCopyWith<$Res> implements $MigrationDataCopy
   factory _$MigrationDataCopyWith(_MigrationData value, $Res Function(_MigrationData) _then) = __$MigrationDataCopyWithImpl;
 @override @useResult
 $Res call({
- Map<String, Object?>? configMap, List<Rule> rules, List<Script> scripts, List<Profile> profiles, List<ProfileRuleLink> links, List<ProxyGroup> proxyGroups, List<ClashProvider> clashProviders, List<CustomProxy> customProxies, List<ProfilePolicyDraft> policyDrafts, List<ProfilePolicySelection> policySelections
+ Map<String, Object?>? configMap, List<Rule> rules, List<Script> scripts, List<Profile> profiles, List<LocalProxyGroup>? globalGroups, List<ProfileRuleLink> links, List<ProxyGroup> proxyGroups, List<ClashProvider> clashProviders, List<CustomProxy> customProxies, List<ProfilePolicyDraft> policyDrafts, List<ProfilePolicySelection> policySelections
 });
 
 
@@ -9744,13 +9754,14 @@ class __$MigrationDataCopyWithImpl<$Res>
 
 /// Create a copy of MigrationData
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? configMap = freezed,Object? rules = null,Object? scripts = null,Object? profiles = null,Object? links = null,Object? proxyGroups = null,Object? clashProviders = null,Object? customProxies = null,Object? policyDrafts = null,Object? policySelections = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? configMap = freezed,Object? rules = null,Object? scripts = null,Object? profiles = null,Object? globalGroups = freezed,Object? links = null,Object? proxyGroups = null,Object? clashProviders = null,Object? customProxies = null,Object? policyDrafts = null,Object? policySelections = null,}) {
   return _then(_MigrationData(
 configMap: freezed == configMap ? _self._configMap : configMap // ignore: cast_nullable_to_non_nullable
 as Map<String, Object?>?,rules: null == rules ? _self._rules : rules // ignore: cast_nullable_to_non_nullable
 as List<Rule>,scripts: null == scripts ? _self._scripts : scripts // ignore: cast_nullable_to_non_nullable
 as List<Script>,profiles: null == profiles ? _self._profiles : profiles // ignore: cast_nullable_to_non_nullable
-as List<Profile>,links: null == links ? _self._links : links // ignore: cast_nullable_to_non_nullable
+as List<Profile>,globalGroups: freezed == globalGroups ? _self._globalGroups : globalGroups // ignore: cast_nullable_to_non_nullable
+as List<LocalProxyGroup>?,links: null == links ? _self._links : links // ignore: cast_nullable_to_non_nullable
 as List<ProfileRuleLink>,proxyGroups: null == proxyGroups ? _self._proxyGroups : proxyGroups // ignore: cast_nullable_to_non_nullable
 as List<ProxyGroup>,clashProviders: null == clashProviders ? _self._clashProviders : clashProviders // ignore: cast_nullable_to_non_nullable
 as List<ClashProvider>,customProxies: null == customProxies ? _self._customProxies : customProxies // ignore: cast_nullable_to_non_nullable

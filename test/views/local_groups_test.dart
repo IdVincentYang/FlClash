@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'package:collection/collection.dart';
 
 import 'package:fl_clash/common/source_acceptance.dart';
+import 'package:fl_clash/common/global_proxy_groups.dart';
+import 'package:fl_clash/common/local_proxy_groups.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/models/models.dart';
@@ -93,6 +96,7 @@ class _Profiles extends ProfilesAction {
     Profile profile,
     List<LocalProxyGroup> groups, {
     void Function()? onSaved,
+    List<LocalProxyGroup>? expectedGlobalGroups,
   }) async {
     if (error != null) throw error!;
     writes.add(groups);
@@ -120,6 +124,56 @@ class _Profiles extends ProfilesAction {
   }
 }
 
+class _GlobalGroups extends GlobalGroupsAction {
+  List<LocalProxyGroup>? library;
+  @override
+  String? build() => null;
+  @override
+  Future<void> save(
+    List<LocalProxyGroup> expected,
+    List<LocalProxyGroup> groups, {
+    int? profileId,
+    int? activate,
+    void Function()? onSaved,
+  }) async {
+    library = groups.map(globalGroupDefinition).toList();
+    ref.invalidate(globalLocalGroupsProvider);
+    final profile = ref.read(currentProfileProvider)!;
+    final bindings = {for (final group in profile.localGroups) group.id: group};
+    await ref.read(profilesActionProvider.notifier).saveLocalGroups(profile, [
+      for (final group in groups)
+        if (bindings.containsKey(group.id) || activate == group.id)
+          group.copyWith(
+            parents: bindings[group.id]?.entrances.toList() ?? const [],
+            matchedNodes: group.nodes,
+          ),
+    ], onSaved: onSaved);
+  }
+
+  @override
+  Future<void> saveReferences(
+    Profile expected,
+    List<LocalProxyGroup> definitions,
+    int groupId,
+    List<String> parents,
+  ) async {
+    await ref.read(profilesActionProvider.notifier).saveLocalGroups(expected, [
+      for (final group in definitions)
+        group.copyWith(
+          parents: group.id == groupId
+              ? parents
+              : expected.localGroups
+                        .where((item) => item.id == group.id)
+                        .firstOrNull
+                        ?.entrances
+                        .toList() ??
+                    const [],
+          matchedNodes: group.nodes,
+        ),
+    ]);
+  }
+}
+
 void main() {
   const nodes = [
     Proxy(name: 'Node A', type: 'Socks5'),
@@ -128,15 +182,29 @@ void main() {
   final profile = Profile.normal(label: 'Fixture');
   late ProviderContainer container;
   late _Profiles actions;
+  late _GlobalGroups globalGroups;
   late _ProxyActions proxyActions;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     actions = _Profiles();
+    globalGroups = _GlobalGroups();
     proxyActions = _ProxyActions();
     container = ProviderContainer(
       overrides: [
         profilesActionProvider.overrideWith(() => actions),
+        globalGroupsActionProvider.overrideWith(() => globalGroups),
+        globalLocalGroupsProvider.overrideWith(
+          (ref) => Stream.value(
+            globalGroups.library ??
+                ref
+                    .watch(currentProfileProvider)
+                    ?.localGroups
+                    .map(globalGroupDefinition)
+                    .toList() ??
+                const [],
+          ),
+        ),
         proxiesActionProvider.overrideWith(() => proxyActions),
         coreHandlerProvider.overrideWithValue(_RegexCore()),
         profilesProvider.overrideWith(() => TestProfiles([profile])),
@@ -193,6 +261,30 @@ void main() {
       ]).map((node) => node.name),
       ['Node A', 'Node B'],
     );
+  });
+
+  testWidgets('global groups stay visible in a subscription without bindings', (
+    tester,
+  ) async {
+    globalGroups.library = [
+      const LocalProxyGroup(
+        id: 9,
+        name: 'Global mine',
+        nodes: ['Missing'],
+        global: true,
+      ),
+    ];
+    await pump(tester, const LocalGroupsView());
+    expect(find.text('Global mine'), findsOneWidget);
+    expect(
+      find.textContaining('Not added to this subscription'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Global mine'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not added to this subscription'), findsOneWidget);
+    expect(find.text('Missing'), findsOneWidget);
+    expect(actions.writes, isEmpty);
   });
 
   testWidgets('create from manager selects nodes and saves once', (
@@ -713,7 +805,11 @@ void main() {
     ];
   }
 
-  Future<void> openReferences(WidgetTester tester, {Profile? snapshot}) async {
+  Future<void> openReferences(
+    WidgetTester tester, {
+    Profile? snapshot,
+    List<LocalProxyGroup>? definitions,
+  }) async {
     final current = snapshot ?? container.read(currentProfileProvider)!;
     await pump(
       tester,
@@ -723,7 +819,13 @@ void main() {
             child: TextButton(
               onPressed: () => BaseNavigator.push(
                 context,
-                LocalGroupRoutingView(profile: current, localId: 7),
+                LocalGroupRoutingView(
+                  profile: current,
+                  localId: 7,
+                  definitions:
+                      definitions ??
+                      current.localGroups.map(globalGroupDefinition).toList(),
+                ),
               ),
               child: const Text('References'),
             ),
@@ -734,6 +836,27 @@ void main() {
     await tester.tap(find.text('References'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('unbound global group can be added to the current subscription', (
+    tester,
+  ) async {
+    const definition = LocalProxyGroup(
+      id: 7,
+      name: 'Mine',
+      nodes: ['Node A'],
+      global: true,
+    );
+    globalGroups.library = [definition];
+    await openReferences(tester, definitions: [definition]);
+    expect(find.widgetWithText(CheckboxListTile, 'Main'), findsOneWidget);
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Main'));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(actions.writes.single.single.entrances, {'Main'});
+    expect(container.read(groupsProvider).first.now, 'Node A');
+    expect(find.byType(LocalGroupRoutingView), findsNothing);
+  });
 
   testWidgets(
     'references can be added to multiple targets without switching selections',

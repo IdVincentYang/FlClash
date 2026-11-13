@@ -16,7 +16,23 @@ Future<void> manageLocalGroupReferences(
   String? groupName,
 }) async {
   final profile = ref.read(currentProfileProvider);
-  final available = profile?.localGroups ?? const <LocalProxyGroup>[];
+  if (profile == null) return;
+  final definitions = await ref.read(globalLocalGroupsProvider.future);
+  if (!context.mounted || ref.read(currentProfileIdProvider) != profile.id) {
+    return;
+  }
+  final available = [
+    for (final definition in definitions)
+      definition.copyWith(
+        parents:
+            profile.localGroups
+                .where((group) => group.id == definition.id)
+                .firstOrNull
+                ?.entrances
+                .toList() ??
+            const [],
+      ),
+  ];
   if (available.isEmpty) {
     await dialogs.showMessage(
       context: context,
@@ -63,12 +79,16 @@ Future<void> manageLocalGroupReferences(
       );
   if (chosen == null || !context.mounted) return;
   final local = available.where((group) => group.name == chosen).firstOrNull;
-  if (local == null || ref.read(currentProfileIdProvider) != profile!.id) {
+  if (local == null || ref.read(currentProfileIdProvider) != profile.id) {
     return;
   }
   await BaseNavigator.push(
     context,
-    LocalGroupRoutingView(profile: profile, localId: local.id),
+    LocalGroupRoutingView(
+      profile: profile,
+      definitions: definitions,
+      localId: local.id,
+    ),
   );
 }
 
@@ -77,10 +97,12 @@ class LocalGroupRoutingView extends ConsumerStatefulWidget {
     super.key,
     required this.profile,
     required this.localId,
+    required this.definitions,
   });
 
   final Profile profile;
   final int localId;
+  final List<LocalProxyGroup> definitions;
 
   @override
   ConsumerState<LocalGroupRoutingView> createState() =>
@@ -98,9 +120,17 @@ class _LocalGroupRoutingViewState extends ConsumerState<LocalGroupRoutingView> {
   void initState() {
     super.initState();
     _baseline = widget.profile;
-    _local = _baseline.localGroups.firstWhere(
-      (group) => group.id == widget.localId,
-    );
+    _local = widget.definitions
+        .firstWhere((group) => group.id == widget.localId)
+        .copyWith(
+          parents:
+              _baseline.localGroups
+                  .where((group) => group.id == widget.localId)
+                  .firstOrNull
+                  ?.entrances
+                  .toList() ??
+              const [],
+        );
     _selected = {..._local.entrances};
   }
 
@@ -137,11 +167,14 @@ class _LocalGroupRoutingViewState extends ConsumerState<LocalGroupRoutingView> {
     )) {
       throw const LocalProxyGroupProblem('inUse');
     }
-    final next = _local.copyWith(parent: null, parents: _selected.toList());
-    await ref.read(profilesActionProvider.notifier).saveLocalGroups(_baseline, [
-      for (final group in _baseline.localGroups)
-        group.id == next.id ? next : group,
-    ]);
+    await ref
+        .read(globalGroupsActionProvider.notifier)
+        .saveReferences(
+          _baseline,
+          widget.definitions,
+          _local.id,
+          _selected.toList(),
+        );
     if (!mounted) return;
     if (!_isCurrent) throw const LocalProxyGroupProblem('changed');
     final message = context.appLocalizations.localGroupsReferencesSaved;
@@ -172,10 +205,13 @@ class _LocalGroupRoutingViewState extends ConsumerState<LocalGroupRoutingView> {
     final l = context.appLocalizations;
     final profile = ref.watch(currentProfileProvider);
     final groups = ref.watch(groupsProvider);
-    final current = profile?.id == widget.profile.id
-        ? profile?.localGroups
-              .where((group) => group.id == widget.localId)
-              .firstOrNull
+    final current =
+        profile?.id == widget.profile.id &&
+            const ListEquality<LocalProxyGroup>().equals(
+              ref.watch(globalLocalGroupsProvider).value,
+              widget.definitions,
+            )
+        ? _local
         : null;
     final localNames =
         profile?.localGroups.map((group) => group.name).toSet() ?? {};
@@ -248,6 +284,7 @@ class _LocalGroupRoutingViewState extends ConsumerState<LocalGroupRoutingView> {
         ),
         children: [
           Text(_local.name, style: context.textTheme.titleLarge),
+          Text(widget.profile.realLabel, style: context.textTheme.titleSmall),
           const SizedBox(height: 8),
           Text(l.localGroupsUseHelp),
           if (current == null) Text(l.localGroupsChanged),

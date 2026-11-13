@@ -6,6 +6,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/config_input.dart';
 import 'package:collection/collection.dart';
 import 'package:fl_clash/common/local_proxy_groups.dart';
+import 'package:fl_clash/common/global_proxy_groups.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/icons/icons.dart';
@@ -33,29 +34,6 @@ String _modeLabel(BuildContext context, GroupType type) => switch (type) {
   _ => context.appLocalizations.localGroupsManual,
 };
 
-List<Proxy> localGroupNodes(List<Group> groups) {
-  final names = groups.map((group) => group.name).toSet();
-  final nodes = <String, Proxy>{};
-  for (final group in groups) {
-    for (final proxy in group.all) {
-      if (!names.contains(proxy.name) &&
-          !const {
-            'DIRECT',
-            'REJECT',
-            'REJECT-DROP',
-            'PASS',
-            'COMPATIBLE',
-          }.contains(proxy.name) &&
-          !GroupType.values.any(
-            (type) => type.name.toLowerCase() == proxy.type.toLowerCase(),
-          )) {
-        nodes[proxy.name] = proxy;
-      }
-    }
-  }
-  return nodes.values.toList()..sort((a, b) => a.name.compareTo(b.name));
-}
-
 class LocalGroupsView extends ConsumerStatefulWidget {
   const LocalGroupsView({super.key, this.initialParent});
   final String? initialParent;
@@ -69,8 +47,10 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
   Object? _error;
 
   Future<void> _store(
-    Profile profile,
+    List<LocalProxyGroup> expected,
     List<LocalProxyGroup> groups, {
+    int? profileId,
+    int? activate,
     void Function()? onSaved,
   }) async {
     if (_busy) return;
@@ -80,8 +60,14 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
     });
     try {
       await ref
-          .read(profilesActionProvider.notifier)
-          .saveLocalGroups(profile, groups, onSaved: onSaved);
+          .read(globalGroupsActionProvider.notifier)
+          .save(
+            expected,
+            groups,
+            profileId: profileId,
+            activate: activate,
+            onSaved: onSaved,
+          );
     } catch (error) {
       if (mounted) setState(() => _error = error);
       rethrow;
@@ -90,12 +76,19 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
     }
   }
 
-  Future<void> _saveEditor(Profile profile, List<LocalProxyGroup> groups) {
+  Future<void> _saveEditor(
+    List<LocalProxyGroup> expected,
+    List<LocalProxyGroup> groups, {
+    int? profileId,
+    int? activate,
+  }) {
     final saved = Completer<void>();
     unawaited(
       _store(
-        profile,
+        expected,
         groups,
+        profileId: profileId,
+        activate: activate,
         onSaved: () {
           if (!saved.isCompleted) saved.complete();
         },
@@ -157,38 +150,20 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
         }
       });
 
-  bool _inUse(LocalProxyGroup group, List<Group> actual) =>
-      ref.read(configStateProvider).fact.profileId ==
-          ref.read(currentProfileIdProvider) &&
-      actual.any((item) => item.name != group.name && item.now == group.name);
-
   Future<void> _toggle(
-    Profile profile,
+    List<LocalProxyGroup> definitions,
     LocalProxyGroup group,
-    List<Group> actual,
-    bool enabled,
-  ) => _perform(() async {
-    if (!enabled && _inUse(group, actual)) {
-      throw const LocalProxyGroupProblem('inUse');
-    }
-    if (enabled &&
-        group.effectiveNodes.any(
-          (name) => !localGroupNodes(actual).any((node) => node.name == name),
-        )) {
-      throw const LocalProxyGroupProblem('members');
-    }
-    await _store(profile, [
-      for (final item in profile.localGroups)
-        item.id == group.id ? item.copyWith(enabled: enabled) : item,
-    ]);
-  });
+  ) => _perform(
+    () => _store(definitions, [
+      for (final item in definitions)
+        item.id == group.id ? item.copyWith(enabled: !group.enabled) : item,
+    ]),
+  );
 
   Future<void> _delete(
-    Profile profile,
+    List<LocalProxyGroup> definitions,
     LocalProxyGroup group,
-    List<Group> actual,
   ) => _perform(() async {
-    if (_inUse(group, actual)) throw const LocalProxyGroupProblem('inUse');
     if (await dialogs.showMessage(
               context: context,
               message: TextSpan(
@@ -199,14 +174,15 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
         !mounted) {
       return;
     }
-    await _store(profile, [
-      for (final item in profile.localGroups)
+    await _store(definitions, [
+      for (final item in definitions)
         if (item.id != group.id) item,
     ]);
   });
 
   Future<void> _edit(
-    Profile profile,
+    Profile? profile,
+    List<LocalProxyGroup> definitions,
     List<Group> actual,
     List<Proxy> nodes, [
     LocalProxyGroup? group,
@@ -219,6 +195,7 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
         ) ??
         LocalProxyGroup(
           id: snowflake.id,
+          global: true,
           name: '',
           type: GroupType.Fallback,
           testUrl: ref.read(appSettingProvider).testUrl,
@@ -241,17 +218,30 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
           return List<String>.from(result['matches'] as List? ?? const []);
         },
         reservedNames: {
-          ...actual.map((item) => item.name),
+          ...actual
+              .where(
+                (item) =>
+                    !(profile?.localGroups ?? const <LocalProxyGroup>[]).any(
+                      (binding) =>
+                          binding.id == group?.id && binding.name == item.name,
+                    ),
+              )
+              .map((item) => item.name),
           ...nodes.map((item) => item.name),
-          ...profile.localGroups
+          ...definitions
               .where((item) => item.id != value.id)
               .map((item) => item.name),
-        }..remove(group?.name),
-        onSave: (next) => _saveEditor(profile, [
-          for (final item in profile.localGroups)
-            if (item.id != next.id) item,
-          next,
-        ]),
+        },
+        onSave: (next) => _saveEditor(
+          definitions,
+          [
+            for (final item in definitions)
+              if (item.id != next.id) item,
+            next,
+          ],
+          profileId: profile?.id,
+          activate: group == null ? next.id : null,
+        ),
       ),
     );
   }
@@ -260,6 +250,9 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
   Widget build(BuildContext context) {
     final l = context.appLocalizations;
     final profile = ref.watch(currentProfileProvider);
+    final library = ref.watch(globalLocalGroupsProvider);
+    final definitions = library.value ?? const <LocalProxyGroup>[];
+    final syncError = ref.watch(globalGroupsActionProvider);
     final actual = ref.watch(groupsProvider);
     final nodes = localGroupNodes(actual);
     final fact = ref.watch(configStateProvider).fact;
@@ -272,24 +265,34 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
         : ref.watch(policySelectionProvider(profile.id)).value;
     final pending =
         profile != null &&
-        (applied != null && fact.profileId == profile.id
-            ? !const ListEquality<LocalProxyGroup>().equals(
-                applied.where((group) => group.enabled).toList(),
-                profile.localGroups.where((group) => group.enabled).toList(),
-              )
-            : profile.localGroups.any((group) {
-                final runtime = actual
-                    .where((item) => item.name == group.name)
-                    .firstOrNull;
-                return group.enabled
-                    ? runtime == null ||
-                          runtime.type != group.type ||
-                          !const SetEquality<String>().equals(
-                            runtime.all.map((node) => node.name).toSet(),
-                            group.effectiveNodes.toSet(),
-                          )
-                    : runtime != null;
-              }));
+        (profile.localGroups.any(
+              (binding) =>
+                  !binding.global ||
+                  !definitions.any(
+                    (definition) =>
+                        sameGlobalGroupDefinition(binding, definition),
+                  ),
+            ) ||
+            (applied != null && fact.profileId == profile.id
+                ? !const ListEquality<LocalProxyGroup>().equals(
+                    applied.where((group) => group.enabled).toList(),
+                    profile.localGroups
+                        .where((group) => group.enabled)
+                        .toList(),
+                  )
+                : profile.localGroups.any((group) {
+                    final runtime = actual
+                        .where((item) => item.name == group.name)
+                        .firstOrNull;
+                    return group.enabled
+                        ? runtime == null ||
+                              runtime.type != group.type ||
+                              !const SetEquality<String>().equals(
+                                runtime.all.map((node) => node.name).toSet(),
+                                group.effectiveNodes.toSet(),
+                              )
+                        : runtime != null;
+                  })));
     final loaded =
         profile != null &&
         fact.profileId == profile.id &&
@@ -302,8 +305,8 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
       primaryAction: IconButtonData(
         glyph: AppGlyphs.add,
         tooltip: l.localGroupsCreate,
-        onPressed: !_busy && loaded
-            ? () => _edit(profile, actual, nodes)
+        onPressed: !_busy && loaded && library.hasValue
+            ? () => _edit(profile, definitions, actual, nodes)
             : null,
       ),
       body: ListView(
@@ -312,11 +315,7 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
           bottom: 16 + BottomInsetScope.of(context),
         ),
         children: [
-          if (profile != null)
-            Text(
-              l.localGroupsScope(profile.realLabel),
-              style: context.textTheme.titleSmall,
-            ),
+          Text(l.localGroupsGlobal, style: context.textTheme.titleSmall),
           const SizedBox(height: 12),
           if (pending)
             Padding(
@@ -337,105 +336,109 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
                 child: Text(l.sourceReviewTitle),
               ),
           ],
-          if (_error != null)
+          if (_error != null || syncError != null || library.hasError)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                userFacingErrorMessage(_error!, l),
+                userFacingErrorMessage(
+                  _error ?? syncError ?? library.error!,
+                  l,
+                ),
                 style: TextStyle(color: context.colorScheme.error),
               ),
             ),
-          if (profile != null && profile.localGroups.isEmpty)
-            Text(l.localGroupsEmpty),
-          if (profile != null)
-            for (final group in profile.localGroups)
-              Card(
-                child: ListTile(
-                  leading: const GlyphIcon(AppGlyphs.layers),
-                  title: Text(
-                    group.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          if (library.isLoading) const LinearProgressIndicator(),
+          if (library.hasValue && definitions.isEmpty) Text(l.localGroupsEmpty),
+          for (final group in definitions)
+            Card(
+              child: ListTile(
+                leading: const GlyphIcon(AppGlyphs.layers),
+                title: Text(
+                  group.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${l.localGroupsOwn} · ${_modeLabel(context, group.type)} · ${l.localGroupsNodeCount(group.regex.isEmpty ? group.nodes.length : (profile?.localGroups.where((binding) => binding.id == group.id).firstOrNull?.effectiveNodes.length ?? 0))}${group.enabled ? '' : ' · ${l.disabled}'}\n${profile?.localGroups.any((binding) => binding.id == group.id) == true ? l.localGroupsReferences(profile!.localGroups.firstWhere((binding) => binding.id == group.id).entrances.length) : l.localGroupsUnbound}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => BaseNavigator.push(
+                  context,
+                  LocalGroupDetail(
+                    name: group.name,
+                    localId: group.id,
+                    onEdit: () async {
+                      final latest = ref.read(currentProfileProvider);
+                      final catalog = ref.read(globalLocalGroupsProvider).value;
+                      final current = catalog
+                          ?.where((value) => value.id == group.id)
+                          .firstOrNull;
+                      if (current == null || catalog == null) return;
+                      final runtime = ref.read(groupsProvider);
+                      await _edit(
+                        latest,
+                        catalog,
+                        runtime,
+                        localGroupNodes(runtime),
+                        current,
+                      );
+                    },
                   ),
-                  subtitle: Text(
-                    '${l.localGroupsOwn} · ${_modeLabel(context, group.type)} · ${l.localGroupsNodeCount(group.effectiveNodes.length)}${group.enabled ? '' : ' · ${l.disabled}'}\n${l.localGroupsReferences(group.entrances.length)}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                trailing: CommonPopupBox(
+                  targetBuilder: (open) => IconButton(
+                    tooltip: l.localGroupsActions(group.name),
+                    icon: const GlyphIcon(AppGlyphs.more),
+                    onPressed: () => open(),
                   ),
-                  onTap: () => BaseNavigator.push(
-                    context,
-                    LocalGroupDetail(
-                      name: group.name,
-                      localId: group.id,
-                      onEdit: () async {
-                        final latest = ref.read(currentProfileProvider);
-                        if (latest == null || latest.id != profile.id) return;
-                        final current = latest.localGroups
-                            .where((value) => value.id == group.id)
-                            .firstOrNull;
-                        if (current == null) return;
-                        final runtime = ref.read(groupsProvider);
-                        await _edit(
-                          latest,
-                          runtime,
-                          localGroupNodes(runtime),
-                          current,
-                        );
-                      },
-                    ),
-                  ),
-                  trailing: CommonPopupBox(
-                    targetBuilder: (open) => IconButton(
-                      tooltip: l.localGroupsActions(group.name),
-                      icon: const GlyphIcon(AppGlyphs.more),
-                      onPressed: () => open(),
-                    ),
-                    popupBuilder: (_) => CommonPopupMenu(
-                      items: [
-                        CommonPopupMenuItem(
-                          label: l.localGroupsRouteThis,
-                          glyph: AppGlyphs.layers,
-                          onPressed: !_busy
-                              ? () => manageLocalGroupReferences(
-                                  context,
-                                  ref,
-                                  groupName: group.name,
-                                )
-                              : null,
-                        ),
-                        CommonPopupMenuItem(
-                          label: l.edit,
-                          glyph: AppGlyphs.edit,
-                          onPressed: !_busy
-                              ? () => _edit(profile, actual, nodes, group)
-                              : null,
-                        ),
-                        CommonPopupMenuItem(
-                          label: group.enabled
-                              ? l.localGroupsDisable
-                              : l.localGroupsEnable,
-                          onPressed: !_busy && (loaded || group.enabled)
-                              ? () => _toggle(
-                                  profile,
-                                  group,
-                                  actual,
-                                  !group.enabled,
-                                )
-                              : null,
-                        ),
-                        CommonPopupMenuItem(
-                          label: l.delete,
-                          glyph: AppGlyphs.delete,
-                          danger: true,
-                          onPressed: !_busy
-                              ? () => _delete(profile, group, actual)
-                              : null,
-                        ),
-                      ],
-                    ),
+                  popupBuilder: (_) => CommonPopupMenu(
+                    items: [
+                      CommonPopupMenuItem(
+                        label: l.localGroupsRouteThis,
+                        glyph: AppGlyphs.layers,
+                        onPressed: !_busy && loaded
+                            ? () => manageLocalGroupReferences(
+                                context,
+                                ref,
+                                groupName: group.name,
+                              )
+                            : null,
+                      ),
+                      CommonPopupMenuItem(
+                        label: l.edit,
+                        glyph: AppGlyphs.edit,
+                        onPressed: !_busy
+                            ? () => _edit(
+                                profile,
+                                definitions,
+                                actual,
+                                nodes,
+                                group,
+                              )
+                            : null,
+                      ),
+                      CommonPopupMenuItem(
+                        label: group.enabled
+                            ? l.localGroupsDisable
+                            : l.localGroupsEnable,
+                        onPressed: !_busy
+                            ? () => _toggle(definitions, group)
+                            : null,
+                      ),
+                      CommonPopupMenuItem(
+                        label: l.delete,
+                        glyph: AppGlyphs.delete,
+                        danger: true,
+                        onPressed: !_busy
+                            ? () => _delete(definitions, group)
+                            : null,
+                      ),
+                    ],
                   ),
                 ),
               ),
+            ),
           if (loaded)
             for (final group in actual.where(
               (group) =>
@@ -618,11 +621,7 @@ class _LocalGroupEditorState extends State<LocalGroupEditor> {
           name.runes.any((rune) => rune < 32 || rune == 127)) {
         throw const LocalProxyGroupProblem('name');
       }
-      if (members.isEmpty ||
-          widget.value.enabled &&
-              members.any(
-                (name) => !widget.nodes.any((node) => node.name == name),
-              )) {
+      if (members.isEmpty && _query.text.isEmpty) {
         throw const LocalProxyGroupProblem('members');
       }
       if (members.length > localProxyGroupMembersLimit) {
@@ -644,6 +643,7 @@ class _LocalGroupEditorState extends State<LocalGroupEditor> {
       }
       await widget.onSave(
         widget.value.copyWith(
+          global: true,
           name: name,
           type: _type,
           nodes: _members.toList(),
@@ -880,32 +880,34 @@ class _LocalGroupDetailState extends ConsumerState<LocalGroupDetail> {
   @override
   Widget build(BuildContext context) {
     final l = context.appLocalizations;
-    final name = widget.localId == null
-        ? widget.name
-        : ref
-                  .watch(currentProfileProvider)
-                  ?.localGroups
-                  .where((group) => group.id == widget.localId)
-                  .firstOrNull
-                  ?.name ??
-              widget.name;
-    final group = ref
-        .watch(groupsProvider)
-        .where((group) => group.name == name)
-        .firstOrNull;
     final saved = ref
         .watch(currentProfileProvider)
         ?.localGroups
         .where((group) => group.id == widget.localId)
         .firstOrNull;
+    final definition = ref
+        .watch(globalLocalGroupsProvider)
+        .value
+        ?.where((group) => group.id == widget.localId)
+        .firstOrNull;
+    final name = definition?.name ?? saved?.name ?? widget.name;
+    final runtimeName = saved?.name ?? name;
+    final group = widget.localId != null && saved == null
+        ? null
+        : ref
+              .watch(groupsProvider)
+              .where((group) => group.name == runtimeName)
+              .firstOrNull;
     final nodes = localGroupNodes(ref.watch(groupsProvider));
-    final selected = ref.watch(selectedProxyNameProvider(name));
-    final exit = ref.watch(realSelectedProxyStateProvider(name)).proxyName;
+    final selected = ref.watch(selectedProxyNameProvider(runtimeName));
+    final exit = ref
+        .watch(realSelectedProxyStateProvider(runtimeName))
+        .proxyName;
     return CommonScaffold(
       title: name,
       isLoading: _busy,
       iconActions: [
-        if (saved != null)
+        if (definition != null)
           IconButtonData(
             glyph: AppGlyphs.layers,
             tooltip: l.localGroupsRouteThis,
@@ -929,9 +931,16 @@ class _LocalGroupDetailState extends ConsumerState<LocalGroupDetail> {
         ),
         children: [
           if (group == null) ...[
-            Text(l.localGroupsUnavailable),
-            if (saved != null)
-              for (final name in saved.effectiveNodes)
+            Text(
+              saved == null && definition != null
+                  ? l.localGroupsUnbound
+                  : l.localGroupsUnavailable,
+            ),
+            if (definition != null || saved != null)
+              for (final name
+                  in definition?.regex.isEmpty == true
+                      ? definition!.nodes
+                      : saved?.effectiveNodes ?? const <String>[])
                 Card(
                   child: ListTile(
                     title: Text(name),

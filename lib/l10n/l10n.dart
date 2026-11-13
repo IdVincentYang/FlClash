@@ -8448,10 +8448,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Delete group “{name}”?`
+  /// `Delete global group “{name}” and its subscription references?`
   String localGroupsDelete(Object name) {
     return Intl.message(
-      'Delete group “$name”?',
+      'Delete global group “$name” and its subscription references?',
       name: 'localGroupsDelete',
       desc: '',
       args: [name],
@@ -10375,6 +10375,46 @@ class AppLocalizations {
       name: 'activityConfiguration',
       desc: '',
       args: [],
+    );
+  }
+
+  /// `Global custom groups`
+  String get localGroupsGlobal {
+    return Intl.message(
+      'Global custom groups',
+      name: 'localGroupsGlobal',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Not added to this subscription`
+  String get localGroupsUnbound {
+    return Intl.message(
+      'Not added to this subscription',
+      name: 'localGroupsUnbound',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No matching nodes in this subscription.`
+  String get localGroupsNoMatchingNodes {
+    return Intl.message(
+      'No matching nodes in this subscription.',
+      name: 'localGroupsNoMatchingNodes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This group is in use by {name}. Select another node there first.`
+  String localGroupsInUseProfile(Object name) {
+    return Intl.message(
+      'This group is in use by $name. Select another node there first.',
+      name: 'localGroupsInUseProfile',
+      desc: '',
+      args: [name],
     );
   }
 }

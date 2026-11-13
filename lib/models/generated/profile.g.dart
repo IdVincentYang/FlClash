@@ -124,6 +124,7 @@ _LocalProxyGroup _$LocalProxyGroupFromJson(Map<String, dynamic> json) =>
           const [],
       parent: json['parent'] as String?,
       enabled: json['enabled'] as bool? ?? true,
+      global: json['global'] as bool? ?? false,
       testUrl: json['testUrl'] as String? ?? '',
     );
 
@@ -139,6 +140,7 @@ Map<String, dynamic> _$LocalProxyGroupToJson(_LocalProxyGroup instance) =>
       'parents': instance.parents,
       'parent': instance.parent,
       'enabled': instance.enabled,
+      'global': instance.global,
       'testUrl': instance.testUrl,
     };
 

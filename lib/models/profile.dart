@@ -109,7 +109,9 @@ abstract class LocalProxyGroup with _$LocalProxyGroup {
   const LocalProxyGroup._();
 
   List<String> get effectiveNodes => regex.isEmpty
-      ? nodes
+      ? global
+            ? matchedNodes
+            : nodes
       : matchedNodes.where((node) => !excludedNodes.contains(node)).toList();
   Set<String> get entrances => {...parents, ?parent};
   const factory LocalProxyGroup({
@@ -123,6 +125,7 @@ abstract class LocalProxyGroup with _$LocalProxyGroup {
     @Default([]) List<String> parents,
     String? parent,
     @Default(true) bool enabled,
+    @Default(false) bool global,
     @Default('') String testUrl,
   }) = _LocalProxyGroup;
 

@@ -579,6 +579,22 @@ void main() {
       );
     });
 
+    test('global groups survive an archive with no subscriptions', () async {
+      const group = LocalProxyGroup(
+        id: 7,
+        name: 'Global mine',
+        nodes: ['a'],
+        global: true,
+      );
+      final source = db.Database(NativeDatabase(File(databasePath)));
+      await source.writeGlobalGroups([group]);
+      await source.close();
+      final archivePath = await backup(entries: const []);
+      final restored = await restore(archivePath);
+      expect(restored.profiles, isEmpty);
+      expect(restored.globalGroups, [group]);
+    });
+
     test('a version 0 archive goes through the legacy migration', () async {
       await seedDatabase();
       writeFile(join(home.path, 'profiles', 'legacy.yaml'), 'proxies: []');

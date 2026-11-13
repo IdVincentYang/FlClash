@@ -5112,6 +5112,205 @@ class ProfilePolicySelectionsCompanion
   }
 }
 
+class $GlobalGroupLibrariesTable extends GlobalGroupLibraries
+    with TableInfo<$GlobalGroupLibrariesTable, RawGlobalGroupLibrary> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GlobalGroupLibrariesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<List<LocalProxyGroup>, String>
+  groups =
+      GeneratedColumn<String>(
+        'groups',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<List<LocalProxyGroup>>(
+        $GlobalGroupLibrariesTable.$convertergroups,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [id, groups];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'global_group_libraries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RawGlobalGroupLibrary> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RawGlobalGroupLibrary map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RawGlobalGroupLibrary(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      groups: $GlobalGroupLibrariesTable.$convertergroups.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}groups'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $GlobalGroupLibrariesTable createAlias(String alias) {
+    return $GlobalGroupLibrariesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<List<LocalProxyGroup>, String> $convertergroups =
+      const LocalProxyGroupsConverter();
+}
+
+class RawGlobalGroupLibrary extends DataClass
+    implements Insertable<RawGlobalGroupLibrary> {
+  final int id;
+  final List<LocalProxyGroup> groups;
+  const RawGlobalGroupLibrary({required this.id, required this.groups});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    {
+      map['groups'] = Variable<String>(
+        $GlobalGroupLibrariesTable.$convertergroups.toSql(groups),
+      );
+    }
+    return map;
+  }
+
+  GlobalGroupLibrariesCompanion toCompanion(bool nullToAbsent) {
+    return GlobalGroupLibrariesCompanion(id: Value(id), groups: Value(groups));
+  }
+
+  factory RawGlobalGroupLibrary.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RawGlobalGroupLibrary(
+      id: serializer.fromJson<int>(json['id']),
+      groups: serializer.fromJson<List<LocalProxyGroup>>(json['groups']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'groups': serializer.toJson<List<LocalProxyGroup>>(groups),
+    };
+  }
+
+  RawGlobalGroupLibrary copyWith({int? id, List<LocalProxyGroup>? groups}) =>
+      RawGlobalGroupLibrary(id: id ?? this.id, groups: groups ?? this.groups);
+  RawGlobalGroupLibrary copyWithCompanion(GlobalGroupLibrariesCompanion data) {
+    return RawGlobalGroupLibrary(
+      id: data.id.present ? data.id.value : this.id,
+      groups: data.groups.present ? data.groups.value : this.groups,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RawGlobalGroupLibrary(')
+          ..write('id: $id, ')
+          ..write('groups: $groups')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, groups);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RawGlobalGroupLibrary &&
+          other.id == this.id &&
+          other.groups == this.groups);
+}
+
+class GlobalGroupLibrariesCompanion
+    extends UpdateCompanion<RawGlobalGroupLibrary> {
+  final Value<int> id;
+  final Value<List<LocalProxyGroup>> groups;
+  const GlobalGroupLibrariesCompanion({
+    this.id = const Value.absent(),
+    this.groups = const Value.absent(),
+  });
+  GlobalGroupLibrariesCompanion.insert({
+    this.id = const Value.absent(),
+    required List<LocalProxyGroup> groups,
+  }) : groups = Value(groups);
+  static Insertable<RawGlobalGroupLibrary> custom({
+    Expression<int>? id,
+    Expression<String>? groups,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (groups != null) 'groups': groups,
+    });
+  }
+
+  GlobalGroupLibrariesCompanion copyWith({
+    Value<int>? id,
+    Value<List<LocalProxyGroup>>? groups,
+  }) {
+    return GlobalGroupLibrariesCompanion(
+      id: id ?? this.id,
+      groups: groups ?? this.groups,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (groups.present) {
+      map['groups'] = Variable<String>(
+        $GlobalGroupLibrariesTable.$convertergroups.toSql(groups.value),
+      );
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GlobalGroupLibrariesCompanion(')
+          ..write('id: $id, ')
+          ..write('groups: $groups')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
@@ -5129,6 +5328,8 @@ abstract class _$Database extends GeneratedDatabase {
       $ProfilePolicyDraftsTable(this);
   late final $ProfilePolicySelectionsTable profilePolicySelections =
       $ProfilePolicySelectionsTable(this);
+  late final $GlobalGroupLibrariesTable globalGroupLibraries =
+      $GlobalGroupLibrariesTable(this);
   late final Index idxRuleTarget = Index(
     'idx_rule_target',
     'CREATE INDEX idx_rule_target ON rules (rule_target)',
@@ -5179,6 +5380,7 @@ abstract class _$Database extends GeneratedDatabase {
     customProxies,
     profilePolicyDrafts,
     profilePolicySelections,
+    globalGroupLibraries,
     idxRuleTarget,
     idxProfileSceneOrder,
     idxProfileNameOrder,
@@ -9136,6 +9338,159 @@ typedef $$ProfilePolicySelectionsTableProcessedTableManager =
       RawProfilePolicySelection,
       PrefetchHooks Function({bool profileId})
     >;
+typedef $$GlobalGroupLibrariesTableCreateCompanionBuilder =
+    GlobalGroupLibrariesCompanion Function({
+      Value<int> id,
+      required List<LocalProxyGroup> groups,
+    });
+typedef $$GlobalGroupLibrariesTableUpdateCompanionBuilder =
+    GlobalGroupLibrariesCompanion Function({
+      Value<int> id,
+      Value<List<LocalProxyGroup>> groups,
+    });
+
+class $$GlobalGroupLibrariesTableFilterComposer
+    extends Composer<_$Database, $GlobalGroupLibrariesTable> {
+  $$GlobalGroupLibrariesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    List<LocalProxyGroup>,
+    List<LocalProxyGroup>,
+    String
+  >
+  get groups => $composableBuilder(
+    column: $table.groups,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+}
+
+class $$GlobalGroupLibrariesTableOrderingComposer
+    extends Composer<_$Database, $GlobalGroupLibrariesTable> {
+  $$GlobalGroupLibrariesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get groups => $composableBuilder(
+    column: $table.groups,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$GlobalGroupLibrariesTableAnnotationComposer
+    extends Composer<_$Database, $GlobalGroupLibrariesTable> {
+  $$GlobalGroupLibrariesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<List<LocalProxyGroup>, String> get groups =>
+      $composableBuilder(column: $table.groups, builder: (column) => column);
+}
+
+class $$GlobalGroupLibrariesTableTableManager
+    extends
+        RootTableManager<
+          _$Database,
+          $GlobalGroupLibrariesTable,
+          RawGlobalGroupLibrary,
+          $$GlobalGroupLibrariesTableFilterComposer,
+          $$GlobalGroupLibrariesTableOrderingComposer,
+          $$GlobalGroupLibrariesTableAnnotationComposer,
+          $$GlobalGroupLibrariesTableCreateCompanionBuilder,
+          $$GlobalGroupLibrariesTableUpdateCompanionBuilder,
+          (
+            RawGlobalGroupLibrary,
+            BaseReferences<
+              _$Database,
+              $GlobalGroupLibrariesTable,
+              RawGlobalGroupLibrary
+            >,
+          ),
+          RawGlobalGroupLibrary,
+          PrefetchHooks Function()
+        > {
+  $$GlobalGroupLibrariesTableTableManager(
+    _$Database db,
+    $GlobalGroupLibrariesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GlobalGroupLibrariesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GlobalGroupLibrariesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$GlobalGroupLibrariesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<List<LocalProxyGroup>> groups = const Value.absent(),
+              }) => GlobalGroupLibrariesCompanion(id: id, groups: groups),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required List<LocalProxyGroup> groups,
+              }) =>
+                  GlobalGroupLibrariesCompanion.insert(id: id, groups: groups),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$GlobalGroupLibrariesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$Database,
+      $GlobalGroupLibrariesTable,
+      RawGlobalGroupLibrary,
+      $$GlobalGroupLibrariesTableFilterComposer,
+      $$GlobalGroupLibrariesTableOrderingComposer,
+      $$GlobalGroupLibrariesTableAnnotationComposer,
+      $$GlobalGroupLibrariesTableCreateCompanionBuilder,
+      $$GlobalGroupLibrariesTableUpdateCompanionBuilder,
+      (
+        RawGlobalGroupLibrary,
+        BaseReferences<
+          _$Database,
+          $GlobalGroupLibrariesTable,
+          RawGlobalGroupLibrary
+        >,
+      ),
+      RawGlobalGroupLibrary,
+      PrefetchHooks Function()
+    >;
 
 class $DatabaseManager {
   final _$Database _db;
@@ -9163,6 +9518,8 @@ class $DatabaseManager {
         _db,
         _db.profilePolicySelections,
       );
+  $$GlobalGroupLibrariesTableTableManager get globalGroupLibraries =>
+      $$GlobalGroupLibrariesTableTableManager(_db, _db.globalGroupLibraries);
 }
 
 mixin _$ProfilesDaoMixin on DatabaseAccessor<Database> {

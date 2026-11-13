@@ -985,7 +985,7 @@
   "localGroupsFallback": "フェイルオーバー",
   "localGroupsLoadFirst": "このサブスクリプションを使用し、ソースの確認を完了してノードを読み込んでください。",
   "localGroupsInUse": "参照の解除、無効化、削除の前に、別のノードまたはグループを選択してください。",
-  "localGroupsDelete": "グループ「{name}」を削除しますか？",
+  "localGroupsDelete": "グローバルグループ「{name}」とその参照を削除しますか？",
   "localGroupsMissing": "利用できないノード: {name}",
   "localGroupsNameConflict": "他のノードやグループと重複しない名前を指定してください。",
   "localGroupsMembersRequired": "利用可能なノードを1つ以上選択してください。",
@@ -1214,5 +1214,9 @@
   "activityObservedDownload": "観測した受信量",
   "activityLastLabel": "最終アクティビティ",
   "activityProxyServerAddress": "プロキシサーバーアドレス",
-  "activityConfiguration": "接続時の設定"
+  "activityConfiguration": "接続時の設定",
+  "localGroupsGlobal": "グローバルカスタムグループ",
+  "localGroupsUnbound": "このサブスクリプションには未追加",
+  "localGroupsNoMatchingNodes": "このサブスクリプションに一致するノードがありません。",
+  "localGroupsInUseProfile": "{name} がこのグループを使用中です。先に別のノードを選択してください。"
 }

@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/global_proxy_groups.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -15,6 +16,7 @@ part 'converter.dart';
 part 'custom_proxies.dart';
 part 'generated/database.g.dart';
 part 'groups.dart';
+part 'global_groups.dart';
 part 'icons.dart';
 part 'links.dart';
 part 'profiles.dart';
@@ -35,6 +37,7 @@ part 'scripts.dart';
     CustomProxies,
     ProfilePolicyDrafts,
     ProfilePolicySelections,
+    GlobalGroupLibraries,
   ],
   daos: [
     ProfilesDao,
@@ -52,7 +55,7 @@ class Database extends _$Database {
   Database([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -105,6 +108,9 @@ class Database extends _$Database {
         if (from < 14) {
           await _addColumnIfMissing(m, profiles, profiles.localGroups);
         }
+        if (from < 15) {
+          await _createTableIfMissing(m, globalGroupLibraries);
+        }
         if (from < 9) {
           await _purgeOrphans();
         }
@@ -115,7 +121,10 @@ class Database extends _$Database {
           await _addColumnIfMissing(m, scripts, scripts.requestProxy);
         }
       },
-      beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
+      beforeOpen: (_) async {
+        await customStatement('PRAGMA foreign_keys = ON');
+        await initializeGlobalGroups();
+      },
     );
   }
 
@@ -210,6 +219,7 @@ class Database extends _$Database {
     List<CustomProxy> customProxies = const [],
     List<ProfilePolicyDraft> policyDrafts = const [],
     List<ProfilePolicySelection> policySelections = const [],
+    List<LocalProxyGroup>? globalGroups,
     bool isOverride = false,
     Future<void> Function()? beforeCommit,
   }) async {
@@ -230,11 +240,20 @@ class Database extends _$Database {
         clashProviders.isEmpty &&
         customProxies.isEmpty &&
         policyDrafts.isEmpty &&
-        policySelections.isEmpty) {
+        policySelections.isEmpty &&
+        globalGroups == null) {
       await beforeCommit?.call();
       return;
     }
     await transaction(() async {
+      final migrated = migrateGlobalGroups(
+        isOverride ? const [] : await readGlobalGroups(),
+        profiles,
+        previousProfiles: await profilesDao.query().get(),
+        definitions: globalGroups,
+      );
+      profiles = migrated.profiles;
+      await writeGlobalGroups(migrated.groups);
       // Backups taken while foreign keys were off may carry orphaned rows.
       await customStatement('PRAGMA defer_foreign_keys = ON');
       await batch((b) {

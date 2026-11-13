@@ -985,7 +985,7 @@
   "localGroupsFallback": "故障转移",
   "localGroupsLoadFirst": "请先使用此订阅并完成来源审核，以加载可选节点。",
   "localGroupsInUse": "请先选择其它节点或分组，再取消此引用、禁用或删除此组。",
-  "localGroupsDelete": "删除分组“{name}”？",
+  "localGroupsDelete": "删除全局分组“{name}”及其订阅引用？",
   "localGroupsMissing": "节点已不可用：{name}",
   "localGroupsNameConflict": "请使用未被节点或其他分组占用的名称。",
   "localGroupsMembersRequired": "请至少选择一个可用节点。",
@@ -1214,5 +1214,9 @@
   "activityObservedDownload": "已观察下载",
   "activityLastLabel": "最近活动",
   "activityProxyServerAddress": "代理服务器地址",
-  "activityConfiguration": "连接采用的配置"
+  "activityConfiguration": "连接采用的配置",
+  "localGroupsGlobal": "全局自建分组",
+  "localGroupsUnbound": "尚未加入此订阅",
+  "localGroupsNoMatchingNodes": "当前订阅中没有匹配的节点。",
+  "localGroupsInUseProfile": "订阅“{name}”正在使用此分组，请先在那里选择其他节点。"
 }

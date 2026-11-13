@@ -655,7 +655,7 @@ $SubscriptionInfoCopyWith<$Res>? get subscriptionInfo {
 /// @nodoc
 mixin _$LocalProxyGroup {
 
- int get id; String get name; GroupType get type; List<String> get nodes; String get regex; List<String> get matchedNodes; List<String> get excludedNodes; List<String> get parents; String? get parent; bool get enabled; String get testUrl;
+ int get id; String get name; GroupType get type; List<String> get nodes; String get regex; List<String> get matchedNodes; List<String> get excludedNodes; List<String> get parents; String? get parent; bool get enabled; bool get global; String get testUrl;
 /// Create a copy of LocalProxyGroup
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -669,20 +669,20 @@ $LocalProxyGroupCopyWith<LocalProxyGroup> get copyWith => _$LocalProxyGroupCopyW
 @override
 bool operator ==(Object other) {
   final _this = this as LocalProxyGroup;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LocalProxyGroup&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.type, _this.type) || other.type == _this.type)&&const DeepCollectionEquality().equals(other.nodes, _this.nodes)&&(identical(other.regex, _this.regex) || other.regex == _this.regex)&&const DeepCollectionEquality().equals(other.matchedNodes, _this.matchedNodes)&&const DeepCollectionEquality().equals(other.excludedNodes, _this.excludedNodes)&&const DeepCollectionEquality().equals(other.parents, _this.parents)&&(identical(other.parent, _this.parent) || other.parent == _this.parent)&&(identical(other.enabled, _this.enabled) || other.enabled == _this.enabled)&&(identical(other.testUrl, _this.testUrl) || other.testUrl == _this.testUrl));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LocalProxyGroup&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.type, _this.type) || other.type == _this.type)&&const DeepCollectionEquality().equals(other.nodes, _this.nodes)&&(identical(other.regex, _this.regex) || other.regex == _this.regex)&&const DeepCollectionEquality().equals(other.matchedNodes, _this.matchedNodes)&&const DeepCollectionEquality().equals(other.excludedNodes, _this.excludedNodes)&&const DeepCollectionEquality().equals(other.parents, _this.parents)&&(identical(other.parent, _this.parent) || other.parent == _this.parent)&&(identical(other.enabled, _this.enabled) || other.enabled == _this.enabled)&&(identical(other.global, _this.global) || other.global == _this.global)&&(identical(other.testUrl, _this.testUrl) || other.testUrl == _this.testUrl));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as LocalProxyGroup;
-  return Object.hash(runtimeType,_this.id,_this.name,_this.type,const DeepCollectionEquality().hash(_this.nodes),_this.regex,const DeepCollectionEquality().hash(_this.matchedNodes),const DeepCollectionEquality().hash(_this.excludedNodes),const DeepCollectionEquality().hash(_this.parents),_this.parent,_this.enabled,_this.testUrl);
+  return Object.hash(runtimeType,_this.id,_this.name,_this.type,const DeepCollectionEquality().hash(_this.nodes),_this.regex,const DeepCollectionEquality().hash(_this.matchedNodes),const DeepCollectionEquality().hash(_this.excludedNodes),const DeepCollectionEquality().hash(_this.parents),_this.parent,_this.enabled,_this.global,_this.testUrl);
 }
 
 @override
 String toString() {
   final _this = this as LocalProxyGroup;
-  return 'LocalProxyGroup(id: ${_this.id}, name: ${_this.name}, type: ${_this.type}, nodes: ${_this.nodes}, regex: ${_this.regex}, matchedNodes: ${_this.matchedNodes}, excludedNodes: ${_this.excludedNodes}, parents: ${_this.parents}, parent: ${_this.parent}, enabled: ${_this.enabled}, testUrl: ${_this.testUrl})';
+  return 'LocalProxyGroup(id: ${_this.id}, name: ${_this.name}, type: ${_this.type}, nodes: ${_this.nodes}, regex: ${_this.regex}, matchedNodes: ${_this.matchedNodes}, excludedNodes: ${_this.excludedNodes}, parents: ${_this.parents}, parent: ${_this.parent}, enabled: ${_this.enabled}, global: ${_this.global}, testUrl: ${_this.testUrl})';
 }
 
 
@@ -693,7 +693,7 @@ abstract mixin class $LocalProxyGroupCopyWith<$Res>  {
   factory $LocalProxyGroupCopyWith(LocalProxyGroup value, $Res Function(LocalProxyGroup) _then) = _$LocalProxyGroupCopyWithImpl;
 @useResult
 $Res call({
- int id, String name, GroupType type, List<String> nodes, String regex, List<String> matchedNodes, List<String> excludedNodes, List<String> parents, String? parent, bool enabled, String testUrl
+ int id, String name, GroupType type, List<String> nodes, String regex, List<String> matchedNodes, List<String> excludedNodes, List<String> parents, String? parent, bool enabled, bool global, String testUrl
 });
 
 
@@ -710,7 +710,7 @@ class _$LocalProxyGroupCopyWithImpl<$Res>
 
 /// Create a copy of LocalProxyGroup
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nodes = null,Object? regex = null,Object? matchedNodes = null,Object? excludedNodes = null,Object? parents = null,Object? parent = freezed,Object? enabled = null,Object? testUrl = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nodes = null,Object? regex = null,Object? matchedNodes = null,Object? excludedNodes = null,Object? parents = null,Object? parent = freezed,Object? enabled = null,Object? global = null,Object? testUrl = null,}) {
   return _then(LocalProxyGroup(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -722,6 +722,7 @@ as List<String>,excludedNodes: null == excludedNodes ? _self.excludedNodes : exc
 as List<String>,parents: null == parents ? _self.parents : parents // ignore: cast_nullable_to_non_nullable
 as List<String>,parent: freezed == parent ? _self.parent : parent // ignore: cast_nullable_to_non_nullable
 as String?,enabled: null == enabled ? _self.enabled : enabled // ignore: cast_nullable_to_non_nullable
+as bool,global: null == global ? _self.global : global // ignore: cast_nullable_to_non_nullable
 as bool,testUrl: null == testUrl ? _self.testUrl : testUrl // ignore: cast_nullable_to_non_nullable
 as String,
   ));
@@ -808,10 +809,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  String testUrl)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  bool global,  String testUrl)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _LocalProxyGroup() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.testUrl);case _:
+return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.global,_that.testUrl);case _:
   return orElse();
 
 }
@@ -829,10 +830,10 @@ return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.mat
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  String testUrl)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  bool global,  String testUrl)  $default,) {final _that = this;
 switch (_that) {
 case _LocalProxyGroup():
-return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.testUrl);case _:
+return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.global,_that.testUrl);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -849,10 +850,10 @@ return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.mat
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  String testUrl)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  GroupType type,  List<String> nodes,  String regex,  List<String> matchedNodes,  List<String> excludedNodes,  List<String> parents,  String? parent,  bool enabled,  bool global,  String testUrl)?  $default,) {final _that = this;
 switch (_that) {
 case _LocalProxyGroup() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.testUrl);case _:
+return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.matchedNodes,_that.excludedNodes,_that.parents,_that.parent,_that.enabled,_that.global,_that.testUrl);case _:
   return null;
 
 }
@@ -864,7 +865,7 @@ return $default(_that.id,_that.name,_that.type,_that.nodes,_that.regex,_that.mat
 @JsonSerializable()
 
 class _LocalProxyGroup extends LocalProxyGroup {
-  const _LocalProxyGroup({required this.id, required this.name, this.type = GroupType.Selector,  List<String> nodes = const [], this.regex = '',  List<String> matchedNodes = const [],  List<String> excludedNodes = const [],  List<String> parents = const [], this.parent, this.enabled = true, this.testUrl = ''}): _nodes = nodes,_matchedNodes = matchedNodes,_excludedNodes = excludedNodes,_parents = parents,super._();
+  const _LocalProxyGroup({required this.id, required this.name, this.type = GroupType.Selector,  List<String> nodes = const [], this.regex = '',  List<String> matchedNodes = const [],  List<String> excludedNodes = const [],  List<String> parents = const [], this.parent, this.enabled = true, this.global = false, this.testUrl = ''}): _nodes = nodes,_matchedNodes = matchedNodes,_excludedNodes = excludedNodes,_parents = parents,super._();
   factory _LocalProxyGroup.fromJson(Map<String, dynamic> json) => _$LocalProxyGroupFromJson(json);
 
 @override final  int id;
@@ -901,6 +902,7 @@ class _LocalProxyGroup extends LocalProxyGroup {
 
 @override final  String? parent;
 @override@JsonKey() final  bool enabled;
+@override@JsonKey() final  bool global;
 @override@JsonKey() final  String testUrl;
 
 /// Create a copy of LocalProxyGroup
@@ -916,18 +918,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LocalProxyGroup&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&const DeepCollectionEquality().equals(other.nodes, _nodes)&&(identical(other.regex, regex) || other.regex == regex)&&const DeepCollectionEquality().equals(other.matchedNodes, _matchedNodes)&&const DeepCollectionEquality().equals(other.excludedNodes, _excludedNodes)&&const DeepCollectionEquality().equals(other.parents, _parents)&&(identical(other.parent, parent) || other.parent == parent)&&(identical(other.enabled, enabled) || other.enabled == enabled)&&(identical(other.testUrl, testUrl) || other.testUrl == testUrl));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LocalProxyGroup&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&const DeepCollectionEquality().equals(other.nodes, _nodes)&&(identical(other.regex, regex) || other.regex == regex)&&const DeepCollectionEquality().equals(other.matchedNodes, _matchedNodes)&&const DeepCollectionEquality().equals(other.excludedNodes, _excludedNodes)&&const DeepCollectionEquality().equals(other.parents, _parents)&&(identical(other.parent, parent) || other.parent == parent)&&(identical(other.enabled, enabled) || other.enabled == enabled)&&(identical(other.global, global) || other.global == global)&&(identical(other.testUrl, testUrl) || other.testUrl == testUrl));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,name,type,const DeepCollectionEquality().hash(_nodes),regex,const DeepCollectionEquality().hash(_matchedNodes),const DeepCollectionEquality().hash(_excludedNodes),const DeepCollectionEquality().hash(_parents),parent,enabled,testUrl);
+    return Object.hash(runtimeType,id,name,type,const DeepCollectionEquality().hash(_nodes),regex,const DeepCollectionEquality().hash(_matchedNodes),const DeepCollectionEquality().hash(_excludedNodes),const DeepCollectionEquality().hash(_parents),parent,enabled,global,testUrl);
 }
 
 @override
 String toString() {
-    return 'LocalProxyGroup(id: $id, name: $name, type: $type, nodes: $nodes, regex: $regex, matchedNodes: $matchedNodes, excludedNodes: $excludedNodes, parents: $parents, parent: $parent, enabled: $enabled, testUrl: $testUrl)';
+    return 'LocalProxyGroup(id: $id, name: $name, type: $type, nodes: $nodes, regex: $regex, matchedNodes: $matchedNodes, excludedNodes: $excludedNodes, parents: $parents, parent: $parent, enabled: $enabled, global: $global, testUrl: $testUrl)';
 }
 
 
@@ -938,7 +940,7 @@ abstract mixin class _$LocalProxyGroupCopyWith<$Res> implements $LocalProxyGroup
   factory _$LocalProxyGroupCopyWith(_LocalProxyGroup value, $Res Function(_LocalProxyGroup) _then) = __$LocalProxyGroupCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String name, GroupType type, List<String> nodes, String regex, List<String> matchedNodes, List<String> excludedNodes, List<String> parents, String? parent, bool enabled, String testUrl
+ int id, String name, GroupType type, List<String> nodes, String regex, List<String> matchedNodes, List<String> excludedNodes, List<String> parents, String? parent, bool enabled, bool global, String testUrl
 });
 
 
@@ -955,7 +957,7 @@ class __$LocalProxyGroupCopyWithImpl<$Res>
 
 /// Create a copy of LocalProxyGroup
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nodes = null,Object? regex = null,Object? matchedNodes = null,Object? excludedNodes = null,Object? parents = null,Object? parent = freezed,Object? enabled = null,Object? testUrl = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nodes = null,Object? regex = null,Object? matchedNodes = null,Object? excludedNodes = null,Object? parents = null,Object? parent = freezed,Object? enabled = null,Object? global = null,Object? testUrl = null,}) {
   return _then(_LocalProxyGroup(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -967,6 +969,7 @@ as List<String>,excludedNodes: null == excludedNodes ? _self._excludedNodes : ex
 as List<String>,parents: null == parents ? _self._parents : parents // ignore: cast_nullable_to_non_nullable
 as List<String>,parent: freezed == parent ? _self.parent : parent // ignore: cast_nullable_to_non_nullable
 as String?,enabled: null == enabled ? _self.enabled : enabled // ignore: cast_nullable_to_non_nullable
+as bool,global: null == global ? _self.global : global // ignore: cast_nullable_to_non_nullable
 as bool,testUrl: null == testUrl ? _self.testUrl : testUrl // ignore: cast_nullable_to_non_nullable
 as String,
   ));

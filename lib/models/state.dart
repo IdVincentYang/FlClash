@@ -372,6 +372,7 @@ abstract class MigrationData with _$MigrationData {
     @Default([]) List<Rule> rules,
     @Default([]) List<Script> scripts,
     @Default([]) List<Profile> profiles,
+    List<LocalProxyGroup>? globalGroups,
     @Default([]) List<ProfileRuleLink> links,
     @Default([]) List<ProxyGroup> proxyGroups,
     @Default([]) List<ClashProvider> clashProviders,

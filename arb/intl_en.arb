@@ -985,7 +985,7 @@
   "localGroupsFallback": "Failover",
   "localGroupsLoadFirst": "Use this subscription and complete source review to load its nodes.",
   "localGroupsInUse": "Choose another node or group before removing this reference, disabling or deleting this group.",
-  "localGroupsDelete": "Delete group “{name}”?",
+  "localGroupsDelete": "Delete global group “{name}” and its subscription references?",
   "localGroupsMissing": "Unavailable node: {name}",
   "localGroupsNameConflict": "Choose a unique group name.",
   "localGroupsMembersRequired": "Select at least one available node.",
@@ -1214,5 +1214,9 @@
   "activityObservedDownload": "Observed download",
   "activityLastLabel": "Last activity",
   "activityProxyServerAddress": "Proxy server address",
-  "activityConfiguration": "Connection configuration"
+  "activityConfiguration": "Connection configuration",
+  "localGroupsGlobal": "Global custom groups",
+  "localGroupsUnbound": "Not added to this subscription",
+  "localGroupsNoMatchingNodes": "No matching nodes in this subscription.",
+  "localGroupsInUseProfile": "This group is in use by {name}. Select another node there first."
 }

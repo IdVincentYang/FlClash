@@ -29,6 +29,7 @@ type sourceLocalGroup struct {
 	Parents       []string `json:"parents,omitempty"`
 	Parent        *string  `json:"parent"`
 	Enabled       bool     `json:"enabled"`
+	Global        bool     `json:"global,omitempty"`
 	TestURL       string   `json:"testUrl"`
 }
 
@@ -56,7 +57,7 @@ func validateLocalGroupMaterials(home string, manifest ConfigManifest, raw *conf
 		if !group.Enabled {
 			continue
 		}
-		if nodes[group.Name] != 0 || len(group.members()) == 0 && group.Regex == "" || len(group.members()) > 1024 {
+		if nodes[group.Name] != 0 || len(group.members()) == 0 && group.Regex == "" && !group.Global || len(group.members()) > 1024 || len(group.Nodes) > 1024 {
 			return errLocalGroups
 		}
 		for _, name := range group.members() {
@@ -76,6 +77,20 @@ func validateLocalGroupMaterials(home string, manifest ConfigManifest, raw *conf
 			actual := slices.Clone(group.MatchedNodes)
 			slices.Sort(actual)
 			if err != nil || !slices.Equal(matches, actual) {
+				return errLocalGroups
+			}
+		}
+		if group.Global && group.Regex == "" {
+			var expected []string
+			for _, name := range group.Nodes {
+				if nodes[name] > 1 {
+					return errLocalGroupAmbiguous
+				}
+				if nodes[name] == 1 {
+					expected = append(expected, name)
+				}
+			}
+			if !slices.Equal(expected, group.MatchedNodes) {
 				return errLocalGroups
 			}
 		}
@@ -184,11 +199,11 @@ func localGroupDefinition(group sourceLocalGroup, inline map[string]bool) map[st
 			external = true
 		}
 	}
-	if len(group.members()) == 0 && group.Regex != "" {
+	if len(group.members()) == 0 && (group.Regex != "" || group.Global) {
 		members = append(members, "REJECT")
 	}
 	definition := map[string]any{"name": group.Name, "type": group.Type, "proxies": members}
-	if group.Regex != "" {
+	if group.Regex != "" || group.Global {
 		definition["empty-fallback"] = "REJECT"
 	}
 	if external {
@@ -265,7 +280,7 @@ func localGroupDelta(base map[string]any, before, after []sourceLocalGroup) (map
 		if !group.Enabled {
 			continue
 		}
-		if group.ID < 0 || strings.TrimSpace(group.Name) == "" || len([]rune(group.Name)) > 128 || strings.ContainsAny(group.Name, "\x00\r\n\t") || names[group.Name] || !slices.Contains([]string{"select", "url-test", "fallback"}, group.Type) || len(group.members()) == 0 && group.Regex == "" || len(group.members()) > 1024 {
+		if group.ID < 0 || strings.TrimSpace(group.Name) == "" || len([]rune(group.Name)) > 128 || strings.ContainsAny(group.Name, "\x00\r\n\t") || names[group.Name] || !slices.Contains([]string{"select", "url-test", "fallback"}, group.Type) || len(group.members()) == 0 && group.Regex == "" && !group.Global || len(group.members()) > 1024 {
 			return nil, errLocalGroups
 		}
 		names[group.Name] = true
@@ -442,6 +457,9 @@ func (g sourceLocalGroup) members() []string {
 	if g.Regex != "" {
 		return slices.DeleteFunc(slices.Clone(g.MatchedNodes), func(name string) bool { return slices.Contains(g.ExcludedNodes, name) })
 	}
+	if g.Global {
+		return g.MatchedNodes
+	}
 	return g.Nodes
 }
 
@@ -542,7 +560,19 @@ func resolveLocalGroupMembers(home string, manifest ConfigManifest, raw *config.
 	}
 	groups := slices.Clone(manifest.LocalGroups)
 	for i, group := range groups {
-		if !group.Enabled || group.Regex == "" {
+		if !group.Enabled {
+			continue
+		}
+		if group.Global && group.Regex == "" {
+			groups[i].MatchedNodes = nil
+			for _, name := range group.Nodes {
+				if nodes[name] > 0 {
+					groups[i].MatchedNodes = append(groups[i].MatchedNodes, name)
+				}
+			}
+			continue
+		}
+		if group.Regex == "" {
 			continue
 		}
 		matches, err := matchLocalNodes(group.Regex, names)

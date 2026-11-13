@@ -1004,6 +1004,42 @@ void main() {
             (await store.profilesDao.query().get()).getProfile(2)!.localGroups,
             isEmpty,
           );
+          const portable = LocalProxyGroup(
+            id: 9,
+            name: 'Portable',
+            global: true,
+            nodes: ['a', 'missing'],
+            matchedNodes: ['a'],
+            type: GroupType.Fallback,
+            testUrl: 'http://127.0.0.1:1/test',
+          );
+          await store.writeGlobalGroups([portable]);
+          await profiles.saveLocalGroups(
+            current(),
+            [portable],
+            expectedGlobalGroups: [portable],
+          );
+          final portableRuntime =
+              ((await bridge.call('refreshGroups'))['value'] as Map)['proxies']
+                  as Map;
+          expect((portableRuntime['Portable'] as Map)['all'], ['a']);
+          final missing = portable.copyWith(
+            nodes: ['missing'],
+            matchedNodes: [],
+          );
+          await store.writeGlobalGroups([missing]);
+          await profiles.saveLocalGroups(
+            current(),
+            [missing],
+            expectedGlobalGroups: [missing],
+          );
+          final emptyRuntime =
+              ((await bridge.call('refreshGroups'))['value'] as Map)['proxies']
+                  as Map;
+          expect((emptyRuntime['Portable'] as Map)['all'], ['REJECT']);
+          await profiles.saveLocalGroups(current(), []);
+          expect(received, isEmpty);
+          expect(confirmations, isEmpty);
           final matched = await core.sourceAcceptance({
             'action': 'matchLocalNodes',
             'pattern': '^a',

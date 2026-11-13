@@ -78,6 +78,12 @@ Stream<List<Profile>> profilesStream(Ref ref) {
 }
 
 @riverpod
+Stream<List<LocalProxyGroup>> globalLocalGroups(Ref ref) => database
+    .globalGroupLibrary()
+    .watchSingle()
+    .map((library) => library.groups);
+
+@riverpod
 Stream<List<Rule>> addedRulesStream(Ref ref, int profileId) {
   return database.rulesDao.queryAddedRules(profileId).watch();
 }

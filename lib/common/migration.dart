@@ -54,6 +54,7 @@ class _AppMigrationStore implements MigrationStore {
       clashProviders: data.clashProviders,
       policyDrafts: data.policyDrafts,
       policySelections: data.policySelections,
+      globalGroups: data.globalGroups,
     );
   }
 

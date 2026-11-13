@@ -91,7 +91,7 @@ final class SetupActionProvider extends $NotifierProvider<SetupAction, void> {
   }
 }
 
-String _$setupActionHash() => r'bdfc2e1564c4e9648d860a61a278c514e808b1fc';
+String _$setupActionHash() => r'72ff9c9a4402bc38a6c5b45c4a4dff8beb076505';
 
 abstract class _$SetupAction extends $Notifier<void> {
   void build();
@@ -142,7 +142,7 @@ final class BackupActionProvider extends $NotifierProvider<BackupAction, void> {
   }
 }
 
-String _$backupActionHash() => r'c7e976cd673d061156a1b1907e4c74496a7371cd';
+String _$backupActionHash() => r'4180e4640889e26183a44075998a318f3f30a978';
 
 abstract class _$BackupAction extends $Notifier<void> {
   void build();
@@ -555,7 +555,7 @@ final class ProfilesActionProvider
   }
 }
 
-String _$profilesActionHash() => r'73205968282c10fea868fd3328da03cbf078c2a1';
+String _$profilesActionHash() => r'd030c792647608215826e151b99e60464b16495d';
 
 abstract class _$ProfilesAction extends $Notifier<void> {
   void build();
@@ -568,6 +568,59 @@ abstract class _$ProfilesAction extends $Notifier<void> {
             as $ClassProviderElement<
               AnyNotifier<void, void>,
               void,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(GlobalGroupsAction)
+final globalGroupsActionProvider = GlobalGroupsActionProvider._();
+
+final class GlobalGroupsActionProvider
+    extends $NotifierProvider<GlobalGroupsAction, String?> {
+  GlobalGroupsActionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'globalGroupsActionProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$globalGroupsActionHash();
+
+  @$internal
+  @override
+  GlobalGroupsAction create() => GlobalGroupsAction();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$globalGroupsActionHash() =>
+    r'e3b91d3ee1915160b1360d3038a2b58d24464aeb';
+
+abstract class _$GlobalGroupsAction extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
               Object?,
               Object?
             >;

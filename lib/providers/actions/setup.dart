@@ -837,6 +837,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
         return _SetupTaskResult.superseded;
       }
       ref.read(profilesActionProvider.notifier).setupExecutionChanged(true);
+      ref.read(globalGroupsActionProvider.notifier).setupExecutionChanged(true);
       final progress = ref.read(proxyPreparationProvider.notifier);
       final progressSequence = progress.start();
       var progressFailed = true;
@@ -900,6 +901,9 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
           progress.finish(progressSequence, failed: progressFailed);
           ref
               .read(profilesActionProvider.notifier)
+              .setupExecutionChanged(false);
+          ref
+              .read(globalGroupsActionProvider.notifier)
               .setupExecutionChanged(false);
         }
       }
@@ -1860,7 +1864,8 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
           if (_requests.requiresSourceAcceptance &&
               acceptedLocalInput == null &&
               snapshot.profile.localGroups.any(
-                (group) => group.enabled && group.regex.isNotEmpty,
+                (group) =>
+                    group.enabled && (group.regex.isNotEmpty || group.global),
               )) {
             final source = sources.firstWhere(
               (source) => source.key == 'application-config',

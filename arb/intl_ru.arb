@@ -985,7 +985,7 @@
   "localGroupsFallback": "Резервирование",
   "localGroupsLoadFirst": "Выберите эту подписку и подтвердите источники для загрузки узлов.",
   "localGroupsInUse": "Выберите другой узел или группу перед удалением связи, отключением или удалением этой группы.",
-  "localGroupsDelete": "Удалить группу «{name}»?",
+  "localGroupsDelete": "Удалить глобальную группу «{name}» и ссылки на неё?",
   "localGroupsMissing": "Узел недоступен: {name}",
   "localGroupsNameConflict": "Укажите имя, не занятое узлом или другой группой.",
   "localGroupsMembersRequired": "Выберите хотя бы один доступный узел.",
@@ -1214,5 +1214,9 @@
   "activityObservedDownload": "Наблюдаемый входящий трафик",
   "activityLastLabel": "Последняя активность",
   "activityProxyServerAddress": "Адрес прокси-сервера",
-  "activityConfiguration": "Конфигурация соединения"
+  "activityConfiguration": "Конфигурация соединения",
+  "localGroupsGlobal": "Глобальные пользовательские группы",
+  "localGroupsUnbound": "Не добавлена в эту подписку",
+  "localGroupsNoMatchingNodes": "В этой подписке нет подходящих узлов.",
+  "localGroupsInUseProfile": "Подписка {name} использует эту группу. Сначала выберите в ней другой узел."
 }

@@ -19,6 +19,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
 
   @override
   void build() {
+    ref.read(globalGroupsActionProvider);
     _watchRefreshProfiles();
     ref.listen(appVisibleProvider, (previous, visible) {
       if (visible && previous != true) unawaited(autoUpdateProfiles());
@@ -146,6 +147,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     Profile expected,
     List<LocalProxyGroup> groups, {
     void Function()? onSaved,
+    List<LocalProxyGroup>? expectedGlobalGroups,
   }) async {
     if (groups.length > localProxyGroupsLimit ||
         groups.map((group) => group.id).toSet().length != groups.length ||
@@ -164,6 +166,13 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     ConfigFact? previousFact;
     Profile? previous;
     await requestClient.mutate(() async {
+      if (expectedGlobalGroups != null &&
+          !const ListEquality<LocalProxyGroup>().equals(
+            await database.readGlobalGroups(),
+            expectedGlobalGroups,
+          )) {
+        throw const LocalProxyGroupProblem('changed');
+      }
       final current = (await database.profilesDao.query().get()).getProfile(
         expected.id,
       );
@@ -350,7 +359,12 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
           const ListEquality<LocalProxyGroup>().equals(
             ref.read(profileProvider(expected.id))?.localGroups,
             groups,
-          ),
+          ) &&
+          (expectedGlobalGroups == null ||
+              const ListEquality<LocalProxyGroup>().equals(
+                await database.readGlobalGroups(),
+                expectedGlobalGroups,
+              )),
     );
     if (applied == _SetupTaskResult.completed) return;
     final fact = await _core.getConfigState();

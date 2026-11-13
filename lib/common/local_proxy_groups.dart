@@ -6,6 +6,29 @@ import 'package:fl_clash/models/models.dart';
 const localProxyGroupsLimit = 64;
 const localProxyGroupMembersLimit = 1024;
 
+List<Proxy> localGroupNodes(List<Group> groups) {
+  final names = groups.map((group) => group.name).toSet();
+  final nodes = <String, Proxy>{};
+  for (final group in groups) {
+    for (final proxy in group.all) {
+      if (!names.contains(proxy.name) &&
+          !const {
+            'DIRECT',
+            'REJECT',
+            'REJECT-DROP',
+            'PASS',
+            'COMPATIBLE',
+          }.contains(proxy.name) &&
+          !GroupType.values.any(
+            (type) => type.name.toLowerCase() == proxy.type.toLowerCase(),
+          )) {
+        nodes[proxy.name] = proxy;
+      }
+    }
+  }
+  return nodes.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+}
+
 String _localNodePattern(String name) => name
     .split('')
     .map(
@@ -64,7 +87,7 @@ Map<String, dynamic> mergeLocalProxyGroups(
           GroupType.URLTest,
           GroupType.Fallback,
         }.contains(group.type) ||
-        group.effectiveNodes.isEmpty && group.regex.isEmpty ||
+        group.effectiveNodes.isEmpty && group.regex.isEmpty && !group.global ||
         group.effectiveNodes.length > localProxyGroupMembersLimit ||
         group.effectiveNodes.toSet().length != group.effectiveNodes.length ||
         group.effectiveNodes.any(
@@ -94,10 +117,12 @@ Map<String, dynamic> mergeLocalProxyGroups(
     definitions.add({
       'name': group.name,
       'type': group.type.value,
-      'proxies': group.effectiveNodes.isEmpty && group.regex.isNotEmpty
+      'proxies':
+          group.effectiveNodes.isEmpty &&
+              (group.regex.isNotEmpty || group.global)
           ? ['REJECT']
           : group.effectiveNodes.where(inlineNodes.contains).toList(),
-      if (group.regex.isNotEmpty) 'empty-fallback': 'REJECT',
+      if (group.regex.isNotEmpty || group.global) 'empty-fallback': 'REJECT',
       if (group.effectiveNodes.any((name) => !inlineNodes.contains(name))) ...{
         'include-all-providers': true,
         'filter':

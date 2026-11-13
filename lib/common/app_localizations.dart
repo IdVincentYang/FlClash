@@ -26,7 +26,7 @@ String userFacingErrorMessage(Object error, AppLocalizations appLocalizations) {
   return networkErrorMessage(error, appLocalizations) ??
       coreLaunchBlockedMessage(error, appLocalizations) ??
       switch (error) {
-        LocalProxyGroupProblem(:final code) => switch (code) {
+        LocalProxyGroupProblem(:final code, :final name) => switch (code) {
           'name' => appLocalizations.localGroupsNameConflict,
           'members' => appLocalizations.localGroupsMembersRequired,
           'parent' => appLocalizations.localGroupsInvalidParent,
@@ -35,6 +35,8 @@ String userFacingErrorMessage(Object error, AppLocalizations appLocalizations) {
           'loading' => appLocalizations.localGroupsLoadFirst,
           'limit' => appLocalizations.localGroupsLimit,
           'inUse' => appLocalizations.localGroupsInUse,
+          'inUseProfile' => appLocalizations.localGroupsInUseProfile(name),
+          'noMatchingNodes' => appLocalizations.localGroupsNoMatchingNodes,
           'changed' => appLocalizations.localGroupsChanged,
           'foreground' => appLocalizations.localGroupsForegroundRequired,
           _ => appLocalizations.localGroupsApplyFailed,

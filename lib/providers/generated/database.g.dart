@@ -48,6 +48,47 @@ final class ProfilesStreamProvider
 
 String _$profilesStreamHash() => r'ea944e081294567f0f63286e95e4e66cdc650383';
 
+@ProviderFor(globalLocalGroups)
+final globalLocalGroupsProvider = GlobalLocalGroupsProvider._();
+
+final class GlobalLocalGroupsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<LocalProxyGroup>>,
+          List<LocalProxyGroup>,
+          Stream<List<LocalProxyGroup>>
+        >
+    with
+        $FutureModifier<List<LocalProxyGroup>>,
+        $StreamProvider<List<LocalProxyGroup>> {
+  GlobalLocalGroupsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'globalLocalGroupsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$globalLocalGroupsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<List<LocalProxyGroup>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<LocalProxyGroup>> create(Ref ref) {
+    return globalLocalGroups(ref);
+  }
+}
+
+String _$globalLocalGroupsHash() => r'781479b64c9ae3f0b3493929dc3337babf53615b';
+
 @ProviderFor(addedRulesStream)
 final addedRulesStreamProvider = AddedRulesStreamFamily._();
 
