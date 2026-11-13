@@ -1146,7 +1146,6 @@
   "profileImportDownloadFailed": "Could not download the subscription. Check the URL and request route, then retry.",
   "profileImportInvalid": "The downloaded file is not a valid subscription. Check the URL.",
   "applicationNetwork": "Application network",
-  "applicationNetworkDesc": "View app connections, matching rules and exits",
   "activityCompactCounts": "Active {active}/{count}",
   "activityShowAllApps": "Show all apps",
   "activitySearchApps": "Search app name or package",

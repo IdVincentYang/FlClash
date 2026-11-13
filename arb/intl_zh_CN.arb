@@ -1146,7 +1146,6 @@
   "profileImportDownloadFailed": "无法下载订阅，请检查 URL 和请求方式后重试。",
   "profileImportInvalid": "下载的文件不是有效订阅，请检查 URL。",
   "applicationNetwork": "应用网络",
-  "applicationNetworkDesc": "查看应用连接、命中规则和出口",
   "activityCompactCounts": "活跃 {active}/{count}",
   "activityShowAllApps": "显示全部应用",
   "activitySearchApps": "搜索应用名称或包名",

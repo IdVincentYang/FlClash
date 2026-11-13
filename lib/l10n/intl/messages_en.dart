@@ -429,9 +429,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "applicationNetwork": MessageLookupByLibrary.simpleMessage(
       "Application network",
     ),
-    "applicationNetworkDesc": MessageLookupByLibrary.simpleMessage(
-      "View app connections, matching rules and exits",
-    ),
     "appliedProfile": MessageLookupByLibrary.simpleMessage(
       "Active configuration",
     ),

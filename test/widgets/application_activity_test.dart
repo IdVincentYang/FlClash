@@ -201,10 +201,7 @@ void main() {
         ),
       );
       expect((entry.leading! as GlyphIcon).glyph, AppGlyphs.application);
-      expect(
-        (entry.subtitle! as Text).data,
-        'View app connections, matching rules and exits',
-      );
+      expect(entry.subtitle, isNull);
       await tester.tap(find.text('Application network'));
       await tester.pumpAndSettle();
       expect(find.text('Observation paused · retained activity'), findsNothing);

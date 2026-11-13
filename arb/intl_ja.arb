@@ -1146,7 +1146,6 @@
   "profileImportDownloadFailed": "サブスクリプションをダウンロードできませんでした。URL とリクエスト経路を確認して再試行してください。",
   "profileImportInvalid": "ダウンロードしたファイルは有効なサブスクリプションではありません。URL を確認してください。",
   "applicationNetwork": "アプリのネットワーク",
-  "applicationNetworkDesc": "アプリの接続・適用ルール・出口を確認",
   "activityCompactCounts": "接続中 {active}/{count}",
   "activityShowAllApps": "すべてのアプリを表示",
   "activitySearchApps": "アプリ名・パッケージ名で検索",

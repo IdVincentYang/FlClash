@@ -9693,16 +9693,6 @@ class AppLocalizations {
     );
   }
 
-  /// `View app connections, matching rules and exits`
-  String get applicationNetworkDesc {
-    return Intl.message(
-      'View app connections, matching rules and exits',
-      name: 'applicationNetworkDesc',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Active {active}/{count}`
   String activityCompactCounts(Object active, Object count) {
     return Intl.message(

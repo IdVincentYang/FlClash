@@ -30,6 +30,8 @@ dialogs, and interaction behavior.
 - The keyboard animates `MediaQuery.viewInsets` every frame. Read MediaQuery by aspect (`paddingOf`, `viewInsetsOf`)
   rather than `MediaQuery.of`, and wrap the page of a new route type in `KeyboardInsetHold`; Keyboard Insets in
   `.agents/architecture.md` has the reasons.
+- Navigation entry names explain their destination. Improve an unclear name rather than adding a subtitle to explain it;
+  the Application network entry has no descriptive subtitle.
 - App bar buttons reach `CommonScaffold` as data (`primaryAction`, `iconActions`, `menuItems`) so it can fold them into
   its overflow menu; App Bar Actions in `.agents/architecture.md` has the rule.
 - User-facing text goes through ARB; use `localization` when text changes are non-trivial.
