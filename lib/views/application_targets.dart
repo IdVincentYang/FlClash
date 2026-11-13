@@ -7,6 +7,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -177,6 +178,26 @@ class _ApplicationIdentity extends StatelessWidget {
   final String? packageName;
   final Map<String, Package> packages;
 
+  Future<void> _copy(BuildContext context, String value) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: value));
+      if (!context.mounted) return;
+      context.showNotifier(context.appLocalizations.copySuccess);
+    } catch (_) {
+      if (!context.mounted) return;
+      context.showNotifier(context.appLocalizations.clipboardWriteFailed);
+    }
+  }
+
+  Widget _value(BuildContext context, String value, {String? label}) => Tooltip(
+    message: '${context.appLocalizations.copy} ${label ?? value}',
+    child: TextButton(
+      onPressed: () => _copy(context, value),
+      style: TextButton.styleFrom(textStyle: context.textTheme.bodySmall),
+      child: Text(label ?? value),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.appLocalizations;
@@ -192,31 +213,39 @@ class _ApplicationIdentity extends StatelessWidget {
           shape: AppShape.xl,
           collapsedShape: AppShape.xl,
           trailing: const _ActivityExpansionIcon(),
-          title: Text(
-            uid == null ? l10n.activitySharedUid : l10n.activityUid(uid),
-          ),
+          title: uid == null
+              ? Text(l10n.activitySharedUid)
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: _value(context, '$uid', label: l10n.activityUid(uid)),
+                ),
           subtitle: Text(l10n.activitySharedIdentityHelp),
           children: [
             for (final name in identity.packages)
               ListTile(
+                onTap: () => _copy(context, name),
                 title: Text(packages[name]?.label ?? name),
                 subtitle: packages[name] == null ? null : Text(name),
+                trailing: const GlyphIcon(AppGlyphs.copy),
               ),
           ],
         ),
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-      child: Text(
-        [
-          ?packageName,
-          if (uid != null) l10n.activityUid(uid),
-          if (packageName == null) l10n.activityIdentityUncertain,
-        ].join(' · '),
-        style: context.textTheme.bodySmall?.copyWith(
-          color: context.colorScheme.onSurfaceVariant,
-        ),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (packageName case final String name) _value(context, name),
+          if (uid != null)
+            _value(context, '$uid', label: l10n.activityUid(uid)),
+          if (packageName == null)
+            Text(
+              l10n.activityIdentityUncertain,
+              style: context.textTheme.bodySmall,
+            ),
+        ],
       ),
     );
   }
@@ -249,47 +278,61 @@ class _TargetActivityRow extends StatelessWidget {
             connection.info,
     };
     final rules = routes.values.map((info) => _rule(context, info)).toSet();
+    final title = Text(
+      host.target.isEmpty ? l10n.activityUnknownTarget : host.target,
+    );
+    final subtitle = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ActivityConnectionSummary(totals: host.totals),
+        Text(
+          routes.length == 1
+              ? '${_rule(context, routes.values.single)} · ${routes.values.single.chains.isEmpty ? l10n.unknown : routes.values.single.chains.join(' → ')}'
+              : l10n.activityRouteCounts(
+                  rules.length,
+                  host.totals.exitPaths.length,
+                ),
+          style: context.textTheme.bodySmall,
+        ),
+      ],
+    );
     return Card.filled(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        key: PageStorageKey('target-details:${host.key}'),
-        shape: AppShape.xl,
-        collapsedShape: AppShape.xl,
-        trailing: const _ActivityExpansionIcon(),
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        title: Text(
-          host.target.isEmpty ? l10n.activityUnknownTarget : host.target,
-        ),
-        subtitle: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ActivityConnectionSummary(totals: host.totals),
-            Text(
-              routes.length == 1
-                  ? '${_rule(context, routes.values.single)} · ${routes.values.single.chains.isEmpty ? l10n.unknown : routes.values.single.chains.join(' → ')}'
-                  : l10n.activityRouteCounts(
-                      rules.length,
-                      host.totals.exitPaths.length,
-                    ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: context.textTheme.bodySmall,
-            ),
-          ],
-        ),
-        children: [
-          for (final info in routes.values)
-            ListTile(
-              title: Text(_rule(context, info)),
-              subtitle: Text(
-                info.chains.isEmpty ? l10n.unknown : info.chains.join(' → '),
+      child: routes.length == 1
+          ? ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
               ),
+              title: title,
+              subtitle: subtitle,
+            )
+          : ExpansionTile(
+              key: PageStorageKey('target-details:${host.key}'),
+              shape: AppShape.xl,
+              collapsedShape: AppShape.xl,
+              trailing: const _ActivityExpansionIcon(),
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              title: title,
+              subtitle: subtitle,
+              children: [
+                for (final info in routes.values)
+                  ListTile(
+                    title: Text(_rule(context, info)),
+                    subtitle: Text(
+                      info.chains.isEmpty
+                          ? l10n.unknown
+                          : info.chains.join(' → '),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 }

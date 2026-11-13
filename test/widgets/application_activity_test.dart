@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:fl_clash/common/application_activity.dart';
 import 'package:fl_clash/models/application_activity.dart';
+import 'package:fl_clash/manager/status_manager.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/providers/application_activity.dart';
@@ -553,7 +554,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ApplicationTargetsView), findsOneWidget);
     expect(find.text('example.test'), findsOneWidget);
-    expect(find.text('test.app.a · UID 10001'), findsOneWidget);
+    expect(find.text('test.app.a'), findsOneWidget);
+    expect(find.text('UID 10001'), findsOneWidget);
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.byType(ApplicationTargetsView), findsNothing);
@@ -784,7 +786,8 @@ void main() {
       final now = DateTime.now();
       final store = ApplicationActivityStore()
         ..setContext('runtime-a', observing: true, now: now)
-        ..addEvent(activityConnection('a'));
+        ..addEvent(activityConnection('a'))
+        ..addEvent(activityConnection('a2', exit: 'node-b'));
       await pump(tester, activity: store.snapshot(), child: targetsPage);
       await tester.tap(find.text('example.test'));
       await tester.pumpAndSettle();
@@ -924,4 +927,127 @@ void main() {
       await screenshot(tester, 'targets-${locale.languageCode}');
     });
   }
+
+  testWidgets('a single distinct route has no redundant expansion', (
+    tester,
+  ) async {
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: DateTime.now())
+      ..addEvent(activityConnection('one'))
+      ..addEvent(activityConnection('two'));
+    await pump(tester, activity: store.snapshot(), child: targetsPage);
+    expect(find.byType(ExpansionTile), findsNothing);
+    final route = find.text('Domain · example.test · node-a → Proxy');
+    expect(route, findsOneWidget);
+    expect(tester.widget<Text>(route).maxLines, isNull);
+    expect(summary('Active —/2'), findsOneWidget);
+    await screenshot(tester, 'target-single-route');
+  });
+
+  testWidgets('package and UID copy their separate raw values', (tester) async {
+    final copied = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied.add((call.arguments as Map)['text'] as String);
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await pump(
+      tester,
+      child: const StatusManager(
+        child: ApplicationTargetsView(
+          appKey: 'package:test.app.a',
+          label: 'Browser A',
+          packageName: 'test.app.a',
+          identity: ApplicationIdentity(
+            status: 'known',
+            uid: 10001,
+            userScope: 'current',
+            packages: ['test.app.a'],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('test.app.a'));
+    await tester.pumpAndSettle();
+    expect(copied, ['test.app.a']);
+    expect(find.text('Copied successfully'), findsOneWidget);
+    await tester.tap(find.text('UID 10001'));
+    await tester.pumpAndSettle();
+    expect(copied, ['test.app.a', '10001']);
+    expect(tester.takeException(), null);
+    await screenshot(tester, 'identity-copy');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'shared UID copy does not toggle candidates and packages copy raw names',
+    (tester) async {
+      final copied = <String>[];
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      await pump(
+        tester,
+        child: const ApplicationTargetsView(
+          appKey: 'shared',
+          label: 'Shared application identity',
+          identity: ApplicationIdentity(
+            status: 'ambiguous',
+            uid: 10001,
+            userScope: 'current',
+            packages: ['test.app.a', 'test.app.b'],
+          ),
+        ),
+      );
+      await tester.tap(find.text('UID 10001'));
+      await tester.pumpAndSettle();
+      expect(find.text('test.app.b'), findsOneWidget);
+      expect(copied, ['10001']);
+      await tester.tap(find.text('test.app.b'));
+      await tester.pumpAndSettle();
+      expect(copied, ['10001', 'test.app.b']);
+    },
+  );
+
+  testWidgets('clipboard failure reports the error and allows another copy', (
+    tester,
+  ) async {
+    var fail = true;
+    final copied = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        if (fail) throw PlatformException(code: 'clipboard-unavailable');
+        copied.add((call.arguments as Map)['text'] as String);
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await pump(tester, child: const StatusManager(child: targetsPage));
+    await tester.tap(find.text('test.app.a'));
+    await tester.pumpAndSettle();
+    expect(copied, isEmpty);
+    expect(find.textContaining('copy to the clipboard'), findsOneWidget);
+    expect(tester.takeException(), null);
+    fail = false;
+    await tester.tap(find.text('test.app.a'));
+    await tester.pumpAndSettle();
+    expect(copied, ['test.app.a']);
+    expect(find.text('Copied successfully'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
