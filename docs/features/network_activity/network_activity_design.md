@@ -191,10 +191,12 @@ ApplicationConnectionsView 默认通过 appKey＋hostKey 过滤同一份保留�
 页面无搜索、汇总统计卡片或手动刷新。标题显示目标，下面显示 App 范围及已观察的目标 IP／端口，
 附原记录具备的 TCP／UDP、地区／ASN。地址去重、可复制，超过三项可展开，不发起 DNS 或 IP 查询来补目标资料。
 
-连接条目直接显示短 ID（点击复制完整 ID）、最后观测上传／下载、实际 chains 的入口到出口顺序和原命中规则。
-ID 与流量共用 activityActiveStyle：已确认活跃使用强调色和稍粗字重，结束和待确认用次要样式；
-tooltip、读屏及展开详情保留准确状态，不另设常驻状态标签。停止／快照失败不被解释为已结束或零活动。
-展开以条目 PageStorage 身份隔离，提供可复制的连接地址、完整时间、协议、规则来源和配置版本，
+连接条目直接显示本地连接开始时间、最后观测上传／下载、实际 chains 的入口到出口顺序和原命中规则。
+首行参考 Recent requests 的 RecordHeader／RecordTimestamp 布局，不重复 Host、应用与源地址等已有上下文。
+时间与流量共用 activityActiveStyle：已确认活跃使用强调色和稍粗字重，结束和待确认用次要样式；
+tooltip 和读屏保留准确状态，不另设常驻状态标签。停止／快照失败不被解释为已结束或零活动。
+点击连接复用 Recent requests 的 TrackerInfoDetailView 及相同导航方式，不再内联展开或维护第二套连接详情。
+传入原连接事实及最后观测的流量计数；不从当前配置重新推断旧连接身份、命中规则或出口。
 不把连接结束当成 HTTP 成功，不提供 URL、响应码、请求耗时、精确结束时间或未取得的最终流量。
 跨 App 菜单扩大查看范围时仍按连接分别展示并标出原应用身份，不修改规则；返回保留前层搜索和滚动位置。
 
@@ -204,7 +206,7 @@ tooltip、读屏及展开详情保留准确状态，不另设常驻状态标签�
 connectionProxyServerIp 从冻结的 remoteDestination 取得公开 IP literal，排除 DIRECT／兼容／拒绝等已知内建出口、
 与目标同址、域名、私网或缺失值；不从节点名称猜国旗，也不使用目标 GeoIP 作为代理 GeoIP。
 本机公网地址只被动读取已有出口检测缓存：未过期、DIRECT 链路、路由戳仍有效且有检测时间；本页不产生公网检测。
-图标 tooltip 和展开内容注明地址角色，国家不可用时图标区域为空。
+图标 tooltip 注明地址角色，国家不可用时图标区域为空；连接详情沿既有页面展示原 remoteDestination。
 
 connectionCountriesProvider 按排序去重地址形成查询键，最多每批 128 项，通过 lookupIpCountries 读取本地 MMDB。
 Go wrapper 在资源读锁下打开独立只读 reader，支持 Meta／Sing／MaxMind 国家记录，排除非公网及多国家歧义，

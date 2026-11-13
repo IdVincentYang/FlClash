@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:fl_clash/common/application_activity.dart';
+import 'package:fl_clash/common/datetime.dart';
+import 'package:fl_clash/features/connection/tracker_info_item.dart';
+import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/manager/status_manager.dart';
@@ -204,6 +207,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Finder row(String id) => find.byKey(ValueKey('connection:runtime-a:$id'));
+
+  TextStyle timestampStyle(WidgetTester tester, String id) =>
+      DefaultTextStyle.of(
+        tester.element(
+          find.descendant(of: row(id), matching: find.byType(RecordTimestamp)),
+        ),
+      ).style;
+
   testWidgets(
     'connections stay separate and show frozen routes, latest bytes and proxy-server flags',
     (tester) async {
@@ -225,31 +237,38 @@ void main() {
       );
       await pump(tester);
       expect(find.byType(TextField), findsNothing);
-      expect(find.text('#8c71f2a9'), findsOneWidget);
-      expect(find.text('#8c71f2aa'), findsOneWidget);
-      expect(find.text('#other-ap'), findsNothing);
+      expect(find.text(a.start.showFull), findsOneWidget);
+      expect(find.text('#8c71f2a9'), findsNothing);
+      expect(find.text(b.start.showFull), findsOneWidget);
+      expect(row('other-app'), findsNothing);
       expect(find.text('Proxy → US 01'), findsOneWidget);
       expect(find.text('Proxy → Other node'), findsOneWidget);
       expect(find.text('↑ 12KB   ↓ 326KB'), findsOneWidget);
-      expect(
-        tester.widget<Text>(find.text('#8c71f2a9')).style!.fontWeight,
-        FontWeight.w600,
-      );
-      expect(
-        tester.widget<Text>(find.text('#8c71f2aa')).style!.fontWeight,
-        FontWeight.normal,
-      );
+      expect(timestampStyle(tester, a.id).fontWeight, FontWeight.w600);
+      expect(timestampStyle(tester, b.id).fontWeight, FontWeight.normal);
       expect(find.text('🇺🇸'), findsOneWidget);
       expect(find.text('🇨🇳'), findsOneWidget);
       expect(find.text('🇯🇵'), findsNothing);
       expect(core.calls.single, ['114.114.114.114', '8.8.8.8']);
+      expect(
+        find.byTooltip(
+          'Proxy server: 8.8.8.8 · US. This is not the website-observed exit.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(ExpansionTile), findsNothing);
       await screenshot(tester, 'host-connections');
       await tester.tap(find.text('Proxy → US 01'));
       await tester.pumpAndSettle();
-      expect(find.text('8c71f2a9-1111'), findsOneWidget);
-      expect(find.text('10.0.2.15:30001'), findsOneWidget);
-      expect(find.textContaining('Proxy server: 8.8.8.8 · US'), findsOneWidget);
-      expect(find.text('input-a'), findsOneWidget);
+      expect(find.byType(TrackerInfoDetailView), findsOneWidget);
+      final detail = tester
+          .widget<TrackerInfoDetailView>(find.byType(TrackerInfoDetailView))
+          .trackerInfo;
+      expect(detail.id, a.id);
+      expect(detail.upload, 12288);
+      expect(detail.download, 333824);
+      expect(detail.metadata, a.metadata);
+      expect(detail.chains, a.chains);
     },
   );
 
@@ -264,15 +283,15 @@ void main() {
       store.applySnapshot([a], startedRevision: store.revision, now: now);
       await pump(tester);
       await menu(tester, 'All apps for this target');
-      expect(find.text('#a'), findsOneWidget);
-      expect(find.text('#b'), findsOneWidget);
+      expect(row('a'), findsOneWidget);
+      expect(row('b'), findsOneWidget);
       expect(find.text('Mail B'), findsOneWidget);
       await menu(tester, 'Only show active connections');
-      expect(find.text('#b'), findsNothing);
+      expect(row('b'), findsNothing);
       store.markUncertain(failed: true);
       notifier.replace(store.snapshot());
       await tester.pumpAndSettle();
-      expect(find.text('#b'), findsOneWidget);
+      expect(row('b'), findsOneWidget);
       expect(
         find.text('Active state is unconfirmed. Showing retained connections.'),
         findsOneWidget,
@@ -280,10 +299,7 @@ void main() {
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
       expect(notifier.refreshes, 1);
-      expect(
-        tester.widget<Text>(find.text('#a')).style!.fontWeight,
-        FontWeight.normal,
-      );
+      expect(timestampStyle(tester, 'a').fontWeight, FontWeight.normal);
     },
   );
 
@@ -332,13 +348,10 @@ void main() {
       notifier.replace(store.snapshot());
       await tester.pumpAndSettle();
       if (reason == 'stopped') {
-        expect(find.text('#a'), findsOneWidget);
-        expect(
-          tester.widget<Text>(find.text('#a')).style!.fontWeight,
-          FontWeight.normal,
-        );
+        expect(row('a'), findsOneWidget);
+        expect(timestampStyle(tester, 'a').fontWeight, FontWeight.normal);
       } else {
-        expect(find.text('#a'), findsNothing);
+        expect(row('a'), findsNothing);
         expect(find.text('No activity observed yet'), findsOneWidget);
       }
     });
@@ -368,7 +381,7 @@ void main() {
       store.addEvent(connection('available'));
       core.fail = true;
       await pump(tester);
-      expect(find.text('#availabl'), findsOneWidget);
+      expect(row('available'), findsOneWidget);
       expect(find.text('🇺🇸'), findsNothing);
       expect(core.calls, hasLength(1));
       expect(tester.takeException(), isNull);
@@ -376,27 +389,47 @@ void main() {
   );
 
   testWidgets(
-    'connection expansion survives insertion and uses last observed counters',
+    'shared details retain the selected connection and use latest observed counters on reopening',
     (tester) async {
       final a = connection('original', offset: 1);
       store.addEvent(a);
       await pump(tester);
-      await tester.tap(find.text('Proxy → US 01'));
+      await tester.tap(row(a.id));
       await tester.pumpAndSettle();
-      expect(find.text('10.0.2.15:30001'), findsOneWidget);
+      expect(find.byType(TrackerInfoDetailView), findsOneWidget);
       final b = connection('new', offset: 2);
       store.addEvent(b);
       store.applySnapshot(
-        [a.copyWith(upload: 2048), b],
+        [
+          a.copyWith(upload: 2048, chains: ['Changed node']),
+          b,
+        ],
         startedRevision: store.revision,
         now: now,
       );
       notifier.replace(store.snapshot());
       await tester.pumpAndSettle();
-      expect(find.text('10.0.2.15:30001'), findsOneWidget);
-      expect(find.text('10.0.2.15:30002'), findsNothing);
+      expect(
+        tester
+            .widget<TrackerInfoDetailView>(find.byType(TrackerInfoDetailView))
+            .trackerInfo
+            .id,
+        a.id,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.text('↑ 2KB   ↓ 0B'), findsOneWidget);
-      expect(find.text('2KB'), findsOneWidget);
+      expect(find.text(a.start.showFull), findsOneWidget);
+      expect(find.text(b.start.showFull), findsOneWidget);
+      await tester.tap(row(a.id));
+      await tester.pumpAndSettle();
+      final detail = tester
+          .widget<TrackerInfoDetailView>(find.byType(TrackerInfoDetailView))
+          .trackerInfo;
+      expect(detail.id, a.id);
+      expect(detail.upload, 2048);
+      expect(detail.chains, a.chains);
+      expect(detail.metadata.sourcePort, '30001');
       expect(core.calls, hasLength(1));
     },
   );
@@ -409,19 +442,14 @@ void main() {
       );
       await pump(tester, localIp: '8.8.8.8');
       expect(find.text('🇺🇸'), findsOneWidget);
-      await tester.tap(find.text('DIRECT'));
-      await tester.pumpAndSettle();
       expect(
-        find.textContaining(
-          'Local public IP (recent observation): 8.8.8.8 · US',
-        ),
+        find.byTooltip('Local public IP (recent observation): 8.8.8.8 · US'),
         findsOneWidget,
       );
-      expect(find.text('Proxy server address'), findsNothing);
     },
   );
 
-  testWidgets('connection ID copy reports clipboard failure and can retry', (
+  testWidgets('observed address copy reports clipboard failure and can retry', (
     tester,
   ) async {
     store.addEvent(connection('12345678-complete-id'));
@@ -439,13 +467,13 @@ void main() {
       () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
     );
     await pump(tester);
-    await tester.tap(find.text('#12345678'));
+    await tester.tap(find.text('192.0.2.1:443'));
     await tester.pumpAndSettle();
     expect(find.textContaining('copy to the clipboard'), findsOneWidget);
     fail = false;
-    await tester.tap(find.text('#12345678'));
+    await tester.tap(find.text('192.0.2.1:443'));
     await tester.pumpAndSettle();
-    expect(copied, ['12345678-complete-id']);
+    expect(copied, ['192.0.2.1:443']);
   });
 
   for (final locale in const [
@@ -466,10 +494,10 @@ void main() {
       );
       await pump(tester, width: 320, scale: 1.7, locale: locale);
       expect(tester.takeException(), isNull);
+      await screenshot(tester, 'host-connections-${locale.languageCode}');
       await tester.tap(find.textContaining('A very long proxy group name'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await screenshot(tester, 'host-connections-${locale.languageCode}');
     });
   }
 

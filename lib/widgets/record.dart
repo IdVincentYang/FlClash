@@ -193,7 +193,7 @@ class DetailRow extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               spacing: 20,
               children: [
-                Text(title),
+                Flexible(child: Text(title)),
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerRight,

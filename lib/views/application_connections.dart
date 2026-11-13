@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/features/connection/tracker_info_item.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
@@ -179,7 +180,6 @@ class _ApplicationConnectionsViewState
             key: ValueKey(
               'connection:${activity.runtimeEpoch}:${record.info.id}',
             ),
-            storageKey: '${activity.runtimeEpoch}:${record.info.id}',
             record: record,
             active: activity.fresh ? record.active : null,
             appLabel: _allApps
@@ -286,7 +286,6 @@ class _ObservedAddressesState extends State<_ObservedAddresses> {
 class _ConnectionRow extends StatelessWidget {
   const _ConnectionRow({
     super.key,
-    required this.storageKey,
     required this.record,
     required this.active,
     this.appLabel,
@@ -294,7 +293,6 @@ class _ConnectionRow extends StatelessWidget {
     this.countryIp,
     this.serverIp,
   });
-  final String storageKey;
   final ActivityConnection record;
   final bool? active;
   final String? appLabel, country, countryIp, serverIp;
@@ -303,13 +301,13 @@ class _ConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.appLocalizations;
     final info = record.info;
-    final shortId = info.id.length > 8 ? info.id.substring(0, 8) : info.id;
     final state = active == null
         ? l.activityPending
         : active!
         ? l.activityActive
         : l.activityConnectionEnded;
     final style = activityActiveStyle(context, active);
+    final textStyles = RecordTextStyles.of(context);
     final countryLabel = country == null
         ? null
         : serverIp == null
@@ -319,11 +317,20 @@ class _ConnectionRow extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        key: PageStorageKey('connection-details:$storageKey'),
-        shape: AppShape.xl,
-        collapsedShape: AppShape.xl,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        onTap: () => showExtend(
+          context,
+          builder: (_) => CommonScaffold(
+            title: l.details(l.request),
+            body: TrackerInfoDetailView(
+              trackerInfo: info.copyWith(
+                upload: record.upload,
+                download: record.download,
+              ),
+            ),
+          ),
+        ),
         leading: SizedBox(
           width: 28,
           child: country == null
@@ -342,146 +349,40 @@ class _ConnectionRow extends StatelessWidget {
                   ),
                 ),
         ),
-        trailing: const GlyphIcon(AppGlyphs.chevronDown),
-        title: LayoutBuilder(
-          builder: (context, constraints) {
-            final id = Tooltip(
-              message: '${l.activityConnectionId(info.id)} · $state',
-              child: TextButton(
-                onPressed: () => _copy(context, info.id),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 36),
-                  alignment: Alignment.centerLeft,
-                  textStyle: context.textTheme.bodyMedium,
-                ),
-                child: Text('#$shortId', style: style),
+        title: RecordHeader(
+          trailing: Semantics(
+            label:
+                '${l.activityObservedUpload}: ${record.upload.traffic.show}, ${l.activityObservedDownload}: ${record.download.traffic.show}, $state',
+            excludeSemantics: true,
+            child: Text(
+              '↑ ${record.upload.traffic.show}   ↓ ${record.download.traffic.show}',
+              style: style,
+            ),
+          ),
+          children: [
+            Tooltip(
+              message: '${l.creationTime}: ${info.start.showFull} · $state',
+              child: DefaultTextStyle.merge(
+                style: style,
+                child: RecordTimestamp(info.start.showFull),
               ),
-            );
-            final traffic = Semantics(
-              label:
-                  '${l.activityObservedUpload}: ${record.upload.traffic.show}, ${l.activityObservedDownload}: ${record.download.traffic.show}, $state',
-              excludeSemantics: true,
-              child: Text(
-                '↑ ${record.upload.traffic.show}   ↓ ${record.download.traffic.show}',
-                style: context.textTheme.bodySmall?.merge(style),
-              ),
-            );
-            if (constraints.maxWidth < 230 ||
-                MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [id, traffic],
-              );
-            }
-            return Row(
-              children: [
-                id,
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: traffic,
-                  ),
-                ),
-              ],
-            );
-          },
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 4,
           children: [
-            if (appLabel != null)
-              Text(appLabel!, style: context.textTheme.labelSmall),
+            if (appLabel != null) Text(appLabel!, style: textStyles.secondary),
             Text(
               info.chains.isEmpty
                   ? l.unknown
                   : info.chains.reversed.join(' → '),
+              style: textStyles.primary,
             ),
-            Text(
-              activityRuleText(context, info),
-              style: context.textTheme.bodySmall,
-            ),
+            Text(activityRuleText(context, info), style: textStyles.secondary),
           ],
         ),
-        children: [
-          _ConnectionDetails(
-            record: record,
-            state: state,
-            countryLabel: countryLabel,
-            serverIp: serverIp,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ConnectionDetails extends StatelessWidget {
-  const _ConnectionDetails({
-    required this.record,
-    required this.state,
-    required this.countryLabel,
-    required this.serverIp,
-  });
-  final ActivityConnection record;
-  final String state;
-  final String? countryLabel, serverIp;
-  @override
-  Widget build(BuildContext context) {
-    final l = context.appLocalizations;
-    final info = record.info, metadata = info.metadata;
-    final provenance = info.provenance;
-    final config = info.observation?.configuration;
-    final entries = <(String, String)>[
-      (l.activityConnectionIdLabel, info.id),
-      (l.activityConnectionState, state),
-      (l.creationTime, info.start.toLocal().showFull),
-      (l.activityLastLabel, record.activityAt.toLocal().showFull),
-      (l.networkType, metadata.network.toUpperCase()),
-      (l.source, _endpoint(metadata.sourceIP, metadata.sourcePort)),
-      (
-        l.destination,
-        _endpoint(metadata.destinationIP, metadata.destinationPort),
-      ),
-      (l.activityProxyServerAddress, serverIp ?? ''),
-      (l.country, countryLabel ?? ''),
-      (l.activityObservedUpload, record.upload.traffic.show),
-      (l.activityObservedDownload, record.download.traffic.show),
-      if (provenance?['known'] == true) ...[
-        (
-          l.sourceRuleOrigin,
-          '${provenance?['label'] ?? provenance?['origin'] ?? l.unknown}',
-        ),
-        (
-          l.sourceAppliedRevision,
-          '${provenance?['appliedRevision'] ?? l.unknown}',
-        ),
-        (
-          l.ruleSet,
-          (provenance?['ruleSets'] as List? ?? const [])
-              .whereType<Map>()
-              .map((set) => '${set['name']} @ ${set['revision']}')
-              .join(', '),
-        ),
-      ],
-      if (config?.status == 'known') (l.activityConfiguration, config!.inputId),
-      (l.dnsMode, metadata.dnsMode?.name ?? ''),
-    ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Column(
-        children: [
-          for (final (label, value) in entries)
-            if (value.isNotEmpty)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(label, style: context.textTheme.labelMedium),
-                subtitle: Text(value),
-                onTap: () => _copy(context, value),
-              ),
-        ],
       ),
     );
   }
