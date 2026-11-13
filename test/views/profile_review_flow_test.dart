@@ -71,7 +71,10 @@ void main() {
   late ProviderContainer container;
   late _Setup setup;
   late _Profiles profiles;
-  final profile = Profile.normal(label: 'Review fixture');
+  final profile = Profile.normal(
+    label: 'Review fixture',
+    url: 'https://example.test/subscription',
+  );
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -182,7 +185,7 @@ void main() {
   for (final selected in [true, false]) {
     for (final pending in [true, false]) {
       testWidgets(
-        'profile card opens review only when required: selected=$selected, pending=$pending',
+        'URL card reviews pending sources or uses subscription: selected=$selected, pending=$pending',
         (tester) async {
           final selections = <int?>[];
           profiles.checkStatus = () async =>
@@ -205,9 +208,9 @@ void main() {
             expect(find.byType(EditProfileView), findsNothing);
           } else {
             expect(profiles.reviews, isEmpty);
-            expect(find.byType(EditProfileView), findsOneWidget);
+            expect(find.byType(EditProfileView), findsNothing);
           }
-          expect(selections, isEmpty);
+          expect(selections, pending || selected ? isEmpty : [profile.id]);
           expect(setup.applications, 0);
           await tester.pumpWidget(const SizedBox.shrink());
         },
@@ -276,17 +279,18 @@ void main() {
 
   for (final failure in [false, true]) {
     testWidgets(
-      'unknown permission status keeps edit available: failure=$failure',
+      'unknown permission status retains Use behavior without accepting sources: failure=$failure',
       (tester) async {
         final gate = Completer<SourceReviewStatus>();
+        final selections = <int?>[];
         profiles.checkStatus = () => gate.future;
         await pump(
           tester,
           Scaffold(
             body: ProfileItem(
               profile: profile,
-              groupValue: profile.id,
-              onChanged: (_) => fail('card tap must not select'),
+              groupValue: null,
+              onChanged: selections.add,
               sourceReviewEnabled: true,
             ),
           ),
@@ -297,10 +301,9 @@ void main() {
           expect(find.text('Permissions unavailable · retry'), findsOneWidget);
           await tester.tap(find.text(profile.realLabel));
           await tester.pumpAndSettle();
-          expect(find.byType(EditProfileView), findsOneWidget);
+          expect(find.byType(EditProfileView), findsNothing);
+          expect(selections, [profile.id]);
           expect(profiles.reviews, isEmpty);
-          globalState.navigatorKey.currentState!.pop();
-          await tester.pumpAndSettle();
           profiles.checkStatus = () async => SourceReviewStatus.required;
           await tester.tap(find.text('Permissions unavailable · retry'));
           await tester.pumpAndSettle();
@@ -312,7 +315,8 @@ void main() {
         if (!failure) {
           await tester.tap(find.text(profile.realLabel));
           await tester.pumpAndSettle();
-          expect(find.byType(EditProfileView), findsOneWidget);
+          expect(find.byType(EditProfileView), findsNothing);
+          expect(selections, [profile.id]);
           expect(profiles.reviews, isEmpty);
         }
         await tester.pumpWidget(const SizedBox.shrink());
@@ -320,4 +324,22 @@ void main() {
       },
     );
   }
+  testWidgets('file profile card retains its edit action', (tester) async {
+    await pump(
+      tester,
+      Scaffold(
+        body: ProfileItem(
+          profile: profile.copyWith(url: ''),
+          groupValue: null,
+          onChanged: (_) => fail('file card keeps its existing edit action'),
+          sourceReviewEnabled: false,
+        ),
+      ),
+    );
+    await tester.tap(find.text(profile.realLabel));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditProfileView), findsOneWidget);
+    expect(profiles.reviews, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

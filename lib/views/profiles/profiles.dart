@@ -453,6 +453,8 @@ class ProfileItem extends ConsumerWidget {
       onPressed: () {
         if (needsReview) {
           unawaited(_handleReviewSource(ref));
+        } else if (profile.type == ProfileType.url) {
+          if (profile.id != groupValue) onChanged(profile.id);
         } else {
           _handleShowEditExtendPage(context);
         }
