@@ -1197,5 +1197,22 @@
   "sourcePartialBlocked": "次の必須依存関係が不足しているため部分設定を生成できません",
   "sourceConfigurationUnavailable": "完全なソース設定を利用できない理由",
   "sourceNodeImportHint": "読み込んだノードを利用できます。アプリのネットワーク設定と1つのプロキシグループを使い、ソースのルール、DNS、元のグループは適用しません。元の URL を保持し、自動更新を停止します。手動更新で完全な設定を再試行できます。",
-  "sourcePartialSettings": "無効化される DNS ポリシー"
+  "sourcePartialSettings": "無効化される DNS ポリシー",
+  "activityAllAppsForTarget": "この接続先のすべてのアプリ",
+  "activityOnlyActiveConnections": "アクティブな接続のみ表示",
+  "activityConnectionsUnconfirmed": "アクティブ状態を確認できないため、保持された接続を表示しています。",
+  "activityObservedAddresses": "観測した宛先アドレス",
+  "activityFewerAddresses": "アドレスを折りたたむ",
+  "activityMoreAddresses": "他の {count} 件のアドレスを表示",
+  "activityConnectionId": "接続 {id}",
+  "activityConnectionIdLabel": "接続 ID",
+  "activityConnectionState": "接続状態",
+  "activityConnectionEnded": "終了",
+  "activityProxyServerCountry": "プロキシサーバー: {ip} · {country}。サイトから見える出口とは異なる場合があります。",
+  "activityLocalPublicCountry": "端末の公開 IP（最近の観測）: {ip} · {country}",
+  "activityObservedUpload": "観測した送信量",
+  "activityObservedDownload": "観測した受信量",
+  "activityLastLabel": "最終アクティビティ",
+  "activityProxyServerAddress": "プロキシサーバーアドレス",
+  "activityConfiguration": "接続時の設定"
 }

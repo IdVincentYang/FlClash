@@ -1197,5 +1197,22 @@
   "sourcePartialBlocked": "以下必要依赖缺失，无法生成部分配置",
   "sourceConfigurationUnavailable": "完整来源配置暂不可用的原因",
   "sourceNodeImportHint": "已获取的节点可以使用。此配置使用应用网络设置和一个代理分组，暂不采用来源的规则、DNS 和原分组。保留原 URL，关闭自动更新；手动更新可重试完整配置。",
-  "sourcePartialSettings": "将停用的 DNS 策略"
+  "sourcePartialSettings": "将停用的 DNS 策略",
+  "activityAllAppsForTarget": "查看所有应用对此目标的连接",
+  "activityOnlyActiveConnections": "仅显示活跃连接",
+  "activityConnectionsUnconfirmed": "活动状态暂无法确认，显示保留的连接。",
+  "activityObservedAddresses": "已观察到的目标地址",
+  "activityFewerAddresses": "收起地址",
+  "activityMoreAddresses": "展开其余 {count} 个地址",
+  "activityConnectionId": "连接 {id}",
+  "activityConnectionIdLabel": "连接 ID",
+  "activityConnectionState": "连接状态",
+  "activityConnectionEnded": "已结束",
+  "activityProxyServerCountry": "代理服务器：{ip} · {country}，不代表网站看到的出口。",
+  "activityLocalPublicCountry": "本机公网 IP（最近检测）：{ip} · {country}",
+  "activityObservedUpload": "已观察上传",
+  "activityObservedDownload": "已观察下载",
+  "activityLastLabel": "最近活动",
+  "activityProxyServerAddress": "代理服务器地址",
+  "activityConfiguration": "连接采用的配置"
 }

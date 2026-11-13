@@ -350,8 +350,14 @@ retention, lifecycle and observation limits.
 App rows navigate through BaseNavigator to ApplicationTargetsView, keyed by the original application identity.
 The target page consumes hostsForApp from the same provider, keeps search and active filtering local, and exposes frozen
 shared-UID candidates without selecting one package. Unknown active states suspend filtering rather than hide retained data.
-Rule/exit expansion preserves actual pairs and uses per-host PageStorage keys, so live reordering cannot transfer expansion.
-Both pages use ActivityConnectionSummary for compact count/time styling and semantics; neither owns service transitions.
+Target rows navigate to ApplicationConnectionsView. Its stable per-connection rows retain app/host scope and return context;
+no search or host-level statistics are repeated. Addresses above the list are deduplicated from retained metadata only.
+ActivityConnectionSummary and connection ID/traffic reuse activityActiveStyle. Both page layers remain read-only.
+The new country icon means the proxy server address's local GeoIP country, not the website-observed exit. DIRECT may use
+an already measured, current DIRECT public-IP cache entry, without triggering a probe. Missing countries stay blank.
+connectionCountriesProvider batches literal addresses to the parent Go wrapper's lookupIpCountries RPC; a scoped,
+resource-locked MMDB reader avoids global-reader initialization/downloads and connection hot-path work. Address arguments
+are excluded from RPC logs. No new route, capture, lifecycle or source-acceptance owner is introduced.
 
 Go event delivery is intentionally non-blocking:
 

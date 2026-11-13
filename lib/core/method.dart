@@ -22,6 +22,7 @@ enum CoreMethod {
   asyncTestDelay,
   probe,
   outboundIp,
+  lookupIpCountries,
   serviceCheck,
   getConnections,
   getConnectionCount,

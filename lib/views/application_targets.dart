@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
@@ -7,6 +5,8 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+
+import 'application_connections.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -156,6 +156,14 @@ class _ApplicationTargetsViewState
                 return _TargetActivityRow(
                   key: ValueKey('target:${host.key}'),
                   host: host,
+                  onPressed: () => BaseNavigator.push(
+                    context,
+                    ApplicationConnectionsView(
+                      appKey: widget.appKey,
+                      hostKey: host.key,
+                      appLabel: label,
+                    ),
+                  ),
                 );
               },
             ),
@@ -252,87 +260,46 @@ class _ApplicationIdentity extends StatelessWidget {
 }
 
 class _TargetActivityRow extends StatelessWidget {
-  const _TargetActivityRow({super.key, required this.host});
+  const _TargetActivityRow({
+    required super.key,
+    required this.host,
+    required this.onPressed,
+  });
 
   final HostActivity host;
-
-  String _rule(BuildContext context, TrackerInfo info) {
-    if (info.rule.isNotEmpty) {
-      return info.rulePayload.isEmpty
-          ? info.rule
-          : '${info.rule} · ${info.rulePayload}';
-    }
-    final config = info.observation?.configuration;
-    return config?.status == 'known' &&
-            (config?.mode == 'global' || config?.mode == 'direct')
-        ? context.appLocalizations.activityRulesBypassed
-        : context.appLocalizations.unknown;
-  }
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.appLocalizations;
-    final routes = {
-      for (final connection in host.totals.connections)
-        jsonEncode([_rule(context, connection.info), connection.info.chains]):
-            connection.info,
-    };
-    final rules = routes.values.map((info) => _rule(context, info)).toSet();
-    final title = Text(
-      host.target.isEmpty ? l10n.activityUnknownTarget : host.target,
-    );
-    final subtitle = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ActivityConnectionSummary(totals: host.totals),
-        Text(
-          routes.length == 1
-              ? '${_rule(context, routes.values.single)} · ${routes.values.single.chains.isEmpty ? l10n.unknown : routes.values.single.chains.join(' → ')}'
-              : l10n.activityRouteCounts(
-                  rules.length,
-                  host.totals.exitPaths.length,
-                ),
-          style: context.textTheme.bodySmall,
-        ),
-      ],
-    );
+    final rules = host.totals.rules;
+    final exits = host.totals.exitPaths;
+    final single = host.totals.connections.first.info;
     return Card.filled(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
-      child: routes.length == 1
-          ? ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 4,
-              ),
-              title: title,
-              subtitle: subtitle,
-            )
-          : ExpansionTile(
-              key: PageStorageKey('target-details:${host.key}'),
-              shape: AppShape.xl,
-              collapsedShape: AppShape.xl,
-              trailing: const _ActivityExpansionIcon(),
-              tilePadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 4,
-              ),
-              title: title,
-              subtitle: subtitle,
-              children: [
-                for (final info in routes.values)
-                  ListTile(
-                    title: Text(_rule(context, info)),
-                    subtitle: Text(
-                      info.chains.isEmpty
-                          ? l10n.unknown
-                          : info.chains.join(' → '),
-                    ),
-                  ),
-              ],
+      child: ListTile(
+        onTap: onPressed,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        title: Text(
+          host.target.isEmpty ? l10n.activityUnknownTarget : host.target,
+        ),
+        subtitle: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ActivityConnectionSummary(totals: host.totals),
+            Text(
+              rules.length == 1 && exits.length == 1
+                  ? '${activityRuleText(context, single)} · ${single.chains.isEmpty ? l10n.unknown : single.chains.join(' → ')}'
+                  : l10n.activityRouteCounts(rules.length, exits.length),
+              style: context.textTheme.bodySmall,
             ),
+          ],
+        ),
+        trailing: const GlyphIcon(AppGlyphs.chevronForward),
+      ),
     );
   }
 }

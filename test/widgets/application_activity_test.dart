@@ -11,6 +11,8 @@ import 'package:fl_clash/providers/config_state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/application_activity.dart';
 import 'package:fl_clash/views/application_targets.dart';
+import 'package:fl_clash/views/application_connections.dart';
+import 'package:fl_clash/providers/connection_countries.dart';
 import 'package:fl_clash/views/tools.dart';
 import 'package:fl_clash/widgets/popup.dart';
 import 'package:material_ui/material_ui.dart';
@@ -99,6 +101,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         configStateProvider.overrideWith(TestConfigState.new),
+        observedLocalPublicIpProvider.overrideWithValue(null),
         applicationActivityProvider.overrideWith(
           () => _Activity(activity ?? _activity()),
         ),
@@ -617,8 +620,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Domain · EXAMPLE.test.'), findsOneWidget);
     expect(find.text('RuleSet · Domestic'), findsOneWidget);
-    expect(find.text('node-a → Proxy'), findsOneWidget);
-    expect(find.text('node-b → Proxy'), findsOneWidget);
+    expect(find.text('Proxy → node-a'), findsOneWidget);
+    expect(find.text('Proxy → node-b'), findsOneWidget);
     expect(find.text('Save'), findsNothing);
     await screenshot(tester, 'targets-routes');
   });
@@ -781,7 +784,7 @@ void main() {
   });
 
   testWidgets(
-    'expanded route results survive live updates and list reordering',
+    'connection detail retains scope through target updates and returns to updated targets',
     (tester) async {
       final now = DateTime.now();
       final store = ApplicationActivityStore()
@@ -795,7 +798,11 @@ void main() {
       (container.read(applicationActivityProvider.notifier) as _Activity)
           .replace(store.snapshot());
       await tester.pumpAndSettle();
-      expect(find.text('node-a → Proxy'), findsOneWidget);
+      expect(find.text('Proxy → node-a'), findsOneWidget);
+      expect(find.byType(ApplicationConnectionsView), findsOneWidget);
+      expect(find.text('new.test'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.text('new.test'), findsOneWidget);
     },
   );

@@ -1197,5 +1197,22 @@
   "sourcePartialBlocked": "Required dependencies prevent a partial configuration",
   "sourceConfigurationUnavailable": "Why the full source configuration is unavailable",
   "sourceNodeImportHint": "The loaded nodes can be used. This configuration uses app network settings and one proxy group; source rules, DNS and original groups are not applied. The original URL is kept and automatic refresh is off. Update manually to retry the complete configuration.",
-  "sourcePartialSettings": "DNS policies to disable"
+  "sourcePartialSettings": "DNS policies to disable",
+  "activityAllAppsForTarget": "All apps for this target",
+  "activityOnlyActiveConnections": "Only show active connections",
+  "activityConnectionsUnconfirmed": "Active state is unconfirmed. Showing retained connections.",
+  "activityObservedAddresses": "Observed destination addresses",
+  "activityFewerAddresses": "Show fewer addresses",
+  "activityMoreAddresses": "Show {count} more addresses",
+  "activityConnectionId": "Connection {id}",
+  "activityConnectionIdLabel": "Connection ID",
+  "activityConnectionState": "Connection state",
+  "activityConnectionEnded": "Ended",
+  "activityProxyServerCountry": "Proxy server: {ip} · {country}. This is not the website-observed exit.",
+  "activityLocalPublicCountry": "Local public IP (recent observation): {ip} · {country}",
+  "activityObservedUpload": "Observed upload",
+  "activityObservedDownload": "Observed download",
+  "activityLastLabel": "Last activity",
+  "activityProxyServerAddress": "Proxy server address",
+  "activityConfiguration": "Connection configuration"
 }

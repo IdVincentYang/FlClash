@@ -1197,5 +1197,22 @@
   "sourcePartialBlocked": "Обязательные зависимости препятствуют созданию частичной конфигурации",
   "sourceConfigurationUnavailable": "Почему полная конфигурация источника недоступна",
   "sourceNodeImportHint": "Загруженные узлы доступны. Используются сетевые настройки приложения и одна группа прокси; правила, DNS и исходные группы источника не применяются. Исходный URL сохранён, автообновление выключено. Обновите вручную для повторной проверки полной конфигурации.",
-  "sourcePartialSettings": "Отключаемые политики DNS"
+  "sourcePartialSettings": "Отключаемые политики DNS",
+  "activityAllAppsForTarget": "Все приложения для этой цели",
+  "activityOnlyActiveConnections": "Только активные соединения",
+  "activityConnectionsUnconfirmed": "Активность не подтверждена. Показаны сохранённые соединения.",
+  "activityObservedAddresses": "Наблюдаемые адреса назначения",
+  "activityFewerAddresses": "Свернуть адреса",
+  "activityMoreAddresses": "Ещё {count} адресов",
+  "activityConnectionId": "Соединение {id}",
+  "activityConnectionIdLabel": "ID соединения",
+  "activityConnectionState": "Состояние соединения",
+  "activityConnectionEnded": "Завершено",
+  "activityProxyServerCountry": "Прокси-сервер: {ip} · {country}. Это не выход, наблюдаемый сайтом.",
+  "activityLocalPublicCountry": "Публичный IP устройства (последняя проверка): {ip} · {country}",
+  "activityObservedUpload": "Наблюдаемый исходящий трафик",
+  "activityObservedDownload": "Наблюдаемый входящий трафик",
+  "activityLastLabel": "Последняя активность",
+  "activityProxyServerAddress": "Адрес прокси-сервера",
+  "activityConfiguration": "Конфигурация соединения"
 }

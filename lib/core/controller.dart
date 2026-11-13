@@ -265,6 +265,9 @@ class CoreController {
 
   Future<ProbeResult?> probe(ProbeParams params) => _interface.probe(params);
 
+  Future<Map<String, String>> lookupIpCountries(List<String> ips) =>
+      _interface.lookupIpCountries(ips);
+
   Future<OutboundIpResult?> outboundIp(OutboundIpParams params) =>
       _interface.outboundIp(params);
 

@@ -280,6 +280,9 @@ var methodHandlers = map[CoreMethod]methodHandler{
 			response.success(handleOutboundIp(params))
 		})
 	}),
+	lookupIpCountriesMethod: withArguments(func(ips *[]string, response MethodResponse) {
+		response.success(handleLookupIPCountries(*ips))
+	}),
 	serviceCheckMethod: withArguments(func(params *ServiceCheckParams, response MethodResponse) {
 		safeGo(response, func() {
 			response.success(handleServiceCheck(params))

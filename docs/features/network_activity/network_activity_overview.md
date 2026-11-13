@@ -4,10 +4,10 @@
 把应用是否由 FlClash 接管、接管后的分流，以及实际网络活动放进同一套 UI。
 用户从活动中的 App 或 Target Host 发现问题，就地调整对应范围的策略，再观察新连接的结果。
 
-本文维护需求、UI 关系和核心功能边界，供具体页面实现时细化。已实现内存汇总、应用活动及某 App 的目标列表只读页；
-目标详情页与快捷规则操作尚未实现。
+本文维护需求、UI 关系和核心功能边界，供具体页面实现时细化。已实现内存汇总、应用活动、某 App 的目标列表和目标逐连接详情只读页；
+快捷规则操作尚未实现。
 现有能力见[实现基础](#实现基础)，功能依赖与顺序见[Plan](network_activity_plan.md)，实现分解见[Tasks](network_activity_tasks.md)。
-已实现的连接观测、汇总、前两层页面及覆盖边界见 [Design](network_activity_design.md)，不代表完整三层 UI 已交付。
+已实现的连接观测、汇总、三层页面及覆盖边界见 [Design](network_activity_design.md)，分流和接管修改仍由后续任务交付。
 
 ## 入口与三层 UI
 
@@ -21,10 +21,10 @@
 | --- | --- | --- |
 | 应用活动 | 当前或近期活动过的 App；接管状态、默认策略、活跃连接数、最近活动及出口概况 | 修改接管范围或 App 默认策略；搜索、筛选；进入某个 App |
 | 某 App 的 Target Host 列表 | 按 Host 汇总该 App 的连接；活跃状态、连接次数、最近活动、命中规则及实际出口概况 | 修改 App 默认策略；为所选 Host 设置该 App 的例外；进入 Host 详情 |
-| 某 Target Host 的活动详情 | 默认限定“当前 App → 当前 Host”；展示当前策略、当时命中的规则、实际出口和近期连接变化 | 修改该 App 对此 Host 的规则；查看规则来源与采用状态；观察修改后的新连接 |
+| 某 Target Host 的活动详情 | 默认限定“当前 App → 当前 Host”；逐条连接显示 ID、观测流量、当时规则和实际出口，展开排查 | 修改该 App 对此 Host 的规则；查看规则来源与采用状态；观察修改后的新连接 |
 
-列表以 App、Host 聚合，不以日志式时间流水为主。同一 Host 的多次连接主要表现为一个条目及统计，
-具体连接只作为可展开的排查信息。一个 App 或 Host 可以命中多条规则、经过多个出口，不能压成一个“当前规则”。
+前两层列表以 App、Host 聚合；目标详情按连接逐项排列。同一 Host 的多次连接主要表现为一个条目及统计，
+目标详情按连接逐项展示，其地址、时间和来源等排查信息可展开。一个 App 或 Host 可以命中多条规则、经过多个出口，不能压成一个“当前规则”。
 默认策略与实际连接结果分别展示。
 
 应用活动页提供“全部应用”的筛选或入口，使未活动、尚未接管的已安装 App 也能被配置，
@@ -99,7 +99,7 @@ Target Host 以可识别的域名为主，无域名时展示 IP，不能猜测�
 | 能力 | 当前覆盖及新增需求 |
 | --- | --- |
 | 应用接管范围 | [Access control](../../../lib/views/access.dart)已有范围设置；需接入三层 UI，保持同一设置来源 |
-| 网络活动数据 | [Live connections](../../../lib/views/connection/connections.dart)读取当前连接；[Requests](../../../lib/providers/app.dart)有近期内存缓冲；另有统一的有界汇总、[应用活动页](../../../lib/views/application_activity.dart)及[某 App 的目标列表](../../../lib/views/application_targets.dart)，目标详情尚未交付 |
+| 网络活动数据 | [Live connections](../../../lib/views/connection/connections.dart)读取当前连接；[Requests](../../../lib/providers/app.dart)有近期内存缓冲；另有统一的有界汇总、[应用活动页](../../../lib/views/application_activity.dart)及[某 App 的目标列表](../../../lib/views/application_targets.dart)，另有目标逐连接详情 |
 | 应用与目标匹配 | Core 已有应用识别及组合规则基础；需补应用策略、Host 例外的持久配置、采用反馈与就地编辑 |
 | 分组目标 | 沿用[订阅组与自建组](../proxies/local_groups_design.md)的可用范围与失效处理，不引入跨订阅节点池 |
 

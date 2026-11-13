@@ -36,6 +36,8 @@ mixin CoreInterface {
 
   Future<OutboundIpResult?> outboundIp(OutboundIpParams params);
 
+  Future<Map<String, String>> lookupIpCountries(List<String> ips);
+
   Future<List<ServiceCheckItem>> serviceCheck(ServiceCheckParams params);
 
   Future<String> updateConfig(UpdateParams updateParams);
@@ -165,6 +167,8 @@ abstract class CoreHandlerInterface with CoreInterface {
         commonPrint.log(
           method == CoreMethod.outboundIp
               ? 'Invoke method outboundIp'
+              : method == CoreMethod.lookupIpCountries
+              ? 'Invoke method lookupIpCountries'
               : 'Invoke method ${method.name} ${DateTime.now()} $arguments',
         );
       },
@@ -503,6 +507,21 @@ abstract class CoreHandlerInterface with CoreInterface {
       timeout: probeGuardDuration(params),
     );
     return data == null ? null : ProbeResult.fromJson(data);
+  }
+
+  @override
+  Future<Map<String, String>> lookupIpCountries(List<String> ips) async {
+    final data = await _invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.lookupIpCountries,
+      arguments: ips,
+    );
+    return {
+      for (final entry in (data ?? const <String, dynamic>{}).entries)
+        if (ips.contains(entry.key) &&
+            entry.value is String &&
+            RegExp(r'^[A-Z]{2}$').hasMatch(entry.value as String))
+          entry.key: entry.value as String,
+    };
   }
 
   @override

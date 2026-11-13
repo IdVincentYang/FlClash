@@ -10207,6 +10207,176 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `All apps for this target`
+  String get activityAllAppsForTarget {
+    return Intl.message(
+      'All apps for this target',
+      name: 'activityAllAppsForTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only show active connections`
+  String get activityOnlyActiveConnections {
+    return Intl.message(
+      'Only show active connections',
+      name: 'activityOnlyActiveConnections',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Active state is unconfirmed. Showing retained connections.`
+  String get activityConnectionsUnconfirmed {
+    return Intl.message(
+      'Active state is unconfirmed. Showing retained connections.',
+      name: 'activityConnectionsUnconfirmed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observed destination addresses`
+  String get activityObservedAddresses {
+    return Intl.message(
+      'Observed destination addresses',
+      name: 'activityObservedAddresses',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Show fewer addresses`
+  String get activityFewerAddresses {
+    return Intl.message(
+      'Show fewer addresses',
+      name: 'activityFewerAddresses',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Show {count} more addresses`
+  String activityMoreAddresses(Object count) {
+    return Intl.message(
+      'Show $count more addresses',
+      name: 'activityMoreAddresses',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Connection {id}`
+  String activityConnectionId(Object id) {
+    return Intl.message(
+      'Connection $id',
+      name: 'activityConnectionId',
+      desc: '',
+      args: [id],
+    );
+  }
+
+  /// `Connection ID`
+  String get activityConnectionIdLabel {
+    return Intl.message(
+      'Connection ID',
+      name: 'activityConnectionIdLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connection state`
+  String get activityConnectionState {
+    return Intl.message(
+      'Connection state',
+      name: 'activityConnectionState',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Ended`
+  String get activityConnectionEnded {
+    return Intl.message(
+      'Ended',
+      name: 'activityConnectionEnded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy server: {ip} · {country}. This is not the website-observed exit.`
+  String activityProxyServerCountry(Object ip, Object country) {
+    return Intl.message(
+      'Proxy server: $ip · $country. This is not the website-observed exit.',
+      name: 'activityProxyServerCountry',
+      desc: '',
+      args: [ip, country],
+    );
+  }
+
+  /// `Local public IP (recent observation): {ip} · {country}`
+  String activityLocalPublicCountry(Object ip, Object country) {
+    return Intl.message(
+      'Local public IP (recent observation): $ip · $country',
+      name: 'activityLocalPublicCountry',
+      desc: '',
+      args: [ip, country],
+    );
+  }
+
+  /// `Observed upload`
+  String get activityObservedUpload {
+    return Intl.message(
+      'Observed upload',
+      name: 'activityObservedUpload',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Observed download`
+  String get activityObservedDownload {
+    return Intl.message(
+      'Observed download',
+      name: 'activityObservedDownload',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Last activity`
+  String get activityLastLabel {
+    return Intl.message(
+      'Last activity',
+      name: 'activityLastLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy server address`
+  String get activityProxyServerAddress {
+    return Intl.message(
+      'Proxy server address',
+      name: 'activityProxyServerAddress',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connection configuration`
+  String get activityConfiguration {
+    return Intl.message(
+      'Connection configuration',
+      name: 'activityConfiguration',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

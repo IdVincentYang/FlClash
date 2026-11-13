@@ -161,6 +161,7 @@ const (
 	asyncTestDelayMethod           CoreMethod = "asyncTestDelay"
 	probeMethod                    CoreMethod = "probe"
 	outboundIpMethod               CoreMethod = "outboundIp"
+	lookupIpCountriesMethod        CoreMethod = "lookupIpCountries"
 	serviceCheckMethod             CoreMethod = "serviceCheck"
 	getConnectionsMethod           CoreMethod = "getConnections"
 	getConnectionCountMethod       CoreMethod = "getConnectionCount"
