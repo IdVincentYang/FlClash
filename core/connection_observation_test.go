@@ -236,6 +236,43 @@ func TestConnectionObservationJSONPreservesUIDAndLegacyFields(t *testing.T) {
 	}
 }
 
+func TestConnectionSnapshotRetainsInternalDNSOrigin(t *testing.T) {
+	previous := connectionObservations
+	connectionObservations = newConnectionObservationStore()
+	defer func() { connectionObservations = previous }()
+	internal := observationTracker(0, C.TCP)
+	internal.Metadata = &C.Metadata{NetWork: C.TCP, Type: C.INNER, DstIP: netip.MustParseAddr("1.1.1.1"), DstPort: 443}
+	app := observationTracker(25002, C.TCP)
+	app.Metadata.DstIP, app.Metadata.DstPort = netip.MustParseAddr("8.8.8.8"), 443
+	identity := decodeApplicationIdentity(10123, `{"status":"known","userScope":"current","packages":["com.android.chrome"]}`, "androidUid")
+	connectionObservations.remember(app.Metadata, connectionIngress{identity: &identity})
+	connectionObservations.bind(app, sourceRuleProvenance{})
+	connectionObservations.bind(internal, sourceRuleProvenance{})
+	data, err := json.Marshal(sourceConnectionView(&statistic.Snapshot{Connections: []*statistic.TrackerInfo{internal, app}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshot struct {
+		Connections []struct {
+			Metadata struct {
+				Type string `json:"type"`
+			} `json:"metadata"`
+			Observation connectionObservation `json:"observation"`
+		} `json:"connections"`
+	}
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Connections) != 2 || snapshot.Connections[0].Metadata.Type != "Inner" || snapshot.Connections[0].Observation.Application.UID != nil || snapshot.Connections[1].Metadata.Type != "Tun" || snapshot.Connections[1].Observation.Application.packageName() != "com.android.chrome" {
+		t.Fatalf("internal and application provenance were mixed: %s", data)
+	}
+	if path := os.Getenv("FLCLASH_INTERNAL_CONNECTION_FIXTURE"); path != "" {
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkConnectionObservation(b *testing.B) {
 	for _, network := range []C.NetWork{C.TCP, C.UDP} {
 		b.Run(fmt.Sprint(network), func(b *testing.B) {

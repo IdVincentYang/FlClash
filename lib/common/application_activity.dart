@@ -41,6 +41,7 @@ class ApplicationActivityStore {
   }
 
   bool _belongs(TrackerInfo info, {required bool snapshot}) {
+    if (_isInternal(info)) return false;
     final epoch = info.observation?.runtimeEpoch ?? '';
     if (_epoch.isEmpty || epoch.isNotEmpty && epoch != _epoch) return false;
     if (epoch.isEmpty && !snapshot) {
@@ -49,6 +50,8 @@ class ApplicationActivityStore {
     }
     return _clearBefore == null || info.start.isAfter(_clearBefore!);
   }
+
+  bool _isInternal(TrackerInfo info) => info.metadata.inboundType == 'Inner';
 
   void _insert(TrackerInfo info, {required bool snapshot}) {
     if (!_belongs(info, snapshot: snapshot)) return;
@@ -78,7 +81,8 @@ class ApplicationActivityStore {
     required DateTime now,
   }) {
     if (!_observing) return;
-    if (infos.any(
+    final applicationInfos = infos.where((info) => !_isInternal(info));
+    if (applicationInfos.any(
       (item) =>
           item.observation?.runtimeEpoch.isNotEmpty == true &&
           item.observation!.runtimeEpoch != _epoch,
@@ -87,7 +91,7 @@ class ApplicationActivityStore {
       return;
     }
     final present = <String>{};
-    for (final info in infos) {
+    for (final info in applicationInfos) {
       if (!_belongs(info, snapshot: true)) continue;
       present.add(info.id);
       _insert(info, snapshot: true);

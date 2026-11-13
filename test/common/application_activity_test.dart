@@ -13,6 +13,95 @@ void main() {
       ApplicationActivityStore(capacity: capacity)
         ..setContext('runtime-a', observing: true, now: now);
 
+  test('Core internal DNS is excluded from both events and snapshots', () {
+    final s = store();
+    final internal = [
+      for (final address in ['8.8.8.8', '1.1.1.1'])
+        activityConnection(
+          'core-$address',
+          status: 'notObserved',
+          host: '',
+          ip: address,
+        ).copyWith(
+          metadata: Metadata(
+            inboundType: 'Inner',
+            network: 'tcp',
+            sourcePort: '0',
+            destinationIP: address,
+            destinationPort: '443',
+          ),
+        ),
+    ];
+    for (final info in internal) {
+      s.addEvent(info);
+    }
+    expect(s.snapshot().connections, isEmpty);
+    s.applySnapshot(internal, startedRevision: s.revision, now: now);
+    expect(s.snapshot().apps, isEmpty);
+    expect(s.snapshot().hasSnapshot, true);
+    expect(s.snapshot().interrupted, false);
+  });
+
+  test(
+    'apps visiting the same DNS addresses still retain known or unknown owners',
+    () {
+      final s = store();
+      final chrome =
+          activityConnection(
+            'chrome',
+            package: 'com.android.chrome',
+            host: '',
+            ip: '8.8.8.8',
+          ).copyWith(
+            metadata: const Metadata(
+              inboundType: 'Tun',
+              destinationIP: '8.8.8.8',
+              destinationPort: '443',
+            ),
+          );
+      final unknown =
+          activityConnection(
+            'unknown',
+            status: 'lookupFailed',
+            host: '',
+            ip: '1.1.1.1',
+          ).copyWith(
+            metadata: const Metadata(
+              inboundType: 'Tun',
+              destinationIP: '1.1.1.1',
+              destinationPort: '443',
+            ),
+          );
+      s.applySnapshot([chrome, unknown], startedRevision: s.revision, now: now);
+      expect(s.snapshot().connections.map((item) => item.info.id), [
+        'chrome',
+        'unknown',
+      ]);
+      expect(s.snapshot().apps.map((item) => item.application.status).toSet(), {
+        'known',
+        'lookupFailed',
+      });
+    },
+  );
+
+  test(
+    'internal runtime metadata does not invalidate a valid app snapshot',
+    () {
+      final s = store();
+      final internal = activityConnection(
+        'core',
+        epoch: 'another-runtime',
+      ).copyWith(metadata: const Metadata(inboundType: 'Inner'));
+      s.applySnapshot(
+        [internal, activityConnection('app')],
+        startedRevision: s.revision,
+        now: now,
+      );
+      expect(s.snapshot().fresh, true);
+      expect(s.snapshot().connections.single.info.id, 'app');
+    },
+  );
+
   test('App, App plus Host, and Host across Apps share one retained set', () {
     final s = store();
     for (final info in [
@@ -253,6 +342,35 @@ void main() {
       }
     },
   );
+
+  final nativeSnapshot =
+      Platform.environment['FLCLASH_INTERNAL_CONNECTION_FIXTURE'];
+  if (nativeSnapshot != null) {
+    test('native snapshot separates Core DNS from application traffic', () {
+      final data = jsonDecode(File(nativeSnapshot).readAsStringSync()) as Map;
+      final infos = (data['connections'] as List)
+          .map((item) => TrackerInfo.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+      expect(infos.map((item) => item.metadata.inboundType), ['Inner', 'Tun']);
+      final s = ApplicationActivityStore()
+        ..setContext(
+          infos.last.observation!.runtimeEpoch,
+          observing: true,
+          now: now,
+        );
+      s.applySnapshot(infos, startedRevision: s.revision, now: now);
+      expect(
+        s.snapshot().connections.single.info.metadata.destinationIP,
+        '8.8.8.8',
+      );
+      expect(
+        s.snapshot().apps.single.application.packageName,
+        'com.android.chrome',
+      );
+      expect(s.snapshot().fresh, true);
+      expect(infos.length, 2);
+    });
+  }
 
   final path = Platform.environment['FLCLASH_ANDROID_OBSERVATION_EVENTS'];
   if (path != null) {

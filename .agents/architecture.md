@@ -337,9 +337,15 @@ inherit a current configuration stamp without matcher evidence.
 Android CoreManager also holds the application activity provider's subscription independently of navigation.
 The observer waits for bootstrap's existing initProvider before reading native/configuration dependencies, then seeds
 from the bounded Requests buffer when observation begins. Its bounded in-memory store merges request events with
-complete, context-fenced foreground connection snapshots;
-failures and background gaps never become zero active connections. App, App-plus-Host and cross-App Host queries share
-the same retained facts. The read-only Tools application network page shows non-expanding app summaries with
+complete, context-fenced foreground connection snapshots. Snapshot failures and
+background gaps never become zero active connections. App, App-plus-Host and
+cross-App Host queries share the same retained facts. Metadata.inboundType
+retains native metadata.type. The app-activity store excludes only explicitly
+Inner Core connections from events and snapshots; raw Requests and Core
+snapshots retain them. Other unidentified app connections remain visible,
+including application traffic to DNS server addresses; neither legacy UID nor
+missing source endpoints classify provenance. The read-only Tools application
+network page shows non-expanding app summaries with
 application-window placeholders, a persistent search field below the title and an overflow toggle for all installed apps.
 Confirmed-active apps lead the recent list; compact count/time rows emphasize only a positive active count.
 Normal observation/retention chrome and manual refresh are absent; actual read failures retain inline retries.

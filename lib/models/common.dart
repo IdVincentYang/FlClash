@@ -85,6 +85,7 @@ extension PackagesExt on List<Package> {
 abstract class Metadata with _$Metadata {
   const factory Metadata({
     @Default(0) int uid,
+    @JsonKey(name: 'type') @Default('') String inboundType,
     @Default('') String network,
     @Default('') String sourceIP,
     @Default('') String sourcePort,

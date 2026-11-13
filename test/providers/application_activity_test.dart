@@ -106,6 +106,48 @@ void main() {
   );
 
   test(
+    'native Inner metadata is excluded from app snapshots and request events',
+    () async {
+      container.listen(applicationActivityProvider, (_, _) {});
+      await pumpEventQueue();
+      final internal = TrackerInfo.fromJson({
+        ...jsonDecode(
+              jsonEncode(
+                activityConnection(
+                  'dns',
+                  status: 'notObserved',
+                  host: '',
+                  ip: '1.1.1.1',
+                ),
+              ),
+            )
+            as Map<String, dynamic>,
+        'metadata': {
+          'type': 'Inner',
+          'network': 'tcp',
+          'sourcePort': '0',
+          'destinationIP': '1.1.1.1',
+          'destinationPort': '443',
+        },
+      });
+      expect(internal.metadata.inboundType, 'Inner');
+      event(internal);
+      when(() => core.getConnections()).thenAnswer(
+        (_) async => [
+          internal,
+          activityConnection('browser', package: 'com.android.chrome'),
+        ],
+      );
+      await container.read(applicationActivityProvider.notifier).refresh();
+      final state = container.read(applicationActivityProvider);
+      expect(state.connections.single.info.id, 'browser');
+      expect(state.apps.single.application.packageName, 'com.android.chrome');
+      expect(state.fresh, true);
+      expect(jsonDecode(jsonEncode(internal))['metadata']['type'], 'Inner');
+    },
+  );
+
+  test(
     'observation does not read native state before bootstrap completes',
     () async {
       final scoped = ProviderContainer(

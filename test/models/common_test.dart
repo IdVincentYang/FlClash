@@ -9,6 +9,20 @@ import 'package:mocktail/mocktail.dart';
 class MockFile extends Mock implements File {}
 
 void main() {
+  test(
+    'metadata retains native inbound kind without treating missing types as internal',
+    () {
+      expect(
+        Metadata.fromJson({
+          'type': 'Inner',
+          'destinationIP': '8.8.8.8',
+        }).inboundType,
+        'Inner',
+      );
+      expect(Metadata.fromJson({'type': 'Tun'}).toJson()['type'], 'Tun');
+      expect(Metadata.fromJson({}).inboundType, '');
+    },
+  );
   group('FileInfo', () {
     late MockFile file;
 
