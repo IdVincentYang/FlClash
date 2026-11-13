@@ -700,6 +700,90 @@ void main() {
   }
 
   test(
+    'bulk refresh defers consent, keeps the accepted runtime, and explicit review uses the new download',
+    () async {
+      await existingService();
+      final entry = profile(1);
+      final file = File(await appPath.getProfilePath('1'));
+      final previous = await core.getConfigState();
+      final permissions = File(
+        '${root.path}/source-acceptance/permissions.json',
+      );
+      final permissionBytes = await permissions.readAsBytes();
+      final incoming = yaml.replaceFirst('127.0.0.1:1', '127.0.0.1:2');
+      responses['/1'] = incoming;
+      confirmations.clear();
+      received.clear();
+      core.sourceActions.clear();
+      final result = await profiles.updateProfile(
+        entry,
+        showLoading: true,
+        allowSourceReview: false,
+      );
+      expect(result.materialSaved, false);
+      expect(result.failure, 'source_review_required');
+      expect(confirmations, isEmpty);
+      expect(received, ['/1']);
+      expect(await file.readAsString(), yaml);
+      expect(await permissions.readAsBytes(), permissionBytes);
+      final retained = await core.getConfigState();
+      expect(ConfigInput.sameAcceptedInput(previous, retained), true);
+      expect(retained.businessActive, true);
+      expect(core.sourceActions, contains('discard'));
+      expect(
+        await profiles.sourceReviewStatus(entry),
+        SourceReviewStatus.required,
+      );
+      (profiles as _Profiles).reviewConfirmation = (review) async {
+        expect(review.material, incoming);
+        return const SourceReviewDecision(automatic: false, routing: 'source');
+      };
+      await profiles.manageSourcePermissions(entry, review: true);
+      expect(received, ['/1', '/1']);
+      expect(await file.readAsString(), incoming);
+      expect(
+        await profiles.sourceReviewStatus(entry),
+        SourceReviewStatus.ready,
+      );
+    },
+    skip: executable == null,
+  );
+
+  test(
+    'canceling a deferred review download keeps the old file and pending status',
+    () async {
+      await existingService();
+      final entry = profile(1);
+      responses['/1'] = yaml.replaceFirst('127.0.0.1:1', '127.0.0.1:2');
+      await profiles.updateProfile(entry, allowSourceReview: false);
+      received.clear();
+      final gate = holds['/1'] = Completer<void>();
+      var current = true;
+      final retry = profiles.updateProfile(entry, isCurrent: () => current);
+      await until(() async => received.contains('/1'));
+      current = false;
+      gate.complete();
+      final result = await retry;
+      expect(result.materialSaved, false);
+      expect(result.application, ProfileApplicationOutcome.superseded);
+      expect(
+        await File(await appPath.getProfilePath('1')).readAsString(),
+        yaml,
+      );
+      expect(
+        await profiles.sourceReviewStatus(entry),
+        SourceReviewStatus.required,
+      );
+      await client.invalidate('profile:1');
+      expect(
+        await profiles.sourceReviewStatus(entry),
+        SourceReviewStatus.ready,
+      );
+    },
+    skip: executable == null,
+  );
+
+  test(
     'URL import uses its own review surface once for all related sources',
     () async {
       container.read(appVisibleProvider.notifier).value = true;

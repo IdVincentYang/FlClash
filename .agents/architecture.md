@@ -815,6 +815,9 @@ directives, so consumers continue to import the same public API:
 - `ThemeAction`: theme state updates.
 - `ProxiesAction`: group management and proxy selection.
 - `ProfilesAction`: profile CRUD, auto-update, import.
+  Manual bulk refresh decides review interactivity by URL subscription count. Queue jobs keep this separate from automatic
+  scheduling; non-interactive jobs defer consent without replacing unaccepted material. Source-scoped in-memory hints
+  make cards pending, and explicit review re-fetches through the same guarded queue. Updating-key changes refresh card status.
 - `GeoResourceAction`: geo resource updates and URL configuration.
 - `UpdatingAction`: stale sweep over `UpdatingKeys`.
 

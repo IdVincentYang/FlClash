@@ -3,6 +3,8 @@ import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/source_acceptance.dart';
+import 'package:fl_clash/common/profile_import.dart';
+import 'package:fl_clash/models/profile_refresh.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -41,6 +43,29 @@ class _Setup extends SetupAction {
 
 class _Profiles extends ProfilesAction {
   final reviews = <({int id, bool direct})>[];
+  final updates = <({int id, bool review})>[];
+  Future<void> Function(Profile)? onUpdate;
+  @override
+  Future<ProfileRefreshResult> updateProfile(
+    Profile profile, {
+    bool showLoading = false,
+    bool automatic = false,
+    bool allowSourceReview = true,
+    bool Function()? isCurrent,
+    bool allowBootstrap = false,
+    bool sourceEdit = false,
+    bool sourceMustMatch = false,
+    bool importing = false,
+    RequestSource? expectedSource,
+    ProfileImportTask? importTask,
+    SourceConfirmation? confirm,
+    Iterable<int> renameIn = const [],
+  }) async {
+    updates.add((id: profile.id, review: allowSourceReview));
+    await onUpdate?.call(profile);
+    return const ProfileRefreshResult();
+  }
+
   int writes = 0;
   Future<SourceReviewStatus> Function()? checkStatus;
   @override
@@ -121,6 +146,147 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  for (final urls in [0, 1, 2]) {
+    for (final localFile in [false, true]) {
+      testWidgets(
+        'Sync all review policy: $urls subscriptions, local=$localFile',
+        (tester) async {
+          final entries = [
+            for (var i = 0; i < urls; i++)
+              profile.copyWith(id: i + 1, label: 'URL $i'),
+            if (localFile) profile.copyWith(id: 3, label: 'File', url: ''),
+          ];
+          (container.read(profilesProvider.notifier) as TestProfiles).replace(
+            entries,
+          );
+          await pump(tester, const ProfilesView());
+          if (entries.isEmpty) {
+            expect(find.byTooltip('Update'), findsNothing);
+          } else {
+            await tester.tap(find.byTooltip('Update'));
+            await tester.pumpAndSettle();
+          }
+          expect(profiles.updates, [
+            for (var i = 0; i < urls; i++) (id: i + 1, review: urls == 1),
+          ]);
+          expect(profiles.reviews, isEmpty);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'failed bulk sync reports download errors and permits another sync',
+    (tester) async {
+      (container.read(profilesProvider.notifier) as TestProfiles).replace([
+        profile,
+        profile.copyWith(id: profile.id + 1, label: 'Other'),
+      ]);
+      profiles.onUpdate = (entry) async {
+        if (entry.id == profile.id) {
+          throw const RequestUnavailable('profile_download_failed');
+        }
+      };
+      await pump(tester, const ProfilesView());
+      await tester.tap(find.byTooltip('Update'));
+      await tester.pumpAndSettle();
+      expect(profiles.updates, hasLength(2));
+      expect(find.text('Tip'), findsOneWidget);
+      expect(
+        find.text(
+          'The subscription download failed. The previous file was kept.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      profiles.onUpdate = null;
+      await tester.tap(find.byTooltip('Update'));
+      await tester.pumpAndSettle();
+      expect(profiles.updates, hasLength(4));
+      expect(find.text('Tip'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('leaving during bulk sync does not show a late error dialog', (
+    tester,
+  ) async {
+    final gate = Completer<void>();
+    profiles.onUpdate = (_) => gate.future;
+    await pump(tester, const ProfilesView());
+    await tester.tap(find.byTooltip('Update'));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    gate.completeError(const RequestUnavailable('profile_download_failed'));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(profiles.updates, hasLength(1));
+  });
+
+  testWidgets(
+    'individual sync remains interactive with multiple subscriptions',
+    (tester) async {
+      (container.read(profilesProvider.notifier) as TestProfiles).replace([
+        profile,
+        profile.copyWith(id: profile.id + 1, label: 'Other'),
+      ]);
+      await pump(
+        tester,
+        Scaffold(
+          body: ProfileItem(
+            profile: profile,
+            groupValue: profile.id,
+            onChanged: (_) {},
+            sourceReviewEnabled: true,
+          ),
+        ),
+      );
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sync'));
+      await tester.pumpAndSettle();
+      expect(profiles.updates, [(id: profile.id, review: true)]);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'bulk sync finishes by marking the card, and only a tap starts review',
+    (tester) async {
+      var pending = false;
+      profiles.checkStatus = () async =>
+          pending ? SourceReviewStatus.required : SourceReviewStatus.ready;
+      final selections = <int?>[];
+      await pump(
+        tester,
+        Scaffold(
+          body: ProfileItem(
+            profile: profile,
+            groupValue: profile.id,
+            onChanged: selections.add,
+            sourceReviewEnabled: true,
+          ),
+        ),
+      );
+      final updating = container.read(updatingKeysProvider.notifier);
+      final operation = updating.start(profile.updatingKey);
+      await tester.pump();
+      pending = true;
+      updating.stop(profile.updatingKey, operation);
+      await tester.pumpAndSettle();
+      expect(find.text('Review required'), findsOneWidget);
+      expect(profiles.reviews, isEmpty);
+      await tester.tap(find.text(profile.realLabel));
+      await tester.pumpAndSettle();
+      expect(profiles.reviews, [(id: profile.id, direct: true)]);
+      expect(selections, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   for (final action in ['leave', 'save unchanged', 'save changes']) {
     testWidgets('editing profile: $action', (tester) async {

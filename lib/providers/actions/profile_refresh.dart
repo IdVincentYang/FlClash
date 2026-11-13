@@ -1,5 +1,8 @@
 part of '../action.dart';
 
+Future<SourceReviewDecision?> _deferProfileSourceReview(SourceReview review) =>
+    Future.error(const RequestUnavailable('source_review_required'));
+
 typedef _RefreshFields = (
   String,
   RequestMode,
@@ -44,6 +47,8 @@ class _ProfileRefreshJob {
     required this.automatic,
     required this.importing,
     required this.allowBootstrap,
+    this.allowSourceReview = true,
+    this.isCurrent,
     this.demandCurrent,
     this.ready = true,
     this.importTask,
@@ -53,7 +58,8 @@ class _ProfileRefreshJob {
   final RequestSource source;
   final RequestSource? expectedSource;
   bool automatic, ready;
-  final bool importing, allowBootstrap;
+  final bool importing, allowBootstrap, allowSourceReview;
+  final bool Function()? isCurrent;
   final Future<bool> Function()? demandCurrent;
   final ProfileImportTask? importTask;
   final SourceConfirmation? confirm;
@@ -76,6 +82,8 @@ class _ProfileRefreshJob {
       (!started || session?.isActive == true) &&
       importing == other.importing &&
       allowBootstrap == other.allowBootstrap &&
+      allowSourceReview == other.allowSourceReview &&
+      identical(isCurrent, other.isCurrent) &&
       identical(demandCurrent, other.demandCurrent) &&
       identical(importTask, other.importTask) &&
       identical(confirm, other.confirm) &&
@@ -121,6 +129,25 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
   final _refreshJobs = <int, _ProfileRefreshJob>{};
   final _refreshSuccessors = <int, _ProfileRefreshJob>{};
   final _refreshRetries = <int, _RefreshRetry>{};
+  final _deferredReviews = <int, RequestSource>{};
+
+  Future<bool> _hasDeferredReview(Profile profile) async {
+    final source = _deferredReviews[profile.id];
+    if (source == null) return false;
+    final current = await requestClient.captureSource(source.key);
+    if (identical(source.owner, current.owner) &&
+        source.client == current.client &&
+        source.dataset == current.dataset &&
+        const [
+          'dataset',
+          'sourceRevision',
+        ].every((field) => source.snapshot[field] == current.snapshot[field])) {
+      return true;
+    }
+    _deferredReviews.remove(profile.id);
+    return false;
+  }
+
   final _refreshClock = Stopwatch()..start();
   Timer? _refreshTimer;
   _ProfileRefreshJob? _refreshWorker;
@@ -132,6 +159,8 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
   Future<_ProfileRefreshJob> _enqueueRefresh(
     Profile proposed, {
     bool automatic = false,
+    bool allowSourceReview = true,
+    bool Function()? isCurrent,
     bool importing = false,
     bool allowBootstrap = false,
     bool sourceMustMatch = false,
@@ -156,6 +185,8 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       source: source,
       expectedSource: expectedSource,
       automatic: automatic,
+      allowSourceReview: allowSourceReview,
+      isCurrent: isCurrent,
       importing: importing,
       allowBootstrap: allowBootstrap,
       demandCurrent: demandCurrent,
@@ -298,6 +329,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
     if (_refreshDisposed ||
         job.superseded ||
         job.importTask?.isCurrent == false ||
+        job.isCurrent?.call() == false ||
         job.demandCurrent != null && !await job.demandCurrent!()) {
       return false;
     }
@@ -307,6 +339,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
     if (_refreshDisposed ||
         job.superseded ||
         job.importTask?.isCurrent == false ||
+        job.isCurrent?.call() == false ||
         job.demandCurrent != null && !await job.demandCurrent!()) {
       return false;
     }
@@ -391,7 +424,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
           : job.importTask?.review ?? ProfileReviewContext();
       Future<SourceMaterialApproval?> reviewMaterial() =>
           _reviewProfileMaterial(
-            confirm: job.confirm ?? ref.read(sourceConfirmationProvider),
+            confirm: job.allowSourceReview
+                ? job.confirm ?? ref.read(sourceConfirmationProvider)
+                : _deferProfileSourceReview,
             core: _core,
             requests: requestClient,
             profile: profile,
@@ -442,6 +477,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
                   staged.staged.path,
                   requestClient,
                   approval: approval,
+                  confirm: job.allowSourceReview
+                      ? null
+                      : _deferProfileSourceReview,
                 );
       final incoming = staged;
       final target = await appPath.getProfilePath(profile.id.toString());
@@ -524,7 +562,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
       job.savedSource = await requestClient.captureSource(
         'profile:${profile.id}',
       );
-      if (!job.automatic && !pendingReview) {
+      if (!job.automatic && job.allowSourceReview && !pendingReview) {
         await _completeSubscriptionReview(profile, confirm: job.confirm);
       }
       retry.failures = 0;
@@ -554,6 +592,17 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
         );
       }
     } on RequestUnavailable catch (error) {
+      if (!job.allowSourceReview && error.code == 'source_review_required') {
+        final source = job.savedSource ?? job.materialSource;
+        if (source != null) _deferredReviews[job.profile.id] = source;
+        _retryFor(job.profile).permissionBlocked = true;
+        result = ProfileRefreshResult(
+          materialSaved: saved,
+          application: ProfileApplicationOutcome.blocked,
+          failure: 'source_review_required',
+        );
+        return;
+      }
       final canceled = const {
         'request_cancelled',
         'bootstrap_required',
@@ -660,7 +709,7 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
             .applyRefreshedProfile(
               isCurrent: current,
               previous: observation.fact,
-              allowSourceReview: !job.automatic,
+              allowSourceReview: !job.automatic && job.allowSourceReview,
               canSubmit: job.automatic
                   ? () => _automaticRunEligible(job.profile)
                   : null,
@@ -713,6 +762,9 @@ mixin _ProfileRefreshQueue on _$ProfilesAction {
   }
 
   void _completeRefresh(_ProfileRefreshJob job, ProfileRefreshResult result) {
+    if (result.materialSaved && result.failure == null) {
+      _deferredReviews.remove(job.profile.id);
+    }
     job.complete(result);
     if (identical(_refreshJobs[job.profile.id], job)) {
       _refreshJobs.remove(job.profile.id);

@@ -51,6 +51,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       _refreshJobs.clear();
       _refreshSuccessors.clear();
       _refreshRetries.clear();
+      _deferredReviews.clear();
     });
   }
 
@@ -127,6 +128,7 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     if (!requestClient.requiresSourceAcceptance) {
       return SourceReviewStatus.ready;
     }
+    if (await _hasDeferredReview(profile)) return SourceReviewStatus.required;
     final source = await requestClient.captureSource('profile:${profile.id}');
     final file = File(await appPath.getProfilePath(profile.id.toString()));
     if (!await file.exists()) {
@@ -393,15 +395,23 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     bool review = false,
   }) async {
     if (review && requestClient.requiresSourceAcceptance) {
-      return presentSourceReview(
-        profile,
-        (confirm, current) => _manageSourcePermissions(
-          profile,
-          review: true,
-          confirm: confirm,
-          isCurrent: current,
-        ),
-      );
+      return presentSourceReview(profile, (confirm, current) async {
+        if (await _hasDeferredReview(profile)) {
+          await updateProfile(
+            profile,
+            showLoading: true,
+            confirm: confirm,
+            isCurrent: current,
+          );
+        } else {
+          await _manageSourcePermissions(
+            profile,
+            review: true,
+            confirm: confirm,
+            isCurrent: current,
+          );
+        }
+      });
     }
     return _manageSourcePermissions(profile, review: review);
   }
@@ -618,7 +628,11 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       return;
     }
     _refreshProfilesSubscribed = true;
-    ref.listen(profilesProvider, (_, _) => unawaited(autoUpdateProfiles()));
+    ref.listen(profilesProvider, (_, next) {
+      final ids = next.map((profile) => profile.id).toSet();
+      _deferredReviews.removeWhere((id, _) => !ids.contains(id));
+      unawaited(autoUpdateProfiles());
+    });
   }
 
   Future<void> autoUpdateProfiles() {
@@ -687,21 +701,36 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
     return (renameIn: renameIn, conflicts: conflicts);
   }
 
-  Future<void> updateProfiles() async {
-    for (final profile in ref.read(profilesProvider)) {
-      if (profile.type == ProfileType.file) continue;
-      try {
-        await updateProfile(profile, showLoading: true);
-      } on RequestUnavailable catch (error) {
-        dialogs.showNotifier(error.toString(), level: MessageLevel.error);
-      }
-    }
+  Future<void> updateProfiles({void Function(Profile, Object)? onError}) async {
+    final subscriptions = ref
+        .read(profilesProvider)
+        .where((profile) => profile.type == ProfileType.url)
+        .toList();
+    await Future.wait(
+      subscriptions.map((profile) async {
+        try {
+          await updateProfile(
+            profile,
+            showLoading: true,
+            allowSourceReview: subscriptions.length == 1,
+          );
+        } catch (error) {
+          if (onError != null) {
+            onError(profile, error);
+          } else {
+            dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+          }
+        }
+      }),
+    );
   }
 
   Future<ProfileRefreshResult> updateProfile(
     Profile profile, {
     bool showLoading = false,
     bool automatic = false,
+    bool allowSourceReview = true,
+    bool Function()? isCurrent,
     bool allowBootstrap = false,
     bool sourceEdit = false,
     bool sourceMustMatch = false,
@@ -724,6 +753,8 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       final job = await _enqueueRefresh(
         profile,
         automatic: automatic,
+        allowSourceReview: allowSourceReview,
+        isCurrent: isCurrent,
         importing: importing,
         allowBootstrap: allowBootstrap,
         sourceMustMatch: sourceMustMatch,
@@ -733,13 +764,17 @@ class ProfilesAction extends _$ProfilesAction with _ProfileRefreshQueue {
       );
       importTask?.attach(job.cancel);
       final result = await job.completion.future;
-      if (result.failure != null &&
+      final deferred =
+          !allowSourceReview && result.failure == 'source_review_required';
+      if (!deferred &&
+          result.failure != null &&
           (!result.materialSaved ||
               result.failure == 'request_partial_commit')) {
         throw RequestUnavailable(result.failure!);
       }
       if (ref.mounted &&
           !automatic &&
+          !deferred &&
           result.materialSaved &&
           !const {
             ProfileApplicationOutcome.notRequired,

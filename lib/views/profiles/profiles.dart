@@ -37,7 +37,7 @@ class _ProfilesViewState extends ConsumerState<ProfilesView> {
     super.initState();
   }
 
-  Future<void> _updateProfiles(List<Profile> profiles) async {
+  Future<void> _updateProfiles() async {
     if (_isUpdating == true) {
       return;
     }
@@ -45,24 +45,23 @@ class _ProfilesViewState extends ConsumerState<ProfilesView> {
     final appLocalizations = context.appLocalizations;
     final profilesAction = ref.read(profilesActionProvider.notifier);
     final List<UpdatingMessage> messages = [];
-    final updateProfiles = profiles.map<Future>((profile) async {
-      if (profile.type == ProfileType.file) return;
-      try {
-        await profilesAction.updateProfile(profile, showLoading: true);
-      } catch (e) {
-        messages.add(
-          UpdatingMessage(
-            label: profile.realLabel,
-            message: userFacingErrorMessage(e, appLocalizations),
-          ),
-        );
+    try {
+      await profilesAction.updateProfiles(
+        onError: (profile, error) {
+          messages.add(
+            UpdatingMessage(
+              label: profile.realLabel,
+              message: userFacingErrorMessage(error, appLocalizations),
+            ),
+          );
+        },
+      );
+      if (mounted && messages.isNotEmpty) {
+        unawaited(dialogs.showAllUpdatingMessagesDialog(messages));
       }
-    });
-    await Future.wait(updateProfiles);
-    if (messages.isNotEmpty) {
-      unawaited(dialogs.showAllUpdatingMessagesDialog(messages));
+    } finally {
+      _isUpdating = false;
     }
-    _isUpdating = false;
   }
 
   List<IconButtonData> _buildActions(List<Profile> profiles) {
@@ -71,7 +70,7 @@ class _ProfilesViewState extends ConsumerState<ProfilesView> {
             IconButtonData(
               glyph: AppGlyphs.sync,
               onPressed: () {
-                _updateProfiles(profiles);
+                _updateProfiles();
               },
               tooltip: context.appLocalizations.update,
             ),

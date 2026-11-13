@@ -10,6 +10,7 @@ final profileReviewStatusProvider = FutureProvider.autoDispose
       ref.watch(nativeRequestStateProvider);
       ref.watch(initProvider);
       ref.watch(appVisibleProvider);
+      ref.watch(isUpdatingProvider(profile.updatingKey));
       return ref
           .read(profilesActionProvider.notifier)
           .sourceReviewStatus(profile);

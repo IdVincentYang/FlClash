@@ -557,6 +557,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
     String incomingPath,
     Request client, {
     SourceMaterialApproval? approval,
+    SourceConfirmation? confirm,
   }) async {
     final selected = await database.profilePolicySelectionsDao
         .query(profileId)
@@ -572,7 +573,12 @@ mixin _PolicyMaterialSetup on _$SetupAction {
       approval: approval,
     );
     try {
-      await _buildMaterialProfile(candidate._inputs, candidate._frame, (_) {});
+      await _buildMaterialProfile(
+        candidate._inputs,
+        candidate._frame,
+        (_) {},
+        confirm: confirm,
+      );
       if (!await candidate.current()) {
         throw const PolicyDraftProblem('materialSource');
       }
@@ -590,6 +596,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
     void Function(Map<String, Object?>)? onSourceUse,
     void Function(Map<String, Object?>)? onRuleLedger,
     bool allowSourceReview = true,
+    SourceConfirmation? confirm,
     Future<bool> Function()? isCurrent,
   }) async {
     final selected = await frame.resolve(
@@ -597,7 +604,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
       snapshot.state,
       snapshot.policy!,
       requests: _requests,
-      confirm: ref.read(sourceConfirmationProvider),
+      confirm: confirm ?? ref.read(sourceConfirmationProvider),
       automatic: !allowSourceReview || !ref.read(appVisibleProvider),
       onSourceUse: onSourceUse,
       isCurrent: isCurrent,
