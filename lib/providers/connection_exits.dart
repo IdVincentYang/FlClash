@@ -44,9 +44,8 @@ ConnectionExitTarget? connectionExitTarget(
   String configuration, {
   String identity = '',
 }) {
-  final entry = connectionProxyServerIp(info);
+  final entry = connectionProxyServerIp(info) ?? '';
   if (identity.isEmpty ||
-      entry == null ||
       configuration.isEmpty ||
       info.observation?.configuration.status != 'known' ||
       info.observation?.configuration.inputId != configuration ||
@@ -110,7 +109,7 @@ class ConnectionExits
   final _manual = <ConnectionExitTarget>{};
   final _loaded = <ConnectionExitTarget>{};
   final _loading = <ConnectionExitTarget>{};
-  final _lastStart = <({String identity, String entry}), Duration>{};
+  final _lastStart = <String, Duration>{};
   ConnectionExitTarget? _running;
   int _sequence = 0;
   Duration? _lastLaunch;
@@ -196,7 +195,7 @@ class ConnectionExits
     try {
       value = await ref
           .read(exitCacheDatabaseProvider)
-          .lookup(target.identity, target.entry, utcNow);
+          .latest(target.identity, utcNow);
     } catch (_) {
       commonPrint.log('Exit cache read failed');
     }
@@ -218,9 +217,6 @@ class ConnectionExits
     }
     _schedule();
   }
-
-  ({String identity, String entry}) _key(ConnectionExitTarget target) =>
-      (identity: target.identity, entry: target.entry);
 
   String _requestKey(ConnectionExitTarget target) =>
       'connectionExit:${jsonEncode([target.node, target.entry, target.configuration, target.identity])}';
@@ -276,15 +272,17 @@ class ConnectionExits
         !_watchers.containsKey(target)) {
       return ExitRefreshResult.unavailable;
     }
-    if (_running case final running?
-        when running.identity == target.identity &&
-            running.entry == target.entry) {
+    if (_running case final running? when running.identity == target.identity) {
       return ExitRefreshResult.coalesced;
     }
-    final last = _lastStart[_key(target)];
+    if (_manual.any((queued) => queued.identity == target.identity)) {
+      return ExitRefreshResult.coalesced;
+    }
+    final last = _lastStart[target.identity];
     if (last != null && elapsed - last < manualInterval) {
       return ExitRefreshResult.throttled;
     }
+    _queue.removeWhere((queued) => queued.identity == target.identity);
     _manual.add(target);
     _queue.add(target);
     state = {
@@ -357,6 +355,7 @@ class ConnectionExits
       if (_watchers.containsKey(target) &&
           _loaded.contains(target) &&
           _current(target) &&
+          !_manual.any((queued) => queued.identity == target.identity) &&
           !_fresh(state[target]) &&
           _running != target &&
           _queue.add(target)) {
@@ -387,7 +386,7 @@ class ConnectionExits
       Duration? retry;
       for (final candidate in _queue) {
         if (!_loaded.contains(candidate)) continue;
-        final last = _lastStart[_key(candidate)];
+        final last = _lastStart[candidate.identity];
         final left = last == null
             ? Duration.zero
             : manualInterval - (elapsed - last);
@@ -404,7 +403,7 @@ class ConnectionExits
       _queue.remove(target);
       _running = target;
       _lastLaunch = elapsed;
-      _lastStart[_key(target)] = elapsed;
+      _lastStart[target.identity] = elapsed;
       state = {
         ...state,
         target: ConnectionExitEntry.pending(ProbePhase.probing, state[target]),
@@ -429,7 +428,7 @@ class ConnectionExits
     if (_lastStart.length > cacheLimit) {
       for (final target in _lastStart.keys.toList()) {
         if (_lastStart.length <= cacheLimit) break;
-        if (!_watchers.keys.any((watched) => _key(watched) == target)) {
+        if (!_watchers.keys.any((watched) => watched.identity == target)) {
           _lastStart.remove(target);
         }
       }
@@ -440,8 +439,10 @@ class ConnectionExits
         if (keep.length <= cacheLimit) break;
         if (!_watchers.containsKey(target)) {
           keep.remove(target);
-          if (!_watchers.keys.any((watched) => _key(watched) == _key(target))) {
-            _lastStart.remove(_key(target));
+          if (!_watchers.keys.any(
+            (watched) => watched.identity == target.identity,
+          )) {
+            _lastStart.remove(target.identity);
           }
         }
       }
@@ -519,9 +520,7 @@ class ConnectionExits
             return;
           }
           for (final watched in _watchers.keys) {
-            if (watched.identity == target.identity &&
-                watched.entry == actual &&
-                watched != target) {
+            if (watched.identity == target.identity && watched != target) {
               _loaded.add(watched);
               state = {
                 ...state,
@@ -534,9 +533,9 @@ class ConnectionExits
             }
           }
         }
-        if (actual == null || actual != target.entry) {
+        if (actual == null) {
           value = null;
-          reason = 'entry-changed';
+          reason = 'entry-unavailable';
         }
       }
     } catch (_) {

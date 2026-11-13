@@ -28,10 +28,10 @@ class _Disk extends ExitCacheDatabase {
   Completer<void>? readGate;
   bool failRead = false;
   @override
-  Future<IpInfo?> lookup(String identity, String entryIp, DateTime now) async {
+  Future<IpInfo?> latest(String identity, DateTime now) async {
     await readGate?.future;
     if (failRead) throw StateError('unavailable');
-    return super.lookup(identity, entryIp, now);
+    return super.latest(identity, now);
   }
 }
 
@@ -248,9 +248,12 @@ void main() {
       });
       cache.watch(a, automatic: true);
       await pumpEventQueue();
-      expect(container.read(connectionExitsProvider)[a]?.value, isNull);
-      expect(await disk.lookup(a.identity, a.entry, cache.utcNow), isNull);
-      expect(await disk.lookup(a.identity, '9.9.9.9', cache.utcNow), isNotNull);
+      expect(container.read(connectionExitsProvider)[a]?.value, isNotNull);
+      expect(
+        (await disk.select(disk.exitMeasurements).get()).single.entryIp,
+        '9.9.9.9',
+      );
+      expect(await disk.latest(a.identity, cache.utcNow), isNotNull);
       const actual = ConnectionExitTarget('A', '9.9.9.9', 'input-a', 'id-a');
       cache.watch(actual, automatic: true);
       await pumpEventQueue();
@@ -277,7 +280,7 @@ void main() {
       );
       expect(container.read(connectionExitsProvider)[a]?.value, before);
       expect(cache.isExpired(a), false);
-      expect(await disk.lookup(a.identity, a.entry, cache.utcNow), before);
+      expect(await disk.latest(a.identity, cache.utcNow), before);
     },
   );
 
@@ -288,6 +291,57 @@ void main() {
     expect(calls, ['A']);
     expect(container.read(connectionExitsProvider)[a]?.value, isNotNull);
   });
+
+  test(
+    'different hosts and entries for the same node share one check',
+    () async {
+      const other = ConnectionExitTarget('A', '9.9.9.9', 'input-a', 'id-a');
+      final gate = Completer<OutboundIpResult?>();
+      when(() => core.outboundIp(any())).thenAnswer((_) {
+        calls.add('A');
+        return gate.future;
+      });
+      cache.watch(a, automatic: true);
+      cache.watch(other, automatic: true);
+      await pumpEventQueue();
+      expect(calls, ['A']);
+      expect(cache.refresh(other), ExitRefreshResult.coalesced);
+      gate.complete(answer('A').copyWith(entryIp: '1.0.0.1'));
+      await pumpEventQueue();
+      expect(
+        container.read(connectionExitsProvider)[a]?.value?.countryCode,
+        'HK',
+      );
+      expect(
+        container.read(connectionExitsProvider)[other]?.value?.countryCode,
+        'HK',
+      );
+      expect(
+        (await disk.select(disk.exitMeasurements).get()).single.entryIp,
+        '1.0.0.1',
+      );
+      cache.time = const Duration(seconds: 2);
+      expect(cache.refresh(other), ExitRefreshResult.throttled);
+    },
+  );
+
+  test(
+    'manual clicks on different entries coalesce before the queue starts',
+    () async {
+      const other = ConnectionExitTarget('A', '9.9.9.9', 'input-a', 'id-a');
+      cache.watch(a, automatic: false);
+      cache.watch(other, automatic: false);
+      await pumpEventQueue();
+      expect(cache.refresh(a), ExitRefreshResult.accepted);
+      expect(cache.refresh(other), ExitRefreshResult.coalesced);
+      await pumpEventQueue();
+      expect(calls, ['A']);
+      expect(
+        container.read(connectionExitsProvider)[other]?.value?.countryCode,
+        'HK',
+      );
+    },
+  );
 
   test(
     'inactive watch does nothing; manual refresh bypasses cache and coalesces clicks',
@@ -384,7 +438,7 @@ void main() {
       );
       await pumpEventQueue();
       expect(container.read(connectionExitsProvider)[a]?.value, isNotNull);
-      expect(await disk.lookup(a.identity, a.entry, cache.utcNow), isNotNull);
+      expect(await disk.latest(a.identity, cache.utcNow), isNotNull);
       expect(calls, ['A']);
     },
   );

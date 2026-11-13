@@ -41,15 +41,20 @@ class ExitCacheDatabase extends _$ExitCacheDatabase {
   @override
   int get schemaVersion => 1;
 
-  Future<IpInfo?> lookup(String identity, String entryIp, DateTime now) async {
+  Future<IpInfo?> latest(String identity, DateTime now) async {
     final row =
-        await (select(exitMeasurements)..where(
-              (row) =>
-                  row.identity.equals(identity) &
-                  row.entryIp.equals(entryIp) &
-                  row.expiresAt.isBiggerThanValue(now) &
-                  row.checkedAt.isSmallerOrEqualValue(now),
-            ))
+        await (select(exitMeasurements)
+              ..where(
+                (row) =>
+                    row.identity.equals(identity) &
+                    row.expiresAt.isBiggerThanValue(now) &
+                    row.checkedAt.isSmallerOrEqualValue(now),
+              )
+              ..orderBy([
+                (row) => OrderingTerm.desc(row.checkedAt),
+                (row) => OrderingTerm.asc(row.entryIp),
+              ])
+              ..limit(1))
             .getSingleOrNull();
     return row == null
         ? null

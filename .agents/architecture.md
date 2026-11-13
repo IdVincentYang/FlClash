@@ -358,7 +358,8 @@ ExitCacheDatabase (independent connection-exits.sqlite, Drift schema 1) before p
 days under immutable connection-parameter fingerprint plus actual public entry IP. ParseProxy captures that SHA256
 identity before adapters discard authentication inputs, excluding labels and UDP capability; the parent Core returns
 only the fingerprint and the probe's actual entry IP. Neither subscription IDs nor whole configuration IDs key the disk
-cache. App-network entry/return launches coalesced background expiry cleanup. Profile refresh/switch and Core/network
+cache. Display reads the newest valid result for that node identity across its entry pool; the original connection
+entry is not a display eligibility check. Queue deduplication and cooldown use node identity. App-network entry/return launches coalesced background expiry cleanup. Profile refresh/switch and Core/network
 changes cancel work without deleting stored results. Ended connections can read a valid result without probing;
 refresh preserves the flag with a corner spinner, and failure preserves the old measurement. Route receipts and epochs
 still fence live work; there is no new route, capture, lifecycle or source-acceptance owner. The independent offline
