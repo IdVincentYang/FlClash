@@ -9733,6 +9733,91 @@ class AppLocalizations {
     );
   }
 
+  /// `Only show active targets`
+  String get activityOnlyActiveTargets {
+    return Intl.message(
+      'Only show active targets',
+      name: 'activityOnlyActiveTargets',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Search domain or IP address`
+  String get activitySearchTargets {
+    return Intl.message(
+      'Search domain or IP address',
+      name: 'activitySearchTargets',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Active state is unconfirmed. Showing retained targets.`
+  String get activityActiveFilterUnavailable {
+    return Intl.message(
+      'Active state is unconfirmed. Showing retained targets.',
+      name: 'activityActiveFilterUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No matching targets`
+  String get activityNoTargetMatches {
+    return Intl.message(
+      'No matching targets',
+      name: 'activityNoTargetMatches',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `These apps share a UID. The connection cannot be attributed to a single app.`
+  String get activitySharedIdentityHelp {
+    return Intl.message(
+      'These apps share a UID. The connection cannot be attributed to a single app.',
+      name: 'activitySharedIdentityHelp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `UID {uid}`
+  String activityUid(Object uid) {
+    return Intl.message('UID $uid', name: 'activityUid', desc: '', args: [uid]);
+  }
+
+  /// `Application could not be identified`
+  String get activityIdentityUncertain {
+    return Intl.message(
+      'Application could not be identified',
+      name: 'activityIdentityUncertain',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unknown target`
+  String get activityUnknownTarget {
+    return Intl.message(
+      'Unknown target',
+      name: 'activityUnknownTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{rules} rule results · {exits} exit paths`
+  String activityRouteCounts(Object rules, Object exits) {
+    return Intl.message(
+      '$rules rule results · $exits exit paths',
+      name: 'activityRouteCounts',
+      desc: '',
+      args: [rules, exits],
+    );
+  }
+
   /// `Recent activity`
   String get activityRecent {
     return Intl.message(

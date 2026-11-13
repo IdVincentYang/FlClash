@@ -9,6 +9,7 @@ import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/providers/config_state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/application_activity.dart';
+import 'package:fl_clash/views/application_targets.dart';
 import 'package:fl_clash/views/tools.dart';
 import 'package:fl_clash/widgets/popup.dart';
 import 'package:material_ui/material_ui.dart';
@@ -343,8 +344,6 @@ void main() {
     tester,
   ) async {
     await pump(tester);
-    await tester.tap(find.text('Browser A'));
-    await tester.pumpAndSettle();
     expect(find.byType(ExpansionTile), findsNothing);
     expect(find.byType(Chip), findsNothing);
     expect(find.text('Observed exit paths (2)'), findsNothing);
@@ -520,6 +519,401 @@ void main() {
       expect(numeric.text, '1');
       expect(numeric.style!.fontWeight, FontWeight.w600);
       await screenshot(tester, 'locale-${locale.languageCode}');
+    });
+  }
+
+  const targetsPage = ApplicationTargetsView(
+    appKey: 'package:test.app.a',
+    label: 'Browser A',
+    packageName: 'test.app.a',
+  );
+
+  Future<void> activeTargets(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Only show active targets'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('application rows open targets and preserve the parent search', (
+    tester,
+  ) async {
+    await pump(tester);
+    await toggleAll(tester);
+    await tester.enterText(find.byType(TextField), 'Browser');
+    await tester.tap(find.text('Browser A'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ApplicationTargetsView), findsOneWidget);
+    expect(find.text('example.test'), findsOneWidget);
+    expect(find.text('test.app.a · UID 10001'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ApplicationTargetsView), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'Browser',
+    );
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mail B'), findsOneWidget);
+  });
+
+  testWidgets('a directory-only application opens an empty target page', (
+    tester,
+  ) async {
+    await pump(tester);
+    await toggleAll(tester);
+    await tester.tap(find.text('Mail B'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ApplicationTargetsView), findsOneWidget);
+    expect(find.text('No activity observed yet'), findsOneWidget);
+    expect(find.text('test.app.b'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(
+      (container.read(applicationActivityProvider.notifier) as _Activity)
+          .refreshCount,
+      0,
+    );
+  });
+
+  testWidgets('targets aggregate this app only and keep actual route pairs', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: now);
+    final a = activityConnection('a', host: 'EXAMPLE.test.');
+    final b = activityConnection(
+      'b',
+      exit: 'node-b',
+    ).copyWith(rule: 'RuleSet', rulePayload: 'Domestic');
+    store.addEvent(a);
+    store.addEvent(b);
+    store.addEvent(
+      activityConnection(
+        'c',
+        package: 'test.app.b',
+        uid: 10002,
+        host: 'mail.test',
+      ),
+    );
+    store.applySnapshot([a], startedRevision: store.revision, now: now);
+    await pump(tester, activity: store.snapshot(), child: targetsPage);
+    expect(find.text('example.test'), findsOneWidget);
+    expect(find.text('mail.test'), findsNothing);
+    expect(summary('Active 1/2'), findsOneWidget);
+    expect(find.text('2 rule results · 2 exit paths'), findsOneWidget);
+    await tester.tap(find.text('example.test'));
+    await tester.pumpAndSettle();
+    expect(find.text('Domain · EXAMPLE.test.'), findsOneWidget);
+    expect(find.text('RuleSet · Domestic'), findsOneWidget);
+    expect(find.text('node-a → Proxy'), findsOneWidget);
+    expect(find.text('node-b → Proxy'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+    await screenshot(tester, 'targets-routes');
+  });
+
+  testWidgets(
+    'targets prioritize active hosts and search without losing focus',
+    (tester) async {
+      final now = DateTime.now();
+      final store = ApplicationActivityStore()
+        ..setContext('runtime-a', observing: true, now: now);
+      final a = activityConnection('a', host: 'active.test');
+      store.addEvent(a);
+      store.addEvent(activityConnection('b', host: 'recent.test', start: now));
+      store.applySnapshot([a], startedRevision: store.revision, now: now);
+      await pump(tester, activity: store.snapshot(), child: targetsPage);
+      expect(
+        tester.getTopLeft(find.text('active.test')).dy,
+        lessThan(tester.getTopLeft(find.text('recent.test')).dy),
+      );
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'active');
+      store.addEvent(activityConnection('new', host: 'active.test'));
+      (container.read(applicationActivityProvider.notifier) as _Activity)
+          .replace(store.snapshot());
+      await tester.pumpAndSettle();
+      expect(find.text('recent.test'), findsNothing);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'active',
+      );
+      expect(
+        tester
+            .widget<EditableText>(find.byType(EditableText))
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      expect(find.text('recent.test'), findsOneWidget);
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      expect(find.text('recent.test'), findsOneWidget);
+      expect(
+        find.text('Active state is unconfirmed. Showing retained targets.'),
+        findsNothing,
+      );
+      // The newly observed connection is not yet confirmed by a snapshot.
+      expect(find.text('Only show active targets'), findsOneWidget);
+    },
+  );
+
+  testWidgets('active filtering falls back to retained targets after failure', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: now);
+    final a = activityConnection('a');
+    store.addEvent(a);
+    store.addEvent(activityConnection('idle', host: 'idle.test'));
+    store.applySnapshot([a], startedRevision: store.revision, now: now);
+    await pump(tester, activity: store.snapshot(), child: targetsPage);
+    await activeTargets(tester);
+    expect(find.text('idle.test'), findsNothing);
+    store.markUncertain(failed: true);
+    final notifier =
+        container.read(applicationActivityProvider.notifier) as _Activity;
+    notifier.replace(store.snapshot());
+    await tester.pumpAndSettle();
+    expect(find.text('idle.test'), findsOneWidget);
+    expect(summary('Active —/1'), findsNWidgets(2));
+    expect(
+      find.text('Active state is unconfirmed. Showing retained targets.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(notifier.refreshCount, 1);
+  });
+
+  testWidgets(
+    'shared identity exposes candidates without selecting a package',
+    (tester) async {
+      final shared = activityConnection(
+        'shared',
+        status: 'ambiguous',
+        candidates: ['test.app.a', 'test.app.b'],
+      );
+      final store = ApplicationActivityStore()
+        ..setContext('runtime-a', observing: true, now: DateTime.now())
+        ..addEvent(shared);
+      await pump(tester, activity: store.snapshot());
+      await tester.tap(find.text('Shared application identity'));
+      await tester.pumpAndSettle();
+      expect(find.text('UID 10001'), findsOneWidget);
+      expect(find.text('Browser A'), findsOneWidget);
+      expect(find.text('Mail B'), findsOneWidget);
+      expect(find.text('test.app.a'), findsOneWidget);
+      expect(find.text('test.app.b'), findsOneWidget);
+      expect(find.text('example.test'), findsOneWidget);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      await pump(
+        tester,
+        activity: store.snapshot(),
+        child: ApplicationTargetsView(
+          appKey: store.snapshot().apps.single.key,
+          label: 'Shared application identity',
+          identity: shared.observation!.application,
+        ),
+      );
+      await screenshot(tester, 'targets-shared');
+    },
+  );
+
+  testWidgets(
+    'IP and unknown targets remain distinct with a missing directory',
+    (tester) async {
+      final store = ApplicationActivityStore()
+        ..setContext('runtime-a', observing: true, now: DateTime.now());
+      for (final ip in ['192.0.2.1', '2001:db8::1', '']) {
+        store.addEvent(activityConnection(ip, host: '', ip: ip));
+      }
+      await pump(
+        tester,
+        activity: store.snapshot(),
+        child: targetsPage,
+        catalogueError: true,
+      );
+      expect(find.text('192.0.2.1'), findsOneWidget);
+      expect(find.text('2001:db8::1'), findsOneWidget);
+      expect(find.text('Unknown target'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '2001:db8');
+      await tester.pumpAndSettle();
+      expect(find.text('2001:db8::1'), findsOneWidget);
+      expect(find.text('192.0.2.1'), findsNothing);
+    },
+  );
+
+  testWidgets('targets remain after stopping and clear with a new runtime', (
+    tester,
+  ) async {
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: DateTime.now())
+      ..addEvent(activityConnection('a'));
+    await pump(tester, activity: store.snapshot(), child: targetsPage);
+    store.setContext('runtime-a', observing: false, now: DateTime.now());
+    final notifier =
+        container.read(applicationActivityProvider.notifier) as _Activity;
+    notifier.replace(store.snapshot());
+    await tester.pumpAndSettle();
+    expect(find.text('example.test'), findsOneWidget);
+    expect(summary('Active —/1'), findsOneWidget);
+    store.setContext('runtime-b', observing: true, now: DateTime.now());
+    notifier.replace(store.snapshot());
+    await tester.pumpAndSettle();
+    expect(find.text('example.test'), findsNothing);
+    expect(find.text('No activity observed yet'), findsOneWidget);
+  });
+
+  testWidgets(
+    'expanded route results survive live updates and list reordering',
+    (tester) async {
+      final now = DateTime.now();
+      final store = ApplicationActivityStore()
+        ..setContext('runtime-a', observing: true, now: now)
+        ..addEvent(activityConnection('a'));
+      await pump(tester, activity: store.snapshot(), child: targetsPage);
+      await tester.tap(find.text('example.test'));
+      await tester.pumpAndSettle();
+      store.addEvent(activityConnection('new', host: 'new.test', start: now));
+      (container.read(applicationActivityProvider.notifier) as _Activity)
+          .replace(store.snapshot());
+      await tester.pumpAndSettle();
+      expect(find.text('node-a → Proxy'), findsOneWidget);
+      expect(find.text('new.test'), findsOneWidget);
+    },
+  );
+
+  testWidgets('target empty search and large text do not overflow', (
+    tester,
+  ) async {
+    await pump(tester, child: targetsPage, width: 320, scale: 2);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.enterText(find.byType(TextField), 'not-present');
+    await tester.pumpAndSettle();
+    expect(find.text('No matching targets'), findsOneWidget);
+    expect(tester.takeException(), null);
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('example.test'), findsOneWidget);
+    expect(tester.takeException(), null);
+    await screenshot(tester, 'targets-large-text');
+  });
+
+  testWidgets('unknown identity stays unknown and cannot borrow an app name', (
+    tester,
+  ) async {
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: DateTime.now())
+      ..addEvent(
+        activityConnection('unknown', status: 'lookupFailed', candidates: []),
+      );
+    await pump(tester, activity: store.snapshot());
+    await tester.tap(find.text('Unknown app'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unknown app'), findsOneWidget);
+    expect(find.text('Browser A'), findsNothing);
+    expect(find.text('example.test'), findsOneWidget);
+    expect(
+      find.textContaining('Application could not be identified'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a bypassed rule needs frozen configuration evidence', (
+    tester,
+  ) async {
+    final original = activityConnection('global');
+    final global = original.copyWith(
+      rule: '',
+      rulePayload: '',
+      observation: original.observation!.copyWith(
+        configuration: const ConnectionConfiguration(
+          status: 'known',
+          mode: 'global',
+        ),
+      ),
+    );
+    final unknown = activityConnection('unknown', host: 'unknown.test')
+        .copyWith(
+          rule: '',
+          rulePayload: '',
+          observation: original.observation!.copyWith(
+            configuration: const ConnectionConfiguration(mode: 'global'),
+          ),
+        );
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: DateTime.now())
+      ..addEvent(global)
+      ..addEvent(unknown);
+    await pump(tester, activity: store.snapshot(), child: targetsPage);
+    expect(
+      find.textContaining('Rules bypassed in Global or Direct mode'),
+      findsOneWidget,
+    );
+    expect(find.text('Unknown · node-a → Proxy'), findsOneWidget);
+  });
+
+  testWidgets('returning from a target page preserves parent scroll position', (
+    tester,
+  ) async {
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: DateTime.now());
+    for (var i = 0; i < 30; i++) {
+      store.addEvent(
+        activityConnection(
+          'app-$i',
+          package: 'test.app.$i',
+          uid: 11000 + i,
+          start: DateTime(2026, 11, 11, 1, i),
+        ),
+      );
+    }
+    await pump(tester, activity: store.snapshot());
+    final list = find.byKey(const PageStorageKey('application-network'));
+    await tester.scrollUntilVisible(
+      find.text('test.app.15'),
+      250,
+      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
+    );
+    final before = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)),
+        )
+        .position
+        .pixels;
+    await tester.tap(find.text('test.app.15'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ApplicationTargetsView), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    final after = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)),
+        )
+        .position
+        .pixels;
+    expect(after, before);
+  });
+
+  for (final locale in const [Locale('zh', 'CN'), Locale('ja'), Locale('ru')]) {
+    testWidgets('target layout supports $locale', (tester) async {
+      await pump(
+        tester,
+        child: targetsPage,
+        locale: locale,
+        width: 320,
+        scale: 1.4,
+      );
+      expect(find.text('example.test'), findsOneWidget);
+      expect(tester.takeException(), null);
+      await screenshot(tester, 'targets-${locale.languageCode}');
     });
   }
 }

@@ -347,6 +347,12 @@ Observation gaps remain internal rather than a persistent warning. It consumes t
 directory without requesting service transitions or source acceptance. See the application network design above for
 retention, lifecycle and observation limits.
 
+App rows navigate through BaseNavigator to ApplicationTargetsView, keyed by the original application identity.
+The target page consumes hostsForApp from the same provider, keeps search and active filtering local, and exposes frozen
+shared-UID candidates without selecting one package. Unknown active states suspend filtering rather than hide retained data.
+Rule/exit expansion preserves actual pairs and uses per-host PageStorage keys, so live reordering cannot transfer expansion.
+Both pages use ActivityConnectionSummary for compact count/time styling and semantics; neither owns service transitions.
+
 Go event delivery is intentionally non-blocking:
 
 - Loaded-provider, geo-update, and route-changed events use a state queue that never evicts; the rules for it are under

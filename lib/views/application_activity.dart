@@ -4,6 +4,9 @@ import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/activity_summary.dart';
+
+import 'application_targets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -149,6 +152,19 @@ class _ApplicationActivityViewState
                   label: _label(entry.value.package, entry.value.activity),
                   package: entry.value.package,
                   activity: entry.value.activity,
+                  onTap: () => BaseNavigator.push(
+                    context,
+                    ApplicationTargetsView(
+                      appKey: entry.key,
+                      label: _label(entry.value.package, entry.value.activity),
+                      packageName:
+                          entry.value.package?.packageName ??
+                          entry.value.activity?.application.packageName,
+                      identity:
+                          entry.value.activity?.application ??
+                          const ApplicationIdentity(),
+                    ),
+                  ),
                 );
               },
             ),
@@ -172,10 +188,12 @@ class _ApplicationActivityRow extends StatelessWidget {
   const _ApplicationActivityRow({
     super.key,
     required this.label,
+    required this.onTap,
     this.package,
     this.activity,
   });
   final String label;
+  final VoidCallback onTap;
   final Package? package;
   final AppActivity? activity;
 
@@ -191,6 +209,7 @@ class _ApplicationActivityRow extends StatelessWidget {
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
       child: ListTile(
+        onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         minVerticalPadding: 8,
         horizontalTitleGap: 12,
@@ -212,7 +231,7 @@ class _ApplicationActivityRow extends StatelessWidget {
             if (totals == null)
               Text(l10n.activityNoObserved)
             else
-              _ActivitySummary(totals: totals),
+              ActivityConnectionSummary(totals: totals),
             if (paths.isNotEmpty)
               Text(
                 paths.first.isEmpty
@@ -224,44 +243,6 @@ class _ApplicationActivityRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ActivitySummary extends StatelessWidget {
-  const _ActivitySummary({required this.totals});
-
-  final ActivityTotals totals;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.appLocalizations;
-    final active = totals.activeCount;
-    final time = totals.lastActivity.getLastUpdateTimeDesc(context);
-    const activePlaceholder = '{active}';
-    final parts = l10n
-        .activityCompactCounts(activePlaceholder, totals.connectionCount)
-        .split(activePlaceholder);
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(text: parts.first),
-          TextSpan(
-            text: active?.toString() ?? '—',
-            style: TextStyle(
-              color: (active ?? 0) > 0
-                  ? context.colorScheme.primary
-                  : context.colorScheme.onSurfaceVariant,
-              fontWeight: (active ?? 0) > 0
-                  ? FontWeight.w600
-                  : FontWeight.normal,
-            ),
-          ),
-          TextSpan(text: '${parts.last} · $time'),
-        ],
-      ),
-      semanticsLabel:
-          '${l10n.activityCounts(active?.toString() ?? '—', totals.connectionCount)} · ${l10n.activityLast(time)}',
     );
   }
 }

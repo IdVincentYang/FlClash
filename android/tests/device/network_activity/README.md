@@ -44,7 +44,9 @@ FLCLASH_ANDROID_OBSERVATION_EVENTS="$PWD/build/verification/na-t01-01/device-can
   flutter test test/models/connection_observation_test.dart
 ```
 
-这不是三层 UI 的设备验收；页面入口在 03，完整交付在 08。
+该夹具不代替页面设备验收。应用活动入口随 02 交付，03 增加某 App 的目标列表；
+当前页面和后续交付边界见[应用网络 Design](../../../../docs/features/network_activity/network_activity_design.md)。
+只读页面验收不应运行本脚本，因为它会替换合成配置并清空开发版数据。
 
 ## 判断结果
 
