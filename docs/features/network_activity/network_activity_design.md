@@ -47,9 +47,12 @@ Native 模块与 Go 库须一起构建交付。
 | notObserved | 没有保留下可关联的入口事实；也用于观测保留上限以外的快照 |
 | method | 成功 UID 的查询来源为 androidUid 或 procfs；没有可用结果时可为 unavailable |
 
-VPN HTTP proxy 使部分应用直接连接本机代理，绕过 TUN 入口。这类 HTTP／HTTPS TCP 连接在 Tracker 加入时，
-使用客户端与本机监听器的原始 socket 地址查询归属；两端必须均为回环地址，不能把 LAN 远端客户端归到本机 App。
+VPN HTTP proxy 使部分应用直接连接本机代理，绕过 TUN 入口。这类 HTTP／HTTPS TCP 连接在入站请求交给
+业务 Tunnel 时、DNS／出口建连之前，使用客户端与本机监听器的原始 socket 地址查询归属并保留结果。
+不能等到 Tracker 加入才首次查询：出口建立期间客户端可能已关闭，系统届时可能只返回未知或 UID 0。
+两端必须均为回环地址，不能把 LAN 远端客户端归到本机 App。
 查询仍核对原 VPN 服务及保护代次，只做一次，不在快照读取时回填。接管证据记为 localProxy，不伪装成 TUN 捕获。
+业务 Tunnel 的 TrackInbound 和 scope 失效处理沿原 owner 转发；观测不取得新的业务执行权限。
 这条路径没有 TUN 入口时的配置戳；配置归属只采用原匹配器能够证明的事实，不套用当前配置。
 
 没有 App 规则、find-process-mode 为 off 时，TUN 连接加入统计器仍会尝试识别应用。

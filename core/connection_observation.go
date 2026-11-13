@@ -123,7 +123,7 @@ func (s *connectionObservationStore) remember(metadata *C.Metadata, ingress conn
 	s.Lock()
 	defer s.Unlock()
 	if previous, exists := s.pending[key]; exists && time.Since(previous.time) < time.Minute && (metadata.NetWork == C.UDP || sameConnectionIngress(previous.metadata, metadata)) {
-		if sameConnectionIngress(previous.metadata, metadata) && ingress.identity != nil {
+		if sameConnectionIngress(previous.metadata, metadata) && previous.identity == nil && ingress.identity != nil {
 			previous.identity = ingress.identity
 			s.pending[key] = previous
 		}
@@ -145,6 +145,15 @@ func (s *connectionObservationStore) remember(metadata *C.Metadata, ingress conn
 	}
 	ingress.metadata, ingress.time = metadata, time.Now()
 	s.pending[key] = ingress
+}
+
+func (s *connectionObservationStore) rememberResolved(metadata *C.Metadata, ingress connectionIngress) {
+	if ingress.resolve == nil {
+		return
+	}
+	identity := ingress.resolve(metadata)
+	ingress.identity, ingress.resolve = &identity, nil
+	s.remember(metadata, ingress)
 }
 
 func observedConfiguration() connectionConfiguration {
@@ -244,6 +253,30 @@ type observableTunnel interface {
 type connectionObservationTunnel struct {
 	observableTunnel
 	capture func(*C.Metadata)
+}
+
+type businessIngressTunnel interface {
+	C.Tunnel
+	TrackInbound(net.Conn) (net.Conn, error)
+}
+
+type localProxyObservationTunnel struct {
+	businessIngressTunnel
+	capture func(*C.Metadata)
+}
+
+func bindObservedBusiness(scope *requestscope.BusinessScope) C.Tunnel {
+	return localProxyObservationTunnel{
+		businessIngressTunnel: tunnel.BindBusiness(scope).(businessIngressTunnel),
+		capture: func(metadata *C.Metadata) {
+			connectionObservations.rememberResolved(metadata, localProxyConnectionIngress(metadata))
+		},
+	}
+}
+
+func (t localProxyObservationTunnel) HandleTCPConn(conn net.Conn, metadata *C.Metadata) {
+	t.capture(metadata)
+	t.businessIngressTunnel.HandleTCPConn(conn, metadata)
 }
 
 func (t connectionObservationTunnel) HandleTCPConn(conn net.Conn, metadata *C.Metadata) {

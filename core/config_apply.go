@@ -504,7 +504,7 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	if op.request.Active {
 		listener.SetAllowLan(raw.AllowLan)
 		listener.SetBindAddress(raw.BindAddress)
-		p.mixed, err = listener.PrepareMixed(raw.MixedPort, tunnel.BindBusiness(p.scope))
+		p.mixed, err = listener.PrepareMixed(raw.MixedPort, bindObservedBusiness(p.scope))
 		if err != nil {
 			return blockConfigLocked(p, err)
 		}
@@ -655,7 +655,7 @@ func finishInstallLocked(p *preparedConfig) ConfigApplyResult {
 		return blockConfigLocked(p, err)
 	}
 	if p.op.request.Active {
-		if err := updateListenersChecked(cfg, tunnel.BindBusiness(p.scope), p.mixed); err != nil {
+		if err := updateListenersChecked(cfg, bindObservedBusiness(p.scope), p.mixed); err != nil {
 			return blockConfigLocked(p, err)
 		}
 	}
