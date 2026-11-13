@@ -9703,6 +9703,36 @@ class AppLocalizations {
     );
   }
 
+  /// `Active {active}/{count}`
+  String activityCompactCounts(Object active, Object count) {
+    return Intl.message(
+      'Active $active/$count',
+      name: 'activityCompactCounts',
+      desc: '',
+      args: [active, count],
+    );
+  }
+
+  /// `Show all apps`
+  String get activityShowAllApps {
+    return Intl.message(
+      'Show all apps',
+      name: 'activityShowAllApps',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Search app name or package`
+  String get activitySearchApps {
+    return Intl.message(
+      'Search app name or package',
+      name: 'activitySearchApps',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Recent activity`
   String get activityRecent {
     return Intl.message(

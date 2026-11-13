@@ -9,12 +9,14 @@ class SearchField extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final TextEditingController? controller;
   final FocusNode? focusNode;
+  final String? hintText;
 
   const SearchField({
     super.key,
     required this.onChanged,
     this.controller,
     this.focusNode,
+    this.hintText,
   });
 
   @override
@@ -51,7 +53,7 @@ class _SearchFieldState extends State<SearchField> {
           inputFormatters: TextInputLimits.limit(TextInputLimits.search),
           onChanged: widget.onChanged,
           decoration: InputDecoration(
-            hintText: appLocalizations.search,
+            hintText: widget.hintText ?? appLocalizations.search,
             prefixIcon: const GlyphIcon(AppGlyphs.search, size: 20),
             suffixIcon: value.text.isEmpty
                 ? null

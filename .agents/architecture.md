@@ -340,8 +340,10 @@ from the bounded Requests buffer when observation begins. Its bounded in-memory 
 complete, context-fenced foreground connection snapshots;
 failures and background gaps never become zero active connections. App, App-plus-Host and cross-App Host queries share
 the same retained facts. The read-only Tools application network page shows non-expanding app summaries with
-application-window placeholders;
-observation gaps remain internal rather than a persistent warning. It consumes the queries and existing package
+application-window placeholders, a persistent search field below the title and an overflow toggle for all installed apps.
+Confirmed-active apps lead the recent list; compact count/time rows emphasize only a positive active count.
+Normal observation/retention chrome and manual refresh are absent; actual read failures retain inline retries.
+Observation gaps remain internal rather than a persistent warning. It consumes the queries and existing package
 directory without requesting service transitions or source acceptance. See the application network design above for
 retention, lifecycle and observation limits.
 

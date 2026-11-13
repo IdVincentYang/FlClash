@@ -10,6 +10,7 @@ import 'package:fl_clash/providers/config_state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/application_activity.dart';
 import 'package:fl_clash/views/tools.dart';
+import 'package:fl_clash/widgets/popup.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -26,9 +27,12 @@ class _Activity extends ApplicationActivity {
   final ApplicationActivityState value;
   @override
   ApplicationActivityState build() => value;
+  int refreshCount = 0;
   void replace(ApplicationActivityState next) => state = next;
   @override
-  Future<void> refresh() async {}
+  Future<void> refresh() async {
+    refreshCount++;
+  }
 }
 
 const _packages = [
@@ -84,6 +88,7 @@ void main() {
     Widget child = const ApplicationActivityView(),
     double width = 420,
     double scale = 1,
+    Locale? locale,
   }) async {
     tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1;
@@ -116,6 +121,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: TestApp(
+          locale: locale,
           homeBuilder: (widget) => Builder(
             builder: (context) => MediaQuery(
               data: MediaQuery.of(
@@ -166,61 +172,187 @@ void main() {
     });
   }
 
-  testWidgets('Tools opens the read-only page while the proxy is stopped', (
-    tester,
-  ) async {
-    await pump(
-      tester,
-      activity: _activity(stopped: true),
-      child: const ToolsView(isAndroid: true),
-    );
-    await tester.tap(find.text('Application network'));
+  Finder summary(String prefix) => find.byWidgetPredicate(
+    (widget) =>
+        widget is Text &&
+        (widget.textSpan?.toPlainText().startsWith(prefix) ?? false),
+  );
+
+  Future<void> toggleAll(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
-    expect(find.text('Observation paused · retained activity'), findsOneWidget);
-    expect(find.text('Browser A'), findsOneWidget);
-    expect(find.text('Active Unconfirmed · Observed 2'), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.text('Show all apps'));
     await tester.pumpAndSettle();
-    expect(find.text('Tools'), findsOneWidget);
-  });
+  }
 
   testWidgets(
-    'search and filters retain activity and show unobserved installed apps',
+    'Tools opens retained activity with an inline search while stopped',
     (tester) async {
-      await pump(tester);
-      expect(find.text('Active 1 · Observed 2'), findsOneWidget);
-      await tester.tap(find.text('All apps'));
+      await pump(
+        tester,
+        activity: _activity(stopped: true),
+        child: const ToolsView(isAndroid: true),
+      );
+      await tester.tap(find.text('Application network'));
       await tester.pumpAndSettle();
-      expect(find.text('Mail B'), findsOneWidget);
-      await tester.tap(find.byTooltip('Search').first);
+      expect(find.text('Observation paused · retained activity'), findsNothing);
+      expect(find.text('Browser A'), findsOneWidget);
+      expect(summary('Active —/2'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first, 'Mail');
-      await tester.pumpAndSettle();
-      expect(find.text('Mail B'), findsOneWidget);
-      expect(find.text('Browser A'), findsNothing);
-      await tester.enterText(find.byType(TextField).first, 'missing');
-      await tester.pumpAndSettle();
-      expect(find.text('No matching apps'), findsOneWidget);
+      expect(find.text('Tools'), findsOneWidget);
     },
   );
 
-  testWidgets('rows show summaries without expansion or detail controls', (
+  testWidgets(
+    'normal chrome has only the menu and the persistent search field',
+    (tester) async {
+      await pump(tester);
+      expect(find.byTooltip('More'), findsOneWidget);
+      expect(find.byTooltip('Search'), findsNothing);
+      expect(find.byTooltip('Retry'), findsNothing);
+      expect(find.byTooltip('Observation scope'), findsNothing);
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.text('Observing VPN activity'), findsNothing);
+      expect(
+        find.text('This run · latest 4096 observed connections'),
+        findsNothing,
+      );
+      expect(find.text('Search app name or package'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byType(TextField)).dy,
+        lessThan(tester.getTopLeft(find.text('Browser A')).dy),
+      );
+    },
+  );
+
+  testWidgets(
+    'all-app menu preserves the search and clear restores recent apps',
+    (tester) async {
+      await pump(tester);
+      await tester.enterText(find.byType(TextField), 'Mail');
+      await tester.pumpAndSettle();
+      expect(find.text('No matching apps'), findsOneWidget);
+      await toggleAll(tester);
+      expect(find.text('Mail B'), findsOneWidget);
+      expect(find.text('Browser A'), findsNothing);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Mail',
+      );
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<CommonPopupMenu>(find.byType(CommonPopupMenu))
+            .items
+            .single
+            .checked,
+        true,
+      );
+      await tester.tap(find.text('Show all apps'));
+      await tester.pumpAndSettle();
+      expect(find.text('No matching apps'), findsOneWidget);
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      expect(find.text('Browser A'), findsOneWidget);
+      expect(find.text('Mail B'), findsNothing);
+      await tester.enterText(find.byType(TextField), 'test.app.a');
+      await tester.pumpAndSettle();
+      expect(find.text('Browser A'), findsOneWidget);
+    },
+  );
+
+  testWidgets('activity updates preserve typed search and keyboard focus', (
     tester,
   ) async {
     await pump(tester);
-    expect(find.byType(ExpansionTile), findsNothing);
-    await tester.tap(find.text('Browser A'));
-    await tester.pumpAndSettle();
-    expect(find.text('Observed exit paths (2)'), findsNothing);
-    expect(find.text('Current settings: include this app'), findsNothing);
-    expect(find.text('Save'), findsNothing);
-    expect(find.text('Active 1 · Observed 2'), findsOneWidget);
-    await screenshot(tester, 'summaries');
+    await tester.tap(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'Browser');
+    final focus = tester
+        .widget<EditableText>(find.byType(EditableText))
+        .focusNode;
+    expect(focus.hasFocus, true);
+    (container.read(applicationActivityProvider.notifier) as _Activity).replace(
+      _activity(stopped: true),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'Browser',
+    );
+    expect(focus.hasFocus, true);
+    expect(find.text('Browser A'), findsOneWidget);
+    expect(summary('Active —/2'), findsOneWidget);
   });
 
-  testWidgets('background and retention gaps do not show an alarm', (
+  testWidgets(
+    'active count is emphasized and active apps precede newer idle apps',
+    (tester) async {
+      final now = DateTime.now();
+      final store = ApplicationActivityStore()
+        ..setContext('runtime-a', observing: true, now: now);
+      final a = activityConnection(
+        'a',
+        start: now.subtract(const Duration(minutes: 2)),
+      );
+      final b = activityConnection(
+        'b',
+        package: 'test.app.b',
+        uid: 10002,
+        start: now,
+      );
+      store.addEvent(a);
+      store.addEvent(b);
+      store.applySnapshot([a], startedRevision: store.revision, now: now);
+      await pump(tester, activity: store.snapshot());
+      expect(
+        tester.getTopLeft(find.text('Browser A')).dy,
+        lessThan(tester.getTopLeft(find.text('Mail B')).dy),
+      );
+      final active = tester.widget<Text>(summary('Active 1/1'));
+      final activeSpan = (active.textSpan! as TextSpan).children!
+          .whereType<TextSpan>()
+          .singleWhere((span) => span.style != null);
+      final idle = tester.widget<Text>(summary('Active 0/1'));
+      final idleSpan = (idle.textSpan! as TextSpan).children!
+          .whereType<TextSpan>()
+          .singleWhere((span) => span.style != null);
+      final theme = Theme.of(tester.element(find.text('Browser A')));
+      expect(active.semanticsLabel, contains('Active 1 · Observed 1'));
+      expect(activeSpan.text, '1');
+      expect(activeSpan.style!.color, theme.colorScheme.primary);
+      expect(activeSpan.style!.fontWeight, FontWeight.w600);
+      expect(idleSpan.text, '0');
+      expect(idleSpan.style!.color, theme.colorScheme.onSurfaceVariant);
+      expect(idleSpan.style!.fontWeight, FontWeight.normal);
+      expect(find.text('Last activity: Just now'), findsNothing);
+      expect(idle.textSpan!.toPlainText(), endsWith(' · Just now'));
+      expect(tester.getSize(summary('Active 0/1')).height, lessThan(24));
+      final tile = find.ancestor(
+        of: find.text('Browser A'),
+        matching: find.byType(ListTile),
+      );
+      expect(tester.getSize(tile).height, lessThanOrEqualTo(88));
+      await screenshot(tester, 'compact-activity');
+    },
+  );
+
+  testWidgets('rows remain summary-only without expansion or status badges', (
     tester,
   ) async {
+    await pump(tester);
+    await tester.tap(find.text('Browser A'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(find.byType(Chip), findsNothing);
+    expect(find.text('Observed exit paths (2)'), findsNothing);
+    expect(find.text('Save'), findsNothing);
+    expect(summary('Active 1/2'), findsOneWidget);
+  });
+
+  testWidgets('observation gaps have no persistent warning', (tester) async {
     final initial = _activity();
     await pump(
       tester,
@@ -233,7 +365,7 @@ void main() {
       ),
     );
     expect(find.text('Observation has gaps'), findsNothing);
-    expect(find.text('Active 1 · Observed 2'), findsOneWidget);
+    expect(summary('Active 1/2'), findsOneWidget);
   });
 
   testWidgets('unknown identity uses an application placeholder', (
@@ -251,10 +383,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byType(ExpansionTile), findsNothing);
+    expect(summary('Active —/1'), findsOneWidget);
   });
 
-  testWidgets('catalogue failure leaves activity visible and provides retry', (
+  testWidgets('catalogue failure leaves observed apps searchable with retry', (
     tester,
   ) async {
     await pump(tester, catalogueError: true);
@@ -263,12 +395,14 @@ void main() {
       find.text('App directory unavailable; observed activity is still shown.'),
       findsOneWidget,
     );
+    await tester.enterText(find.byType(TextField), 'test.app.a');
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Retry'));
     await tester.pumpAndSettle();
-    expect(find.text('test.app.a'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'test.app.a'), findsOneWidget);
   });
 
-  testWidgets('snapshot failure is distinct from empty or zero active data', (
+  testWidgets('connection failures offer retry without showing a false zero', (
     tester,
   ) async {
     await pump(tester, activity: _activity(failed: true));
@@ -276,23 +410,30 @@ void main() {
       find.text('Could not refresh · active state unconfirmed'),
       findsOneWidget,
     );
-    expect(find.text('Active Unconfirmed · Observed 2'), findsOneWidget);
-    await screenshot(tester, 'snapshot-failed');
+    expect(summary('Active —/2'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Retry'));
+    await tester.pump();
+    expect(
+      (container.read(applicationActivityProvider.notifier) as _Activity)
+          .refreshCount,
+      1,
+    );
+    await screenshot(tester, 'connection-failed');
   });
 
-  testWidgets(
-    'empty activity is immediately readable without an endless spinner',
-    (tester) async {
-      await pump(tester, activity: const ApplicationActivityState());
-      expect(find.text('No activity observed yet'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      await tester.tap(find.text('Active now'));
-      await tester.pumpAndSettle();
-      expect(find.text('No confirmed active connections'), findsOneWidget);
-    },
-  );
+  testWidgets('empty activity still offers search and all installed apps', (
+    tester,
+  ) async {
+    await pump(tester, activity: const ApplicationActivityState());
+    expect(find.text('No activity observed yet'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    await toggleAll(tester);
+    expect(find.text('Browser A'), findsOneWidget);
+    expect(find.text('Mail B'), findsOneWidget);
+  });
 
-  testWidgets('shared identities remain separate from their candidate apps', (
+  testWidgets('shared identities stay separate from candidate apps', (
     tester,
   ) async {
     final store = ApplicationActivityStore()
@@ -307,68 +448,78 @@ void main() {
     await pump(tester, activity: store.snapshot());
     expect(find.text('Shared application identity'), findsOneWidget);
     expect(find.text('Browser A'), findsNothing);
-    expect(find.byType(ExpansionTile), findsNothing);
   });
 
-  testWidgets(
-    'activity updates keep each summary with the correct application',
-    (tester) async {
-      final now = DateTime.utc(2026, 11, 11, 2);
-      final store = ApplicationActivityStore()
-        ..setContext('runtime-a', observing: true, now: now);
-      store.addEvent(activityConnection('a', start: now));
-      store.addEvent(
-        activityConnection(
-          'b',
-          package: 'test.app.b',
-          uid: 10002,
-          start: now.add(const Duration(seconds: 1)),
-        ),
-      );
-      await pump(tester, activity: store.snapshot());
-      store.addEvent(
-        activityConnection('new-a', start: now.add(const Duration(seconds: 2))),
-      );
-      (container.read(applicationActivityProvider.notifier) as _Activity)
-          .replace(store.snapshot());
-      await tester.pumpAndSettle();
-      final browser = find.ancestor(
-        of: find.text('Browser A'),
-        matching: find.byType(ListTile),
-      );
-      final mail = find.ancestor(
-        of: find.text('Mail B'),
-        matching: find.byType(ListTile),
-      );
-      expect(
-        find.descendant(
-          of: browser,
-          matching: find.text('Active Unconfirmed · Observed 2'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: mail,
-          matching: find.text('Active Unconfirmed · Observed 1'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        tester.getTopLeft(browser).dy,
-        lessThan(tester.getTopLeft(mail).dy),
-      );
-    },
-  );
+  testWidgets('reordered summaries retain the correct counts', (tester) async {
+    final now = DateTime.now();
+    final store = ApplicationActivityStore()
+      ..setContext('runtime-a', observing: true, now: now);
+    store.addEvent(activityConnection('a', start: now));
+    store.addEvent(
+      activityConnection(
+        'b',
+        package: 'test.app.b',
+        uid: 10002,
+        start: now.add(const Duration(seconds: 1)),
+      ),
+    );
+    await pump(tester, activity: store.snapshot());
+    store.addEvent(
+      activityConnection('new-a', start: now.add(const Duration(seconds: 2))),
+    );
+    (container.read(applicationActivityProvider.notifier) as _Activity).replace(
+      store.snapshot(),
+    );
+    await tester.pumpAndSettle();
+    final browser = find.ancestor(
+      of: find.text('Browser A'),
+      matching: find.byType(ListTile),
+    );
+    final mail = find.ancestor(
+      of: find.text('Mail B'),
+      matching: find.byType(ListTile),
+    );
+    expect(
+      find.descendant(of: browser, matching: summary('Active —/2')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: mail, matching: summary('Active —/1')),
+      findsOneWidget,
+    );
+    expect(tester.getTopLeft(browser).dy, lessThan(tester.getTopLeft(mail).dy));
+  });
 
-  testWidgets('narrow screens and large text keep content scrollable', (
+  testWidgets('narrow large-text layout stays usable with the keyboard open', (
     tester,
   ) async {
     await pump(tester, width: 320, scale: 2);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'test.app.a');
+    await tester.pump();
     expect(tester.takeException(), null);
-    await tester.tap(find.text('Browser A'));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), null);
+    expect(find.text('Browser A'), findsOneWidget);
+    expect(tester.getBottomLeft(find.byType(TextField)).dy, lessThan(600));
     await screenshot(tester, 'narrow-large-text');
   });
+
+  for (final locale in const [Locale('zh', 'CN'), Locale('ja'), Locale('ru')]) {
+    testWidgets('localized compact counts retain their styled value $locale', (
+      tester,
+    ) async {
+      await pump(tester, locale: locale, width: 360);
+      expect(tester.takeException(), null);
+      final texts = tester.widgetList<Text>(find.byType(Text));
+      final stats = texts.singleWhere((text) => text.textSpan != null);
+      expect(stats.textSpan!.toPlainText(), isNot(contains('{active}')));
+      final numeric = (stats.textSpan! as TextSpan).children!
+          .whereType<TextSpan>()
+          .singleWhere((span) => span.style != null);
+      expect(numeric.text, '1');
+      expect(numeric.style!.fontWeight, FontWeight.w600);
+      await screenshot(tester, 'locale-${locale.languageCode}');
+    });
+  }
 }

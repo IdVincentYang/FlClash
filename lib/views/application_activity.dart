@@ -7,8 +7,6 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum _ActivityFilter { recent, active, all }
-
 class ApplicationActivityView extends ConsumerStatefulWidget {
   const ApplicationActivityView({super.key});
 
@@ -19,9 +17,8 @@ class ApplicationActivityView extends ConsumerStatefulWidget {
 
 class _ApplicationActivityViewState
     extends ConsumerState<ApplicationActivityView> {
-  _ActivityFilter _filter = _ActivityFilter.recent;
+  bool _showAllApps = false;
   String _query = '';
-  late final _searchState = AppBarSearchState(onSearch: _search);
 
   void _search(String value) => setState(() => _query = value);
 
@@ -34,16 +31,19 @@ class _ApplicationActivityViewState
       for (final package in catalogue.asData?.value.packages ?? <Package>[])
         package.packageName: package,
     };
+    final apps = activity.apps;
+    final ordered = [
+      ...apps.where((item) => item.totals.confirmedActiveCount > 0),
+      ...apps.where((item) => item.totals.confirmedActiveCount == 0),
+    ];
     final rows = <String, ({Package? package, AppActivity? activity})>{
-      for (final item in activity.apps)
-        if (_filter != _ActivityFilter.active ||
-            item.totals.confirmedActiveCount > 0)
-          item.key: (
-            package: packages[item.application.packageName],
-            activity: item,
-          ),
+      for (final item in ordered)
+        item.key: (
+          package: packages[item.application.packageName],
+          activity: item,
+        ),
     };
-    if (_filter == _ActivityFilter.all) {
+    if (_showAllApps) {
       final sorted = packages.values.toList()
         ..sort((a, b) => a.label.compareTo(b.label));
       for (final package in sorted) {
@@ -66,135 +66,94 @@ class _ApplicationActivityViewState
         _label(item.package, item.activity),
       ]);
     }).toList();
-    final status = !activity.observing
-        ? l10n.activityPaused
-        : activity.snapshotFailed
-        ? l10n.activitySnapshotFailed
-        : !activity.hasSnapshot
-        ? l10n.activityChecking
-        : l10n.activityObserving;
     return CommonScaffold(
       title: l10n.applicationNetwork,
-      searchState: _searchState,
-      iconActions: [
-        IconButtonData(
-          glyph: AppGlyphs.refresh,
-          tooltip: l10n.retry,
-          onPressed: activity.observing
-              ? () => ref.read(applicationActivityProvider.notifier).refresh()
-              : null,
-        ),
-        IconButtonData(
-          glyph: AppGlyphs.info,
-          tooltip: l10n.activityObservationScope,
-          onPressed: () => dialogs.showMessage(
-            message: TextSpan(text: l10n.activityScopeHelp),
-          ),
+      menuItems: [
+        CommonPopupMenuItem(
+          label: l10n.activityShowAllApps,
+          glyph: AppGlyphs.appsList,
+          checked: _showAllApps,
+          onPressed: () => setState(() => _showAllApps = !_showAllApps),
         ),
       ],
-      body: ListView.builder(
-        findChildIndexCallback: (key) {
-          final index = visible.indexWhere(
-            (entry) => ValueKey('activity:${entry.key}') == key,
-          );
-          return index < 0 ? null : index + 3;
-        },
-        key: const PageStorageKey('application-network'),
-        padding: EdgeInsets.only(
-          top: context.contentTopPadding,
-          bottom: 16 + BottomInsetScope.of(context),
-        ),
-        itemCount: 3 + (visible.isEmpty ? 1 : visible.length),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 8),
+            child: SearchField(
+              hintText: l10n.activitySearchApps,
+              onChanged: _search,
+            ),
+          ),
+          if (activity.observing && activity.snapshotFailed)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
                 children: [
-                  Text(status, style: context.textTheme.titleSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.activityRetention(activity.capacity),
-                    style: context.textTheme.bodySmall,
+                  Expanded(child: Text(l10n.activitySnapshotFailed)),
+                  TextButton(
+                    onPressed: () => ref
+                        .read(applicationActivityProvider.notifier)
+                        .refresh(),
+                    child: Text(l10n.retry),
                   ),
                 ],
               ),
-            );
-          }
-          if (index == 1) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+            ),
+          if (_showAllApps && catalogue.isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Text(l10n.activityLoadingApps),
+            ),
+          if (catalogue.hasError || catalogue.asData?.value.accessible == false)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
                 children: [
-                  for (final value in _ActivityFilter.values)
-                    ChoiceChip(
-                      label: Text(switch (value) {
-                        _ActivityFilter.recent => l10n.activityRecent,
-                        _ActivityFilter.active => l10n.activityActive,
-                        _ActivityFilter.all => l10n.activityAllApps,
-                      }),
-                      selected: _filter == value,
-                      onSelected: (_) => setState(() => _filter = value),
-                    ),
+                  Expanded(child: Text(l10n.activityCatalogueUnavailable)),
+                  TextButton(
+                    onPressed: () =>
+                        ref.invalidate(applicationCatalogueProvider),
+                    child: Text(l10n.retry),
+                  ),
                 ],
               ),
-            );
-          }
-          if (index == 2) {
-            if (catalogue.isLoading) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Text(l10n.activityLoadingApps),
-              );
-            }
-            if (catalogue.hasError ||
-                catalogue.asData?.value.accessible == false) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l10n.activityCatalogueUnavailable),
-                    TextButton(
-                      onPressed: () =>
-                          ref.invalidate(applicationCatalogueProvider),
-                      child: Text(l10n.retry),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }
-          if (visible.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text(
-                search.isNotEmpty
-                    ? l10n.activityNoMatches
-                    : _filter == _ActivityFilter.active
-                    ? l10n.activityNoActive
-                    : l10n.activityNoObserved,
+            ),
+          Expanded(
+            child: ListView.builder(
+              key: const PageStorageKey('application-network'),
+              findChildIndexCallback: (key) {
+                final index = visible.indexWhere(
+                  (entry) => ValueKey('activity:${entry.key}') == key,
+                );
+                return index < 0 ? null : index;
+              },
+              padding: EdgeInsets.only(
+                bottom: 16 + BottomInsetScope.of(context),
               ),
-            );
-          }
-          final entry = visible[index - 3];
-          return _ApplicationActivityRow(
-            key: ValueKey('activity:${entry.key}'),
-            label: _label(entry.value.package, entry.value.activity),
-            package: entry.value.package,
-            activity: entry.value.activity,
-          );
-        },
+              itemCount: visible.isEmpty ? 1 : visible.length,
+              itemBuilder: (context, index) {
+                if (visible.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      search.isNotEmpty
+                          ? l10n.activityNoMatches
+                          : l10n.activityNoObserved,
+                    ),
+                  );
+                }
+                final entry = visible[index];
+                return _ApplicationActivityRow(
+                  key: ValueKey('activity:${entry.key}'),
+                  label: _label(entry.value.package, entry.value.activity),
+                  package: entry.value.package,
+                  activity: entry.value.activity,
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -232,43 +191,77 @@ class _ApplicationActivityRow extends StatelessWidget {
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        minVerticalPadding: 8,
+        horizontalTitleGap: 12,
+        subtitleTextStyle: context.textTheme.bodySmall?.copyWith(
+          color: context.colorScheme.onSurfaceVariant,
+        ),
         leading: packageName == null
-            ? const GlyphIcon(AppGlyphs.application, size: 40)
+            ? const GlyphIcon(AppGlyphs.application, size: 48)
             : PackageIcon(
                 packageName: packageName,
-                size: 40,
-                placeholder: const GlyphIcon(AppGlyphs.application, size: 40),
+                size: 48,
+                placeholder: const GlyphIcon(AppGlyphs.application, size: 48),
               ),
-        title: Text(label),
+        title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              totals == null
-                  ? l10n.activityNoObserved
-                  : l10n.activityCounts(
-                      totals.activeCount?.toString() ?? l10n.activityPending,
-                      totals.connectionCount,
-                    ),
-            ),
-            if (totals != null)
-              Text(
-                l10n.activityLast(
-                  totals.lastActivity.getLastUpdateTimeDesc(context),
-                ),
-              ),
+            if (totals == null)
+              Text(l10n.activityNoObserved)
+            else
+              _ActivitySummary(totals: totals),
             if (paths.isNotEmpty)
               Text(
                 paths.first.isEmpty
                     ? l10n.unknown
                     : '${paths.first.join(' → ')}${paths.length > 1 ? ' (+${paths.length - 1})' : ''}',
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ActivitySummary extends StatelessWidget {
+  const _ActivitySummary({required this.totals});
+
+  final ActivityTotals totals;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.appLocalizations;
+    final active = totals.activeCount;
+    final time = totals.lastActivity.getLastUpdateTimeDesc(context);
+    const activePlaceholder = '{active}';
+    final parts = l10n
+        .activityCompactCounts(activePlaceholder, totals.connectionCount)
+        .split(activePlaceholder);
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: parts.first),
+          TextSpan(
+            text: active?.toString() ?? '—',
+            style: TextStyle(
+              color: (active ?? 0) > 0
+                  ? context.colorScheme.primary
+                  : context.colorScheme.onSurfaceVariant,
+              fontWeight: (active ?? 0) > 0
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+            ),
+          ),
+          TextSpan(text: '${parts.last} · $time'),
+        ],
+      ),
+      semanticsLabel:
+          '${l10n.activityCounts(active?.toString() ?? '—', totals.connectionCount)} · ${l10n.activityLast(time)}',
     );
   }
 }
