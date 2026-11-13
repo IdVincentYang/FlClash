@@ -44,6 +44,30 @@ func TestLookupIPCountriesIsLocalAndOptional(t *testing.T) {
 	}
 }
 
+func TestLookupIPCountriesPreservesTerritories(t *testing.T) {
+	previous := C.Path.HomeDir()
+	C.SetHomeDir(t.TempDir())
+	defer C.SetHomeDir(previous)
+	data, err := os.ReadFile("../assets/data/GEOIP.metadb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(C.Path.MMDB(), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]string{"8.210.0.1": "HK", "34.92.0.1": "HK", "202.175.1.1": "MO", "168.95.1.1": "TW"}
+	ips := make([]string, 0, len(cases))
+	for ip := range cases {
+		ips = append(ips, ip)
+	}
+	actual := handleLookupIPCountries(ips)
+	for ip, expected := range cases {
+		if actual[ip] != expected {
+			t.Fatalf("region for %s = %q, want %s", ip, actual[ip], expected)
+		}
+	}
+}
+
 func TestCountryMMDBRecordFormats(t *testing.T) {
 	for _, value := range []any{"us", []any{"us"}, []any{"us", "google"}, map[string]any{"country": map[string]any{"iso_code": "us"}}} {
 		if got := countryFromMMDB(value); got != "US" {

@@ -1,11 +1,9 @@
-import 'dart:convert';
-
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
-import 'package:fl_clash/providers/connection_countries.dart';
+import 'package:fl_clash/widgets/connection_exit.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 
@@ -66,21 +64,6 @@ class _ApplicationTargetsViewState
     final latestConnections = {
       for (final host in visible) host.key: _latestConnection(host).info,
     };
-    final hasDirect = latestConnections.values.any(
-      (info) => info.chains.isNotEmpty && info.chains.first == 'DIRECT',
-    );
-    final localIp = hasDirect ? ref.watch(observedLocalPublicIpProvider) : null;
-    final ips = {
-      for (final info in latestConnections.values)
-        ?connectionCountryIp(info, localIp),
-    }.toList()..sort();
-    final countries = ips.isEmpty
-        ? const <String, String>{}
-        : ref
-                  .watch(connectionCountriesProvider(jsonEncode(ips)))
-                  .asData
-                  ?.value ??
-              const <String, String>{};
     final label = packages[widget.packageName]?.label ?? widget.label;
     return CommonScaffold(
       titleWidget: Row(
@@ -178,8 +161,9 @@ class _ApplicationTargetsViewState
                   key: ValueKey('target:${host.key}'),
                   host: host,
                   latestConnection: latestConnections[host.key]!,
-                  countries: countries,
-                  localPublicIp: localIp,
+                  active: activity.fresh
+                      ? host.totals.confirmedActiveCount > 0
+                      : null,
                   onPressed: () => BaseNavigator.push(
                     context,
                     ApplicationConnectionsView(
@@ -198,14 +182,19 @@ class _ApplicationTargetsViewState
   }
 }
 
-ActivityConnection _latestConnection(HostActivity host) =>
-    host.totals.connections.reduce((latest, candidate) {
-      final time = candidate.info.start.compareTo(latest.info.start);
-      return time > 0 ||
-              time == 0 && candidate.info.id.compareTo(latest.info.id) < 0
-          ? candidate
-          : latest;
-    });
+ActivityConnection _latestConnection(HostActivity host) {
+  final active = host.totals.connections
+      .where((item) => host.totals.fresh && item.active == true)
+      .toList();
+  final candidates = active.isNotEmpty ? active : host.totals.connections;
+  return candidates.reduce((latest, candidate) {
+    final time = candidate.info.start.compareTo(latest.info.start);
+    return time > 0 ||
+            time == 0 && candidate.info.id.compareTo(latest.info.id) < 0
+        ? candidate
+        : latest;
+  });
+}
 
 class _ApplicationIdentity extends StatelessWidget {
   const _ApplicationIdentity({
@@ -297,15 +286,13 @@ class _TargetActivityRow extends StatelessWidget {
     required super.key,
     required this.host,
     required this.latestConnection,
-    required this.countries,
-    this.localPublicIp,
+    required this.active,
     required this.onPressed,
   });
 
   final HostActivity host;
   final TrackerInfo latestConnection;
-  final Map<String, String> countries;
-  final String? localPublicIp;
+  final bool? active;
   final VoidCallback onPressed;
 
   @override
@@ -321,11 +308,7 @@ class _TargetActivityRow extends StatelessWidget {
       child: ListTile(
         onTap: onPressed,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: ConnectionCountryIcon(
-          info: latestConnection,
-          countries: countries,
-          localPublicIp: localPublicIp,
-        ),
+        leading: ConnectionExitIcon(info: latestConnection, active: active),
         title: Text(
           host.target.isEmpty ? l10n.activityUnknownTarget : host.target,
         ),

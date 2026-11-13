@@ -82,6 +82,7 @@ dependencies:
     path: plugins/rust_api
   setup:
     path: plugins/setup
+  visibility_detector: ^0.4.0+2
 dev_dependencies:
   flutter_test:
     sdk: flutter

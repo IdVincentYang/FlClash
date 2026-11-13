@@ -1219,5 +1219,13 @@
   "localGroupsUnbound": "このサブスクリプションには未追加",
   "localGroupsNoMatchingNodes": "このサブスクリプションに一致するノードがありません。",
   "localGroupsInUseProfile": "{name} がこのグループを使用中です。先に別のノードを選択してください。",
-  "localGroupsLoadFailed": "保存済みのグループを読み込めませんでした。再試行してください。"
+  "localGroupsLoadFailed": "保存済みのグループを読み込めませんでした。再試行してください。",
+  "activityExitNotApplicable": "この接続にはプロキシ出口がありません。",
+  "activityExitInactive": "アクティブな接続がないため自動確認しません。タップすると出口を確認します。",
+  "activityExitChecking": "プロキシ出口を確認中…",
+  "activityExitObserved": "確認した出口: {ip} · {country}\n確認日時: {time}\nタップして再確認します。宛先によって出口が異なる場合があります。",
+  "activityExitFailed": "出口の確認に失敗しました。タップして再試行します。",
+  "activityExitNotChecked": "プロキシ出口は未確認です。タップして確認します。",
+  "activityExitUnavailable": "この接続の出口を確認できません。プロキシとノードが利用可能か確認してください。",
+  "activityExitCooldown": "数秒待ってから出口を再確認してください。"
 }

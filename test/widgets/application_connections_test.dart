@@ -4,7 +4,11 @@ import 'dart:ui' as ui;
 import 'package:fl_clash/common/application_activity.dart';
 import 'package:fl_clash/common/datetime.dart';
 import 'package:fl_clash/features/connection/tracker_info_item.dart';
-import 'package:fl_clash/widgets/activity_summary.dart';
+import 'package:fl_clash/widgets/connection_exit.dart';
+import 'package:fl_clash/providers/connection_exits.dart';
+import 'package:fl_clash/providers/routed_probe.dart';
+import 'package:fl_clash/models/config_state.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
@@ -12,7 +16,7 @@ import 'package:fl_clash/manager/status_manager.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
-import 'package:fl_clash/providers/connection_countries.dart';
+import 'package:fl_clash/common/connection_address.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/application_connections.dart';
@@ -50,8 +54,62 @@ class _Core extends Fake implements CoreHandlerInterface {
         if (ip == '8.8.8.8')
           ip: 'US'
         else if (ip == '114.114.114.114')
-          ip: 'CN',
+          ip: 'CN'
+        else if (ip == '8.210.0.1')
+          ip: 'HK'
+        else if (ip == '202.175.1.1')
+          ip: 'MO'
+        else if (ip == '168.95.1.1')
+          ip: 'TW',
     };
+  }
+}
+
+class _Exits extends ConnectionExits {
+  _Exits(this.core);
+  final _Core core;
+  final requests = <ConnectionExitTarget>[];
+  @override
+  Map<ConnectionExitTarget, ConnectionExitEntry> build() => const {};
+  @override
+  bool isExpired(ConnectionExitTarget target) => state[target]?.value == null;
+  void _answer(ConnectionExitTarget target) {
+    requests.add(target);
+    final country = target.node.contains('🇭🇰')
+        ? 'HK'
+        : switch (target.entry) {
+            '114.114.114.114' => 'CN',
+            '8.210.0.1' => 'HK',
+            '202.175.1.1' => 'MO',
+            '168.95.1.1' => 'TW',
+            _ => 'US',
+          };
+    state = {
+      ...state,
+      target: ConnectionExitEntry(
+        core.fail ? ProbePhase.failed : ProbePhase.fresh,
+        value: core.fail
+            ? null
+            : IpInfo(
+                ip: '8.210.0.1',
+                countryCode: country,
+                checkedAt: DateTime(2026, 11, 13, 14, 33),
+              ),
+      ),
+    };
+  }
+
+  @override
+  void watch(ConnectionExitTarget target, {required bool automatic}) {
+    if (automatic && !state.containsKey(target)) _answer(target);
+  }
+
+  @override
+  void unwatch(ConnectionExitTarget target, {required bool automatic}) {}
+  @override
+  ExitRefreshResult refresh(ConnectionExitTarget target) {
+    _answer(target);
+    return ExitRefreshResult.accepted;
   }
 }
 
@@ -121,12 +179,15 @@ void main() {
   late ProviderContainer container;
   late _Activity notifier;
   late _Core core;
+  late _Exits exits;
   late ApplicationActivityStore store;
   final now = DateTime(2026, 11, 13, 14, 33);
   setUp(() {
     store = ApplicationActivityStore()
       ..setContext('runtime-a', observing: true, now: now);
     core = _Core();
+    exits = _Exits(core);
+    VisibilityDetectorController.instance.updateInterval = Duration.zero;
   });
 
   Future<void> pump(
@@ -135,19 +196,28 @@ void main() {
     double width = 420,
     double scale = 1,
     Locale? locale,
-    String? localIp,
+    bool confirm = true,
   }) async {
     tester.view.physicalSize = Size(width, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    if (confirm && !store.snapshot().hasSnapshot) {
+      store.applySnapshot(
+        store.snapshot().connections.map((item) => item.info).toList(),
+        startedRevision: store.revision,
+        now: now,
+      );
+    }
     notifier = _Activity(store.snapshot());
     container = ProviderContainer(
       overrides: [
-        configStateProvider.overrideWith(TestConfigState.new),
+        configStateProvider.overrideWith(
+          () => TestConfigState(const ConfigFact(inputId: 'input-a')),
+        ),
+        connectionExitsProvider.overrideWith(() => exits),
         initProvider.overrideWithBuild((_, _) => true),
         applicationActivityProvider.overrideWith(() => notifier),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-        observedLocalPublicIpProvider.overrideWithValue(localIp),
         applicationCatalogueProvider.overrideWith(
           (_) async => const ApplicationCatalogue(
             packages: [
@@ -169,15 +239,15 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: TestApp(
-          locale: locale,
-          homeBuilder: (child) => Builder(
-            builder: (context) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(scale)),
-              child: RepaintBoundary(
-                key: const ValueKey('connections-capture'),
+        child: RepaintBoundary(
+          key: const ValueKey('connections-capture'),
+          child: TestApp(
+            locale: locale,
+            homeBuilder: (child) => Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
                 child: Theme(
                   data: font == null
                       ? Theme.of(context)
@@ -190,11 +260,13 @@ void main() {
                 ),
               ),
             ),
+            child: StatusManager(child: child),
           ),
-          child: StatusManager(child: child),
         ),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
   }
 
@@ -229,140 +301,87 @@ void main() {
         ),
       ).style;
 
-  testWidgets(
-    'target country uses newest connection while route summary covers all retained connections',
-    (tester) async {
-      final latest = connection('new', offset: 2, exit: 'US exit');
-      final older = connection(
-        'old',
-        offset: 1,
-        server: '114.114.114.114',
-        exit: 'CN exit',
-      );
-      store
-        ..addEvent(latest)
-        ..addEvent(older)
-        ..addEvent(
-          connection(
-            'other-app',
-            offset: 3,
-            package: 'test.app.b',
-            server: '114.114.114.114',
-          ),
-        )
-        ..applySnapshot([older], startedRevision: store.revision, now: now);
-      await pump(tester, child: _targets);
-      expect(find.text('🇺🇸'), findsOneWidget);
-      expect(find.text('🇨🇳'), findsNothing);
-      expect(find.text('🇯🇵'), findsNothing);
-      expect(find.text('1 rule results · 2 exit paths'), findsOneWidget);
-      expect(core.calls.single, ['8.8.8.8']);
-      await screenshot(tester, 'target-latest-country');
-      await tester.tap(find.text('example.test'));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widgetList<ConnectionCountryIcon>(
-              find.byType(ConnectionCountryIcon),
-            )
-            .map((icon) => icon.info.id),
-        ['new', 'old'],
-      );
-      expect(find.text('🇺🇸'), findsOneWidget);
-      expect(find.text('🇨🇳'), findsOneWidget);
-    },
-  );
-
-  testWidgets('target country updates when a newer connection arrives', (
+  testWidgets('measured HK exit wins over a mainland entry and a node label', (
     tester,
   ) async {
-    store.addEvent(connection('older', server: '114.114.114.114'));
+    store.addEvent(
+      connection('hk-exit', server: '114.114.114.114', exit: '🇭🇰 V香港 01'),
+    );
     await pump(tester, child: _targets);
-    expect(find.text('🇨🇳'), findsOneWidget);
-    store.addEvent(connection('newer', offset: 1));
-    notifier.replace(store.snapshot());
-    await tester.pumpAndSettle();
-    expect(find.text('🇺🇸'), findsOneWidget);
+    expect(find.text('🇭🇰'), findsOneWidget);
     expect(find.text('🇨🇳'), findsNothing);
-    expect(core.calls, [
-      ['114.114.114.114'],
-      ['8.8.8.8'],
-    ]);
-  });
-
-  for (final reason in [
-    'hostname',
-    'direct without observation',
-    'lookup failure',
-  ]) {
-    testWidgets('target never borrows an older country: $reason', (
-      tester,
-    ) async {
-      store.addEvent(connection('older', server: '114.114.114.114'));
-      await pump(tester, child: _targets);
-      expect(find.text('🇨🇳'), findsOneWidget);
-      core.fail = reason == 'lookup failure';
-      var latest = connection(
-        'newer',
-        offset: 1,
-        server: reason == 'hostname' ? 'proxy.test' : '8.8.8.8',
-      );
-      if (reason == 'direct without observation') {
-        latest = latest.copyWith(chains: ['DIRECT']);
-      }
-      store.addEvent(latest);
-      notifier.replace(store.snapshot());
-      await tester.pumpAndSettle();
-      expect(find.text('example.test'), findsOneWidget);
-      expect(find.text('🇨🇳'), findsNothing);
-      expect(find.text('🇺🇸'), findsNothing);
-      expect(find.text('🇯🇵'), findsNothing);
-      expect(core.calls.length, reason == 'lookup failure' ? 2 : 1);
-    });
-  }
-
-  testWidgets('latest DIRECT target uses only the already observed public IP', (
-    tester,
-  ) async {
-    store
-      ..addEvent(connection('older'))
-      ..addEvent(connection('newer', offset: 1).copyWith(chains: ['DIRECT']));
-    await pump(tester, child: _targets, localIp: '114.114.114.114');
-    expect(find.text('🇨🇳'), findsOneWidget);
-    expect(find.text('🇺🇸'), findsNothing);
+    expect(exits.requests.single.node, '🇭🇰 V香港 01');
+    await screenshot(tester, 'measured-exit-target-hk');
+    await tester.tap(find.text('example.test'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text('🇭🇰'), findsOneWidget);
+    expect(exits.requests, hasLength(1));
     expect(
       find.byTooltip(
-        'Local public IP (recent observation): 114.114.114.114 · CN',
+        'Measured exit: 8.210.0.1 · HK\nChecked: 2026-11-13 14:33:00\nTap to check again. Other destinations may use a different exit.',
       ),
       findsOneWidget,
     );
-    expect(core.calls.single, ['114.114.114.114']);
-  });
-
-  testWidgets('simultaneous target connections match third-level ordering', (
-    tester,
-  ) async {
-    store
-      ..addEvent(connection('b', server: '114.114.114.114'))
-      ..addEvent(connection('a'));
-    await pump(tester, child: _targets);
-    expect(find.text('🇺🇸'), findsOneWidget);
-    expect(find.text('🇨🇳'), findsNothing);
-    await tester.tap(find.text('example.test'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<ConnectionCountryIcon>(
-            find.byType(ConnectionCountryIcon).first,
-          )
-          .info
-          .id,
-      'a',
-    );
   });
 
   testWidgets(
-    'connections stay separate and show frozen routes, latest bytes and proxy-server flags',
+    'ended connections do not probe automatically and support an explicit check',
+    (tester) async {
+      store.addEvent(connection('ended'));
+      store.applySnapshot([], startedRevision: store.revision, now: now);
+      await pump(tester);
+      expect(exits.requests, isEmpty);
+      expect(find.text('🇺🇸'), findsNothing);
+      await tester.tap(
+        find.byTooltip(
+          'No active connections. Tap to check the node’s exit manually.',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(exits.requests, hasLength(1));
+      expect(find.text('🇺🇸'), findsOneWidget);
+    },
+  );
+
+  testWidgets('DIRECT has no proxy exit and does not launch a check', (
+    tester,
+  ) async {
+    store.addEvent(connection('direct').copyWith(chains: ['DIRECT']));
+    await pump(tester, child: _targets);
+    expect(
+      find.byTooltip('No proxy exit for this connection.'),
+      findsOneWidget,
+    );
+    expect(exits.requests, isEmpty);
+  });
+
+  testWidgets(
+    'target picks its newest active connection before older retained paths',
+    (tester) async {
+      final active = connection('active', offset: 1);
+      store
+        ..addEvent(active)
+        ..addEvent(
+          connection('newer-ended', offset: 2, server: '114.114.114.114'),
+        );
+      store.applySnapshot([active], startedRevision: store.revision, now: now);
+      await pump(tester, child: _targets);
+      expect(find.text('🇺🇸'), findsOneWidget);
+      expect(exits.requests.single.entry, '8.8.8.8');
+      expect(
+        tester
+            .widget<ConnectionExitIcon>(find.byType(ConnectionExitIcon))
+            .info
+            .id,
+        'active',
+      );
+    },
+  );
+
+  testWidgets(
+    'connections stay separate and show frozen routes, latest bytes and measured exits',
     (tester) async {
       final a = connection('8c71f2a9-1111', offset: 1);
       final b = connection(
@@ -392,12 +411,12 @@ void main() {
       expect(timestampStyle(tester, a.id).fontWeight, FontWeight.w600);
       expect(timestampStyle(tester, b.id).fontWeight, FontWeight.normal);
       expect(find.text('🇺🇸'), findsOneWidget);
-      expect(find.text('🇨🇳'), findsOneWidget);
+      expect(find.text('🇨🇳'), findsNothing);
       expect(find.text('🇯🇵'), findsNothing);
-      expect(core.calls.single, ['114.114.114.114', '8.8.8.8']);
+      expect(exits.requests, hasLength(1));
       expect(
         find.byTooltip(
-          'Proxy server: 8.8.8.8 · US. This is not the website-observed exit.',
+          'Measured exit: 8.210.0.1 · US\nChecked: 2026-11-13 14:33:00\nTap to check again. Other destinations may use a different exit.',
         ),
         findsOneWidget,
       );
@@ -528,7 +547,7 @@ void main() {
       await pump(tester);
       expect(row('available'), findsOneWidget);
       expect(find.text('🇺🇸'), findsNothing);
-      expect(core.calls, hasLength(1));
+      expect(exits.requests, hasLength(1));
       expect(tester.takeException(), isNull);
     },
   );
@@ -575,22 +594,7 @@ void main() {
       expect(detail.upload, 2048);
       expect(detail.chains, a.chains);
       expect(detail.metadata.sourcePort, '30001');
-      expect(core.calls, hasLength(1));
-    },
-  );
-
-  testWidgets(
-    'DIRECT can use an already observed local public IP without probing',
-    (tester) async {
-      store.addEvent(
-        connection('direct', exit: 'DIRECT').copyWith(chains: ['DIRECT']),
-      );
-      await pump(tester, localIp: '8.8.8.8');
-      expect(find.text('🇺🇸'), findsOneWidget);
-      expect(
-        find.byTooltip('Local public IP (recent observation): 8.8.8.8 · US'),
-        findsOneWidget,
-      );
+      expect(exits.requests, hasLength(1));
     },
   );
 

@@ -1,7 +1,6 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/providers/connection_countries.dart';
 import 'package:material_ui/material_ui.dart';
 
 TextStyle activityActiveStyle(BuildContext context, bool? active) => TextStyle(
@@ -22,46 +21,6 @@ String activityRuleText(BuildContext context, TrackerInfo info) {
           (config?.mode == 'global' || config?.mode == 'direct')
       ? context.appLocalizations.activityRulesBypassed
       : context.appLocalizations.unknown;
-}
-
-class ConnectionCountryIcon extends StatelessWidget {
-  const ConnectionCountryIcon({
-    super.key,
-    required this.info,
-    required this.countries,
-    this.localPublicIp,
-  });
-
-  final TrackerInfo info;
-  final Map<String, String> countries;
-  final String? localPublicIp;
-
-  @override
-  Widget build(BuildContext context) {
-    final ip = connectionCountryIp(info, localPublicIp);
-    final country = countries[ip];
-    final l = context.appLocalizations;
-    return SizedBox(
-      width: 28,
-      child: country == null || ip == null
-          ? null
-          : Tooltip(
-              message: connectionProxyServerIp(info) == null
-                  ? l.activityLocalPublicCountry(ip, country)
-                  : l.activityProxyServerCountry(ip, country),
-              child: Text(
-                country.countryFlagEmoji,
-                maxLines: 1,
-                softWrap: false,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontFamily: 'Apple Color Emoji',
-                  fontFamilyFallback: ['Noto Color Emoji'],
-                ),
-              ),
-            ),
-    );
-  }
 }
 
 class ActivityConnectionSummary extends StatelessWidget {

@@ -10427,6 +10427,86 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `No proxy exit for this connection.`
+  String get activityExitNotApplicable {
+    return Intl.message(
+      'No proxy exit for this connection.',
+      name: 'activityExitNotApplicable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No active connections. Tap to check the node’s exit manually.`
+  String get activityExitInactive {
+    return Intl.message(
+      'No active connections. Tap to check the node’s exit manually.',
+      name: 'activityExitInactive',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking proxy exit…`
+  String get activityExitChecking {
+    return Intl.message(
+      'Checking proxy exit…',
+      name: 'activityExitChecking',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Measured exit: {ip} · {country}\nChecked: {time}\nTap to check again. Other destinations may use a different exit.`
+  String activityExitObserved(Object ip, Object country, Object time) {
+    return Intl.message(
+      'Measured exit: $ip · $country\nChecked: $time\nTap to check again. Other destinations may use a different exit.',
+      name: 'activityExitObserved',
+      desc: '',
+      args: [ip, country, time],
+    );
+  }
+
+  /// `Exit check failed. Tap to retry.`
+  String get activityExitFailed {
+    return Intl.message(
+      'Exit check failed. Tap to retry.',
+      name: 'activityExitFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy exit not checked. Tap to check.`
+  String get activityExitNotChecked {
+    return Intl.message(
+      'Proxy exit not checked. Tap to check.',
+      name: 'activityExitNotChecked',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Exit check is unavailable for this connection. Check that the proxy and node are ready.`
+  String get activityExitUnavailable {
+    return Intl.message(
+      'Exit check is unavailable for this connection. Check that the proxy and node are ready.',
+      name: 'activityExitUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Please wait a few seconds before checking this exit again.`
+  String get activityExitCooldown {
+    return Intl.message(
+      'Please wait a few seconds before checking this exit again.',
+      name: 'activityExitCooldown',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -12,7 +12,6 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/application_activity.dart';
 import 'package:fl_clash/views/application_targets.dart';
 import 'package:fl_clash/views/application_connections.dart';
-import 'package:fl_clash/providers/connection_countries.dart';
 import 'package:fl_clash/views/tools.dart';
 import 'package:fl_clash/widgets/popup.dart';
 import 'package:material_ui/material_ui.dart';
@@ -101,7 +100,6 @@ void main() {
     container = ProviderContainer(
       overrides: [
         configStateProvider.overrideWith(TestConfigState.new),
-        observedLocalPublicIpProvider.overrideWithValue(null),
         applicationActivityProvider.overrideWith(
           () => _Activity(activity ?? _activity()),
         ),

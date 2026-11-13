@@ -1,12 +1,10 @@
-import 'dart:convert';
-
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/features/connection/tracker_info_item.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
-import 'package:fl_clash/providers/connection_countries.dart';
+import 'package:fl_clash/widgets/connection_exit.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/services.dart';
@@ -53,21 +51,6 @@ class _ApplicationConnectionsViewState
     final visible = records
         .where((item) => !_onlyActive || !canFilter || item.active == true)
         .toList();
-    final hasDirect = records.any(
-      (item) =>
-          item.info.chains.isNotEmpty && item.info.chains.first == 'DIRECT',
-    );
-    final localIp = hasDirect ? ref.watch(observedLocalPublicIpProvider) : null;
-    final ips = {
-      for (final item in records) ?connectionCountryIp(item.info, localIp),
-    }.toList()..sort();
-    final countries = ips.isEmpty
-        ? const <String, String>{}
-        : ref
-                  .watch(connectionCountriesProvider(jsonEncode(ips)))
-                  .asData
-                  ?.value ??
-              const <String, String>{};
     final catalogue = _allApps
         ? ref.watch(applicationCatalogueProvider).asData?.value
         : null;
@@ -182,8 +165,6 @@ class _ApplicationConnectionsViewState
                           ? l.activitySharedUid
                           : l.activityUnknownApp)
                 : null,
-            countries: countries,
-            localPublicIp: localIp,
           );
         },
       ),
@@ -280,14 +261,11 @@ class _ConnectionRow extends StatelessWidget {
     super.key,
     required this.record,
     required this.active,
-    required this.countries,
     this.appLabel,
-    this.localPublicIp,
   });
   final ActivityConnection record;
   final bool? active;
-  final Map<String, String> countries;
-  final String? appLabel, localPublicIp;
+  final String? appLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -318,11 +296,7 @@ class _ConnectionRow extends StatelessWidget {
             ),
           ),
         ),
-        leading: ConnectionCountryIcon(
-          info: info,
-          countries: countries,
-          localPublicIp: localPublicIp,
-        ),
+        leading: ConnectionExitIcon(info: info, active: active),
         title: RecordHeader(
           trailing: Semantics(
             label:

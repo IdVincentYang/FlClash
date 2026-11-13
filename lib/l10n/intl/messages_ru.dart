@@ -27,231 +27,234 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m2(active, count) =>
       "Активных: ${active} · Наблюдалось: ${count}";
 
-  static String m3(time) => "Последняя активность: ${time}";
+  static String m3(ip, country, time) =>
+      "Проверенный выход: ${ip} · ${country}\nВремя проверки: ${time}\nНажмите для повторной проверки. Другие адресаты могут использовать другой выход.";
 
-  static String m4(ip, country) =>
+  static String m4(time) => "Последняя активность: ${time}";
+
+  static String m5(ip, country) =>
       "Публичный IP устройства (последняя проверка): ${ip} · ${country}";
 
-  static String m5(count) => "Ещё ${count} адресов";
+  static String m6(count) => "Ещё ${count} адресов";
 
-  static String m6(ip, country) =>
+  static String m7(ip, country) =>
       "Прокси-сервер: ${ip} · ${country}. Это не выход, наблюдаемый сайтом.";
 
-  static String m7(count) => "Текущий запуск · последние ${count} соединений";
+  static String m8(count) => "Текущий запуск · последние ${count} соединений";
 
-  static String m8(rules, exits) =>
+  static String m9(rules, exits) =>
       "Вариантов правил: ${rules} · путей выхода: ${exits}";
 
-  static String m9(uid) => "UID ${uid}";
+  static String m10(uid) => "UID ${uid}";
 
-  static String m10(count, skipped) =>
+  static String m11(count, skipped) =>
       "Будет добавлено: ${count}, пропущено (уже есть): ${skipped}";
 
-  static String m11(phase) => "Предыдущий этап: ${phase}";
+  static String m12(phase) => "Предыдущий этап: ${phase}";
 
-  static String m12(reason) =>
+  static String m13(reason) =>
       "Причина завершения по данным системы: ${reason}";
 
-  static String m13(code) =>
+  static String m14(code) =>
       "Windows отказалась запускать FlClashCore.exe (ошибка ${code}). Политики контроля приложений, такие как Smart App Control или AppLocker, блокируют неподписанные программы; разрешите FlClash в этой политике или отключите её и повторите попытку.";
 
-  static String m14(name) =>
+  static String m15(name) =>
       "Система сообщила об аварийном завершении при запуске. Предыдущий профиль: ${name}. Автоматическая настройка пропущена; текущий выбор и файлы сохранены.";
 
-  static String m15(url) => "Создать профиль по ссылке ${url}?";
+  static String m16(url) => "Создать профиль по ссылке ${url}?";
 
-  static String m16(count) =>
+  static String m17(count) =>
       "${Intl.plural(count, one: '${count} день назад', few: '${count} дня назад', many: '${count} дней назад', other: '${count} дня назад')}";
 
-  static String m17(reason) => "Тест задержки не завершён: ${reason}";
+  static String m18(reason) => "Тест задержки не завершён: ${reason}";
 
-  static String m18(label) =>
+  static String m19(label) =>
       "Вы уверены, что хотите удалить выбранные элементы (${label})?";
 
-  static String m19(label) => "Вы уверены, что хотите удалить «${label}»?";
+  static String m20(label) => "Вы уверены, что хотите удалить «${label}»?";
 
-  static String m20(label) => "Сведения: ${label}";
+  static String m21(label) => "Сведения: ${label}";
 
-  static String m21(label) => "Поле «${label}» не может быть пустым";
+  static String m22(label) => "Поле «${label}» не может быть пустым";
 
-  static String m22(label) => "«${label}» уже существует";
+  static String m23(label) => "«${label}» уже существует";
 
-  static String m23(name) => "${name}: уже последняя версия";
+  static String m24(name) => "${name}: уже последняя версия";
 
-  static String m24(name) => "${name}: обновлено";
+  static String m25(name) => "${name}: обновлено";
 
-  static String m25(action) =>
+  static String m26(action) =>
       "Уже используется для «${action}». При сохранении будет перенесено сюда.";
 
-  static String m26(modifiers) =>
+  static String m27(modifiers) =>
       "Добавьте хотя бы одну из клавиш: ${modifiers}";
 
-  static String m27(count) =>
+  static String m28(count) =>
       "${Intl.plural(count, one: '${count} час назад', few: '${count} часа назад', many: '${count} часов назад', other: '${count} часа назад')}";
 
-  static String m28(count) =>
+  static String m29(count) =>
       "${Intl.plural(count, one: '${count} час', few: '${count} часа', many: '${count} часов', other: '${count} часа')}";
 
-  static String m29(target) => "${target} — недопустимая политика";
+  static String m30(target) => "${target} — недопустимая политика";
 
-  static String m30(proxyName) => "${proxyName} — недопустимый прокси";
+  static String m31(proxyName) => "${proxyName} — недопустимый прокси";
 
-  static String m31(providerName) =>
+  static String m32(providerName) =>
       "${providerName} — недопустимый провайдер прокси";
 
-  static String m32(ruleSet) => "${ruleSet} — недопустимый набор правил";
+  static String m33(ruleSet) => "${ruleSet} — недопустимый набор правил";
 
-  static String m33(subRule) => "${subRule} — недопустимый SUB_RULE";
+  static String m34(subRule) => "${subRule} — недопустимый SUB_RULE";
 
-  static String m34(line, message) => "Строка ${line}: ${message}";
+  static String m35(line, message) => "Строка ${line}: ${message}";
 
-  static String m35(name) => "Действия: ${name}";
+  static String m36(name) => "Действия: ${name}";
 
-  static String m36(name) => "Текущий выход: ${name}";
-
-  static String m37(name) =>
-      "Удалить глобальную группу «${name}» и ссылки на неё?";
+  static String m37(name) => "Текущий выход: ${name}";
 
   static String m38(name) =>
+      "Удалить глобальную группу «${name}» и ссылки на неё?";
+
+  static String m39(name) =>
       "Подписка ${name} использует эту группу. Сначала выберите в ней другой узел.";
 
-  static String m39(name) => "Узел недоступен: ${name}";
+  static String m40(name) => "Узел недоступен: ${name}";
 
-  static String m40(count) => "Узлов: ${count}";
+  static String m41(count) => "Узлов: ${count}";
 
-  static String m41(name) => "Предпочтительный узел: ${name}";
+  static String m42(name) => "Предпочтительный узел: ${name}";
 
-  static String m42(count) => "Добавлена в ${count} групп";
+  static String m43(count) => "Добавлена в ${count} групп";
 
-  static String m43(name) => "${name}";
+  static String m44(name) => "${name}";
 
-  static String m44(appName) =>
+  static String m45(appName) =>
       "1. Откройте Системные настройки > Конфиденциальность и безопасность\n2. Выберите Службы геолокации\n3. Найдите и отметьте ${appName} в списке\n\nПосле настройки вернитесь в приложение и продолжайте работу. Спасибо за сотрудничество.";
 
-  static String m45(label, max) => "«${label}» — не более ${max} символов";
+  static String m46(label, max) => "«${label}» — не более ${max} символов";
 
-  static String m46(size) => "Освобождено ${size}";
-
-  static String m47(count) =>
-      "${Intl.plural(count, one: '${count} минуту назад', few: '${count} минуты назад', many: '${count} минут назад', other: '${count} минуты назад')}";
+  static String m47(size) => "Освобождено ${size}";
 
   static String m48(count) =>
+      "${Intl.plural(count, one: '${count} минуту назад', few: '${count} минуты назад', many: '${count} минут назад', other: '${count} минуты назад')}";
+
+  static String m49(count) =>
       "${Intl.plural(count, one: '${count} месяц назад', few: '${count} месяца назад', many: '${count} месяцев назад', other: '${count} месяца назад')}";
 
-  static String m49(code) =>
+  static String m50(code) =>
       "Сервер запретил доступ (HTTP ${code}). Возможно, ссылка устарела или учётные данные неверны";
 
-  static String m50(code) => "Сервер отклонил запрос (HTTP ${code})";
+  static String m51(code) => "Сервер отклонил запрос (HTTP ${code})";
 
-  static String m51(code) =>
+  static String m52(code) =>
       "По этому адресу ничего не найдено (HTTP ${code}). Проверьте правильность URL";
 
-  static String m52(detail) => "Сетевой запрос не выполнен: ${detail}";
+  static String m53(detail) => "Сетевой запрос не выполнен: ${detail}";
 
-  static String m53(code) =>
+  static String m54(code) =>
       "На сервере произошла ошибка (HTTP ${code}). Повторите попытку позже";
 
-  static String m54(label) => "Пока нет: ${label}";
+  static String m55(label) => "Пока нет: ${label}";
 
-  static String m55(label) => "Значение «${label}» должно быть числом";
+  static String m56(label) => "Значение «${label}» должно быть числом";
 
-  static String m56(message) =>
+  static String m57(message) =>
       "Ядро не может разобрать этот прокси: ${message}";
 
-  static String m57(name) =>
+  static String m58(name) =>
       "Имя ${name} уже занято другим прокси или группой прокси";
 
-  static String m58(path) =>
+  static String m59(path) =>
       "Группы прокси ссылаются друг на друга по кругу: ${path}";
 
-  static String m59(names) => "Эти провайдеры прокси не существуют: ${names}";
+  static String m60(names) => "Эти провайдеры прокси не существуют: ${names}";
 
-  static String m60(names) => "Эти прокси или политики не существуют: ${names}";
+  static String m61(names) => "Эти прокси или политики не существуют: ${names}";
 
-  static String m61(name) =>
+  static String m62(name) =>
       "${name} — встроенное имя политики, его нельзя использовать";
 
-  static String m62(names) =>
+  static String m63(names) =>
       "Собственные группы прокси профиля ссылаются на прокси, которых больше нет среди пользовательских: ${names}";
 
-  static String m63(count) =>
+  static String m64(count) =>
       "Проблем: ${count}, применение переопределения может завершиться ошибкой";
 
-  static String m64(location) =>
+  static String m65(location) =>
       "Проверьте ${location}. Заполните или исправьте поле перед просмотром.";
 
-  static String m65(locations) =>
+  static String m66(locations) =>
       "Ресурс используется в ${locations}. Измените ссылки перед удалением.";
 
-  static String m66(label) =>
+  static String m67(label) =>
       "Значение «${label}» должно быть от 1024 до 49151";
 
-  static String m67(label, profiles) =>
+  static String m68(label, profiles) =>
       "«${label}» всё ещё используется в пользовательских группах прокси или правилах профилей: ${profiles}. Сначала уберите его оттуда";
 
-  static String m68(profiles, label) =>
+  static String m69(profiles, label) =>
       "В подписках профилей ${profiles} уже есть «${label}», и после переименования они будут использовать его. Выберите другое имя";
 
-  static String m69(count) => "${count} прокси";
+  static String m70(count) => "${count} прокси";
 
-  static String m70(host) =>
+  static String m71(host) =>
       "Текущая конфигурация не позволяет загрузить этот объект. Разрешить этой операции прямое соединение с ${host}? Разрешение истечёт после завершения операции или изменения источника.";
 
-  static String m71(target) => "GLOBAL (текущий выбор: ${target})";
+  static String m72(target) => "GLOBAL (текущий выбор: ${target})";
 
-  static String m72(count) =>
+  static String m73(count) =>
       "${Intl.plural(count, one: '${count} правило', few: '${count} правила', many: '${count} правил', other: '${count} правила')}";
 
-  static String m73(appName) => "${appName} (Безопасный режим)";
+  static String m74(appName) => "${appName} (Безопасный режим)";
 
-  static String m74(count) =>
+  static String m75(count) =>
       "${Intl.plural(count, one: '${count} секунда', few: '${count} секунды', many: '${count} секунд', other: '${count} секунды')}";
 
-  static String m75(count) => "Выбрано: ${count}";
+  static String m76(count) => "Выбрано: ${count}";
 
-  static String m76(time) => "Проверено в ${time}";
+  static String m77(time) => "Проверено в ${time}";
 
-  static String m77(region) => "Регион по ответу: ${region}";
+  static String m78(region) => "Регион по ответу: ${region}";
 
-  static String m78(milliseconds) =>
+  static String m79(milliseconds) =>
       "Всего (включая очередь и тело): ${milliseconds} мс";
 
-  static String m79(result) => "Устарело: ${result}";
+  static String m80(result) => "Устарело: ${result}";
 
-  static String m80(hosts) => "Адресаты: ${hosts}";
+  static String m81(hosts) => "Адресаты: ${hosts}";
 
-  static String m81(label) => "«${label}» — только одно значение";
+  static String m82(label) => "«${label}» — только одно значение";
 
-  static String m82(features) =>
+  static String m83(features) =>
       "Разрешённые заявленные возможности: ${features}";
 
-  static String m83(services) => "Принятый диапазон DNS: ${services}";
+  static String m84(services) => "Принятый диапазон DNS: ${services}";
 
-  static String m84(protocols) => "Разрешённые протоколы узлов: ${protocols}";
+  static String m85(protocols) => "Разрешённые протоколы узлов: ${protocols}";
 
-  static String m85(count) => "Принятые версии: ${count}";
+  static String m86(count) => "Принятые версии: ${count}";
 
-  static String m86(features) => "Заявленные возможности: ${features}";
+  static String m87(features) => "Заявленные возможности: ${features}";
 
-  static String m87(target) => "Выход источника по умолчанию: ${target}";
+  static String m88(target) => "Выход источника по умолчанию: ${target}";
 
-  static String m88(ready, total) => "Готово: ${ready}/${total}";
+  static String m89(ready, total) => "Готово: ${ready}/${total}";
 
-  static String m89(nodes, rules) =>
+  static String m90(nodes, rules) =>
       "Материал источника: узлов — ${nodes}, правил — ${rules}";
 
-  static String m90(services) => "Предлагаемые службы DNS: ${services}";
+  static String m91(services) => "Предлагаемые службы DNS: ${services}";
 
-  static String m91(protocols) => "Протоколы узлов: ${protocols}";
+  static String m92(protocols) => "Протоколы узлов: ${protocols}";
 
-  static String m92(count) => "Связанные источники: ${count}";
+  static String m93(count) => "Связанные источники: ${count}";
 
-  static String m93(targets) =>
+  static String m94(targets) =>
       "Делегированные блоки прокси-правил: ${targets}. Условия могут охватывать любой домен или IP. Фиксированная защита и выход по умолчанию сохраняются; удаления, расширяющие DIRECT, требуют проверки.";
 
-  static String m94(label) => "Значение «${label}» должно быть URL";
+  static String m95(label) => "Значение «${label}» должно быть URL";
 
-  static String m95(count) =>
+  static String m96(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -326,6 +329,28 @@ class MessageLookup extends MessageLookupByLibrary {
     "activityExcludedSetting": MessageLookupByLibrary.simpleMessage(
       "Текущая настройка: исключить приложение",
     ),
+    "activityExitChecking": MessageLookupByLibrary.simpleMessage(
+      "Проверка выхода прокси…",
+    ),
+    "activityExitCooldown": MessageLookupByLibrary.simpleMessage(
+      "Подождите несколько секунд перед повторной проверкой выхода.",
+    ),
+    "activityExitFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось проверить выход. Нажмите для повтора.",
+    ),
+    "activityExitInactive": MessageLookupByLibrary.simpleMessage(
+      "Нет активных соединений. Нажмите для ручной проверки выхода узла.",
+    ),
+    "activityExitNotApplicable": MessageLookupByLibrary.simpleMessage(
+      "У этого соединения нет прокси-выхода.",
+    ),
+    "activityExitNotChecked": MessageLookupByLibrary.simpleMessage(
+      "Выход прокси не проверен. Нажмите для проверки.",
+    ),
+    "activityExitObserved": m3,
+    "activityExitUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Выход этого соединения сейчас недоступен для проверки. Убедитесь, что прокси и узел готовы.",
+    ),
     "activityExits": MessageLookupByLibrary.simpleMessage(
       "Наблюдавшиеся маршруты",
     ),
@@ -341,15 +366,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "activityIncomplete": MessageLookupByLibrary.simpleMessage(
       "В наблюдении есть пропуски",
     ),
-    "activityLast": m3,
+    "activityLast": m4,
     "activityLastLabel": MessageLookupByLibrary.simpleMessage(
       "Последняя активность",
     ),
     "activityLoadingApps": MessageLookupByLibrary.simpleMessage(
       "Загрузка названий приложений…",
     ),
-    "activityLocalPublicCountry": m4,
-    "activityMoreAddresses": m5,
+    "activityLocalPublicCountry": m5,
+    "activityMoreAddresses": m6,
     "activityNoActive": MessageLookupByLibrary.simpleMessage(
       "Нет подтверждённых активных соединений",
     ),
@@ -390,12 +415,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "activityProxyServerAddress": MessageLookupByLibrary.simpleMessage(
       "Адрес прокси-сервера",
     ),
-    "activityProxyServerCountry": m6,
+    "activityProxyServerCountry": m7,
     "activityRecent": MessageLookupByLibrary.simpleMessage(
       "Недавняя активность",
     ),
-    "activityRetention": m7,
-    "activityRouteCounts": m8,
+    "activityRetention": m8,
+    "activityRouteCounts": m9,
     "activityRules": MessageLookupByLibrary.simpleMessage(
       "Наблюдавшиеся правила",
     ),
@@ -423,7 +448,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "activitySnapshotFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось обновить · состояние не подтверждено",
     ),
-    "activityUid": m9,
+    "activityUid": m10,
     "activityUnknownApp": MessageLookupByLibrary.simpleMessage(
       "Неизвестное приложение",
     ),
@@ -564,7 +589,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "batchMapInputTip": MessageLookupByLibrary.simpleMessage(
       "По одной записи на строку: ключ, пробел, значение",
     ),
-    "batchPreviewTip": m10,
+    "batchPreviewTip": m11,
     "batteryOptimizationDesc": MessageLookupByLibrary.simpleMessage(
       "Чтобы приложение работало в фоне, отключите для него оптимизацию батареи. Нажмите, чтобы перейти к настройкам.",
     ),
@@ -614,8 +639,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "bootRecordUnavailable": MessageLookupByLibrary.simpleMessage(
       "Не удалось прочитать или сохранить запись защиты запуска. Автоматическая настройка пропущена. Работающая служба и файлы сохранены; ручное управление доступно.",
     ),
-    "bootRecoveryPhase": m11,
-    "bootRecoveryReason": m12,
+    "bootRecoveryPhase": m12,
+    "bootRecoveryReason": m13,
     "bootRecoveryRepeated": MessageLookupByLibrary.simpleMessage(
       "Запуск прерывался несколько раз подряд. Проверьте или выберите профиль в списке и запустите вручную.",
     ),
@@ -732,17 +757,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "copyLink": MessageLookupByLibrary.simpleMessage("Копировать ссылку"),
     "copySuccess": MessageLookupByLibrary.simpleMessage("Скопировано"),
     "core": MessageLookupByLibrary.simpleMessage("Ядро"),
-    "coreBlockedByPolicyTip": m13,
+    "coreBlockedByPolicyTip": m14,
     "coreBlockedBySmartAppControlTip": MessageLookupByLibrary.simpleMessage(
       "Smart App Control в Windows заблокировал неподписанный FlClashCore.exe. Откройте Безопасность Windows → Управление приложениями и браузером → Параметры Smart App Control, выберите «Выкл.» и снова запустите FlClash. Повторно включить Smart App Control без переустановки Windows нельзя.",
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("Статус ядра"),
     "country": MessageLookupByLibrary.simpleMessage("Регион"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Обнаружен сбой"),
-    "crashDetectedTip": m14,
+    "crashDetectedTip": m15,
     "crashTest": MessageLookupByLibrary.simpleMessage("Тест сбоя"),
     "create": MessageLookupByLibrary.simpleMessage("Создать"),
-    "createProfileFromUrlTip": m15,
+    "createProfileFromUrlTip": m16,
     "creationTime": MessageLookupByLibrary.simpleMessage("Время создания"),
     "custom": MessageLookupByLibrary.simpleMessage("Вручную"),
     "customProxiesEmpty": MessageLookupByLibrary.simpleMessage(
@@ -757,11 +782,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "databaseWriteFailedTip": MessageLookupByLibrary.simpleMessage(
       "Не удалось сохранить изменение; оно отменено",
     ),
-    "daysAgo": m16,
+    "daysAgo": m17,
     "defaultText": MessageLookupByLibrary.simpleMessage("По умолчанию"),
     "delay": MessageLookupByLibrary.simpleMessage("Задержка"),
     "delayTest": MessageLookupByLibrary.simpleMessage("Тест задержки"),
-    "delayTestFailed": m17,
+    "delayTestFailed": m18,
     "delayTestNoResult": MessageLookupByLibrary.simpleMessage(
       "Core не вернул результат теста. Проверьте подключение прокси и повторите попытку.",
     ),
@@ -774,8 +799,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "Ожидание результата",
     ),
     "delete": MessageLookupByLibrary.simpleMessage("Удалить"),
-    "deleteMultipTip": m18,
-    "deleteTip": m19,
+    "deleteMultipTip": m19,
+    "deleteTip": m20,
     "desc": MessageLookupByLibrary.simpleMessage(
       "Многоплатформенный прокси-клиент на основе ClashMeta: простой и удобный, с открытым исходным кодом и без рекламы.",
     ),
@@ -786,7 +811,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "destinationIPASN": MessageLookupByLibrary.simpleMessage(
       "ASN IP назначения",
     ),
-    "details": m20,
+    "details": m21,
     "detectionTip": MessageLookupByLibrary.simpleMessage(
       "Использует сторонний API; только для справки",
     ),
@@ -829,7 +854,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "editorUnavailable": MessageLookupByLibrary.simpleMessage(
       "Редактор недоступен",
     ),
-    "emptyTip": m21,
+    "emptyTip": m22,
     "en": MessageLookupByLibrary.simpleMessage("Английский"),
     "enabled": MessageLookupByLibrary.simpleMessage("Включено"),
     "entries": MessageLookupByLibrary.simpleMessage(" записей"),
@@ -846,7 +871,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "При подключении к Wi-Fi с исключённым SSID состояние работы приложения переключается автоматически",
     ),
     "excludeType": MessageLookupByLibrary.simpleMessage("Исключаемые типы"),
-    "existsTip": m22,
+    "existsTip": m23,
     "exit": MessageLookupByLibrary.simpleMessage("Выход"),
     "exitFullScreen": MessageLookupByLibrary.simpleMessage(
       "Выйти из полноэкранного режима",
@@ -922,8 +947,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "Сопоставляет IP-адреса с кодами стран и регионов для правил GEOIP и некоторых проверок DNS. Используется при выключенном режиме геоданных. В FlClash это база стран и регионов в формате MaxMind DB.",
     ),
     "geoResources": MessageLookupByLibrary.simpleMessage("Ресурсы Geo"),
-    "geoSkipped": m23,
-    "geoUpdated": m24,
+    "geoSkipped": m24,
+    "geoUpdated": m25,
     "geodataLoader": MessageLookupByLibrary.simpleMessage(
       "Geo: экономия памяти",
     ),
@@ -949,19 +974,19 @@ class MessageLookup extends MessageLookupByLibrary {
       "Не показывать узлы, у которых последний тест задержки завершился таймаутом",
     ),
     "host": MessageLookupByLibrary.simpleMessage("Хост"),
-    "hotkeyConflictWith": m25,
+    "hotkeyConflictWith": m26,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "Глобальные горячие клавиши работают, даже когда окно скрыто. Нажмите на действие, чтобы записать сочетание клавиш.",
     ),
     "hotkeyManagement": MessageLookupByLibrary.simpleMessage("Горячие клавиши"),
-    "hotkeyNeedsModifier": m26,
+    "hotkeyNeedsModifier": m27,
     "hotkeyNotSet": MessageLookupByLibrary.simpleMessage("Не задано"),
     "hotkeyUnavailable": MessageLookupByLibrary.simpleMessage(
       "Не зарегистрировано: сочетание может быть занято другим приложением",
     ),
     "hours": MessageLookupByLibrary.simpleMessage("часов"),
-    "hoursAgo": m27,
-    "hoursCount": m28,
+    "hoursAgo": m28,
+    "hoursCount": m29,
     "icon": MessageLookupByLibrary.simpleMessage("Значок"),
     "iconRecords": MessageLookupByLibrary.simpleMessage("История значков"),
     "iconStyle": MessageLookupByLibrary.simpleMessage("Стиль значков"),
@@ -1032,17 +1057,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "invalidNetworkContent": MessageLookupByLibrary.simpleMessage(
       "Поддерживаются только tcp и udp",
     ),
-    "invalidPolicy": m29,
+    "invalidPolicy": m30,
     "invalidProfileQrcode": MessageLookupByLibrary.simpleMessage(
       "Этот QR-код не содержит ссылку на профиль",
     ),
-    "invalidProxy": m30,
-    "invalidProxyProvider": m31,
+    "invalidProxy": m31,
+    "invalidProxyProvider": m32,
     "invalidRangeContent": MessageLookupByLibrary.simpleMessage(
       "Введите числа или диапазоны, например 80 или 8000-9000, через /",
     ),
-    "invalidRuleSet": m32,
-    "invalidSubRule": m33,
+    "invalidRuleSet": m33,
+    "invalidSubRule": m34,
     "ipAddress": MessageLookupByLibrary.simpleMessage("IP-адрес"),
     "ipAsn": MessageLookupByLibrary.simpleMessage("ASN"),
     "ipClassificationDisclosure": MessageLookupByLibrary.simpleMessage(
@@ -1150,7 +1175,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "layout": MessageLookupByLibrary.simpleMessage("Макет"),
     "light": MessageLookupByLibrary.simpleMessage("Светлая"),
-    "lineIssueTip": m34,
+    "lineIssueTip": m35,
     "lineWrap": MessageLookupByLibrary.simpleMessage("Перенос строк"),
     "list": MessageLookupByLibrary.simpleMessage("Список"),
     "listen": MessageLookupByLibrary.simpleMessage("Прослушивание"),
@@ -1168,8 +1193,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "localCrashReports": MessageLookupByLibrary.simpleMessage(
       "Локальные отчёты о сбоях",
     ),
-    "localGroupsActions": m35,
-    "localGroupsActualExit": m36,
+    "localGroupsActions": m36,
+    "localGroupsActualExit": m37,
     "localGroupsAmbiguous": MessageLookupByLibrary.simpleMessage(
       "Выбранные имена узлов повторяются в разных источниках. Выберите узлы с уникальными именами.",
     ),
@@ -1184,7 +1209,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Конфигурация изменилась. Обновите список групп и повторите.",
     ),
     "localGroupsCreate": MessageLookupByLibrary.simpleMessage("Новая группа"),
-    "localGroupsDelete": m37,
+    "localGroupsDelete": m38,
     "localGroupsDisable": MessageLookupByLibrary.simpleMessage("Отключить"),
     "localGroupsDownloading": MessageLookupByLibrary.simpleMessage(
       "Загрузка обновлений источников…",
@@ -1211,7 +1236,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsInUse": MessageLookupByLibrary.simpleMessage(
       "Выберите другой узел или группу перед удалением связи, отключением или удалением этой группы.",
     ),
-    "localGroupsInUseProfile": m38,
+    "localGroupsInUseProfile": m39,
     "localGroupsIndependent": MessageLookupByLibrary.simpleMessage(
       "Отдельная группа",
     ),
@@ -1237,7 +1262,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsMembersRequired": MessageLookupByLibrary.simpleMessage(
       "Выберите хотя бы один доступный узел.",
     ),
-    "localGroupsMissing": m39,
+    "localGroupsMissing": m40,
     "localGroupsNameConflict": MessageLookupByLibrary.simpleMessage(
       "Укажите имя, не занятое узлом или другой группой.",
     ),
@@ -1250,7 +1275,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsNoSaved": MessageLookupByLibrary.simpleMessage(
       "Нет собственных групп. Создайте группу в разделе управления группами.",
     ),
-    "localGroupsNodeCount": m40,
+    "localGroupsNodeCount": m41,
     "localGroupsNodesSection": MessageLookupByLibrary.simpleMessage("Узлы"),
     "localGroupsOwn": MessageLookupByLibrary.simpleMessage("Своя"),
     "localGroupsParent": MessageLookupByLibrary.simpleMessage(
@@ -1259,7 +1284,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsPending": MessageLookupByLibrary.simpleMessage(
       "Изменения сохранены и ожидают применения.",
     ),
-    "localGroupsPreferred": m41,
+    "localGroupsPreferred": m42,
     "localGroupsPreparing": MessageLookupByLibrary.simpleMessage(
       "Проверка сохранённой конфигурации…",
     ),
@@ -1275,7 +1300,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsReferenceUsing": MessageLookupByLibrary.simpleMessage(
       "Сейчас используется",
     ),
-    "localGroupsReferences": m42,
+    "localGroupsReferences": m43,
     "localGroupsReferencesSaved": MessageLookupByLibrary.simpleMessage(
       "Связи применены. Текущий выбор сохранён.",
     ),
@@ -1292,7 +1317,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "localGroupsSaving": MessageLookupByLibrary.simpleMessage(
       "Проверка и сохранение группы…",
     ),
-    "localGroupsScope": m43,
+    "localGroupsScope": m44,
     "localGroupsSearch": MessageLookupByLibrary.simpleMessage("Поиск узлов"),
     "localGroupsSelectNodeHelp": MessageLookupByLibrary.simpleMessage(
       "Нажмите узел для немедленного переключения. Сохранять не нужно.",
@@ -1338,7 +1363,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "locationPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "По требованию системы для получения имени сети Wi-Fi необходимо разрешение на геолокацию. На Android выберите «Разрешить всегда», иначе имя сети Wi-Fi нельзя получить, пока приложение в фоне.",
     ),
-    "locationPermissionGuide": m44,
+    "locationPermissionGuide": m45,
     "locationPermissionRequired": MessageLookupByLibrary.simpleMessage(
       "Требуется разрешение на геолокацию",
     ),
@@ -1364,7 +1389,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "maxFailedTimes": MessageLookupByLibrary.simpleMessage(
       "Макс. число неудач",
     ),
-    "maxLengthTip": m45,
+    "maxLengthTip": m46,
     "maximize": MessageLookupByLibrary.simpleMessage("Развернуть"),
     "memoryAppResident": MessageLookupByLibrary.simpleMessage(
       "Резидентная память",
@@ -1395,7 +1420,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "memoryReleased": MessageLookupByLibrary.simpleMessage(
       "Память освобождена",
     ),
-    "memoryReleasedSize": m46,
+    "memoryReleasedSize": m47,
     "messageTest": MessageLookupByLibrary.simpleMessage("Тест сообщения"),
     "messageTestTip": MessageLookupByLibrary.simpleMessage("Это сообщение."),
     "min": MessageLookupByLibrary.simpleMessage("Минимальный"),
@@ -1403,17 +1428,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "minimizeOnExit": MessageLookupByLibrary.simpleMessage(
       "Сворачивать при выходе",
     ),
-    "minutesAgo": m47,
+    "minutesAgo": m48,
     "mixedPort": MessageLookupByLibrary.simpleMessage("Смешанный порт"),
     "mode": MessageLookupByLibrary.simpleMessage("Режим"),
     "monochromeScheme": MessageLookupByLibrary.simpleMessage("Монохром"),
-    "monthsAgo": m48,
+    "monthsAgo": m49,
     "more": MessageLookupByLibrary.simpleMessage("Ещё"),
     "name": MessageLookupByLibrary.simpleMessage("Название"),
     "navigationBarStyle": MessageLookupByLibrary.simpleMessage("Нижняя панель"),
     "network": MessageLookupByLibrary.simpleMessage("Сеть"),
-    "networkAccessDeniedError": m49,
-    "networkBadResponseError": m50,
+    "networkAccessDeniedError": m50,
+    "networkBadResponseError": m51,
     "networkCancelledError": MessageLookupByLibrary.simpleMessage(
       "Запрос отменён",
     ),
@@ -1424,12 +1449,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "networkHostLookupError": MessageLookupByLibrary.simpleMessage(
       "Не удалось определить адрес сервера. Проверьте правильность URL и работу DNS",
     ),
-    "networkNotFoundError": m51,
+    "networkNotFoundError": m52,
     "networkRateLimitedError": MessageLookupByLibrary.simpleMessage(
       "Слишком много запросов (HTTP 429). Подождите немного и повторите попытку",
     ),
-    "networkRequestFailed": m52,
-    "networkServerError": m53,
+    "networkRequestFailed": m53,
+    "networkServerError": m54,
     "networkSpeed": MessageLookupByLibrary.simpleMessage("Скорость сети"),
     "networkTimeoutError": MessageLookupByLibrary.simpleMessage(
       "Время ожидания запроса истекло. Проверьте сеть или прокси и повторите попытку",
@@ -1469,8 +1494,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "nullProfileDesc": MessageLookupByLibrary.simpleMessage(
       "Добавьте профиль, чтобы начать",
     ),
-    "nullTip": m54,
-    "numberTip": m55,
+    "nullTip": m55,
+    "numberTip": m56,
     "officialDocumentation": MessageLookupByLibrary.simpleMessage(
       "Официальная документация",
     ),
@@ -1503,20 +1528,20 @@ class MessageLookup extends MessageLookupByLibrary {
     "overrideScript": MessageLookupByLibrary.simpleMessage(
       "Скрипт переопределения",
     ),
-    "overwriteIssueCoreRejected": m56,
-    "overwriteIssueDuplicateName": m57,
+    "overwriteIssueCoreRejected": m57,
+    "overwriteIssueDuplicateName": m58,
     "overwriteIssueEmptyName": MessageLookupByLibrary.simpleMessage(
       "Имя не задано",
     ),
-    "overwriteIssueGroupLoop": m58,
-    "overwriteIssueMissingProviders": m59,
-    "overwriteIssueMissingProxies": m60,
+    "overwriteIssueGroupLoop": m59,
+    "overwriteIssueMissingProviders": m60,
+    "overwriteIssueMissingProxies": m61,
     "overwriteIssueNoProxySource": MessageLookupByLibrary.simpleMessage(
       "Не выбраны ни прокси, ни провайдеры прокси, поэтому ядро отклонит эту группу",
     ),
-    "overwriteIssueReservedName": m61,
-    "overwriteIssueSubscriptionGroupMissingProxies": m62,
-    "overwriteIssuesSummary": m63,
+    "overwriteIssueReservedName": m62,
+    "overwriteIssueSubscriptionGroupMissingProxies": m63,
+    "overwriteIssuesSummary": m64,
     "overwriteTypeCustom": MessageLookupByLibrary.simpleMessage(
       "Пользовательский",
     ),
@@ -1611,7 +1636,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyDraftGroups": MessageLookupByLibrary.simpleMessage(
       "Статические группы прокси",
     ),
-    "policyDraftIncomplete": m64,
+    "policyDraftIncomplete": m65,
     "policyDraftIpDefault": MessageLookupByLibrary.simpleMessage(
       "Политика для IP без совпадений",
     ),
@@ -1670,7 +1695,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "policyDraftRebuildConfirm": MessageLookupByLibrary.simpleMessage(
       "Отбросить черновик и материалы миграции? Новая политика не гарантирует сохранение защиты старой конфигурации. Исходный профиль и действующая конфигурация не изменятся.",
     ),
-    "policyDraftReferenced": m65,
+    "policyDraftReferenced": m66,
     "policyDraftReload": MessageLookupByLibrary.simpleMessage(
       "Загрузить сохранённый черновик",
     ),
@@ -1781,7 +1806,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "portConflictTip": MessageLookupByLibrary.simpleMessage(
       "Введите другой порт",
     ),
-    "portTip": m66,
+    "portTip": m67,
     "prerequisites": MessageLookupByLibrary.simpleMessage(
       "Предварительные условия",
     ),
@@ -1852,8 +1877,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "profiles": MessageLookupByLibrary.simpleMessage("Профили"),
     "profilesSort": MessageLookupByLibrary.simpleMessage("Сортировка профилей"),
     "project": MessageLookupByLibrary.simpleMessage("Проект"),
-    "providerInUse": m67,
-    "providerRenameShadowed": m68,
+    "providerInUse": m68,
+    "providerRenameShadowed": m69,
     "providerSourceSubscription": MessageLookupByLibrary.simpleMessage(
       "Подписка",
     ),
@@ -1862,7 +1887,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "providers": MessageLookupByLibrary.simpleMessage("Внешние ресурсы"),
     "proxies": MessageLookupByLibrary.simpleMessage("Прокси"),
-    "proxiesCount": m69,
+    "proxiesCount": m70,
     "proxiesEmpty": MessageLookupByLibrary.simpleMessage("Список прокси пуст"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("Цепочка прокси"),
     "proxyDefinition": MessageLookupByLibrary.simpleMessage(
@@ -2000,7 +2025,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Записано; содержимое назначения не проверено",
     ),
     "request": MessageLookupByLibrary.simpleMessage("Запрос"),
-    "requestDirectRecoveryMessage": m70,
+    "requestDirectRecoveryMessage": m71,
     "requestDirectRecoveryTitle": MessageLookupByLibrary.simpleMessage(
       "Восстановить через прямое соединение?",
     ),
@@ -2014,7 +2039,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(
       "Часть локальных изменений не удалось отменить. Файлы восстановления сохранены; автоматические обновления заблокированы.",
     ),
-    "requestProxyDefault": m71,
+    "requestProxyDefault": m72,
     "requestProxyTarget": MessageLookupByLibrary.simpleMessage("Цель прокси"),
     "requestRestartRequired": MessageLookupByLibrary.simpleMessage(
       "Незавершённое локальное сохранение может ещё выполняться. Откройте сведения о приложении → Остановить, затем снова откройте FlClash. Перезапуска прокси или закрытия экрана недостаточно. После открытия проверьте сохранённые данные в разрешениях источников.",
@@ -2208,10 +2233,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleSet": MessageLookupByLibrary.simpleMessage("Набор правил"),
     "ruleTarget": MessageLookupByLibrary.simpleMessage("Цель правила"),
     "rules": MessageLookupByLibrary.simpleMessage("Правила"),
-    "rulesCount": m72,
+    "rulesCount": m73,
     "runTime": MessageLookupByLibrary.simpleMessage("Время работы"),
     "safeMode": MessageLookupByLibrary.simpleMessage("Безопасный режим"),
-    "safeModeAppTitle": m73,
+    "safeModeAppTitle": m74,
     "save": MessageLookupByLibrary.simpleMessage("Сохранить"),
     "saveChanges": MessageLookupByLibrary.simpleMessage("Сохранить изменения?"),
     "script": MessageLookupByLibrary.simpleMessage("Скрипт"),
@@ -2223,7 +2248,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Поиск"),
     "seconds": MessageLookupByLibrary.simpleMessage("секунд"),
-    "secondsCount": m74,
+    "secondsCount": m75,
     "selectAll": MessageLookupByLibrary.simpleMessage("Выбрать всё"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Выбрать прокси"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -2239,7 +2264,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Выберите подправило",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Выбрано"),
-    "selectedCountTitle": m75,
+    "selectedCountTitle": m76,
     "server": MessageLookupByLibrary.simpleMessage("Сервер"),
     "serviceAdvanced": MessageLookupByLibrary.simpleMessage(
       "Проверка региона и сервиса",
@@ -2267,12 +2292,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "serviceCheck": MessageLookupByLibrary.simpleMessage("Проверить"),
     "serviceCheckAll": MessageLookupByLibrary.simpleMessage("Проверить все"),
-    "serviceCheckedAt": m76,
+    "serviceCheckedAt": m77,
     "serviceComingSoon": MessageLookupByLibrary.simpleMessage("Скоро появится"),
     "serviceConnectFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось получить ответ на запрос",
     ),
-    "serviceDetectedRegion": m77,
+    "serviceDetectedRegion": m78,
     "serviceDisallowedIsp": MessageLookupByLibrary.simpleMessage(
       "Недопустимый провайдер",
     ),
@@ -2282,8 +2307,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "serviceDnsFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось разрешить имя для запроса",
     ),
-    "serviceElapsed": m78,
-    "serviceExpired": m79,
+    "serviceElapsed": m79,
+    "serviceExpired": m80,
     "serviceFailed": MessageLookupByLibrary.simpleMessage(
       "Невозможно определить",
     ),
@@ -2319,7 +2344,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "serviceRecipientBlocked": MessageLookupByLibrary.simpleMessage(
       "Адресат или переход вне проверки",
     ),
-    "serviceRecipients": m80,
+    "serviceRecipients": m81,
     "serviceRedirected": MessageLookupByLibrary.simpleMessage(
       "Перенаправление (не выполнено)",
     ),
@@ -2369,7 +2394,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Запускаться без показа окна",
     ),
     "singleAdd": MessageLookupByLibrary.simpleMessage("По одному"),
-    "singleValueTip": m81,
+    "singleValueTip": m82,
     "size": MessageLookupByLibrary.simpleMessage("Размер"),
     "slide": MessageLookupByLibrary.simpleMessage("Сдвиг"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Порт SOCKS"),
@@ -2378,10 +2403,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceAcceptRevision": MessageLookupByLibrary.simpleMessage(
       "Принять эту версию",
     ),
-    "sourceAcceptedCapabilities": m82,
-    "sourceAcceptedDns": m83,
-    "sourceAcceptedProtocols": m84,
-    "sourceAcceptedRevisions": m85,
+    "sourceAcceptedCapabilities": m83,
+    "sourceAcceptedDns": m84,
+    "sourceAcceptedProtocols": m85,
+    "sourceAcceptedRevisions": m86,
     "sourceAppliedNotSaved": MessageLookupByLibrary.simpleMessage(
       "Применено; восстановление не сохранено",
     ),
@@ -2415,8 +2440,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceConfigurationUnavailable": MessageLookupByLibrary.simpleMessage(
       "Почему полная конфигурация источника недоступна",
     ),
-    "sourceDeclaredCapabilities": m86,
-    "sourceDefaultExit": m87,
+    "sourceDeclaredCapabilities": m87,
+    "sourceDefaultExit": m88,
     "sourceDelegateMaintenance": MessageLookupByLibrary.simpleMessage(
       "Разрешить обслуживание в этих пределах",
     ),
@@ -2447,7 +2472,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceLoadDownloading": MessageLookupByLibrary.simpleMessage("Загрузка…"),
     "sourceLoadFailed": MessageLookupByLibrary.simpleMessage("Ошибка"),
-    "sourceLoadProgress": m88,
+    "sourceLoadProgress": m89,
     "sourceLoadQueued": MessageLookupByLibrary.simpleMessage("Ожидание"),
     "sourceLoadReady": MessageLookupByLibrary.simpleMessage("Готово"),
     "sourceLoadVerifying": MessageLookupByLibrary.simpleMessage("Проверка…"),
@@ -2457,7 +2482,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceMaintenanceLimits": MessageLookupByLibrary.simpleMessage(
       "Автоматически применяются лишь изменения, доказанно входящие в возможности этой версии. Остальные ожидают проверки. Текущие соединения используют прежние сокеты; лимиты ресурсов могут задержать применение.",
     ),
-    "sourceMaterialCounts": m89,
+    "sourceMaterialCounts": m90,
     "sourceMaterialUnavailable": MessageLookupByLibrary.simpleMessage(
       "Не удалось загрузить связанный источник. Проверьте адрес, подключение и маршрут запросов, затем повторите попытку.",
     ),
@@ -2518,8 +2543,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceProfileUse": MessageLookupByLibrary.simpleMessage(
       "Содержимое Profile",
     ),
-    "sourceProposedDns": m90,
-    "sourceProtocols": m91,
+    "sourceProposedDns": m91,
+    "sourceProtocols": m92,
     "sourceProviderChanged": MessageLookupByLibrary.simpleMessage(
       "Изменён провайдер или источник его загрузки.",
     ),
@@ -2532,7 +2557,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceRecoveryUnavailable": MessageLookupByLibrary.simpleMessage(
       "Разрешение источника изменено, но checkpoint восстановления обновить не удалось. Восстановление после перезапуска недоступно.",
     ),
-    "sourceRelatedSourcesCount": m92,
+    "sourceRelatedSourcesCount": m93,
     "sourceRematchDenied": MessageLookupByLibrary.simpleMessage(
       "Узлы REMATCH нельзя использовать, пока маршрутизация источника исключена.",
     ),
@@ -2554,7 +2579,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "sourceRoutingExcluded": MessageLookupByLibrary.simpleMessage(
       "Содержимое включает исключённые возможности маршрутизации. Удалите их или явно измените выбор маршрутизации источника.",
     ),
-    "sourceRuleDelegation": m93,
+    "sourceRuleDelegation": m94,
     "sourceRuleOrigin": MessageLookupByLibrary.simpleMessage(
       "Источник правила",
     ),
@@ -2698,7 +2723,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("Получить профиль по URL"),
-    "urlTip": m94,
+    "urlTip": m95,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useProfile": MessageLookupByLibrary.simpleMessage("Использовать"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
@@ -2732,7 +2757,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Также устанавливать системные часы; Android это игнорирует",
     ),
-    "yearsAgo": m95,
+    "yearsAgo": m96,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

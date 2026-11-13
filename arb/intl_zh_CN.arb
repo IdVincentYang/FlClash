@@ -1219,5 +1219,13 @@
   "localGroupsUnbound": "尚未加入此订阅",
   "localGroupsNoMatchingNodes": "当前订阅中没有匹配的节点。",
   "localGroupsInUseProfile": "订阅“{name}”正在使用此分组，请先在那里选择其他节点。",
-  "localGroupsLoadFailed": "无法读取已保存的分组，请重试。"
+  "localGroupsLoadFailed": "无法读取已保存的分组，请重试。",
+  "activityExitNotApplicable": "此连接没有代理出口。",
+  "activityExitInactive": "没有活动连接，不自动检测。点击可手动检测节点出口。",
+  "activityExitChecking": "正在检测代理出口…",
+  "activityExitObserved": "检测出口：{ip} · {country}\n检测时间：{time}\n点击重新检测。访问其他目标时可能使用不同出口。",
+  "activityExitFailed": "出口检测失败，点击重试。",
+  "activityExitNotChecked": "尚未检测代理出口，点击检测。",
+  "activityExitUnavailable": "此连接暂时无法检测出口，请确认代理和节点已就绪。",
+  "activityExitCooldown": "请稍等几秒后再检测此出口。"
 }

@@ -71,6 +71,10 @@ void main() {
   group('StringExtension.countryFlagEmoji', () {
     test('maps a two-letter region code to its flag', () {
       expect('us'.countryFlagEmoji, '🇺🇸');
+      expect('hk'.countryFlagEmoji, '🇭🇰');
+      expect('MO'.countryFlagEmoji, '🇲🇴');
+      expect('TW'.countryFlagEmoji, '🇹🇼');
+      expect('CN'.countryFlagEmoji, '🇨🇳');
     });
 
     test('leaves anything but two ASCII letters untouched', () {
