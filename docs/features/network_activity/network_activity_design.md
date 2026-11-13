@@ -181,6 +181,10 @@ Android 的 Tools 顶部提供“应用网络”入口。ApplicationActivityView
 
 每个 Host 项显示目标、合并的连接数／最近时间及规则／出口概况；没有域名时显示原 IPv4／IPv6，
 目标也缺失时单列未知。点击统一进入 ApplicationConnectionsView，不再展开目标汇总。
+左侧复用逐连接列表的国家图标，取当前 App／Host 中开始时间最新的连接；同时间按连接 ID 升序，
+与第三层默认排序一致，不以最后插入或最近流量更新替代。新连接国家未知时留空，不沿用较旧连接的国家。
+图标只代表这条最新连接，规则／出口摘要仍覆盖该 Host 保留的全部连接。
+规则与出口路径均唯一时展示实际内容，否则展示各自去重数量；长路径自然换行，因此物理行数可以不同。
 只有冻结配置明确为已知 Global／Direct 且规则为空时说明规则未参与匹配；其它缺失事实显示未知，
 不读取当前模式回填旧结果。两层连接摘要共用 ActivityConnectionSummary。
 
@@ -207,6 +211,8 @@ connectionProxyServerIp 从冻结的 remoteDestination 取得公开 IP literal�
 与目标同址、域名、私网或缺失值；不从节点名称猜国旗，也不使用目标 GeoIP 作为代理 GeoIP。
 本机公网地址只被动读取已有出口检测缓存：未过期、DIRECT 链路、路由戳仍有效且有检测时间；本页不产生公网检测。
 图标 tooltip 注明地址角色，国家不可用时图标区域为空；连接详情沿既有页面展示原 remoteDestination。
+二级目标列表与三级逐连接列表共用 ConnectionCountryIcon 和同一地址选择逻辑；按页去重批量查询，
+二级只查询当前筛选结果中目标的最新连接地址，不增加外部检测、节点名称推断或独立缓存。
 
 connectionCountriesProvider 按排序去重地址形成查询键，最多每批 128 项，通过 lookupIpCountries 读取本地 MMDB。
 Go wrapper 在资源读锁下打开独立只读 reader，支持 Meta／Sing／MaxMind 国家记录，排除非公网及多国家歧义，

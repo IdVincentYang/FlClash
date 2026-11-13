@@ -30,6 +30,14 @@ String? connectionProxyServerIp(TrackerInfo info) {
   return ip;
 }
 
+String? connectionCountryIp(TrackerInfo info, String? localPublicIp) {
+  final serverIp = connectionProxyServerIp(info);
+  if (serverIp != null) return serverIp;
+  return info.chains.isNotEmpty && info.chains.first == 'DIRECT'
+      ? localPublicIp
+      : null;
+}
+
 final observedLocalPublicIpProvider = Provider<String?>((ref) {
   final probes = ref.watch(outboundIpProbeProvider);
   final route = ref.watch(routeTrackerProvider);

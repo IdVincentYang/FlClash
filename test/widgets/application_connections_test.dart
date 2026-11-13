@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:fl_clash/common/application_activity.dart';
 import 'package:fl_clash/common/datetime.dart';
 import 'package:fl_clash/features/connection/tracker_info_item.dart';
+import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
@@ -58,6 +59,18 @@ const _page = ApplicationConnectionsView(
   appKey: 'package:test.app.a',
   hostKey: 'host:example.test',
   appLabel: 'Browser A',
+);
+
+const _targets = ApplicationTargetsView(
+  appKey: 'package:test.app.a',
+  label: 'Browser A',
+  packageName: 'test.app.a',
+  identity: ApplicationIdentity(
+    status: 'known',
+    uid: 10001,
+    userScope: 'current',
+    packages: ['test.app.a'],
+  ),
 );
 
 TrackerInfo connection(
@@ -215,6 +228,138 @@ void main() {
           find.descendant(of: row(id), matching: find.byType(RecordTimestamp)),
         ),
       ).style;
+
+  testWidgets(
+    'target country uses newest connection while route summary covers all retained connections',
+    (tester) async {
+      final latest = connection('new', offset: 2, exit: 'US exit');
+      final older = connection(
+        'old',
+        offset: 1,
+        server: '114.114.114.114',
+        exit: 'CN exit',
+      );
+      store
+        ..addEvent(latest)
+        ..addEvent(older)
+        ..addEvent(
+          connection(
+            'other-app',
+            offset: 3,
+            package: 'test.app.b',
+            server: '114.114.114.114',
+          ),
+        )
+        ..applySnapshot([older], startedRevision: store.revision, now: now);
+      await pump(tester, child: _targets);
+      expect(find.text('🇺🇸'), findsOneWidget);
+      expect(find.text('🇨🇳'), findsNothing);
+      expect(find.text('🇯🇵'), findsNothing);
+      expect(find.text('1 rule results · 2 exit paths'), findsOneWidget);
+      expect(core.calls.single, ['8.8.8.8']);
+      await screenshot(tester, 'target-latest-country');
+      await tester.tap(find.text('example.test'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widgetList<ConnectionCountryIcon>(
+              find.byType(ConnectionCountryIcon),
+            )
+            .map((icon) => icon.info.id),
+        ['new', 'old'],
+      );
+      expect(find.text('🇺🇸'), findsOneWidget);
+      expect(find.text('🇨🇳'), findsOneWidget);
+    },
+  );
+
+  testWidgets('target country updates when a newer connection arrives', (
+    tester,
+  ) async {
+    store.addEvent(connection('older', server: '114.114.114.114'));
+    await pump(tester, child: _targets);
+    expect(find.text('🇨🇳'), findsOneWidget);
+    store.addEvent(connection('newer', offset: 1));
+    notifier.replace(store.snapshot());
+    await tester.pumpAndSettle();
+    expect(find.text('🇺🇸'), findsOneWidget);
+    expect(find.text('🇨🇳'), findsNothing);
+    expect(core.calls, [
+      ['114.114.114.114'],
+      ['8.8.8.8'],
+    ]);
+  });
+
+  for (final reason in [
+    'hostname',
+    'direct without observation',
+    'lookup failure',
+  ]) {
+    testWidgets('target never borrows an older country: $reason', (
+      tester,
+    ) async {
+      store.addEvent(connection('older', server: '114.114.114.114'));
+      await pump(tester, child: _targets);
+      expect(find.text('🇨🇳'), findsOneWidget);
+      core.fail = reason == 'lookup failure';
+      var latest = connection(
+        'newer',
+        offset: 1,
+        server: reason == 'hostname' ? 'proxy.test' : '8.8.8.8',
+      );
+      if (reason == 'direct without observation') {
+        latest = latest.copyWith(chains: ['DIRECT']);
+      }
+      store.addEvent(latest);
+      notifier.replace(store.snapshot());
+      await tester.pumpAndSettle();
+      expect(find.text('example.test'), findsOneWidget);
+      expect(find.text('🇨🇳'), findsNothing);
+      expect(find.text('🇺🇸'), findsNothing);
+      expect(find.text('🇯🇵'), findsNothing);
+      expect(core.calls.length, reason == 'lookup failure' ? 2 : 1);
+    });
+  }
+
+  testWidgets('latest DIRECT target uses only the already observed public IP', (
+    tester,
+  ) async {
+    store
+      ..addEvent(connection('older'))
+      ..addEvent(connection('newer', offset: 1).copyWith(chains: ['DIRECT']));
+    await pump(tester, child: _targets, localIp: '114.114.114.114');
+    expect(find.text('🇨🇳'), findsOneWidget);
+    expect(find.text('🇺🇸'), findsNothing);
+    expect(
+      find.byTooltip(
+        'Local public IP (recent observation): 114.114.114.114 · CN',
+      ),
+      findsOneWidget,
+    );
+    expect(core.calls.single, ['114.114.114.114']);
+  });
+
+  testWidgets('simultaneous target connections match third-level ordering', (
+    tester,
+  ) async {
+    store
+      ..addEvent(connection('b', server: '114.114.114.114'))
+      ..addEvent(connection('a'));
+    await pump(tester, child: _targets);
+    expect(find.text('🇺🇸'), findsOneWidget);
+    expect(find.text('🇨🇳'), findsNothing);
+    await tester.tap(find.text('example.test'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<ConnectionCountryIcon>(
+            find.byType(ConnectionCountryIcon).first,
+          )
+          .info
+          .id,
+      'a',
+    );
+  });
 
   testWidgets(
     'connections stay separate and show frozen routes, latest bytes and proxy-server flags',
@@ -482,6 +627,25 @@ void main() {
     Locale('ja'),
     Locale('ru'),
   ]) {
+    testWidgets('target country layout supports narrow large text in $locale', (
+      tester,
+    ) async {
+      store.addEvent(
+        connection('latest', exit: 'A very long proxy group name'),
+      );
+      await pump(
+        tester,
+        child: _targets,
+        width: 320,
+        scale: 1.7,
+        locale: locale,
+      );
+      expect(find.text('🇺🇸'), findsOneWidget);
+      expect(find.text('example.test'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await screenshot(tester, 'target-country-${locale.languageCode}');
+    });
+
     testWidgets('connections support narrow large text in $locale', (
       tester,
     ) async {

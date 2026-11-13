@@ -59,8 +59,7 @@ class _ApplicationConnectionsViewState
     );
     final localIp = hasDirect ? ref.watch(observedLocalPublicIpProvider) : null;
     final ips = {
-      for (final item in records) ?connectionProxyServerIp(item.info),
-      ?localIp,
+      for (final item in records) ?connectionCountryIp(item.info, localIp),
     }.toList()..sort();
     final countries = ips.isEmpty
         ? const <String, String>{}
@@ -169,12 +168,6 @@ class _ApplicationConnectionsViewState
             );
           }
           final record = visible[index - 1];
-          final serverIp = connectionProxyServerIp(record.info);
-          final direct =
-              record.info.chains.isNotEmpty &&
-              record.info.chains.first == 'DIRECT';
-          final countryIp = serverIp ?? (direct ? localIp : null);
-          final country = countries[countryIp];
           final identity = record.application;
           return _ConnectionRow(
             key: ValueKey(
@@ -189,9 +182,8 @@ class _ApplicationConnectionsViewState
                           ? l.activitySharedUid
                           : l.activityUnknownApp)
                 : null,
-            country: country,
-            countryIp: countryIp,
-            serverIp: serverIp,
+            countries: countries,
+            localPublicIp: localIp,
           );
         },
       ),
@@ -288,14 +280,14 @@ class _ConnectionRow extends StatelessWidget {
     super.key,
     required this.record,
     required this.active,
+    required this.countries,
     this.appLabel,
-    this.country,
-    this.countryIp,
-    this.serverIp,
+    this.localPublicIp,
   });
   final ActivityConnection record;
   final bool? active;
-  final String? appLabel, country, countryIp, serverIp;
+  final Map<String, String> countries;
+  final String? appLabel, localPublicIp;
 
   @override
   Widget build(BuildContext context) {
@@ -308,11 +300,6 @@ class _ConnectionRow extends StatelessWidget {
         : l.activityConnectionEnded;
     final style = activityActiveStyle(context, active);
     final textStyles = RecordTextStyles.of(context);
-    final countryLabel = country == null
-        ? null
-        : serverIp == null
-        ? l.activityLocalPublicCountry(countryIp!, country!)
-        : l.activityProxyServerCountry(countryIp!, country!);
     return Card.filled(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
@@ -331,23 +318,10 @@ class _ConnectionRow extends StatelessWidget {
             ),
           ),
         ),
-        leading: SizedBox(
-          width: 28,
-          child: country == null
-              ? null
-              : Tooltip(
-                  message: countryLabel!,
-                  child: Text(
-                    country!.countryFlagEmoji,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontFamily: 'Apple Color Emoji',
-                      fontFamilyFallback: ['Noto Color Emoji'],
-                    ),
-                  ),
-                ),
+        leading: ConnectionCountryIcon(
+          info: info,
+          countries: countries,
+          localPublicIp: localPublicIp,
         ),
         title: RecordHeader(
           trailing: Semantics(
