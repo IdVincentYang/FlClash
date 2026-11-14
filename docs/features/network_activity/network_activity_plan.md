@@ -9,7 +9,7 @@
 其中 Rule／Direct 叠加应用策略、策略全局保存及切订阅恢复／修复为本轮实施基线；
 05／06 已交付；实际结果与边界见 [Result](na_t01_05_06_result.md)。
 07 的 Host 规则及 Android 受控验收已完成（交付 `22d1f32`），当前契约见[Design](network_activity_design.md#host-覆盖规则)；
-08 的快捷入口已交付，实际验证与限制见 [08 Result](na_t01_08_result.md)，09 未开始。
+08 的快捷入口已交付（`f8d9854` 保留专项验证），当前契约见[Design](network_activity_design.md#dashboard-与连接详情快捷入口)，09 未开始。
 
 ## 目标与实施边界
 

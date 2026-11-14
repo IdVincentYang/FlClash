@@ -137,7 +137,8 @@ Rule 顺序为本 App＋Host、App 整体、通用 Host、原有规则及订阅�
 
 ## NA-T01-08 Dashboard 与连接详情快捷入口
 
-执行者：Codex；[08 Plan](na_t01_08_plan.md)定义交付，实际检查与边界见 [08 Result](na_t01_08_result.md)。
+执行者：Codex；已完成并合入 `f8d9854`，该提交保留冻结的 08 Plan／Result。
+当前契约见 [Design](network_activity_design.md#dashboard-与连接详情快捷入口)。
 
 提供 Dashboard 应用活动卡片及现有连接详情的 App／Host 跳转，进入与 Tools 相同的三层页面。
 卡片应用 item 与 Application network 共用 UI、导航、策略操作及状态，统一修改后一同生效。
