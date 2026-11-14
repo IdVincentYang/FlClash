@@ -126,7 +126,8 @@ Rule／Direct 叠加应用规则，Global 完全忽略；关闭应用规则恢�
 
 ## NA-T01-07 Host 例外与跨 App 操作
 
-执行者：Codex；[07 Plan](na_t01_07_plan.md)与[验收结果](na_t01_07_result.md)定义本次交付与验证。
+执行者：Codex；已完成并合入 `22d1f32`，该提交保留冻结的 07 Plan／Result。
+当前契约见 [Design](network_activity_design.md#host-覆盖规则)。
 
 在 Host item 右侧显示生效策略并进入双范围规则编辑页，复用现有规则库、表单及目标选择。
 Rule 顺序为本 App＋Host、App 整体、通用 Host、原有规则及订阅；Direct 不采用通用 Host，Global 暂停全部。

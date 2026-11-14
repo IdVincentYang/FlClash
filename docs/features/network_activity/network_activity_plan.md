@@ -8,7 +8,7 @@
 05–07 的模式关系与交互调整见已批准的[应用分流方案](application_routing_plan.md)。
 其中 Rule／Direct 叠加应用策略、策略全局保存及切订阅恢复／修复为本轮实施基线；
 05／06 已交付；实际结果与边界见 [Result](na_t01_05_06_result.md)。
-07 的 Host 规则及 Android 受控验收已完成，结果见[07 Result](na_t01_07_result.md)；
+07 的 Host 规则及 Android 受控验收已完成（交付 `22d1f32`），当前契约见[Design](network_activity_design.md#host-覆盖规则)；
 接续按[08 Plan](na_t01_08_plan.md)推进快捷入口，09 未开始。
 
 ## 目标与实施边界
