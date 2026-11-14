@@ -133,6 +133,30 @@ func TestConnectionObservationDoesNotLabelConfigurationDuringMutation(t *testing
 	}
 }
 
+func TestLocalProxyConfigurationChangeDuringIdentityLookupRemainsUnknown(t *testing.T) {
+	checkpointMu.Lock()
+	previous := configFact
+	configFact = ConfigFact{InputID: "before-lookup", Phase: "ready", BusinessActive: true}
+	checkpointMu.Unlock()
+	t.Cleanup(func() {
+		checkpointMu.Lock()
+		configFact = previous
+		checkpointMu.Unlock()
+	})
+	store := newConnectionObservationStore()
+	info := observationTracker(22010, C.TCP)
+	store.rememberResolved(info.Metadata, connectionIngress{resolve: func(*C.Metadata) applicationIdentity {
+		checkpointMu.Lock()
+		configFact.InputID = "after-lookup"
+		checkpointMu.Unlock()
+		return unknownApplication("lookupFailed")
+	}})
+	store.bind(info, sourceRuleProvenance{})
+	if config := store.view(info).observation.Configuration; config.Status != "unknown" || config.InputID != "" {
+		t.Fatalf("identity lookup relabeled an in-flight connection: %+v", config)
+	}
+}
+
 func TestConnectionObservationTCPPortReuseDoesNotRetainAnEarlierOwner(t *testing.T) {
 	store := newConnectionObservationStore()
 	first := observationTracker(22101, C.TCP)

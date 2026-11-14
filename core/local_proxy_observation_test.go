@@ -26,6 +26,15 @@ func (t delayedObservationTunnel) HandleTCPConn(conn net.Conn, metadata *C.Metad
 }
 
 func TestLocalProxyIdentitySurvivesClientClosingBeforeTrackerJoin(t *testing.T) {
+	checkpointMu.Lock()
+	previous := configFact
+	configFact = ConfigFact{InputID: "local-proxy-input", Phase: "ready", BusinessActive: true}
+	checkpointMu.Unlock()
+	t.Cleanup(func() {
+		checkpointMu.Lock()
+		configFact = previous
+		checkpointMu.Unlock()
+	})
 	for _, method := range []string{"GET http://controlled.test/ HTTP/1.1\r\nHost: controlled.test\r\n\r\n", "CONNECT controlled.test:443 HTTP/1.1\r\nHost: controlled.test:443\r\n\r\n"} {
 		t.Run(method[:3], func(t *testing.T) {
 			store := newConnectionObservationStore()
@@ -102,6 +111,9 @@ func TestLocalProxyIdentitySurvivesClientClosingBeforeTrackerJoin(t *testing.T) 
 			case observed := <-result:
 				if observed.observation.Application.packageName() != "test.browser" || observed.metadata.Uid != 10150 || observed.observation.Capture.Status != "localProxy" || calls.Load() != 1 {
 					t.Fatalf("closed client lost its ingress identity: %+v", observed.observation)
+				}
+				if observed.observation.Configuration.Status != "known" || observed.observation.Configuration.InputID != "local-proxy-input" {
+					t.Fatalf("local proxy lost its ingress configuration without rule provenance: %+v", observed.observation.Configuration)
 				}
 			case <-time.After(3 * time.Second):
 				t.Fatal("delayed tracker did not finish")

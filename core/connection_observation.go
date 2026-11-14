@@ -151,6 +151,7 @@ func (s *connectionObservationStore) rememberResolved(metadata *C.Metadata, ingr
 	if ingress.resolve == nil {
 		return
 	}
+	ingress.configuration = observedConfiguration()
 	identity := ingress.resolve(metadata)
 	ingress.identity, ingress.resolve = &identity, nil
 	s.remember(metadata, ingress)
