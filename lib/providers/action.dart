@@ -7,6 +7,7 @@ import 'package:collection/collection.dart';
 import 'package:fl_clash/common/boot_guard.dart';
 import 'package:fl_clash/common/config_input.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/application_routing.dart';
 import 'package:fl_clash/common/run_request.dart';
 import 'package:fl_clash/common/system_dns.dart';
 import 'package:fl_clash/common/policy_migration.dart';

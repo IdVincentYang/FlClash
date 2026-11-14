@@ -19,6 +19,8 @@ abstract class SetupParams with _$SetupParams {
 @freezed
 abstract class UpdateParams with _$UpdateParams {
   const factory UpdateParams({
+    @JsonKey(name: 'application-routing')
+    Map<String, dynamic>? applicationRouting,
     required Tun tun,
     @JsonKey(name: 'mixed-port') required int mixedPort,
     @JsonKey(name: 'allow-lan') required bool allowLan,

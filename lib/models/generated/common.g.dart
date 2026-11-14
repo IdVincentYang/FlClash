@@ -12,6 +12,11 @@ _Package _$PackageFromJson(Map<String, dynamic> json) => _Package(
   system: json['system'] as bool,
   internet: json['internet'] as bool,
   lastUpdateTime: (json['lastUpdateTime'] as num).toInt(),
+  sharedPackages:
+      (json['sharedPackages'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [],
 );
 
 Map<String, dynamic> _$PackageToJson(_Package instance) => <String, dynamic>{
@@ -20,6 +25,7 @@ Map<String, dynamic> _$PackageToJson(_Package instance) => <String, dynamic>{
   'system': instance.system,
   'internet': instance.internet,
   'lastUpdateTime': instance.lastUpdateTime,
+  'sharedPackages': instance.sharedPackages,
 };
 
 _Metadata _$MetadataFromJson(Map<String, dynamic> json) => _Metadata(

@@ -1227,5 +1227,63 @@
   "activityExitFailed": "Не удалось проверить выход. Нажмите для повтора.",
   "activityExitNotChecked": "Выход прокси не проверен. Нажмите для проверки.",
   "activityExitUnavailable": "Выход этого соединения сейчас недоступен для проверки. Убедитесь, что прокси и узел готовы.",
-  "activityExitCooldown": "Подождите несколько секунд перед повторной проверкой выхода."
+  "activityExitCooldown": "Подождите несколько секунд перед повторной проверкой выхода.",
+  "appPolicyTitle": "Политика · {name}",
+  "@appPolicyTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicyChoose": "Выбрать политику",
+  "appPolicyPreparing": "Ожидание применения",
+  "appPolicyEmptyGroup": "Нет доступных узлов",
+  "appPolicyDisabledGroup": "Группа отключена",
+  "appPolicyUnbound": "Группа не загружена для подписки",
+  "appPolicyMissingTarget": "Выберите доступную цель",
+  "appPolicyGlobalPaused": "Global · Политики приложений приостановлены",
+  "appPolicyExcluded": "Исключено из VPN",
+  "appPolicyVpnStopped": "VPN не запущен",
+  "appPolicyApplied": "Применено к новым подключениям",
+  "appPolicySaved": "Политика сохранена. Маршруты текущих подключений не изменены.",
+  "appPolicySharedTarget": "Общая прокси-группа приложений",
+  "appPolicySharedIdentity": "Эти приложения имеют общий Android ID. Изменение затронет все:\n{packages}",
+  "@appPolicySharedIdentity": {
+    "placeholders": {
+      "packages": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicySearch": "Поиск групп и узлов",
+  "appPolicyDirect": "Напрямую",
+  "appPolicyReject": "Блокировать",
+  "appPolicyAll": "Все",
+  "appPolicyGroups": "Группы",
+  "appPolicyNodes": "Узлы",
+  "appPolicyMembers": "Узлы группы",
+  "appPolicyCapture": "Включить в VPN",
+  "appPolicyEdit": "Политика приложения",
+  "appPolicyCaptureSaved": "Область VPN сохранена. Изменения применяются при работе VPN.",
+  "appPolicyCapturePending": "Область VPN ожидает применения",
+  "appPolicyDirectExceptions": "Direct · Исключений приложений: {count}",
+  "@appPolicyDirectExceptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicySharedChange": "Изменить общую цель для {count} включённых приложений?",
+  "@appPolicySharedChange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicyGlobalSaved": "Сохранено. Политики возобновятся в Rule или Direct.",
+  "appPolicyFollowRule": "Следовать правилам",
+  "appPolicyVpnScope": "Приложения VPN"
 }

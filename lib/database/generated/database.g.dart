@@ -5311,6 +5311,209 @@ class GlobalGroupLibrariesCompanion
   }
 }
 
+class $ApplicationRoutingLibrariesTable extends ApplicationRoutingLibraries
+    with TableInfo<$ApplicationRoutingLibrariesTable, RawApplicationRouting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ApplicationRoutingLibrariesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _settingsMeta = const VerificationMeta(
+    'settings',
+  );
+  @override
+  late final GeneratedColumn<String> settings = GeneratedColumn<String>(
+    'settings',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, settings];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'application_routing_libraries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RawApplicationRouting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('settings')) {
+      context.handle(
+        _settingsMeta,
+        settings.isAcceptableOrUnknown(data['settings']!, _settingsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_settingsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RawApplicationRouting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RawApplicationRouting(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      settings: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}settings'],
+      )!,
+    );
+  }
+
+  @override
+  $ApplicationRoutingLibrariesTable createAlias(String alias) {
+    return $ApplicationRoutingLibrariesTable(attachedDatabase, alias);
+  }
+}
+
+class RawApplicationRouting extends DataClass
+    implements Insertable<RawApplicationRouting> {
+  final int id;
+  final String settings;
+  const RawApplicationRouting({required this.id, required this.settings});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['settings'] = Variable<String>(settings);
+    return map;
+  }
+
+  ApplicationRoutingLibrariesCompanion toCompanion(bool nullToAbsent) {
+    return ApplicationRoutingLibrariesCompanion(
+      id: Value(id),
+      settings: Value(settings),
+    );
+  }
+
+  factory RawApplicationRouting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RawApplicationRouting(
+      id: serializer.fromJson<int>(json['id']),
+      settings: serializer.fromJson<String>(json['settings']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'settings': serializer.toJson<String>(settings),
+    };
+  }
+
+  RawApplicationRouting copyWith({int? id, String? settings}) =>
+      RawApplicationRouting(
+        id: id ?? this.id,
+        settings: settings ?? this.settings,
+      );
+  RawApplicationRouting copyWithCompanion(
+    ApplicationRoutingLibrariesCompanion data,
+  ) {
+    return RawApplicationRouting(
+      id: data.id.present ? data.id.value : this.id,
+      settings: data.settings.present ? data.settings.value : this.settings,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RawApplicationRouting(')
+          ..write('id: $id, ')
+          ..write('settings: $settings')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, settings);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RawApplicationRouting &&
+          other.id == this.id &&
+          other.settings == this.settings);
+}
+
+class ApplicationRoutingLibrariesCompanion
+    extends UpdateCompanion<RawApplicationRouting> {
+  final Value<int> id;
+  final Value<String> settings;
+  const ApplicationRoutingLibrariesCompanion({
+    this.id = const Value.absent(),
+    this.settings = const Value.absent(),
+  });
+  ApplicationRoutingLibrariesCompanion.insert({
+    this.id = const Value.absent(),
+    required String settings,
+  }) : settings = Value(settings);
+  static Insertable<RawApplicationRouting> custom({
+    Expression<int>? id,
+    Expression<String>? settings,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (settings != null) 'settings': settings,
+    });
+  }
+
+  ApplicationRoutingLibrariesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? settings,
+  }) {
+    return ApplicationRoutingLibrariesCompanion(
+      id: id ?? this.id,
+      settings: settings ?? this.settings,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (settings.present) {
+      map['settings'] = Variable<String>(settings.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ApplicationRoutingLibrariesCompanion(')
+          ..write('id: $id, ')
+          ..write('settings: $settings')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
@@ -5330,6 +5533,8 @@ abstract class _$Database extends GeneratedDatabase {
       $ProfilePolicySelectionsTable(this);
   late final $GlobalGroupLibrariesTable globalGroupLibraries =
       $GlobalGroupLibrariesTable(this);
+  late final $ApplicationRoutingLibrariesTable applicationRoutingLibraries =
+      $ApplicationRoutingLibrariesTable(this);
   late final Index idxRuleTarget = Index(
     'idx_rule_target',
     'CREATE INDEX idx_rule_target ON rules (rule_target)',
@@ -5381,6 +5586,7 @@ abstract class _$Database extends GeneratedDatabase {
     profilePolicyDrafts,
     profilePolicySelections,
     globalGroupLibraries,
+    applicationRoutingLibraries,
     idxRuleTarget,
     idxProfileSceneOrder,
     idxProfileNameOrder,
@@ -9491,6 +9697,162 @@ typedef $$GlobalGroupLibrariesTableProcessedTableManager =
       RawGlobalGroupLibrary,
       PrefetchHooks Function()
     >;
+typedef $$ApplicationRoutingLibrariesTableCreateCompanionBuilder =
+    ApplicationRoutingLibrariesCompanion Function({
+      Value<int> id,
+      required String settings,
+    });
+typedef $$ApplicationRoutingLibrariesTableUpdateCompanionBuilder =
+    ApplicationRoutingLibrariesCompanion Function({
+      Value<int> id,
+      Value<String> settings,
+    });
+
+class $$ApplicationRoutingLibrariesTableFilterComposer
+    extends Composer<_$Database, $ApplicationRoutingLibrariesTable> {
+  $$ApplicationRoutingLibrariesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get settings => $composableBuilder(
+    column: $table.settings,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ApplicationRoutingLibrariesTableOrderingComposer
+    extends Composer<_$Database, $ApplicationRoutingLibrariesTable> {
+  $$ApplicationRoutingLibrariesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get settings => $composableBuilder(
+    column: $table.settings,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ApplicationRoutingLibrariesTableAnnotationComposer
+    extends Composer<_$Database, $ApplicationRoutingLibrariesTable> {
+  $$ApplicationRoutingLibrariesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get settings =>
+      $composableBuilder(column: $table.settings, builder: (column) => column);
+}
+
+class $$ApplicationRoutingLibrariesTableTableManager
+    extends
+        RootTableManager<
+          _$Database,
+          $ApplicationRoutingLibrariesTable,
+          RawApplicationRouting,
+          $$ApplicationRoutingLibrariesTableFilterComposer,
+          $$ApplicationRoutingLibrariesTableOrderingComposer,
+          $$ApplicationRoutingLibrariesTableAnnotationComposer,
+          $$ApplicationRoutingLibrariesTableCreateCompanionBuilder,
+          $$ApplicationRoutingLibrariesTableUpdateCompanionBuilder,
+          (
+            RawApplicationRouting,
+            BaseReferences<
+              _$Database,
+              $ApplicationRoutingLibrariesTable,
+              RawApplicationRouting
+            >,
+          ),
+          RawApplicationRouting,
+          PrefetchHooks Function()
+        > {
+  $$ApplicationRoutingLibrariesTableTableManager(
+    _$Database db,
+    $ApplicationRoutingLibrariesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ApplicationRoutingLibrariesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ApplicationRoutingLibrariesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ApplicationRoutingLibrariesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> settings = const Value.absent(),
+              }) => ApplicationRoutingLibrariesCompanion(
+                id: id,
+                settings: settings,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String settings,
+              }) => ApplicationRoutingLibrariesCompanion.insert(
+                id: id,
+                settings: settings,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ApplicationRoutingLibrariesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$Database,
+      $ApplicationRoutingLibrariesTable,
+      RawApplicationRouting,
+      $$ApplicationRoutingLibrariesTableFilterComposer,
+      $$ApplicationRoutingLibrariesTableOrderingComposer,
+      $$ApplicationRoutingLibrariesTableAnnotationComposer,
+      $$ApplicationRoutingLibrariesTableCreateCompanionBuilder,
+      $$ApplicationRoutingLibrariesTableUpdateCompanionBuilder,
+      (
+        RawApplicationRouting,
+        BaseReferences<
+          _$Database,
+          $ApplicationRoutingLibrariesTable,
+          RawApplicationRouting
+        >,
+      ),
+      RawApplicationRouting,
+      PrefetchHooks Function()
+    >;
 
 class $DatabaseManager {
   final _$Database _db;
@@ -9520,6 +9882,12 @@ class $DatabaseManager {
       );
   $$GlobalGroupLibrariesTableTableManager get globalGroupLibraries =>
       $$GlobalGroupLibrariesTableTableManager(_db, _db.globalGroupLibraries);
+  $$ApplicationRoutingLibrariesTableTableManager
+  get applicationRoutingLibraries =>
+      $$ApplicationRoutingLibrariesTableTableManager(
+        _db,
+        _db.applicationRoutingLibraries,
+      );
 }
 
 mixin _$ProfilesDaoMixin on DatabaseAccessor<Database> {

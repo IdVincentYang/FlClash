@@ -352,6 +352,7 @@ class PolicyMaterialCandidate {
 
   _SetupInputs _inputsWithSelection(String raw, {bool resetPicks = false}) =>
       _SetupInputs(
+        applicationRouting: _inputs.applicationRouting,
         state: _inputs.state.copyWith(
           policySelection: ProfilePolicySelection(
             profileId: profileId,
@@ -448,6 +449,7 @@ mixin _PolicyMaterialSetup on _$SetupAction {
           sources.add(await requests.captureSource(key));
         }
         final inputs = _SetupInputs(
+          applicationRouting: await database.readApplicationRouting(),
           state: state,
           profile: profile,
           patch: _effectivePatchConfig(ref.read(patchClashConfigProvider)),

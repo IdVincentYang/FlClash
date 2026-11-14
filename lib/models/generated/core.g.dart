@@ -19,6 +19,7 @@ Map<String, dynamic> _$SetupParamsToJson(_SetupParams instance) =>
 
 _UpdateParams _$UpdateParamsFromJson(Map<String, dynamic> json) =>
     _UpdateParams(
+      applicationRouting: json['application-routing'] as Map<String, dynamic>?,
       tun: Tun.fromJson(json['tun'] as Map<String, dynamic>),
       mixedPort: (json['mixed-port'] as num).toInt(),
       allowLan: json['allow-lan'] as bool,
@@ -51,6 +52,7 @@ _UpdateParams _$UpdateParamsFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$UpdateParamsToJson(_UpdateParams instance) =>
     <String, dynamic>{
+      'application-routing': instance.applicationRouting,
       'tun': instance.tun,
       'mixed-port': instance.mixedPort,
       'allow-lan': instance.allowLan,

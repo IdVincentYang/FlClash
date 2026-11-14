@@ -10507,6 +10507,291 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `App policy · {name}`
+  String appPolicyTitle(String name) {
+    return Intl.message(
+      'App policy · $name',
+      name: 'appPolicyTitle',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Choose policy`
+  String get appPolicyChoose {
+    return Intl.message(
+      'Choose policy',
+      name: 'appPolicyChoose',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Waiting to apply`
+  String get appPolicyPreparing {
+    return Intl.message(
+      'Waiting to apply',
+      name: 'appPolicyPreparing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No usable nodes`
+  String get appPolicyEmptyGroup {
+    return Intl.message(
+      'No usable nodes',
+      name: 'appPolicyEmptyGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Group disabled`
+  String get appPolicyDisabledGroup {
+    return Intl.message(
+      'Group disabled',
+      name: 'appPolicyDisabledGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Group not loaded for this subscription`
+  String get appPolicyUnbound {
+    return Intl.message(
+      'Group not loaded for this subscription',
+      name: 'appPolicyUnbound',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose an available target`
+  String get appPolicyMissingTarget {
+    return Intl.message(
+      'Choose an available target',
+      name: 'appPolicyMissingTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Global · App policies paused`
+  String get appPolicyGlobalPaused {
+    return Intl.message(
+      'Global · App policies paused',
+      name: 'appPolicyGlobalPaused',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Excluded from VPN`
+  String get appPolicyExcluded {
+    return Intl.message(
+      'Excluded from VPN',
+      name: 'appPolicyExcluded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN is not running`
+  String get appPolicyVpnStopped {
+    return Intl.message(
+      'VPN is not running',
+      name: 'appPolicyVpnStopped',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Applied to new connections`
+  String get appPolicyApplied {
+    return Intl.message(
+      'Applied to new connections',
+      name: 'appPolicyApplied',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Policy saved. Existing connections keep their routes.`
+  String get appPolicySaved {
+    return Intl.message(
+      'Policy saved. Existing connections keep their routes.',
+      name: 'appPolicySaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Shared app proxy group`
+  String get appPolicySharedTarget {
+    return Intl.message(
+      'Shared app proxy group',
+      name: 'appPolicySharedTarget',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `These apps share an Android identity. This change affects all of them:\n{packages}`
+  String appPolicySharedIdentity(String packages) {
+    return Intl.message(
+      'These apps share an Android identity. This change affects all of them:\n$packages',
+      name: 'appPolicySharedIdentity',
+      desc: '',
+      args: [packages],
+    );
+  }
+
+  /// `Search groups and nodes`
+  String get appPolicySearch {
+    return Intl.message(
+      'Search groups and nodes',
+      name: 'appPolicySearch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Direct connection`
+  String get appPolicyDirect {
+    return Intl.message(
+      'Direct connection',
+      name: 'appPolicyDirect',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Block connections`
+  String get appPolicyReject {
+    return Intl.message(
+      'Block connections',
+      name: 'appPolicyReject',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `All`
+  String get appPolicyAll {
+    return Intl.message('All', name: 'appPolicyAll', desc: '', args: []);
+  }
+
+  /// `Groups`
+  String get appPolicyGroups {
+    return Intl.message('Groups', name: 'appPolicyGroups', desc: '', args: []);
+  }
+
+  /// `Nodes`
+  String get appPolicyNodes {
+    return Intl.message('Nodes', name: 'appPolicyNodes', desc: '', args: []);
+  }
+
+  /// `Browse group nodes`
+  String get appPolicyMembers {
+    return Intl.message(
+      'Browse group nodes',
+      name: 'appPolicyMembers',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Include in VPN`
+  String get appPolicyCapture {
+    return Intl.message(
+      'Include in VPN',
+      name: 'appPolicyCapture',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `App policy`
+  String get appPolicyEdit {
+    return Intl.message(
+      'App policy',
+      name: 'appPolicyEdit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN scope saved. Changes apply when the VPN is running.`
+  String get appPolicyCaptureSaved {
+    return Intl.message(
+      'VPN scope saved. Changes apply when the VPN is running.',
+      name: 'appPolicyCaptureSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN scope is waiting to apply`
+  String get appPolicyCapturePending {
+    return Intl.message(
+      'VPN scope is waiting to apply',
+      name: 'appPolicyCapturePending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Direct · {count} app exceptions`
+  String appPolicyDirectExceptions(int count) {
+    return Intl.message(
+      'Direct · $count app exceptions',
+      name: 'appPolicyDirectExceptions',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Update the shared target for {count} enabled apps?`
+  String appPolicySharedChange(int count) {
+    return Intl.message(
+      'Update the shared target for $count enabled apps?',
+      name: 'appPolicySharedChange',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Saved. App policies resume in Rule or Direct mode.`
+  String get appPolicyGlobalSaved {
+    return Intl.message(
+      'Saved. App policies resume in Rule or Direct mode.',
+      name: 'appPolicyGlobalSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Follow rules`
+  String get appPolicyFollowRule {
+    return Intl.message(
+      'Follow rules',
+      name: 'appPolicyFollowRule',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN app scope`
+  String get appPolicyVpnScope {
+    return Intl.message(
+      'VPN app scope',
+      name: 'appPolicyVpnScope',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

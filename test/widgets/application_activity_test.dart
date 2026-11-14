@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'package:fl_clash/providers/application_routing.dart';
+import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/state.dart';
 import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:fl_clash/database/connection_exits.dart';
@@ -103,6 +108,7 @@ void main() {
     WidgetTester tester, {
     ApplicationActivityState? activity,
     bool catalogueError = false,
+    List<Package> packageCatalogue = _packages,
     bool catalogueLoading = false,
     Widget child = const ApplicationActivityView(),
     double width = 420,
@@ -118,7 +124,14 @@ void main() {
     container = ProviderContainer(
       overrides: [
         exitCacheDatabaseProvider.overrideWithValue(cache),
+        viewSizeProvider.overrideWithBuild((_, _) => Size(width, 900)),
         configStateProvider.overrideWith(TestConfigState.new),
+        applicationRoutingSettingsProvider.overrideWith(
+          (_) => Stream.value(const ApplicationRoutingSettings()),
+        ),
+        globalLocalGroupsProvider.overrideWith(
+          (_) => Stream.value(const <LocalProxyGroup>[]),
+        ),
         applicationActivityProvider.overrideWith(
           () => _Activity(activity ?? _activity()),
         ),
@@ -130,13 +143,18 @@ void main() {
               () => const ApplicationCatalogue(packages: [], accessible: false),
             );
           }
-          return const ApplicationCatalogue(
-            packages: _packages,
+          return ApplicationCatalogue(
+            packages: packageCatalogue,
             accessible: true,
           );
         }),
       ],
     );
+    container.listen(patchClashConfigProvider, (_, _) {});
+    container.listen(vpnSettingProvider, (_, _) {});
+    container.listen(currentProfileIdProvider, (_, _) {});
+    container.listen(currentProfileProvider, (_, _) {});
+    container.listen(globalLocalGroupsProvider, (_, _) {});
     globalState.container = container;
     addTearDown(container.dispose);
     await tester.pumpWidget(
@@ -301,7 +319,7 @@ void main() {
         tester
             .widget<CommonPopupMenu>(find.byType(CommonPopupMenu))
             .items
-            .single
+            .singleWhere((item) => item.label == 'Show all apps')
             .checked,
         true,
       );
@@ -484,6 +502,40 @@ void main() {
     expect(find.text('Browser A'), findsOneWidget);
     expect(find.text('Mail B'), findsOneWidget);
   });
+
+  testWidgets(
+    'installed shared UID applications confirm the full identity before editing',
+    (tester) async {
+      await pump(
+        tester,
+        activity: const ApplicationActivityState(),
+        packageCatalogue: const [
+          Package(
+            packageName: 'test.app.a',
+            label: 'Shared A',
+            system: false,
+            internet: true,
+            lastUpdateTime: 0,
+            sharedPackages: ['test.app.a', 'test.hidden'],
+          ),
+        ],
+      );
+      await toggleAll(tester);
+      await tester.tap(find.text('Follow rules'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SelectableText &&
+              widget.textSpan?.toPlainText().contains('test.hidden') == true,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('App policy · Shared A'), findsNothing);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('shared identities stay separate from candidate apps', (
     tester,

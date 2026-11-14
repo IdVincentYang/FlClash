@@ -29,6 +29,7 @@ data class ApplicationRequestState(
     val directNetworkId: String = "",
     val protectGeneration: Long = 0,
     val protectPhase: String = "none",
+    val captureFingerprint: String = "",
 )
 
 data class RequestServiceIdentity(val serviceId: String, val requestId: Long, val generation: Long = 0)

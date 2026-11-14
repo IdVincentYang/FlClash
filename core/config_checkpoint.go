@@ -347,6 +347,8 @@ func publishCheckpointCandidate(candidate *checkpointCandidate) error {
 	configFact.InputID = candidate.id
 	if trace := p.sourceTrace.Load(); trace != nil && !trace.busy {
 		publishSourceTraceState(p, candidate.id, false)
+		configFact.ApplicationRoutingRevision = p.sourceTrace.Load().applicationRevision
+		configFact.ApplicationRoutingRules = p.sourceTrace.Load().applicationRuleKeys
 	}
 	configFact.Version = configFactSequence.Add(1)
 	configFact.ReplayEligible = p.eligible

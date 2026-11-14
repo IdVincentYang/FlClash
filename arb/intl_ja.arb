@@ -1227,5 +1227,63 @@
   "activityExitFailed": "出口の確認に失敗しました。タップして再試行します。",
   "activityExitNotChecked": "プロキシ出口は未確認です。タップして確認します。",
   "activityExitUnavailable": "この接続の出口を確認できません。プロキシとノードが利用可能か確認してください。",
-  "activityExitCooldown": "数秒待ってから出口を再確認してください。"
+  "activityExitCooldown": "数秒待ってから出口を再確認してください。",
+  "appPolicyTitle": "アプリのポリシー · {name}",
+  "@appPolicyTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicyChoose": "ポリシーを選択",
+  "appPolicyPreparing": "適用を待機中",
+  "appPolicyEmptyGroup": "利用可能なノードなし",
+  "appPolicyDisabledGroup": "グループが無効",
+  "appPolicyUnbound": "このサブスクリプションで未読み込み",
+  "appPolicyMissingTarget": "利用可能な接続先を選択",
+  "appPolicyGlobalPaused": "Global · アプリポリシー停止中",
+  "appPolicyExcluded": "VPN の対象外",
+  "appPolicyVpnStopped": "VPN は停止中",
+  "appPolicyApplied": "新しい接続に適用済み",
+  "appPolicySaved": "保存しました。既存の接続経路は維持されます。",
+  "appPolicySharedTarget": "共通のアプリプロキシグループ",
+  "appPolicySharedIdentity": "これらのアプリは Android ID を共有します。すべてに適用されます：\n{packages}",
+  "@appPolicySharedIdentity": {
+    "placeholders": {
+      "packages": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicySearch": "グループとノードを検索",
+  "appPolicyDirect": "直接接続",
+  "appPolicyReject": "接続を拒否",
+  "appPolicyAll": "すべて",
+  "appPolicyGroups": "グループ",
+  "appPolicyNodes": "ノード",
+  "appPolicyMembers": "グループ内のノード",
+  "appPolicyCapture": "VPN の対象にする",
+  "appPolicyEdit": "アプリのポリシー",
+  "appPolicyCaptureSaved": "VPN の対象を保存しました。VPN 実行時に適用されます。",
+  "appPolicyCapturePending": "VPN の対象の適用を待機中",
+  "appPolicyDirectExceptions": "Direct · {count} 件のアプリ例外",
+  "@appPolicyDirectExceptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicySharedChange": "有効な {count} 件のアプリの共通接続先を変更しますか？",
+  "@appPolicySharedChange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicyGlobalSaved": "保存しました。Rule または Direct で有効になります。",
+  "appPolicyFollowRule": "ルールに従う",
+  "appPolicyVpnScope": "VPN の対象アプリ"
 }

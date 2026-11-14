@@ -142,3 +142,14 @@ class RouteAddressTest {
         }
     }
 }
+
+class CaptureFingerprintTest {
+    @Test
+    fun `capture fingerprint ignores disabled lists and canonicalizes active packages`() {
+        val all = optionsWithRoutes(emptyList()).accessControlProps
+        assertEquals(all.captureFingerprint(), all.copy(acceptList = listOf("old"), mode = AccessControlMode.REJECT_SELECTED).captureFingerprint())
+        val deny = all.copy(enable = true, mode = AccessControlMode.REJECT_SELECTED, rejectList = listOf("b", "a", "a"))
+        assertEquals(deny.copy(rejectList = listOf("a", "b")).captureFingerprint(), deny.captureFingerprint())
+        assertEquals("8caa2476c10e01ec8e23ca53fcd9ef5c7d17858d8b5e89ec170c137980ecd065", deny.captureFingerprint())
+    }
+}

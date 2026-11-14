@@ -61,6 +61,7 @@ class _Setup extends SetupAction {
   final listenerTargets = <bool>[];
   @override
   Future<bool> applyProfile({
+    bool rebuildVpn = false,
     bool silence = false,
     bool force = false,
     bool allowSourceReview = true,

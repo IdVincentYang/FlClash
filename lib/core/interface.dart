@@ -253,6 +253,12 @@ abstract class CoreHandlerInterface with CoreInterface {
     return data.map((item) => item?.toString() ?? '').toList();
   }
 
+  Future<String> updateApplicationRouting(Map<String, dynamic> settings) =>
+      _invokeMessage(
+        method: CoreMethod.updateConfig,
+        arguments: {'application-routing': settings},
+      );
+
   @override
   Future<String> updateConfig(UpdateParams updateParams) async {
     return _invokeMessage(

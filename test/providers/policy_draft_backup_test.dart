@@ -30,6 +30,7 @@ class _NoPublishSetup extends SetupAction {
   void build() {}
   @override
   Future<bool> applyProfile({
+    bool rebuildVpn = false,
     bool silence = false,
     bool force = false,
     bool allowSourceReview = true,

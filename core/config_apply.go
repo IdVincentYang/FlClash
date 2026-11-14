@@ -97,25 +97,27 @@ type ServiceCoreParams struct {
 }
 
 type ConfigFact struct {
-	MaterialPending  bool   `json:"materialPending,omitempty"`
-	RuntimeEpoch     string `json:"runtimeEpoch"`
-	Version          uint64 `json:"version"`
-	Token            uint64 `json:"token"`
-	Owner            uint64 `json:"owner"`
-	InputID          string `json:"inputId"`
-	YAMLSHA256       string `json:"yamlSha256"`
-	ParsedSHA256     string `json:"parsedSha256"`
-	ProfileID        *int64 `json:"profileId"`
-	ProfileName      string `json:"profileName"`
-	Phase            string `json:"phase"`
-	BusinessActive   bool   `json:"businessActive"`
-	ReplayEligible   bool   `json:"replayEligible"`
-	PolicyVersion    int    `json:"policyVersion"`
-	PolicySHA256     string `json:"policySha256"`
-	MaintenanceProxy string `json:"maintenanceProxy"`
-	MixedPort        int    `json:"mixedPort"`
-	RouteEpoch       uint64 `json:"routeEpoch"`
-	PicksVersion     uint64 `json:"picksVersion"`
+	ApplicationRoutingRules    map[string]string `json:"applicationRoutingRules,omitempty"`
+	ApplicationRoutingRevision string            `json:"applicationRoutingRevision,omitempty"`
+	MaterialPending            bool              `json:"materialPending,omitempty"`
+	RuntimeEpoch               string            `json:"runtimeEpoch"`
+	Version                    uint64            `json:"version"`
+	Token                      uint64            `json:"token"`
+	Owner                      uint64            `json:"owner"`
+	InputID                    string            `json:"inputId"`
+	YAMLSHA256                 string            `json:"yamlSha256"`
+	ParsedSHA256               string            `json:"parsedSha256"`
+	ProfileID                  *int64            `json:"profileId"`
+	ProfileName                string            `json:"profileName"`
+	Phase                      string            `json:"phase"`
+	BusinessActive             bool              `json:"businessActive"`
+	ReplayEligible             bool              `json:"replayEligible"`
+	PolicyVersion              int               `json:"policyVersion"`
+	PolicySHA256               string            `json:"policySha256"`
+	MaintenanceProxy           string            `json:"maintenanceProxy"`
+	MixedPort                  int               `json:"mixedPort"`
+	RouteEpoch                 uint64            `json:"routeEpoch"`
+	PicksVersion               uint64            `json:"picksVersion"`
 }
 
 type ConfigApplyResult struct {
@@ -308,6 +310,12 @@ func readConfigInput(home, id string) (ConfigManifest, []byte, *config.RawConfig
 		return manifest, nil, nil, "", err
 	}
 
+	var app applicationRouteSettings
+	if value := manifest.AcceptedOverrides["application-routing"]; len(value) != 0 {
+		if json.Unmarshal(value, &app) != nil || app.ProfileID == nil || manifest.ProfileID == nil || *app.ProfileID != *manifest.ProfileID {
+			return manifest, nil, nil, "", errors.New("application routing profile mismatch")
+		}
+	}
 	if err = patchConfigInput(raw, manifest.AcceptedOverrides); err != nil {
 		return manifest, nil, nil, "", err
 	}
@@ -669,6 +677,10 @@ func finishInstallLocked(p *preparedConfig) ConfigApplyResult {
 	}
 	checkpointMu.Lock()
 	currentConfig = cfg
+	if trace := p.sourceTrace.Load(); trace != nil {
+		configFact.ApplicationRoutingRevision = trace.applicationRevision
+		configFact.ApplicationRoutingRules = trace.applicationRuleKeys
+	}
 	configFact.Phase = "installed"
 	configFact.BusinessActive = false
 	configFact.Version = configFactSequence.Add(1)
@@ -869,6 +881,10 @@ func configStateSnapshot() ConfigFact {
 	fact.RouteEpoch, fact.PicksVersion = routeStamp()
 	if appliedConfig != nil && fact.Owner == appliedConfig.receipt.Owner {
 		fact.ReplayEligible = appliedConfig.eligible
+		if trace := appliedConfig.sourceTrace.Load(); trace != nil {
+			fact.ApplicationRoutingRevision = trace.applicationRevision
+			fact.ApplicationRoutingRules = trace.applicationRuleKeys
+		}
 	}
 	if fact.RuntimeEpoch == "" {
 		fact.RuntimeEpoch = configRuntimeEpoch
@@ -909,6 +925,9 @@ func patchConfigInput(raw *config.RawConfig, values map[string]json.RawMessage) 
 	}
 	var p UpdateParams
 	if err = json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	if err := validateApplicationRoutes(p.ApplicationRouting); err != nil {
 		return err
 	}
 	if err := patchGeneralOverrides(raw, &p); err != nil {
@@ -985,6 +1004,7 @@ func init() {
 		}
 		response.success(raw)
 	}))
+	tunnel.ApplicationRoutingHook = resolveApplicationRoute
 	requestscope.BusinessHook = activeBusiness.Load
 	registerMethod(prepareConfigMethod, withArguments(func(p *ConfigReceipt, response MethodResponse) { response.success(prepareConfig(*p)) }))
 	registerMethod(installConfigMethod, withArguments(func(p *ConfigReceipt, response MethodResponse) { response.success(installConfig(*p)) }))

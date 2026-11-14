@@ -1,5 +1,7 @@
 class ConfigFact {
   const ConfigFact({
+    this.applicationRoutingRevision = '',
+    this.applicationRoutingRules = const {},
     this.runtimeEpoch = '',
     this.version = 0,
     this.token = 0,
@@ -20,6 +22,8 @@ class ConfigFact {
     this.picksVersion = 0,
   });
 
+  final String applicationRoutingRevision;
+  final Map<String, String> applicationRoutingRules;
   final String runtimeEpoch, inputId, yamlSha256, profileName, phase;
   final int version, token, owner;
   final int? profileId;
@@ -40,6 +44,11 @@ class ConfigFact {
   };
 
   factory ConfigFact.fromJson(Map<String, Object?> json) => ConfigFact(
+    applicationRoutingRevision:
+        json['applicationRoutingRevision'] as String? ?? '',
+    applicationRoutingRules: Map<String, String>.from(
+      json['applicationRoutingRules'] as Map? ?? const {},
+    ),
     runtimeEpoch: json['runtimeEpoch'] as String? ?? '',
     version: (json['version'] as num?)?.toInt() ?? 0,
     token: (json['token'] as num?)?.toInt() ?? 0,

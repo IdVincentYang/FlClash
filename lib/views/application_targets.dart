@@ -8,6 +8,10 @@ import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 
 import 'application_connections.dart';
+import 'application_policy.dart';
+import 'package:fl_clash/common/application_routing.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/widgets/application_policy_status.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -34,6 +38,61 @@ class _ApplicationTargetsViewState
     extends ConsumerState<ApplicationTargetsView> {
   String _query = '';
   bool _onlyActive = false;
+  bool _captureBusy = false;
+  String? _captureError;
+
+  List<String> get _applicationPackages {
+    if (widget.identity.status == 'ambiguous') return widget.identity.packages;
+    final name = widget.packageName;
+    if (name == null) return const [];
+    final package = ref
+        .read(applicationCatalogueProvider)
+        .value
+        ?.packages
+        .where((value) => value.packageName == name)
+        .firstOrNull;
+    return package?.sharedPackages.isNotEmpty == true
+        ? package!.sharedPackages
+        : [name];
+  }
+
+  Future<void> _capture(bool enabled) async {
+    if (!await confirmApplicationPackages(context, _applicationPackages) ||
+        !mounted) {
+      return;
+    }
+    setState(() {
+      _captureBusy = true;
+      _captureError = null;
+    });
+    try {
+      await ref
+          .read(applicationInputActionProvider.notifier)
+          .updateVpn(
+            (previous) => previous.copyWith(
+              accessControlProps: setApplicationCapture(
+                previous.accessControlProps,
+                _applicationPackages,
+                enabled,
+              ),
+            ),
+          );
+      if (mounted) {
+        context.showNotifier(context.appLocalizations.appPolicyCaptureSaved);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _captureError = userFacingErrorMessage(
+            error,
+            context.appLocalizations,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _captureBusy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +124,14 @@ class _ApplicationTargetsViewState
       for (final host in visible) host.key: _latestConnection(host).info,
     };
     final label = packages[widget.packageName]?.label ?? widget.label;
+    final capture = ref.watch(vpnSettingProvider).accessControlProps;
+    final included = _applicationPackages.every(
+      (name) => applicationCaptured(capture, name),
+    );
+    final capturePending =
+        ref.watch(runControlProvider) &&
+        ref.watch(nativeRequestStateProvider)['captureFingerprint'] !=
+            applicationCaptureFingerprint(capture);
     return CommonScaffold(
       titleWidget: Row(
         children: [
@@ -83,6 +150,36 @@ class _ApplicationTargetsViewState
         ],
       ),
       menuItems: [
+        if (_applicationPackages.isNotEmpty)
+          CommonPopupMenuItem(
+            label: l10n.appPolicyEdit,
+            glyph: AppGlyphs.layers,
+            onPressed: () async {
+              if (!await confirmApplicationPackages(
+                    context,
+                    _applicationPackages,
+                  ) ||
+                  !context.mounted) {
+                return;
+              }
+              await BaseNavigator.push(
+                context,
+                ApplicationPolicyView(
+                  packages: _applicationPackages,
+                  label: label,
+                ),
+              );
+            },
+          ),
+        if (_applicationPackages.isNotEmpty &&
+            !_applicationPackages.contains('com.follow.clash.dev') &&
+            !_applicationPackages.contains('com.follow.clash'))
+          CommonPopupMenuItem(
+            label: l10n.appPolicyCapture,
+            glyph: AppGlyphs.vpn,
+            checked: included,
+            onPressed: _captureBusy ? null : () => _capture(!included),
+          ),
         CommonPopupMenuItem(
           label: l10n.activityOnlyActiveTargets,
           glyph: AppGlyphs.networkCheck,
@@ -94,6 +191,19 @@ class _ApplicationTargetsViewState
       ],
       body: Column(
         children: [
+          if (_captureBusy) const LinearProgressIndicator(),
+          if (_captureError != null || capturePending)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Text(
+                _captureError ?? l10n.appPolicyCapturePending,
+                style: TextStyle(
+                  color: _captureError != null
+                      ? context.colorScheme.error
+                      : context.colorScheme.tertiary,
+                ),
+              ),
+            ),
           Padding(
             padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 8),
             child: SearchField(

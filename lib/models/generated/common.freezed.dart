@@ -301,7 +301,7 @@ as List<NavigationItemMode>,
 /// @nodoc
 mixin _$Package {
 
- String get packageName; String get label; bool get system; bool get internet; int get lastUpdateTime;
+ String get packageName; String get label; bool get system; bool get internet; int get lastUpdateTime; List<String> get sharedPackages;
 /// Create a copy of Package
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -315,20 +315,20 @@ $PackageCopyWith<Package> get copyWith => _$PackageCopyWithImpl<Package>(this as
 @override
 bool operator ==(Object other) {
   final _this = this as Package;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Package&&(identical(other.packageName, _this.packageName) || other.packageName == _this.packageName)&&(identical(other.label, _this.label) || other.label == _this.label)&&(identical(other.system, _this.system) || other.system == _this.system)&&(identical(other.internet, _this.internet) || other.internet == _this.internet)&&(identical(other.lastUpdateTime, _this.lastUpdateTime) || other.lastUpdateTime == _this.lastUpdateTime));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Package&&(identical(other.packageName, _this.packageName) || other.packageName == _this.packageName)&&(identical(other.label, _this.label) || other.label == _this.label)&&(identical(other.system, _this.system) || other.system == _this.system)&&(identical(other.internet, _this.internet) || other.internet == _this.internet)&&(identical(other.lastUpdateTime, _this.lastUpdateTime) || other.lastUpdateTime == _this.lastUpdateTime)&&const DeepCollectionEquality().equals(other.sharedPackages, _this.sharedPackages));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Package;
-  return Object.hash(runtimeType,_this.packageName,_this.label,_this.system,_this.internet,_this.lastUpdateTime);
+  return Object.hash(runtimeType,_this.packageName,_this.label,_this.system,_this.internet,_this.lastUpdateTime,const DeepCollectionEquality().hash(_this.sharedPackages));
 }
 
 @override
 String toString() {
   final _this = this as Package;
-  return 'Package(packageName: ${_this.packageName}, label: ${_this.label}, system: ${_this.system}, internet: ${_this.internet}, lastUpdateTime: ${_this.lastUpdateTime})';
+  return 'Package(packageName: ${_this.packageName}, label: ${_this.label}, system: ${_this.system}, internet: ${_this.internet}, lastUpdateTime: ${_this.lastUpdateTime}, sharedPackages: ${_this.sharedPackages})';
 }
 
 
@@ -339,7 +339,7 @@ abstract mixin class $PackageCopyWith<$Res>  {
   factory $PackageCopyWith(Package value, $Res Function(Package) _then) = _$PackageCopyWithImpl;
 @useResult
 $Res call({
- String packageName, String label, bool system, bool internet, int lastUpdateTime
+ String packageName, String label, bool system, bool internet, int lastUpdateTime, List<String> sharedPackages
 });
 
 
@@ -356,14 +356,15 @@ class _$PackageCopyWithImpl<$Res>
 
 /// Create a copy of Package
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? packageName = null,Object? label = null,Object? system = null,Object? internet = null,Object? lastUpdateTime = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? packageName = null,Object? label = null,Object? system = null,Object? internet = null,Object? lastUpdateTime = null,Object? sharedPackages = null,}) {
   return _then(Package(
 packageName: null == packageName ? _self.packageName : packageName // ignore: cast_nullable_to_non_nullable
 as String,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
 as String,system: null == system ? _self.system : system // ignore: cast_nullable_to_non_nullable
 as bool,internet: null == internet ? _self.internet : internet // ignore: cast_nullable_to_non_nullable
 as bool,lastUpdateTime: null == lastUpdateTime ? _self.lastUpdateTime : lastUpdateTime // ignore: cast_nullable_to_non_nullable
-as int,
+as int,sharedPackages: null == sharedPackages ? _self.sharedPackages : sharedPackages // ignore: cast_nullable_to_non_nullable
+as List<String>,
   ));
 }
 
@@ -448,10 +449,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String packageName,  String label,  bool system,  bool internet,  int lastUpdateTime)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String packageName,  String label,  bool system,  bool internet,  int lastUpdateTime,  List<String> sharedPackages)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Package() when $default != null:
-return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.lastUpdateTime);case _:
+return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.lastUpdateTime,_that.sharedPackages);case _:
   return orElse();
 
 }
@@ -469,10 +470,10 @@ return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String packageName,  String label,  bool system,  bool internet,  int lastUpdateTime)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String packageName,  String label,  bool system,  bool internet,  int lastUpdateTime,  List<String> sharedPackages)  $default,) {final _that = this;
 switch (_that) {
 case _Package():
-return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.lastUpdateTime);case _:
+return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.lastUpdateTime,_that.sharedPackages);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -489,10 +490,10 @@ return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String packageName,  String label,  bool system,  bool internet,  int lastUpdateTime)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String packageName,  String label,  bool system,  bool internet,  int lastUpdateTime,  List<String> sharedPackages)?  $default,) {final _that = this;
 switch (_that) {
 case _Package() when $default != null:
-return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.lastUpdateTime);case _:
+return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.lastUpdateTime,_that.sharedPackages);case _:
   return null;
 
 }
@@ -504,7 +505,7 @@ return $default(_that.packageName,_that.label,_that.system,_that.internet,_that.
 @JsonSerializable()
 
 class _Package implements Package {
-  const _Package({required this.packageName, required this.label, required this.system, required this.internet, required this.lastUpdateTime});
+  const _Package({required this.packageName, required this.label, required this.system, required this.internet, required this.lastUpdateTime,  List<String> sharedPackages = const []}): _sharedPackages = sharedPackages;
   factory _Package.fromJson(Map<String, dynamic> json) => _$PackageFromJson(json);
 
 @override final  String packageName;
@@ -512,6 +513,13 @@ class _Package implements Package {
 @override final  bool system;
 @override final  bool internet;
 @override final  int lastUpdateTime;
+ final  List<String> _sharedPackages;
+@override@JsonKey() List<String> get sharedPackages {
+  if (_sharedPackages is EqualUnmodifiableListView) return _sharedPackages;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_sharedPackages);
+}
+
 
 /// Create a copy of Package
 /// with the given fields replaced by the non-null parameter values.
@@ -526,18 +534,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Package&&(identical(other.packageName, packageName) || other.packageName == packageName)&&(identical(other.label, label) || other.label == label)&&(identical(other.system, system) || other.system == system)&&(identical(other.internet, internet) || other.internet == internet)&&(identical(other.lastUpdateTime, lastUpdateTime) || other.lastUpdateTime == lastUpdateTime));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Package&&(identical(other.packageName, packageName) || other.packageName == packageName)&&(identical(other.label, label) || other.label == label)&&(identical(other.system, system) || other.system == system)&&(identical(other.internet, internet) || other.internet == internet)&&(identical(other.lastUpdateTime, lastUpdateTime) || other.lastUpdateTime == lastUpdateTime)&&const DeepCollectionEquality().equals(other.sharedPackages, _sharedPackages));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,packageName,label,system,internet,lastUpdateTime);
+    return Object.hash(runtimeType,packageName,label,system,internet,lastUpdateTime,const DeepCollectionEquality().hash(_sharedPackages));
 }
 
 @override
 String toString() {
-    return 'Package(packageName: $packageName, label: $label, system: $system, internet: $internet, lastUpdateTime: $lastUpdateTime)';
+    return 'Package(packageName: $packageName, label: $label, system: $system, internet: $internet, lastUpdateTime: $lastUpdateTime, sharedPackages: $sharedPackages)';
 }
 
 
@@ -548,7 +556,7 @@ abstract mixin class _$PackageCopyWith<$Res> implements $PackageCopyWith<$Res> {
   factory _$PackageCopyWith(_Package value, $Res Function(_Package) _then) = __$PackageCopyWithImpl;
 @override @useResult
 $Res call({
- String packageName, String label, bool system, bool internet, int lastUpdateTime
+ String packageName, String label, bool system, bool internet, int lastUpdateTime, List<String> sharedPackages
 });
 
 
@@ -565,14 +573,15 @@ class __$PackageCopyWithImpl<$Res>
 
 /// Create a copy of Package
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? packageName = null,Object? label = null,Object? system = null,Object? internet = null,Object? lastUpdateTime = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? packageName = null,Object? label = null,Object? system = null,Object? internet = null,Object? lastUpdateTime = null,Object? sharedPackages = null,}) {
   return _then(_Package(
 packageName: null == packageName ? _self.packageName : packageName // ignore: cast_nullable_to_non_nullable
 as String,label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
 as String,system: null == system ? _self.system : system // ignore: cast_nullable_to_non_nullable
 as bool,internet: null == internet ? _self.internet : internet // ignore: cast_nullable_to_non_nullable
 as bool,lastUpdateTime: null == lastUpdateTime ? _self.lastUpdateTime : lastUpdateTime // ignore: cast_nullable_to_non_nullable
-as int,
+as int,sharedPackages: null == sharedPackages ? _self._sharedPackages : sharedPackages // ignore: cast_nullable_to_non_nullable
+as List<String>,
   ));
 }
 

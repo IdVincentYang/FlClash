@@ -1227,5 +1227,63 @@
   "activityExitFailed": "出口检测失败，点击重试。",
   "activityExitNotChecked": "尚未检测代理出口，点击检测。",
   "activityExitUnavailable": "此连接暂时无法检测出口，请确认代理和节点已就绪。",
-  "activityExitCooldown": "请稍等几秒后再检测此出口。"
+  "activityExitCooldown": "请稍等几秒后再检测此出口。",
+  "appPolicyTitle": "应用策略 · {name}",
+  "@appPolicyTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicyChoose": "选择策略",
+  "appPolicyPreparing": "等待应用",
+  "appPolicyEmptyGroup": "没有可用节点",
+  "appPolicyDisabledGroup": "分组已禁用",
+  "appPolicyUnbound": "此订阅尚未加载分组",
+  "appPolicyMissingTarget": "请重新选择可用目标",
+  "appPolicyGlobalPaused": "Global · 应用策略已暂停",
+  "appPolicyExcluded": "已排除在 VPN 外",
+  "appPolicyVpnStopped": "VPN 未运行",
+  "appPolicyApplied": "已应用于新连接",
+  "appPolicySaved": "策略已保存，已有连接保持原有路径。",
+  "appPolicySharedTarget": "共用应用代理组",
+  "appPolicySharedIdentity": "这些应用共用 Android 身份，本次修改会同时影响：\n{packages}",
+  "@appPolicySharedIdentity": {
+    "placeholders": {
+      "packages": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicySearch": "搜索分组和节点",
+  "appPolicyDirect": "直连",
+  "appPolicyReject": "拒绝连接",
+  "appPolicyAll": "全部",
+  "appPolicyGroups": "分组",
+  "appPolicyNodes": "节点",
+  "appPolicyMembers": "查看组内节点",
+  "appPolicyCapture": "纳入 VPN",
+  "appPolicyEdit": "应用策略",
+  "appPolicyCaptureSaved": "VPN 范围已保存，VPN 运行时应用。",
+  "appPolicyCapturePending": "VPN 范围等待应用",
+  "appPolicyDirectExceptions": "Direct · {count} 个应用例外",
+  "@appPolicyDirectExceptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicySharedChange": "为 {count} 个已启用应用更新共用目标？",
+  "@appPolicySharedChange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicyGlobalSaved": "已保存，切回 Rule／Direct 后生效。",
+  "appPolicyFollowRule": "跟随规则",
+  "appPolicyVpnScope": "VPN 应用范围"
 }

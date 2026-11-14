@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -241,7 +242,7 @@ func TestConfigControllerWritesUseAcceptedAuthority(t *testing.T) {
 	call("PATCH", "/configs", `{"mode":"direct","unsupported":true}`, 409)
 	call("PATCH", "/configs", `{"mode":"direct","mixed-port":12345}`, 409)
 	call("PATCH", "/rules/disable", `{"0":true}`, 409)
-	if after := configStateSnapshot(); before != after || currentConfig.General.Mode != tunnel.Rule {
+	if after := configStateSnapshot(); !reflect.DeepEqual(before, after) || currentConfig.General.Mode != tunnel.Rule {
 		t.Fatal("rejected HTTP write had configuration effects", before, after)
 	}
 	call("PATCH", "/configs", `{"mode":"global","ipv6":true,"unified-delay":true}`, 204)
@@ -256,7 +257,7 @@ func TestConfigControllerWritesUseAcceptedAuthority(t *testing.T) {
 	}
 	for _, body := range []string{`{}`, `{"name":""}`, `{"name":null}`} {
 		call("PUT", "/proxies/pick", body, 400)
-		if state := configStateSnapshot(); state != beforeInvalidPick {
+		if state := configStateSnapshot(); !reflect.DeepEqual(state, beforeInvalidPick) {
 			t.Fatal("invalid PUT changed actual fact", state)
 		}
 		if epoch, picks := routeStamp(); epoch != beforeEpoch || picks != beforePicks {
@@ -289,7 +290,7 @@ func TestConfigControllerWritesUseAcceptedAuthority(t *testing.T) {
 	call("PUT", "/proxies/auto", `{"name":"second"}`, 204)
 	beforeInvalid := configStateSnapshot()
 	call("GET", "/group/auto/delay?timeout=invalid", "", 400)
-	if after := configStateSnapshot(); after != beforeInvalid {
+	if after := configStateSnapshot(); !reflect.DeepEqual(after, beforeInvalid) {
 		t.Fatal("invalid diagnostic cleared selection")
 	}
 	call("DELETE", "/proxies/auto", "", 204)

@@ -53,3 +53,11 @@ fun String.toCIDR(): CIDR {
 
     return CIDR(address, prefixLength)
 }
+
+fun AccessControlProps.captureFingerprint(): String {
+    val allow = mode == AccessControlMode.ACCEPT_SELECTED
+    val policy = if (!enable) "all" else if (allow) "allow" else "deny"
+    val entries = if (!enable) emptyList() else (if (allow) acceptList else rejectList).distinct().sorted()
+    val text = policy + "\n" + entries.joinToString("") { "$it\n" }
+    return java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+}

@@ -344,14 +344,23 @@ retains native metadata.type. The app-activity store excludes only explicitly
 Inner Core connections from events and snapshots; raw Requests and Core
 snapshots retain them. Other unidentified app connections remain visible,
 including application traffic to DNS server addresses; neither legacy UID nor
-missing source endpoints classify provenance. The read-only Tools application
+missing source endpoints classify provenance. The Tools application
 network page shows non-expanding app summaries with
 application-window placeholders, a persistent search field below the title and an overflow toggle for all installed apps.
 Confirmed-active apps lead the recent list; compact count/time rows emphasize only a positive active count.
 Normal observation/retention chrome and manual refresh are absent; actual read failures retain inline retries.
 Observation gaps remain internal rather than a persistent warning. It consumes the queries and existing package
-directory without requesting service transitions or source acceptance. See the application network design above for
+directory; explicit VPN-scope edits use the existing Setup/ServiceState transition owner. See the application network design above for
 retention, lifecycle and observation limits.
+
+ApplicationRoutingSettings uses a schema-16 Drift singleton JSON library: app intent is global, ordinary targets
+are profile-scoped, and global group IDs survive renames. ApplicationRoutingController persists through Request,
+then updates the trusted accepted override using existing updateConfig; Setup captures the same revision for full
+apply. ConfigFact publishes adopted per-app keys. The minimal mihomo ApplicationRoutingHook applies to Rule/Direct
+TCP and UDP using captured UID identity; Global/Inner bypass it. The independent ApplicationPolicyView copies the
+Proxies layout without modifying its selector. Capture edits rebuild through Setup/ServiceState and compare the
+published captureFingerprint. See the [implemented routing contract](../docs/features/network_activity/network_activity_design.md#app-默认策略与-vpn-范围).
+Host exceptions remain task 07.
 
 App rows navigate through BaseNavigator to ApplicationTargetsView, keyed by the original application identity.
 The target page consumes hostsForApp from the same provider, keeps search and active filtering local, and exposes frozen

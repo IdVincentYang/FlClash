@@ -1,5 +1,10 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/application_routing.dart';
+import 'package:fl_clash/providers/application_routing.dart';
+import 'package:fl_clash/widgets/application_policy.dart';
+import 'package:fl_clash/widgets/application_policy_status.dart';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
@@ -10,7 +15,10 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 
 import 'application_targets.dart';
+import 'application_policy.dart';
+import 'access.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ApplicationActivityView extends ConsumerStatefulWidget {
@@ -25,6 +33,8 @@ class _ApplicationActivityViewState
     extends ConsumerState<ApplicationActivityView> {
   bool _showAllApps = false;
   String _query = '';
+  bool _scrolling = false;
+  List<String> _rowOrder = [];
   bool _wasCurrent = false;
 
   void _search(String value) => setState(() => _query = value);
@@ -59,6 +69,25 @@ class _ApplicationActivityViewState
           activity: item,
         ),
     };
+    final routing = ref.watch(applicationRoutingSettingsProvider).value;
+    for (final rule in routing?.rules.values ?? <ApplicationRouteRule>[]) {
+      if (!rule.enabled) continue;
+      rows.putIfAbsent(
+        'package:${rule.packageName}',
+        () => (
+          package:
+              packages[rule.packageName] ??
+              Package(
+                packageName: rule.packageName,
+                label: rule.packageName,
+                system: false,
+                internet: true,
+                lastUpdateTime: 0,
+              ),
+          activity: null,
+        ),
+      );
+    }
     if (_showAllApps) {
       final sorted = packages.values.toList()
         ..sort((a, b) => a.label.compareTo(b.label));
@@ -82,9 +111,72 @@ class _ApplicationActivityViewState
         _label(item.package, item.activity),
       ]);
     }).toList();
+    final routingOperation = ref.watch(applicationRoutingControllerProvider);
+    final invalid = <String>{};
+    for (final entry in visible) {
+      final packageName =
+          entry.value.package?.packageName ??
+          entry.value.activity?.application.packageName;
+      if (routingOperation.errors.containsKey(packageName)) {
+        invalid.add(entry.key);
+      }
+      final rule =
+          routing?.rules[entry.value.package?.packageName ??
+              entry.value.activity?.application.packageName];
+      if (rule == null ||
+          !rule.enabled ||
+          rule.action != ApplicationRouteAction.proxy) {
+        continue;
+      }
+      final state = applicationTargetState(ref, rule);
+      if (state.issue != null &&
+          state.issue != ApplicationTargetIssue.preparing) {
+        invalid.add(entry.key);
+      }
+    }
+    final hold =
+        _scrolling ||
+        ref.watch(applicationRoutingControllerProvider).pending.isNotEmpty;
+    final previousOrder = {
+      for (final (index, key) in _rowOrder.indexed) key: index,
+    };
+    final original = {
+      for (final (index, entry) in visible.indexed) entry.key: index,
+    };
+    visible.sort((a, b) {
+      if (hold) {
+        return (previousOrder[a.key] ?? visible.length).compareTo(
+          previousOrder[b.key] ?? visible.length,
+        );
+      }
+      final priority = (invalid.contains(a.key) ? 0 : 1).compareTo(
+        invalid.contains(b.key) ? 0 : 1,
+      );
+      return priority != 0
+          ? priority
+          : original[a.key]!.compareTo(original[b.key]!);
+    });
+    _rowOrder = visible.map((entry) => entry.key).toList();
     return CommonScaffold(
       title: l10n.applicationNetwork,
       menuItems: [
+        CommonPopupMenuItem(
+          label: l10n.appPolicySharedTarget,
+          glyph: AppGlyphs.layers,
+          onPressed: () => BaseNavigator.push(
+            context,
+            const ApplicationPolicyView(
+              packages: [],
+              label: '',
+              sharedTarget: true,
+            ),
+          ),
+        ),
+        CommonPopupMenuItem(
+          label: l10n.appPolicyVpnScope,
+          glyph: AppGlyphs.vpn,
+          onPressed: () => BaseNavigator.push(context, const AccessView()),
+        ),
         CommonPopupMenuItem(
           label: l10n.activityShowAllApps,
           glyph: AppGlyphs.appsList,
@@ -95,7 +187,11 @@ class _ApplicationActivityViewState
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 8),
+            padding: EdgeInsets.only(top: context.contentTopPadding),
+            child: const ApplicationPolicyStatus(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SearchField(
               hintText: l10n.activitySearchApps,
               onChanged: _search,
@@ -136,50 +232,59 @@ class _ApplicationActivityViewState
               ),
             ),
           Expanded(
-            child: ListView.builder(
-              key: const PageStorageKey('application-network'),
-              findChildIndexCallback: (key) {
-                final index = visible.indexWhere(
-                  (entry) => ValueKey('activity:${entry.key}') == key,
-                );
-                return index < 0 ? null : index;
+            child: NotificationListener<UserScrollNotification>(
+              onNotification: (notification) {
+                _scrolling = notification.direction != ScrollDirection.idle;
+                return false;
               },
-              padding: EdgeInsets.only(
-                bottom: 16 + BottomInsetScope.of(context),
-              ),
-              itemCount: visible.isEmpty ? 1 : visible.length,
-              itemBuilder: (context, index) {
-                if (visible.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      search.isNotEmpty
-                          ? l10n.activityNoMatches
-                          : l10n.activityNoObserved,
+              child: ListView.builder(
+                key: const PageStorageKey('application-network'),
+                findChildIndexCallback: (key) {
+                  final index = visible.indexWhere(
+                    (entry) => ValueKey('activity:${entry.key}') == key,
+                  );
+                  return index < 0 ? null : index;
+                },
+                padding: EdgeInsets.only(
+                  bottom: 16 + BottomInsetScope.of(context),
+                ),
+                itemCount: visible.isEmpty ? 1 : visible.length,
+                itemBuilder: (context, index) {
+                  if (visible.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        search.isNotEmpty
+                            ? l10n.activityNoMatches
+                            : l10n.activityNoObserved,
+                      ),
+                    );
+                  }
+                  final entry = visible[index];
+                  return _ApplicationActivityRow(
+                    key: ValueKey('activity:${entry.key}'),
+                    label: _label(entry.value.package, entry.value.activity),
+                    package: entry.value.package,
+                    activity: entry.value.activity,
+                    onTap: () => BaseNavigator.push(
+                      context,
+                      ApplicationTargetsView(
+                        appKey: entry.key,
+                        label: _label(
+                          entry.value.package,
+                          entry.value.activity,
+                        ),
+                        packageName:
+                            entry.value.package?.packageName ??
+                            entry.value.activity?.application.packageName,
+                        identity:
+                            entry.value.activity?.application ??
+                            const ApplicationIdentity(),
+                      ),
                     ),
                   );
-                }
-                final entry = visible[index];
-                return _ApplicationActivityRow(
-                  key: ValueKey('activity:${entry.key}'),
-                  label: _label(entry.value.package, entry.value.activity),
-                  package: entry.value.package,
-                  activity: entry.value.activity,
-                  onTap: () => BaseNavigator.push(
-                    context,
-                    ApplicationTargetsView(
-                      appKey: entry.key,
-                      label: _label(entry.value.package, entry.value.activity),
-                      packageName:
-                          entry.value.package?.packageName ??
-                          entry.value.activity?.application.packageName,
-                      identity:
-                          entry.value.activity?.application ??
-                          const ApplicationIdentity(),
-                    ),
-                  ),
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
@@ -197,7 +302,7 @@ class _ApplicationActivityViewState
   }
 }
 
-class _ApplicationActivityRow extends StatelessWidget {
+class _ApplicationActivityRow extends ConsumerWidget {
   const _ApplicationActivityRow({
     super.key,
     required this.label,
@@ -211,7 +316,7 @@ class _ApplicationActivityRow extends StatelessWidget {
   final AppActivity? activity;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.appLocalizations;
     final packageName =
         package?.packageName ?? activity?.application.packageName;
@@ -236,23 +341,53 @@ class _ApplicationActivityRow extends StatelessWidget {
                 size: 48,
                 placeholder: const GlyphIcon(AppGlyphs.application, size: 48),
               ),
-        title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            if (totals == null)
-              Text(l10n.activityNoObserved)
-            else
-              ActivityConnectionSummary(totals: totals),
-            if (paths.isNotEmpty)
-              Text(
-                paths.first.isEmpty
-                    ? l10n.unknown
-                    : '${paths.first.join(' → ')}${paths.length > 1 ? ' (+${paths.length - 1})' : ''}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Expanded(
+              child: DefaultTextStyle(
+                style: context.textTheme.bodySmall!.copyWith(
+                  color: context.colorScheme.onSurfaceVariant,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.textTheme.titleMedium,
+                    ),
+                    if (totals == null)
+                      Text(l10n.activityNoObserved)
+                    else
+                      ActivityConnectionSummary(
+                        totals: totals,
+                        singleLine: true,
+                      ),
+                    if (paths.isNotEmpty)
+                      Text(
+                        paths.first.isEmpty
+                            ? l10n.unknown
+                            : '${paths.first.join(' → ')}${paths.length > 1 ? ' (+${paths.length - 1})' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
+            ),
+            const SizedBox(width: 4),
+            ApplicationPolicySwitch(
+              packages: packageName != null
+                  ? package?.sharedPackages.isNotEmpty == true
+                        ? package!.sharedPackages
+                        : [packageName]
+                  : activity?.application.status == 'ambiguous'
+                  ? activity!.application.packages
+                  : const [],
+              label: label,
+            ),
           ],
         ),
       ),

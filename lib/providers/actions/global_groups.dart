@@ -77,6 +77,8 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
     );
   }
 
+  Future<void> synchronizeApplicationGroups() => _synchronize(explicit: true);
+
   Future<List<LocalProxyGroup>> _materialize(
     List<LocalProxyGroup> definitions,
     Profile profile, {
@@ -136,6 +138,16 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
         !const {'ready', 'installed'}.contains(fact.phase)) {
       return;
     }
+    final settings = await database.readApplicationRouting();
+    attach = {
+      ...attach,
+      for (final rule in settings.rules.values)
+        if (rule.enabled && rule.action == ApplicationRouteAction.proxy)
+          if (applicationTargetFor(settings, rule, profile.id)
+              case final target?
+              when target.kind == ApplicationTargetKind.globalGroup)
+            target.groupId!,
+    };
     final definitions = await database.readGlobalGroups();
     if (!ref.mounted || ref.read(currentProfileIdProvider) != profile.id) {
       return;

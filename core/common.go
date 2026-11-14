@@ -315,6 +315,20 @@ func updateConfigOwned(params *UpdateParams, expected *controllerConfigMutation)
 		return err
 	}
 
+	if err := validateApplicationRoutes(params.ApplicationRouting); err != nil {
+		return err
+	}
+	if params.ApplicationRouting != nil {
+		app := params.ApplicationRouting
+		if appliedConfig.manifest.ProfileID == nil || app.ProfileID == nil || *app.ProfileID != *appliedConfig.manifest.ProfileID {
+			return errConfigSuperseded
+		}
+		if state := appliedConfig.sourceTrace.Load(); state != nil && app.Version < state.applicationVersion {
+			copy := *params
+			copy.ApplicationRouting = nil
+			params = &copy
+		}
+	}
 	general := currentConfig.General
 	tunChanged := false
 	if params.Tun != nil {
@@ -334,7 +348,12 @@ func updateConfigOwned(params *UpdateParams, expected *controllerConfigMutation)
 			selectMu.Unlock()
 		}
 	}()
-	routeChanged := params.Mode != nil && general.Mode != *params.Mode || params.IPv6 != nil && general.IPv6 != *params.IPv6
+	applicationChanged := false
+	if params.ApplicationRouting != nil {
+		state := appliedConfig.sourceTrace.Load()
+		applicationChanged = state == nil || state.applicationRevision != params.ApplicationRouting.Revision
+	}
+	routeChanged := params.Mode != nil && general.Mode != *params.Mode || params.IPv6 != nil && general.IPv6 != *params.IPv6 || applicationChanged
 	sourceChanged := params.Authentication != nil && !slices.Equal(general.Authentication, *params.Authentication)
 	for geoType, link := range params.GeoXUrl {
 		if resource, exists := geoResources[strings.ToUpper(geoType)]; exists && link != "" && link != resource.url() {

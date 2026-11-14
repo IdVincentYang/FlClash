@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'app.dart';
+import 'application_routing.dart';
 import 'clash_config.dart';
 import 'common.dart';
 import 'config.dart';
@@ -373,6 +374,7 @@ abstract class MigrationData with _$MigrationData {
     @Default([]) List<Script> scripts,
     @Default([]) List<Profile> profiles,
     List<LocalProxyGroup>? globalGroups,
+    ApplicationRoutingSettings? applicationRouting,
     @Default([]) List<ProfileRuleLink> links,
     @Default([]) List<ProxyGroup> proxyGroups,
     @Default([]) List<ClashProvider> clashProviders,

@@ -220,6 +220,7 @@ Future<MigrationData> readBackupArchive({
       configMap: configMap,
       profiles: results[0].cast<Profile>(),
       globalGroups: results[9].cast<LocalProxyGroup>(),
+      applicationRouting: await database.readApplicationRouting(),
       scripts: results[1].cast<Script>(),
       rules: results[2].cast<Rule>(),
       links: results[3].cast<ProfileRuleLink>(),

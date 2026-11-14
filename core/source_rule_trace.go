@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"sync"
@@ -89,6 +90,10 @@ type sourceRuleProvenance struct {
 }
 
 type sourceTraceState struct {
+	applicationVersion       uint64
+	applicationRuleKeys      map[string]string
+	applicationRevision      string
+	applicationRoutes        map[string]applicationRoute
 	profileName              string
 	origins                  []SourceRuleOrigin
 	routeEpoch, picksVersion uint64
@@ -209,6 +214,12 @@ func recordSourceRuleSetMatch(p *preparedConfig, name string, generation *source
 
 func publishSourceTraceState(p *preparedConfig, id string, busy bool) {
 	state := &sourceTraceState{input: id, busy: busy, profileName: p.manifest.ProfileName, materials: map[string]string{}}
+	state.applicationRevision, state.applicationRoutes = applicationRoutesFor(p.manifest)
+	var app applicationRouteSettings
+	if json.Unmarshal(p.manifest.AcceptedOverrides["application-routing"], &app) == nil {
+		state.applicationVersion = app.Version
+		state.applicationRuleKeys = applicationRuleKeys(app)
+	}
 	state.routeEpoch, state.picksVersion = routeStamp()
 	if p.cfg != nil {
 		state.origins = make([]SourceRuleOrigin, len(p.cfg.Rules))
@@ -227,10 +238,10 @@ func publishSourceTraceState(p *preparedConfig, id string, busy bool) {
 }
 
 func installSourceRuleTracing(p *preparedConfig) {
+	publishSourceTraceState(p, p.receipt.InputID, false)
 	if p.manifest.Version != 2 {
 		return
 	}
-	publishSourceTraceState(p, p.receipt.InputID, false)
 	p.cfg.Rules = sourceTracedRules(p, p.cfg.Rules, p.manifest.RuleLedger)
 	for _, runtime := range p.sourceProviders {
 		if runtime.rule == nil {

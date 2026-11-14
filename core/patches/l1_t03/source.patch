@@ -4233,6 +4233,59 @@ index 2e7829ae71af03449f6ec134157402deff914aac..689d3efd956f8bef82f549052633eecb
  
  	wrapper := &RuleSetProvider{
  		rp,
+diff --git a/tunnel/application_routing_test.go b/tunnel/application_routing_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5ba8ab52dfbf594c736fd1dcfe53c316b3f2442
+--- /dev/null
++++ b/tunnel/application_routing_test.go
+@@ -0,0 +1,47 @@
++package tunnel
++
++import (
++	"context"
++	"testing"
++
++	"github.com/metacubex/mihomo/component/requestscope"
++	C "github.com/metacubex/mihomo/constant"
++	RC "github.com/metacubex/mihomo/rules/common"
++)
++
++func TestApplicationRoutingPrecedesRuleAndDirectButNotGlobal(t *testing.T) {
++	oldHook, oldMode, oldProxies, oldRules := ApplicationRoutingHook, mode, proxies, rules
++	defer func() { ApplicationRoutingHook, mode, proxies, rules = oldHook, oldMode, oldProxies, oldRules }()
++	direct, app, global := &businessDialCounter{}, &businessDialCounter{}, &businessDialCounter{}
++	proxies = map[string]C.Proxy{"DIRECT": direct, "app": app, "GLOBAL": global}
++	rules = []C.Rule{RC.NewMatch("DIRECT")}
++	scope := requestscope.NewBusinessScope(901, func() bool { return true })
++	scope.Activate()
++	defer scope.Close()
++	calls := 0
++	ApplicationRoutingHook = func(context.Context, requestscope.Lease, *C.Metadata) (C.Rule, string, error) {
++		calls++
++		return RC.NewMatch("app"), "app", nil
++	}
++	for _, network := range []C.NetWork{C.TCP, C.UDP} {
++		metadata := &C.Metadata{NetWork: network, Type: C.TUN}
++		for _, tc := range []struct {
++			mode    TunnelMode
++			want    C.Proxy
++			invokes bool
++		}{{Rule, app, true}, {Direct, app, true}, {Global, global, false}} {
++			mode = tc.mode
++			before := calls
++			actual, _, err := resolveMetadataScoped(context.Background(), metadata, scope)
++			if err != nil || actual != tc.want || (calls > before) != tc.invokes {
++				t.Fatalf("%s %v resolved wrong route: %v %v", network, tc.mode, actual, err)
++			}
++		}
++		metadata.Type = C.INNER
++		mode = Direct
++		before := calls
++		if actual, _, err := resolveMetadataScoped(context.Background(), metadata, scope); err != nil || actual != direct || calls != before {
++			t.Fatal("internal traffic used app policy", err)
++		}
++	}
++}
 diff --git a/tunnel/business.go b/tunnel/business.go
 new file mode 100644
 index 0000000000000000000000000000000000000000..a308087d352a2823b624bc0e4c9e1059d6561c7f
@@ -4566,7 +4619,7 @@ index 3a66a76e545826ecaba8a938ba7d199a58e676d0..38e41947fc56331446b3f7c03f56628d
  	case <-s.ctx.Done():
  		packet.Drop() // sender closed before Send()
 diff --git a/tunnel/tunnel.go b/tunnel/tunnel.go
-index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6f9b9328e 100644
+index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..46a15252a71697970376f41f148d1c4304ccb47e 100644
 --- a/tunnel/tunnel.go
 +++ b/tunnel/tunnel.go
 @@ -19,6 +19,7 @@ import (
@@ -4628,11 +4681,13 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  	key := packetAdapter.Key()
  
  	hash := utils.MapHash(key)
-@@ -315,10 +349,19 @@ func preHandleMetadata(metadata *C.Metadata) error {
+@@ -315,10 +349,36 @@ func preHandleMetadata(metadata *C.Metadata) error {
  	return nil
  }
  
 -func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err error) {
++var ApplicationRoutingHook func(context.Context, requestscope.Lease, *C.Metadata) (C.Rule, string, error)
++
 +func resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 +	return resolveMetadataScoped(context.Background(), metadata, nil)
 +}
@@ -4640,6 +4695,21 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
 +func resolveMetadataScoped(parent context.Context, metadata *C.Metadata, lease requestscope.Lease) (proxy C.Proxy, rule C.Rule, err error) {
 +	if err = requestscope.Check(lease); err != nil {
 +		return
++	}
++	if mode != Global && metadata.Type != C.INNER && ApplicationRoutingHook != nil {
++		rule, target, routeErr := ApplicationRoutingHook(parent, lease, metadata)
++		if routeErr != nil {
++			return nil, nil, routeErr
++		}
++		if target != "" {
++			configMux.RLock()
++			proxy = proxies[target]
++			configMux.RUnlock()
++			if proxy == nil {
++				return nil, nil, fmt.Errorf("application target %s unavailable", target)
++			}
++			return proxy, rule, nil
++		}
 +	}
  	if metadata.SpecialProxy != "" {
  		var exist bool
@@ -4649,7 +4719,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  		if !exist {
  			err = fmt.Errorf("proxy %s not found", metadata.SpecialProxy)
  		}
-@@ -337,7 +380,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+@@ -337,7 +397,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
  	helper := C.RuleMatchHelper{
  		ResolveIP: func() {
  			if !resolved && metadata.Host != "" && !metadata.Resolved() {
@@ -4658,7 +4728,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  				defer cancel()
  				ip, err := resolver.ResolveIP(ctx, metadata.Host)
  				if err != nil {
-@@ -401,12 +444,16 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+@@ -401,12 +461,16 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
  
  	switch mode {
  	case Direct:
@@ -4676,7 +4746,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  	}
  	return
  }
-@@ -419,7 +466,8 @@ func processUDP(queue chan C.PacketAdapter) {
+@@ -419,7 +483,8 @@ func processUDP(queue chan C.PacketAdapter) {
  }
  
  func handleUDPConn(packet C.PacketAdapter) {
@@ -4686,7 +4756,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  		packet.Drop()
  		return
  	}
-@@ -440,7 +488,7 @@ func handleUDPConn(packet C.PacketAdapter) {
+@@ -440,7 +505,7 @@ func handleUDPConn(packet C.PacketAdapter) {
  
  	key := packet.Key()
  	sender, loaded := natTable.GetOrCreate(key, func() C.PacketSender {
@@ -4695,7 +4765,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  		if sniffingEnable && snifferDispatcher.Enable() {
  			return snifferDispatcher.UDPSniff(packet, sender)
  		}
-@@ -458,16 +506,26 @@ func handleUDPConn(packet C.PacketAdapter) {
+@@ -458,16 +523,26 @@ func handleUDPConn(packet C.PacketAdapter) {
  
  			_ = preHandleMetadata(metadata) // error was pre-checked
  
@@ -4724,7 +4794,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  				return proxy.ListenPacketContext(ctx, dialMetadata)
  			}, func(err error) {
  				logMetadataErr(metadata, rule, proxy, err)
-@@ -475,6 +533,14 @@ func handleUDPConn(packet C.PacketAdapter) {
+@@ -475,6 +550,14 @@ func handleUDPConn(packet C.PacketAdapter) {
  			if err != nil {
  				return nil, nil, err
  			}
@@ -4739,7 +4809,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  			logMetadata(metadata, rule, rawPc)
  
  			pc := statistic.NewUDPTracker(rawPc, statistic.DefaultManager, metadata, rule, 0, 0, true)
-@@ -483,7 +549,12 @@ func handleUDPConn(packet C.PacketAdapter) {
+@@ -483,7 +566,12 @@ func handleUDPConn(packet C.PacketAdapter) {
  			oAddrPort := dialMetadata.AddrPort()
  			writeBackProxy := nat.NewWriteBackProxy(packet)
  
@@ -4753,7 +4823,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  			return pc, writeBackProxy, nil
  		}
  
-@@ -501,7 +572,23 @@ func handleUDPConn(packet C.PacketAdapter) {
+@@ -501,7 +589,23 @@ func handleUDPConn(packet C.PacketAdapter) {
  }
  
  func handleTCPConn(connCtx C.ConnContext) {
@@ -4778,7 +4848,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  		_ = connCtx.Conn().Close()
  		return
  	}
-@@ -552,7 +639,21 @@ func handleTCPConn(connCtx C.ConnContext) {
+@@ -552,7 +656,21 @@ func handleTCPConn(connCtx C.ConnContext) {
  		}()
  	}
  
@@ -4801,7 +4871,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  	if err != nil {
  		log.Warnln("[Metadata] parse failed: %s", err.Error())
  		return
-@@ -572,14 +673,38 @@ func handleTCPConn(connCtx C.ConnContext) {
+@@ -572,14 +690,38 @@ func handleTCPConn(connCtx C.ConnContext) {
  	var peekBytes []byte
  	var peekLen int
  
@@ -4841,7 +4911,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  		if N.NeedHandshake(remoteConn) {
  			defer func() {
  				if err != nil {
-@@ -596,6 +721,9 @@ func handleTCPConn(connCtx C.ConnContext) {
+@@ -596,6 +738,9 @@ func handleTCPConn(connCtx C.ConnContext) {
  			peekMutex.Lock()
  			defer peekMutex.Unlock()
  			peekBytes, _ = conn.Peek(conn.Buffered())
@@ -4851,7 +4921,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  			_, err = remoteConn.Write(peekBytes)
  			if err != nil {
  				return
-@@ -622,7 +750,14 @@ func handleTCPConn(connCtx C.ConnContext) {
+@@ -622,7 +767,14 @@ func handleTCPConn(connCtx C.ConnContext) {
  	peekMutex.Lock()
  	defer peekMutex.Unlock()
  	_ = conn.SetReadDeadline(time.Time{}) // reset
@@ -4867,7 +4937,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  }
  
  func logMetadataErr(metadata *C.Metadata, rule C.Rule, proxy C.ProxyAdapter, err error) {
-@@ -653,8 +788,15 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
+@@ -653,8 +805,15 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
  }
  
  func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, error) {
@@ -4883,7 +4953,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  
  	var rematchChain []string
  	for {
-@@ -662,6 +804,9 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
+@@ -662,6 +821,9 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
  		var rematchRule C.Rule
  	GetRules:
  		for _, rule := range getRules(metadata) {
@@ -4893,7 +4963,7 @@ index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..6c0cb72860331ab34bdbf532eeb8fae6
  			if matched, ada := rule.Match(metadata, helper); matched {
  				adapter, ok := proxies[ada]
  				if !ok {
-@@ -696,7 +841,7 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
+@@ -696,7 +858,7 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
  				return rematchProxy, rematchRule, nil
  			}
  			rematchChain = append(rematchChain, rematchProxy.Name())

@@ -77,6 +77,7 @@ class ApplicationInputAction extends _$ApplicationInputAction {
     () => ref.read(vpnSettingProvider),
     (value) => ref.read(vpnSettingProvider.notifier).value = value,
     update,
+    rebuildVpn: true,
   );
 
   Future<void> updateGeoUrl(GeoResource resource, String url) => _change(
@@ -126,6 +127,7 @@ class ApplicationInputAction extends _$ApplicationInputAction {
     T Function(T) update, {
     void Function(T previous, T next, bool managed)? validate,
     Future<void> Function()? beforePublish,
+    bool rebuildVpn = false,
   }) async {
     var managed = false;
     var changed = false;
@@ -179,7 +181,17 @@ class ApplicationInputAction extends _$ApplicationInputAction {
     }
     if (changed && ref.mounted && ref.read(initProvider)) {
       final setup = ref.read(setupActionProvider.notifier);
-      if (managed) {
+      if (rebuildVpn) {
+        if (system.isAndroid &&
+            !androidRunRequested(ref.read(nativeRequestStateProvider))) {
+          return;
+        }
+        await setup.applyProfile(
+          force: true,
+          rebuildVpn: true,
+          expectedRun: failure?.nativeRun,
+        );
+      } else if (managed) {
         await setup.applyProfile(force: true);
       } else {
         await setup.updateConfigDebounce();

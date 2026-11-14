@@ -24,9 +24,14 @@ String activityRuleText(BuildContext context, TrackerInfo info) {
 }
 
 class ActivityConnectionSummary extends StatelessWidget {
-  const ActivityConnectionSummary({super.key, required this.totals});
+  const ActivityConnectionSummary({
+    super.key,
+    required this.totals,
+    this.singleLine = false,
+  });
 
   final ActivityTotals totals;
+  final bool singleLine;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +53,8 @@ class ActivityConnectionSummary extends StatelessWidget {
           TextSpan(text: '${parts.last} · $time'),
         ],
       ),
+      maxLines: singleLine ? 1 : null,
+      overflow: singleLine ? TextOverflow.ellipsis : null,
       semanticsLabel:
           '${l10n.activityCounts(active?.toString() ?? '—', totals.connectionCount)} · ${l10n.activityLast(time)}',
     );

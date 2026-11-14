@@ -38,6 +38,7 @@ class _Setup extends SetupAction {
 
   @override
   Future<bool> applyProfile({
+    bool rebuildVpn = false,
     bool silence = false,
     bool force = false,
     bool allowSourceReview = true,

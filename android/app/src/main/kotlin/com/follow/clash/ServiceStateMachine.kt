@@ -1,5 +1,7 @@
 package com.follow.clash
 
+import com.follow.clash.service.models.captureFingerprint
+
 import com.follow.clash.common.RunIntentArbiter
 import com.follow.clash.common.ApplicationRequestState
 import com.follow.clash.common.RequestNetworkFacts
@@ -172,6 +174,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                 if (arbiter.current().id != request.id || configToken.get() != token) return@withLock ConfigCleanupResult("superseded")
                 if (!cleaned) return@withLock ConfigCleanupResult("cleanupFailed", "Owned service cleanup did not complete")
                 preparedOptionsFingerprint = null
+                publish { previous -> previous.copy(captureFingerprint = "") }
                 applySharedState()
                 ConfigCleanupResult("cleaned")
             } catch (error: Exception) {
@@ -304,6 +307,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                 if (!currentConfigRequest(request, receipt)) return@withLock null
                 val state = getRequestState()
                 check(state.serviceId.isNotEmpty() && (!options.enable || state.protectGeneration != 0L && state.protectPhase == "ready")) { START_FAILED_MESSAGE }
+                publish { previous -> previous.copy(captureFingerprint = options.accessControlProps.captureFingerprint()) }
                 receipt.copy(serviceId = state.serviceId, protectGeneration = if (options.enable) state.protectGeneration else 0, optionsFingerprint = fingerprint)
             } ?: return ConfigApplyResult("superseded", receipt = receipt)
             serviceReceipt = preparedService

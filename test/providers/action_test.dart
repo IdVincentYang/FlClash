@@ -1018,6 +1018,7 @@ class _TestSetupAction extends SetupAction {
 
   @override
   Future<bool> applyProfile({
+    bool rebuildVpn = false,
     bool silence = false,
     bool force = false,
     Future<void> Function()? preloadInvoke,
@@ -1100,6 +1101,7 @@ class _RaceSetupAction extends SetupAction {
 
   @override
   Future<bool> applyProfile({
+    bool rebuildVpn = false,
     bool silence = false,
     bool force = false,
     bool allowSourceReview = true,

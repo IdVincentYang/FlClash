@@ -50,6 +50,7 @@ internal class PackageResolver(
             @Suppress("DEPRECATION")
             packageManager.getInstalledPackages(flags)
         }
+        val identities = mutableMapOf<Int, List<String>>()
         return packages.asSequence()
             .filter { info ->
                 info.packageName != appPackageName && info.packageName != ANDROID_PACKAGE_NAME
@@ -65,6 +66,9 @@ internal class PackageResolver(
                     internet = info.requestedPermissions
                         ?.contains(Manifest.permission.INTERNET) == true,
                     lastUpdateTime = info.lastUpdateTime,
+                    sharedPackages = info.applicationInfo?.uid?.let { uid ->
+                        identities.getOrPut(uid) { packageManager.getPackagesForUid(uid)?.sorted() ?: emptyList() }
+                    } ?: emptyList(),
                 )
             }.toList()
     }

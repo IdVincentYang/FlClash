@@ -118,3 +118,26 @@ FLCLASH_ANDROID_OBSERVATION_EVENTS="$PWD/build/verification/na-t01-01/device-can
 test/manager/application_activity_manager_test.dart 和 test/providers/application_activity_test.dart。
 实际覆盖与失败在 [02 Result](../../../../docs/features/network_activity/na_t01_02_result.md)记录；
 这些验证不代表 03、04 的目标页面或后续编辑功能已交付。
+
+## 应用策略与 VPN 范围验证
+
+05／06 的检查使用 `run_application_routing.py`，不运行会清空数据的 `run_device.py`。
+须先获得目标 AVD 的 VPN／界面操作许可；脚本停止开发版、备份私有数据、运行两个受控客户端，
+结束后恢复备份、原 VPN AppOps，并移除本次新装的客户端，VPN 保持断开。
+备份在写入设备前转换为 Android 可读取的 USTAR；命令文件以 rename 发布，避免 Native 读到半写入 JSON。
+执行者仍需核对恢复文件摘要，并另外检查 Flutter 页面；失败时保留本地备份先恢复数据。
+
+客户端和 instrumentation 使用与正常调试 APK 相同的证书，避免替换日常测试包签名：
+
+```bash
+python3 android/tests/device/network_activity/build_clients.py \
+  --out build/verification/na-t01-05-06/clients --keystore /path/to/debug.keystore
+python3 android/tests/device/network_activity/run_application_routing.py \
+  --serial emulator-5554 --avd Pixel_7a_API_34 \
+  --clients build/verification/na-t01-05-06/clients \
+  --out build/verification/na-t01-05-06/device
+```
+
+检查 Rule／Direct 下 App A 使用代理组、App B 直连；Global 忽略两者策略；显式 REJECT 拒绝 A；
+关闭应用策略后恢复 Direct；最后通过正式 ServiceState 重建仅包含 B 的 VPN，验证 A 的新连接不进入 Core。
+每组覆盖 TCP、已连接 UDP 和未连接 UDP，以客户端响应和宿主独立代理转发记录交叉判断。

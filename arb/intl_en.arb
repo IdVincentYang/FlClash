@@ -1227,5 +1227,63 @@
   "activityExitFailed": "Exit check failed. Tap to retry.",
   "activityExitNotChecked": "Proxy exit not checked. Tap to check.",
   "activityExitUnavailable": "Exit check is unavailable for this connection. Check that the proxy and node are ready.",
-  "activityExitCooldown": "Please wait a few seconds before checking this exit again."
+  "activityExitCooldown": "Please wait a few seconds before checking this exit again.",
+  "appPolicyTitle": "App policy · {name}",
+  "@appPolicyTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicyChoose": "Choose policy",
+  "appPolicyPreparing": "Waiting to apply",
+  "appPolicyEmptyGroup": "No usable nodes",
+  "appPolicyDisabledGroup": "Group disabled",
+  "appPolicyUnbound": "Group not loaded for this subscription",
+  "appPolicyMissingTarget": "Choose an available target",
+  "appPolicyGlobalPaused": "Global · App policies paused",
+  "appPolicyExcluded": "Excluded from VPN",
+  "appPolicyVpnStopped": "VPN is not running",
+  "appPolicyApplied": "Applied to new connections",
+  "appPolicySaved": "Policy saved. Existing connections keep their routes.",
+  "appPolicySharedTarget": "Shared app proxy group",
+  "appPolicySharedIdentity": "These apps share an Android identity. This change affects all of them:\n{packages}",
+  "@appPolicySharedIdentity": {
+    "placeholders": {
+      "packages": {
+        "type": "String"
+      }
+    }
+  },
+  "appPolicySearch": "Search groups and nodes",
+  "appPolicyDirect": "Direct connection",
+  "appPolicyReject": "Block connections",
+  "appPolicyAll": "All",
+  "appPolicyGroups": "Groups",
+  "appPolicyNodes": "Nodes",
+  "appPolicyMembers": "Browse group nodes",
+  "appPolicyCapture": "Include in VPN",
+  "appPolicyEdit": "App policy",
+  "appPolicyCaptureSaved": "VPN scope saved. Changes apply when the VPN is running.",
+  "appPolicyCapturePending": "VPN scope is waiting to apply",
+  "appPolicyDirectExceptions": "Direct · {count} app exceptions",
+  "@appPolicyDirectExceptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicySharedChange": "Update the shared target for {count} enabled apps?",
+  "@appPolicySharedChange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appPolicyGlobalSaved": "Saved. App policies resume in Rule or Direct mode.",
+  "appPolicyFollowRule": "Follow rules",
+  "appPolicyVpnScope": "VPN app scope"
 }

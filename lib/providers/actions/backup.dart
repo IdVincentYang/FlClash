@@ -225,6 +225,7 @@ class BackupAction extends _$BackupAction {
           policyDrafts: data.policyDrafts,
           policySelections: data.policySelections,
           globalGroups: data.globalGroups,
+          applicationRouting: data.applicationRouting,
           isOverride: isOverride,
           beforeCommit: () async {
             await database.profilePolicySelectionsDao.requireSelections(

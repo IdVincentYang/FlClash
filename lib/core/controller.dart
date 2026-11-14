@@ -166,6 +166,9 @@ class CoreController {
     return res;
   }
 
+  Future<String> updateApplicationRouting(Map<String, dynamic> settings) =>
+      _interface.updateApplicationRouting(settings);
+
   Future<String> updateConfig(UpdateParams updateParams) async {
     return _interface.updateConfig(updateParams);
   }

@@ -17,6 +17,8 @@ data class ServiceCoreParams(
 )
 
 data class ConfigFact(
+    val applicationRoutingRevision: String = "",
+    val applicationRoutingRules: Map<String, String> = emptyMap(),
     val runtimeEpoch: String = "",
     val version: Long = 0,
     val token: Long = 0,

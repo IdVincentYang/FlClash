@@ -37,6 +37,7 @@ abstract class Package with _$Package {
     required bool system,
     required bool internet,
     required int lastUpdateTime,
+    @Default([]) List<String> sharedPackages,
   }) = _Package;
 
   factory Package.fromJson(Map<String, Object?> json) =>

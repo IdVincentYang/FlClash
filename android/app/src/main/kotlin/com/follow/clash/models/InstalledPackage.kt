@@ -6,4 +6,5 @@ data class InstalledPackage(
     val system: Boolean,
     val internet: Boolean,
     val lastUpdateTime: Long,
+    val sharedPackages: List<String> = emptyList(),
 )

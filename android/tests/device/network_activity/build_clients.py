@@ -7,8 +7,9 @@ import subprocess
 import zipfile
 
 
-def build(out, app=None, baseline_core=None):
+def build(out, app=None, baseline_core=None, keystore=None):
     source = Path(__file__).resolve().parent
+    keystore = keystore or Path.home() / '.android/debug.keystore'
     sdk = Path(os.environ.get('ANDROID_HOME', Path.home() / 'Library/Android/sdk'))
     java = Path(subprocess.check_output(['/usr/libexec/java_home', '-v', '17'], text=True).strip())
     version = lambda path: tuple(map(int, re.findall(r'\d+', path.name)))
@@ -44,12 +45,12 @@ def build(out, app=None, baseline_core=None):
                         '--min-sdk-version', '24', '--target-sdk-version', '34'], check=True)
         with zipfile.ZipFile(unsigned, 'a') as archive:
             archive.write(dex / 'classes.dex', 'classes.dex')
-        subprocess.run([str(tools / 'apksigner'), 'sign', '--ks', str(Path.home() / '.android/debug.keystore'),
+        subprocess.run([str(tools / 'apksigner'), 'sign', '--ks', str(keystore),
                         '--ks-key-alias', 'androiddebugkey', '--ks-pass', 'pass:android', '--key-pass', 'pass:android',
                         '--out', str(out / (name + '.apk')), str(unsigned)], check=True)
         print(out / (name + '.apk'))
     if app is not None:
-        subprocess.run([str(tools / 'apksigner'), 'sign', '--ks', str(Path.home() / '.android/debug.keystore'),
+        subprocess.run([str(tools / 'apksigner'), 'sign', '--ks', str(keystore),
                         '--ks-key-alias', 'androiddebugkey', '--ks-pass', 'pass:android', '--key-pass', 'pass:android',
                         '--out', str(out / 'app-under-test.apk'), str(app.resolve())], check=True)
         print(out / 'app-under-test.apk')
@@ -62,7 +63,7 @@ def build(out, app=None, baseline_core=None):
                     data = baseline_core.read_bytes() if item.filename == 'lib/arm64-v8a/libclash.so' else original.read(item.filename)
                     target.writestr(item, data)
             subprocess.run([str(tools / 'zipalign'), '-f', '4', str(unsigned), str(aligned)], check=True)
-            subprocess.run([str(tools / 'apksigner'), 'sign', '--ks', str(Path.home() / '.android/debug.keystore'),
+            subprocess.run([str(tools / 'apksigner'), 'sign', '--ks', str(keystore),
                             '--ks-key-alias', 'androiddebugkey', '--ks-pass', 'pass:android', '--key-pass', 'pass:android',
                             '--out', str(out.parent / 'baseline.apk'), str(aligned)], check=True)
             unsigned.unlink()
@@ -75,5 +76,6 @@ if __name__ == '__main__':
     parser.add_argument('--out', type=Path, default=Path(__file__).resolve().parents[4] / 'build/verification/na-t01-01/clients')
     parser.add_argument('--app', type=Path)
     parser.add_argument('--baseline-core', type=Path)
+    parser.add_argument('--keystore', type=Path)
     args = parser.parse_args()
-    build(args.out, args.app, args.baseline_core)
+    build(args.out, args.app, args.baseline_core, args.keystore)

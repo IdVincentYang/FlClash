@@ -23,20 +23,21 @@ type SetupParams struct {
 }
 
 type UpdateParams struct {
-	Tun                *tunSchema         `json:"tun"`
-	AllowLan           *bool              `json:"allow-lan"`
-	MixedPort          *int               `json:"mixed-port"`
-	FindProcessMode    *P.FindProcessMode `json:"find-process-mode"`
-	Mode               *tunnel.TunnelMode `json:"mode"`
-	LogLevel           *log.LogLevel      `json:"log-level"`
-	IPv6               *bool              `json:"ipv6"`
-	TCPConcurrent      *bool              `json:"tcp-concurrent"`
-	ExternalController *string            `json:"external-controller"`
-	UnifiedDelay       *bool              `json:"unified-delay"`
-	Authentication     *[]string          `json:"authentication"`
-	GeoAutoUpdate      *bool              `json:"geo-auto-update"`
-	GeoUpdateInterval  *int               `json:"geo-update-interval"`
-	GeoXUrl            map[string]string  `json:"geox-url"`
+	ApplicationRouting *applicationRouteSettings `json:"application-routing,omitempty"`
+	Tun                *tunSchema                `json:"tun"`
+	AllowLan           *bool                     `json:"allow-lan"`
+	MixedPort          *int                      `json:"mixed-port"`
+	FindProcessMode    *P.FindProcessMode        `json:"find-process-mode"`
+	Mode               *tunnel.TunnelMode        `json:"mode"`
+	LogLevel           *log.LogLevel             `json:"log-level"`
+	IPv6               *bool                     `json:"ipv6"`
+	TCPConcurrent      *bool                     `json:"tcp-concurrent"`
+	ExternalController *string                   `json:"external-controller"`
+	UnifiedDelay       *bool                     `json:"unified-delay"`
+	Authentication     *[]string                 `json:"authentication"`
+	GeoAutoUpdate      *bool                     `json:"geo-auto-update"`
+	GeoUpdateInterval  *int                      `json:"geo-update-interval"`
+	GeoXUrl            map[string]string         `json:"geox-url"`
 }
 
 type tunSchema struct {

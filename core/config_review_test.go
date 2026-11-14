@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -442,7 +443,7 @@ func TestConfigControllerRejectsEmptyManualPick(t *testing.T) {
 		afterRef, err := readCheckpointLocked(C.Path.HomeDir())
 		checkpointMu.Unlock()
 		afterEpoch, afterPicks := routeStamp()
-		if selected != "REJECT" || configStateSnapshot() != before || epoch != afterEpoch || picks != afterPicks || err != nil || ref.InputID != afterRef.InputID {
+		if selected != "REJECT" || !reflect.DeepEqual(configStateSnapshot(), before) || epoch != afterEpoch || picks != afterPicks || err != nil || ref.InputID != afterRef.InputID {
 			t.Fatal("invalid manual PUT changed actual selection, fact, route or checkpoint", body, afterRef, err)
 		}
 	}

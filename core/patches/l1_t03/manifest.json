@@ -50,14 +50,15 @@
     "listener/tunnel/udp.go": "554c22cdf5eb748230df83a2e54d6e19fed5212c",
     "ntp/ntp/service.go": "652bc292b966953f4822b920376fc8c3b42fd600",
     "rules/provider/provider.go": "689d3efd956f8bef82f549052633eecb9a64dcbb",
+    "tunnel/application_routing_test.go": "a5ba8ab52dfbf594c736fd1dcfe53c316b3f2442",
     "tunnel/business.go": "a308087d352a2823b624bc0e4c9e1059d6561c7f",
     "tunnel/business_test.go": "aae096046a5182cb606d1f1b8f8e20048cb89231",
     "tunnel/connection.go": "38e41947fc56331446b3f7c03f56628d5f19f4e4",
-    "tunnel/tunnel.go": "6c0cb72860331ab34bdbf532eeb8fae6f9b9328e"
+    "tunnel/tunnel.go": "46a15252a71697970376f41f148d1c4304ccb47e"
   },
-  "commit": "06af145eb170fca95b5c8fe3c97f43f83b9c0a55",
-  "commit_sha256": "e06f67c264c31cc850fd085c988012aec5c8108a9afd82a378051e33644111ab",
-  "patch_sha256": "b4db4fca6034842fbcb2a92d001ff46dd0b5e6e74d249a700ab7c9b6ef9f3c7f",
+  "commit": "7a620b930bdcb85e466450880313d34add46252b",
+  "commit_sha256": "b15bee115e445c2e9fcfd08b07daf3da02e516bf800fb3962d8f56b7da7f3b22",
+  "patch_sha256": "e24a3335f5304aea20d533ea9ebb57910a2ef2fa0e37e204f305409237b5a471",
   "repository": "git@github.com:chen08209/Clash.Meta.git",
-  "tree": "9666d28946522f1292a70bdcb3df4f3d6dfa8cae"
+  "tree": "9df3b9d4fc95bff70a8ef60651e6b9e191ed23e0"
 }

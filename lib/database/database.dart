@@ -17,6 +17,7 @@ part 'custom_proxies.dart';
 part 'generated/database.g.dart';
 part 'groups.dart';
 part 'global_groups.dart';
+part 'application_routing.dart';
 part 'icons.dart';
 part 'links.dart';
 part 'profiles.dart';
@@ -38,6 +39,7 @@ part 'scripts.dart';
     ProfilePolicyDrafts,
     ProfilePolicySelections,
     GlobalGroupLibraries,
+    ApplicationRoutingLibraries,
   ],
   daos: [
     ProfilesDao,
@@ -55,7 +57,7 @@ class Database extends _$Database {
   Database([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -68,6 +70,9 @@ class Database extends _$Database {
   MigrationStrategy get migration {
     return MigrationStrategy(
       onUpgrade: (m, from, to) async {
+        if (from < 16) {
+          await _createTableIfMissing(m, applicationRoutingLibraries);
+        }
         if (from < 2) {
           await m.createTable(proxyGroups);
           await m.createTable(iconRecords);
@@ -220,6 +225,7 @@ class Database extends _$Database {
     List<ProfilePolicyDraft> policyDrafts = const [],
     List<ProfilePolicySelection> policySelections = const [],
     List<LocalProxyGroup>? globalGroups,
+    ApplicationRoutingSettings? applicationRouting,
     bool isOverride = false,
     Future<void> Function()? beforeCommit,
   }) async {
@@ -241,7 +247,8 @@ class Database extends _$Database {
         customProxies.isEmpty &&
         policyDrafts.isEmpty &&
         policySelections.isEmpty &&
-        globalGroups == null) {
+        globalGroups == null &&
+        applicationRouting == null) {
       await beforeCommit?.call();
       return;
     }
@@ -296,6 +303,32 @@ class Database extends _$Database {
           isOverride: false,
         );
       });
+      if (applicationRouting != null) {
+        final previous = isOverride
+            ? const ApplicationRoutingSettings()
+            : await readApplicationRouting();
+        await writeApplicationRouting(
+          previous.copyWith(
+            sharedTargets: {
+              ...previous.sharedTargets,
+              ...applicationRouting.sharedTargets,
+            },
+            rules: {
+              ...previous.rules,
+              for (final entry in applicationRouting.rules.entries)
+                entry.key: entry.value.copyWith(
+                  targets: {
+                    ...?previous.rules[entry.key]?.targets,
+                    ...entry.value.targets,
+                  },
+                ),
+            },
+          ),
+        );
+      }
+      await pruneApplicationRouting(
+        (await profilesDao.query().get()).map((p) => p.id).toSet(),
+      );
       await _purgeOrphans();
       await beforeCommit?.call();
     });
@@ -304,6 +337,9 @@ class Database extends _$Database {
   Future<void> deleteProfile(int profileId) {
     return transaction(() async {
       await profiles.remove((t) => t.id.equals(profileId));
+      await pruneApplicationRouting(
+        (await profilesDao.query().get()).map((p) => p.id).toSet(),
+      );
       await rulesDao.delUnlinkedRules();
     });
   }

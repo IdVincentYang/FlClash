@@ -70,8 +70,10 @@ class _SetupInputs {
     required this.vpn,
     required this.fact,
     required this.policy,
+    required this.applicationRouting,
   });
 
+  final ApplicationRoutingSettings applicationRouting;
   final SetupState state;
   final Profile profile;
   final PatchClashConfig patch;
@@ -104,6 +106,7 @@ class _SetupInputs {
       vpn: vpn,
       fact: fact,
       policy: next,
+      applicationRouting: applicationRouting,
     );
   }
 }
@@ -661,10 +664,17 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       }
       final networkSetting = ref.read(networkSettingProvider);
       final message = await _core.updateConfig(
-        _effectivePatchConfig(patchConfig).toUpdateParams(
-          routeMode: networkSetting.routeMode,
-          authentication: networkSetting.authentication.credentials,
-        ),
+        _effectivePatchConfig(patchConfig)
+            .toUpdateParams(
+              routeMode: networkSetting.routeMode,
+              authentication: networkSetting.authentication.credentials,
+            )
+            .copyWith(
+              applicationRouting: compileApplicationRouting(
+                await database.readApplicationRouting(),
+                ref.read(currentProfileIdProvider),
+              ),
+            ),
       );
       if (message == 'configuration_reapply_required' ||
           message == 'config is not applied') {
@@ -725,6 +735,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     bool allowBootstrap = false,
     Map<String, Object?>? expectedRun,
     int? setupSequence,
+    bool rebuildVpn = false,
   }) async {
     if (expectedRun != null &&
         (!_isAndroid ||
@@ -734,6 +745,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     final previous = ref.read(configStateProvider).fact;
     final result = await _runSetup(
       preferHot:
+          !rebuildVpn &&
           _requests.requiresSourceAcceptance &&
           previous.businessActive &&
           !previous.isManaged &&
@@ -1562,6 +1574,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
               );
             }
             captured = _SetupInputs(
+              applicationRouting: await database.readApplicationRouting(),
               state: setupState,
               profile: actualProfile,
               patch: effective,
@@ -1948,9 +1961,15 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
                   : (localManifest['localGroups'] as List? ?? const [])
                         .map((value) => Map<String, Object?>.from(value as Map))
                         .toList(),
-              acceptedOverrides: Map<String, Object?>.from(
-                localManifest?['acceptedOverrides'] as Map? ?? const {},
-              ),
+              acceptedOverrides: {
+                ...Map<String, Object?>.from(
+                  localManifest?['acceptedOverrides'] as Map? ?? const {},
+                ),
+                'application-routing': compileApplicationRouting(
+                  snapshot.applicationRouting,
+                  snapshot.profile.id,
+                ),
+              },
               ruleLedger: _requests.requiresSourceAcceptance
                   ? ruleLedger
                   : null,

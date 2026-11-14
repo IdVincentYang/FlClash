@@ -24,6 +24,7 @@ public final class ObservationInstrumentation extends Instrumentation {
     private Object unit;
     private JSONObject ticket;
     private int sequence;
+    private JSONObject sharedSettings;
 
     @Override public void onCreate(Bundle args) {
         arguments = args;
@@ -169,6 +170,7 @@ public final class ObservationInstrumentation extends Instrumentation {
         Class<?> sharedClass = loader.loadClass("com.follow.clash.models.SharedState");
         Object defaults = sharedClass.getConstructor().newInstance();
         JSONObject shared = gsonObject(defaults).put("vpnOptions", vpn);
+        sharedSettings = shared;
         call("com.follow.clash.ServiceState", "syncSharedState", new Class<?>[]{sharedClass}, gsonModel(shared, sharedClass.getName()));
         long request = (Long) call("com.follow.clash.ServiceState", "prepareRunIntent", new Class<?>[]{boolean.class, String.class, boolean.class}, true, "ui", false);
         JSONObject apply = new JSONObject().put("inputId", input).put("active", true).put("requestId", request).put("source", ticket);
@@ -230,6 +232,16 @@ public final class ObservationInstrumentation extends Instrumentation {
                 else if ("cpu".equals(action)) data = new JSONObject().put("cpuMillis", android.os.Process.getElapsedCpuTime())
                     .put("wallMillis", android.os.SystemClock.elapsedRealtime());
                 else if ("patch".equals(action)) data = rpc("updateConfig", command.getJSONObject("patch"));
+                else if ("capture".equals(action)) {
+                    sharedSettings.getJSONObject("vpnOptions").getJSONObject("accessControlProps").put("acceptList", command.getJSONArray("packages"));
+                    Class<?> sharedClass = loader.loadClass("com.follow.clash.models.SharedState");
+                    call("com.follow.clash.ServiceState", "syncSharedState", new Class<?>[]{sharedClass}, gsonModel(sharedSettings, sharedClass.getName()));
+                    long request = (Long) call("com.follow.clash.ServiceState", "prepareRunIntent", new Class<?>[]{boolean.class, String.class, boolean.class}, true, "ui", false);
+                    JSONObject fact = (JSONObject) rpc("getConfigState", JSONObject.NULL);
+                    JSONObject apply = new JSONObject().put("inputId", fact.getString("inputId")).put("active",true).put("requestId",request).put("source",ticket);
+                    Class<?> jsonClass = loader.loadClass("com.google.gson.JsonObject");
+                    data = gsonObject(await(call("com.follow.clash.ServiceState", "applyConfig", new Class<?>[]{jsonClass}, gsonModel(apply,jsonClass.getName()))));
+                }
                 else throw new IllegalArgumentException("Unsupported fixture command");
                 write(command.getString("result") + ".json", data);
             }

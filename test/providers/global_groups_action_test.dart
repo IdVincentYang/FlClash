@@ -150,6 +150,32 @@ void main() {
   }
 
   test(
+    'enabled app policy attaches its stable global group without selector references',
+    () async {
+      ready(a, 'A node');
+      await store.writeApplicationRouting(
+        ApplicationRoutingSettings(
+          sharedTargets: {
+            a.id: ApplicationRouteTarget(
+              name: regex.name,
+              kind: ApplicationTargetKind.globalGroup,
+              groupId: regex.id,
+            ),
+          },
+          rules: const {
+            'app': ApplicationRouteRule(packageName: 'app', enabled: true),
+          },
+        ),
+      );
+      await action.synchronizeApplicationGroups();
+      final binding = profiles.writes.last.localGroups.single;
+      expect(binding.id, regex.id);
+      expect(binding.effectiveNodes, ['A node']);
+      expect(binding.entrances, isEmpty);
+    },
+  );
+
+  test(
     'A to B to A shares definitions but resolves members and references per subscription',
     () async {
       ready(a, 'A node');

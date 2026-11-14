@@ -201,7 +201,7 @@ func validateManagedInput(manifest ConfigManifest, raw *config.RawConfig) error 
 }
 
 func managedHotKey(key string) bool {
-	return key == "log-level" || key == "tcp-concurrent" || key == "unified-delay"
+	return key == "log-level" || key == "tcp-concurrent" || key == "unified-delay" || key == "application-routing"
 }
 
 func validateManagedUpdate(p *preparedConfig, params *UpdateParams) error {
