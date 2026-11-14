@@ -220,7 +220,6 @@
   "stop": "Стоп",
   "key": "Ключ",
   "value": "Значение",
-  "vpnTip": "Изменения вступят в силу после перезапуска VPN",
   "vpnEnableDesc": "Автоматически направляет весь системный трафик через VpnService",
   "options": "Опции",
   "enabled": "Включено",
@@ -479,7 +478,6 @@
   "accessControlSettings": "Настройки контроля доступа",
   "turnOn": "Включить",
   "turnOff": "Выключить",
-  "vpnConfigChangeDetected": "Обнаружено изменение настроек VPN",
   "restart": "Перезапустить",
   "speedStatistics": "Статистика скорости",
   "resetPageChangesTip": "На этой странице есть изменения. Вы уверены, что хотите выполнить сброс?",
@@ -1264,7 +1262,6 @@
   "appPolicyNodes": "Узлы",
   "appPolicyMembers": "Узлы группы",
   "appPolicyCapture": "Включить в VPN",
-  "appPolicyEdit": "Политика приложения",
   "appPolicyCaptureSaved": "Область VPN сохранена. Изменения применяются при работе VPN.",
   "appPolicyCapturePending": "Область VPN ожидает применения",
   "appPolicyDirectExceptions": "Direct · Исключений приложений: {count}",
@@ -1285,5 +1282,57 @@
   },
   "appPolicyGlobalSaved": "Сохранено. Политики возобновятся в Rule или Direct.",
   "appPolicyFollowRule": "Следовать правилам",
-  "appPolicyVpnScope": "Приложения VPN"
+  "appPolicyVpnScope": "Приложения VPN",
+  "appHostRuleTitle": "Правила для {host}",
+  "@appHostRuleTitle": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostScope": "Это приложение",
+  "appHostAllScope": "Все приложения",
+  "appHostNotCreated": "Правило для этой области не создано. Выберите выход для создания.",
+  "appHostCreate": "Создать правило",
+  "appHostDeleteConfirm": "Удалить правило «{scope}» для {host}?",
+  "@appHostDeleteConfirm": {
+    "placeholders": {
+      "scope": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostDiscard": "Отменить несохранённые изменения?",
+  "appHostCount": "Правил хоста: {count}",
+  "@appHostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appHostCurrent": "Новые подключения: {target}",
+  "@appHostCurrent": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostOnlyGeneric": "Приложение не определено. Можно изменить общее правило.",
+  "appHostDeletedPending": "Удаление сохранено; до применения может действовать прежнее правило.",
+  "appHostAppDisabled": "Правила приложения отключены. Включите их в строке приложения.",
+  "appPolicyFollowApp": "Как приложение",
+  "activityOtherExitPaths": "Других маршрутов: {count}",
+  "@activityOtherExitPaths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

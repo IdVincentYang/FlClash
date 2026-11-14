@@ -67,7 +67,6 @@ class _SetupInputs {
     required this.testUrl,
     required this.picks,
     required this.shared,
-    required this.vpn,
     required this.fact,
     required this.policy,
     required this.applicationRouting,
@@ -82,7 +81,6 @@ class _SetupInputs {
   final String testUrl;
   final Map<String, String> picks;
   final SharedState shared;
-  final VpnState vpn;
   final ConfigFact fact;
   final SelectedPolicy? policy;
 
@@ -103,7 +101,6 @@ class _SetupInputs {
       shared: shared.copyWith(
         setupParams: SetupParams(selectedMap: selected, testUrl: testUrl),
       ),
-      vpn: vpn,
       fact: fact,
       policy: next,
       applicationRouting: applicationRouting,
@@ -678,7 +675,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
       );
       if (message == 'configuration_reapply_required' ||
           message == 'config is not applied') {
-        if (!await applyProfile(force: true)) {
+        if (!await applyProfile(force: true, rebuildVpn: true)) {
           throw MessageException(currentAppLocalizations.configRetained);
         }
       } else if (message.isNotEmpty) {
@@ -1585,7 +1582,6 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
               testUrl: testUrl,
               picks: picks,
               shared: shared,
-              vpn: ref.read(vpnStateProvider),
               fact: await _core.getConfigState(),
               policy: policy,
             );
@@ -1936,7 +1932,6 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
               throw const RequestUnavailable('request_cancelled');
             }
             if (_isAndroid && !hot) {
-              globalState.lastVpnState = snapshot.vpn;
               final desired = snapshot.shared;
               if (!await preferences.saveShareState(desired)) {
                 throw const RequestUnavailable('preferences_save_failed');

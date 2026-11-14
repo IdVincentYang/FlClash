@@ -1685,16 +1685,6 @@ class AppLocalizations {
     return Intl.message('Value', name: 'value', desc: '', args: []);
   }
 
-  /// `Changes take effect after restarting the VPN`
-  String get vpnTip {
-    return Intl.message(
-      'Changes take effect after restarting the VPN',
-      name: 'vpnTip',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Route all system traffic through VpnService automatically`
   String get vpnEnableDesc {
     return Intl.message(
@@ -3798,16 +3788,6 @@ class AppLocalizations {
   /// `Turn off`
   String get turnOff {
     return Intl.message('Turn off', name: 'turnOff', desc: '', args: []);
-  }
-
-  /// `VPN-related configuration change detected`
-  String get vpnConfigChangeDetected {
-    return Intl.message(
-      'VPN-related configuration change detected',
-      name: 'vpnConfigChangeDetected',
-      desc: '',
-      args: [],
-    );
   }
 
   /// `Restart`
@@ -10713,16 +10693,6 @@ class AppLocalizations {
     );
   }
 
-  /// `App policy`
-  String get appPolicyEdit {
-    return Intl.message(
-      'App policy',
-      name: 'appPolicyEdit',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `VPN scope saved. Changes apply when the VPN is running.`
   String get appPolicyCaptureSaved {
     return Intl.message(
@@ -10790,6 +10760,143 @@ class AppLocalizations {
       name: 'appPolicyVpnScope',
       desc: '',
       args: [],
+    );
+  }
+
+  /// `Rules for {host}`
+  String appHostRuleTitle(String host) {
+    return Intl.message(
+      'Rules for $host',
+      name: 'appHostRuleTitle',
+      desc: '',
+      args: [host],
+    );
+  }
+
+  /// `This app`
+  String get appHostScope {
+    return Intl.message('This app', name: 'appHostScope', desc: '', args: []);
+  }
+
+  /// `All apps`
+  String get appHostAllScope {
+    return Intl.message(
+      'All apps',
+      name: 'appHostAllScope',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No rule for this scope. Choose a target to create one.`
+  String get appHostNotCreated {
+    return Intl.message(
+      'No rule for this scope. Choose a target to create one.',
+      name: 'appHostNotCreated',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Create rule`
+  String get appHostCreate {
+    return Intl.message(
+      'Create rule',
+      name: 'appHostCreate',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delete the {scope} rule for {host}?`
+  String appHostDeleteConfirm(String scope, String host) {
+    return Intl.message(
+      'Delete the $scope rule for $host?',
+      name: 'appHostDeleteConfirm',
+      desc: '',
+      args: [scope, host],
+    );
+  }
+
+  /// `Discard unsaved changes?`
+  String get appHostDiscard {
+    return Intl.message(
+      'Discard unsaved changes?',
+      name: 'appHostDiscard',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{count} host rules`
+  String appHostCount(int count) {
+    return Intl.message(
+      '$count host rules',
+      name: 'appHostCount',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `New connections: {target}`
+  String appHostCurrent(String target) {
+    return Intl.message(
+      'New connections: $target',
+      name: 'appHostCurrent',
+      desc: '',
+      args: [target],
+    );
+  }
+
+  /// `This app could not be identified. You can edit the all-app rule.`
+  String get appHostOnlyGeneric {
+    return Intl.message(
+      'This app could not be identified. You can edit the all-app rule.',
+      name: 'appHostOnlyGeneric',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Deletion saved; the previous rule may still be in use until adoption succeeds.`
+  String get appHostDeletedPending {
+    return Intl.message(
+      'Deletion saved; the previous rule may still be in use until adoption succeeds.',
+      name: 'appHostDeletedPending',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `App rules are off. Enable them on the app item.`
+  String get appHostAppDisabled {
+    return Intl.message(
+      'App rules are off. Enable them on the app item.',
+      name: 'appHostAppDisabled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Follow app`
+  String get appPolicyFollowApp {
+    return Intl.message(
+      'Follow app',
+      name: 'appPolicyFollowApp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{count, plural, one {1 other exit path} other {{count} other exit paths}}`
+  String activityOtherExitPaths(int count) {
+    return Intl.plural(
+      count,
+      one: '1 other exit path',
+      other: '$count other exit paths',
+      name: 'activityOtherExitPaths',
+      desc: '',
+      args: [count],
     );
   }
 }

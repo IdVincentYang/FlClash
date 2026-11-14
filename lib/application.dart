@@ -27,9 +27,7 @@ Widget buildManagerStack({
   onConnectivityChanged,
   required Widget child,
 }) {
-  final platformApp = isDesktop
-      ? WindowHeaderContainer(child: child)
-      : VpnManager(child: child);
+  final platformApp = isDesktop ? WindowHeaderContainer(child: child) : child;
   final state = AppStateManager(
     child: CoreManager(
       child: ConnectivityManager(

@@ -6,6 +6,27 @@ part of '../application_routing.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+_HostRuleBinding _$HostRuleBindingFromJson(Map<String, dynamic> json) =>
+    _HostRuleBinding(
+      packageName: json['packageName'] as String?,
+      profileId: (json['profileId'] as num?)?.toInt(),
+      targets:
+          (json['targets'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(
+              int.parse(k),
+              ApplicationRouteTarget.fromJson(e as Map<String, dynamic>),
+            ),
+          ) ??
+          const {},
+    );
+
+Map<String, dynamic> _$HostRuleBindingToJson(_HostRuleBinding instance) =>
+    <String, dynamic>{
+      'packageName': instance.packageName,
+      'profileId': instance.profileId,
+      'targets': instance.targets.map((k, e) => MapEntry(k.toString(), e)),
+    };
+
 _ApplicationRouteTarget _$ApplicationRouteTargetFromJson(
   Map<String, dynamic> json,
 ) => _ApplicationRouteTarget(
@@ -33,6 +54,7 @@ _ApplicationRouteRule _$ApplicationRouteRuleFromJson(
 ) => _ApplicationRouteRule(
   packageName: json['packageName'] as String,
   enabled: json['enabled'] as bool? ?? false,
+  hasDefault: json['hasDefault'] as bool? ?? true,
   action:
       $enumDecodeNullable(_$ApplicationRouteActionEnumMap, json['action']) ??
       ApplicationRouteAction.proxy,
@@ -52,6 +74,7 @@ Map<String, dynamic> _$ApplicationRouteRuleToJson(
 ) => <String, dynamic>{
   'packageName': instance.packageName,
   'enabled': instance.enabled,
+  'hasDefault': instance.hasDefault,
   'action': _$ApplicationRouteActionEnumMap[instance.action]!,
   'useSharedTarget': instance.useSharedTarget,
   'targets': instance.targets.map((k, e) => MapEntry(k.toString(), e)),

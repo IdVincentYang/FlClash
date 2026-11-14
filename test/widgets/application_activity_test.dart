@@ -12,6 +12,7 @@ import 'dart:ui' as ui;
 
 import 'package:fl_clash/common/application_activity.dart';
 import 'package:fl_clash/models/application_activity.dart';
+import 'package:fl_clash/models/config_state.dart';
 import 'package:fl_clash/manager/status_manager.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/icons/icons.dart';
@@ -23,6 +24,8 @@ import 'package:fl_clash/views/application_targets.dart';
 import 'package:fl_clash/views/application_connections.dart';
 import 'package:fl_clash/views/tools.dart';
 import 'package:fl_clash/widgets/popup.dart';
+import 'package:fl_clash/widgets/host_rule.dart';
+import 'package:fl_clash/widgets/application_policy.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -114,6 +117,8 @@ void main() {
     double width = 420,
     double scale = 1,
     Locale? locale,
+    ApplicationRoutingSettings routing = const ApplicationRoutingSettings(),
+    Profile? profile,
   }) async {
     tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1;
@@ -125,9 +130,19 @@ void main() {
       overrides: [
         exitCacheDatabaseProvider.overrideWithValue(cache),
         viewSizeProvider.overrideWithBuild((_, _) => Size(width, 900)),
-        configStateProvider.overrideWith(TestConfigState.new),
+        configStateProvider.overrideWith(
+          () => TestConfigState(
+            profile == null
+                ? const ConfigFact()
+                : ConfigFact(profileId: profile.id, phase: 'ready'),
+          ),
+        ),
+        if (profile != null) ...[
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          currentProfileProvider.overrideWith((_) => profile),
+        ],
         applicationRoutingSettingsProvider.overrideWith(
-          (_) => Stream.value(const ApplicationRoutingSettings()),
+          (_) => Stream.value(routing),
         ),
         globalLocalGroupsProvider.overrideWith(
           (_) => Stream.value(const <LocalProxyGroup>[]),
@@ -640,6 +655,185 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('policy menus do not duplicate the app and host item buttons', (
+    tester,
+  ) async {
+    await pump(tester);
+    expect(find.byType(ApplicationPolicySwitch), findsOneWidget);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('Shared app proxy group'), findsNothing);
+    await tester.tap(find.text('Show all apps'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Browser A'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HostRuleButton), findsOneWidget);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('Host rules'), findsNothing);
+    expect(find.text('App policy'), findsNothing);
+    expect(find.text('Only show active targets'), findsOneWidget);
+  });
+
+  for (final exception in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'host policy is a 64-wide text button: exception=$exception scale=$scale',
+        (tester) async {
+          const target = 'A very long proxy group name with several regions';
+          const binding = ApplicationRouteTarget(
+            name: target,
+            kind: ApplicationTargetKind.globalGroup,
+            groupId: 8,
+          );
+          var taps = 0;
+          await pump(
+            tester,
+            width: 360,
+            scale: scale,
+            routing: ApplicationRoutingSettings(
+              rules: const {
+                'test.app.a': ApplicationRouteRule(
+                  packageName: 'test.app.a',
+                  enabled: true,
+                  useSharedTarget: false,
+                  targets: {7: binding},
+                ),
+              },
+              hostRules: [
+                if (exception)
+                  const Rule(
+                    id: 1,
+                    content: 'example.test',
+                    ruleTarget: target,
+                    hostBinding: HostRuleBinding(
+                      packageName: 'test.app.a',
+                      targets: {7: binding},
+                    ),
+                  ),
+              ],
+            ),
+            child: Scaffold(
+              body: Center(
+                child: HostRuleButton(
+                  host: 'example.test',
+                  packages: const ['test.app.a'],
+                  onPressed: () => taps++,
+                ),
+              ),
+            ),
+          );
+          final button = find.byType(HostRuleButton);
+          final text = find.descendant(
+            of: button,
+            matching: find.text(exception ? target : 'Follow app'),
+          );
+          expect(tester.getSize(button).width, 64);
+          expect(tester.getSize(button).height, 56);
+          expect(
+            find.descendant(of: button, matching: find.byType(GlyphIcon)),
+            findsNothing,
+          );
+          expect(tester.widget<Text>(text).maxLines, 2);
+          expect(tester.widget<Text>(text).overflow, TextOverflow.ellipsis);
+          expect(
+            find.byWidgetPredicate(
+              (w) => w is Tooltip && w.message!.contains(target),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(button);
+          expect(taps, 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('host policy shows a warning only for an unavailable target', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      profile: const Profile(id: 7, autoUpdateDuration: Duration(hours: 1)),
+      routing: const ApplicationRoutingSettings(
+        hostRules: [
+          Rule(
+            id: 1,
+            content: 'example.test',
+            ruleTarget: 'Removed node',
+            hostBinding: HostRuleBinding(
+              targets: {
+                7: ApplicationRouteTarget(
+                  name: 'Removed node',
+                  kind: ApplicationTargetKind.node,
+                ),
+              },
+            ),
+          ),
+        ],
+      ),
+      child: Scaffold(
+        body: Center(
+          child: HostRuleButton(
+            host: 'example.test',
+            packages: const ['test.app.a'],
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+    final glyph = tester.widget<GlyphIcon>(
+      find.descendant(
+        of: find.byType(HostRuleButton),
+        matching: find.byType(GlyphIcon),
+      ),
+    );
+    expect(glyph.glyph, AppGlyphs.warning);
+    expect(find.text('Removed node'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'host items remove repeated rule identities and keep the full observed chain',
+    (tester) async {
+      final store = ApplicationActivityStore()
+        ..setContext('runtime-a', observing: true, now: DateTime.now());
+      const chain = ['node-a', 'Automatic', 'Default'];
+      final first = activityConnection(
+        'one',
+      ).copyWith(rule: 'ProcessName', rulePayload: 'test.app.a', chains: chain);
+      store
+        ..addEvent(first)
+        ..addEvent(
+          activityConnection('two', host: 'second.test').copyWith(
+            rule: 'DomainSuffix',
+            rulePayload: 'repeated-condition',
+            chains: chain,
+          ),
+        );
+      store.applySnapshot(
+        [first],
+        startedRevision: store.revision,
+        now: DateTime.now(),
+      );
+      await pump(tester, activity: store.snapshot(), child: targetsPage);
+      expect(find.text('test.app.a'), findsOneWidget);
+      expect(find.textContaining('ProcessName'), findsNothing);
+      expect(find.textContaining('repeated-condition'), findsNothing);
+      expect(find.text('node-a → Automatic → Default'), findsNWidgets(2));
+      expect(
+        container
+            .read(applicationActivityProvider)
+            .connections
+            .first
+            .info
+            .rulePayload,
+        'test.app.a',
+      );
+    },
+  );
+
   testWidgets('application rows open targets and preserve the parent search', (
     tester,
   ) async {
@@ -708,7 +902,8 @@ void main() {
     expect(find.text('example.test'), findsOneWidget);
     expect(find.text('mail.test'), findsNothing);
     expect(summary('Active 1/2'), findsOneWidget);
-    expect(find.text('2 rule results · 2 exit paths'), findsOneWidget);
+    expect(find.text('node-a → Proxy · 1 other exit path'), findsOneWidget);
+    expect(find.text('2 rule results · 2 exit paths'), findsNothing);
     await tester.tap(find.text('example.test'));
     await tester.pumpAndSettle();
     expect(find.text('Domain · EXAMPLE.test.'), findsOneWidget);
@@ -966,9 +1161,20 @@ void main() {
     await pump(tester, activity: store.snapshot(), child: targetsPage);
     expect(
       find.textContaining('Rules bypassed in Global or Direct mode'),
+      findsNothing,
+    );
+    expect(find.text('node-a → Proxy'), findsNWidgets(2));
+    await tester.tap(find.text('example.test'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Rules bypassed in Global or Direct mode'),
       findsOneWidget,
     );
-    expect(find.text('Unknown · node-a → Proxy'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('unknown.test'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unknown'), findsOneWidget);
   });
 
   testWidgets('returning from a target page preserves parent scroll position', (
@@ -1037,7 +1243,7 @@ void main() {
       ..addEvent(activityConnection('two'));
     await pump(tester, activity: store.snapshot(), child: targetsPage);
     expect(find.byType(ExpansionTile), findsNothing);
-    final route = find.text('Domain · example.test · node-a → Proxy');
+    final route = find.text('node-a → Proxy');
     expect(route, findsOneWidget);
     expect(tester.widget<Text>(route).maxLines, isNull);
     expect(summary('Active —/2'), findsOneWidget);

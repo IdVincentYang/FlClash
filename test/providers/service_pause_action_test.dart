@@ -3,14 +3,11 @@ import 'dart:async';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/models/config.dart';
-import 'package:fl_clash/manager/status_manager.dart';
-import 'package:fl_clash/manager/vpn_manager.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:fl_clash/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/manager/app_manager.dart';
 import 'package:fl_clash/manager/connectivity_manager.dart';
@@ -38,15 +35,6 @@ class _Store extends StoreAction {
   void savePreferencesDebounce() {}
 }
 
-class _VpnProps extends Notifier<VpnProps> {
-  @override
-  VpnProps build() => const VpnProps();
-
-  void change() => state = state.copyWith(enable: false);
-}
-
-final _vpnProps = NotifierProvider<_VpnProps, VpnProps>(_VpnProps.new);
-
 class _Setup extends SetupAction {
   _Setup(Service native)
     : super.scoped(
@@ -57,6 +45,7 @@ class _Setup extends SetupAction {
   int builds = 0;
   final bootstrapChoices = <bool>[];
   Completer<void>? buildGate;
+  Completer<void>? buildEntered;
   Completer<void>? stopGate;
   final listenerTargets = <bool>[];
   @override
@@ -70,6 +59,7 @@ class _Setup extends SetupAction {
     int? setupSequence,
   }) async {
     builds++;
+    buildEntered?.complete();
     bootstrapChoices.add(allowBootstrap);
     await buildGate?.future;
     return true;
@@ -145,7 +135,6 @@ void main() {
         appSettingProvider.overrideWithBuild(
           (_, _) => const AppSettingProps(showTrayTitle: false),
         ),
-        vpnSettingProvider.overrideWithBuild((ref, _) => ref.watch(_vpnProps)),
       ],
     );
     globalState.container = container;
@@ -292,52 +281,19 @@ void main() {
     });
   }
 
-  testWidgets('manual Stop wins while the VPN Restart action is pending', (
-    tester,
-  ) async {
-    container.dispose();
-    configure();
-    globalState.lastVpnState = null;
+  test('manual Stop wins while a configuration restart is pending', () async {
     setup.buildGate = Completer();
+    setup.buildEntered = Completer();
     setup.stopGate = Completer();
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          navigatorKey: globalState.navigatorKey,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.delegate.supportedLocales,
-          builder: (_, child) =>
-              StatusManager(child: VpnManager(child: child!)),
-          home: const SizedBox(),
-        ),
-      ),
-    );
-    container.read(runTimeProvider.notifier).value = 1;
-    container.read(_vpnProps.notifier).change();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('Restart'));
-    await tester.pump();
+    final restart = setup.setRunning(true);
+    await setup.buildEntered!.future;
     final stop = setup.setRunning(false);
-    var stopped = false;
-    unawaited(stop.then((_) => stopped = true));
-    await tester.pump();
     setup.stopGate!.complete();
     setup.buildGate!.complete();
-    for (var i = 0; i < 20 && !stopped; i++) {
-      await tester.pump(const Duration(milliseconds: 1));
-    }
-    expect(stopped, true);
-    await tester.pump();
+    await stop;
+    expect(await restart, isFalse);
     expect(container.read(runTimeProvider), isNull);
     expect(setup.listenerTargets, [false]);
-    await tester.pump(const Duration(seconds: 11));
-    await tester.pumpWidget(const SizedBox.shrink());
-    globalState.lastVpnState = null;
   });
 
   testWidgets('opt-in SSID observation reaches the Android pause command', (

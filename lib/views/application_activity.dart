@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_clash/common/application_routing.dart';
 import 'package:fl_clash/providers/application_routing.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/application_policy.dart';
 import 'package:fl_clash/widgets/application_policy_status.dart';
 
@@ -15,7 +16,6 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 
 import 'application_targets.dart';
-import 'application_policy.dart';
 import 'access.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -120,12 +120,22 @@ class _ApplicationActivityViewState
       if (routingOperation.errors.containsKey(packageName)) {
         invalid.add(entry.key);
       }
+      for (final host in routing?.hostRules ?? <Rule>[]) {
+        if (host.hostBinding?.packageName == packageName &&
+            hostRuleApplies(host, ref.watch(currentProfileIdProvider)) &&
+            routing?.rules[packageName]?.enabled == true) {
+          final issue = hostRuleTargetState(ref, host)?.issue;
+          if (issue != null && issue != ApplicationTargetIssue.preparing) {
+            invalid.add(entry.key);
+          }
+        }
+      }
       final rule =
           routing?.rules[entry.value.package?.packageName ??
               entry.value.activity?.application.packageName];
       if (rule == null ||
           !rule.enabled ||
-          rule.action != ApplicationRouteAction.proxy) {
+          (!rule.hasDefault || rule.action != ApplicationRouteAction.proxy)) {
         continue;
       }
       final state = applicationTargetState(ref, rule);
@@ -160,18 +170,6 @@ class _ApplicationActivityViewState
     return CommonScaffold(
       title: l10n.applicationNetwork,
       menuItems: [
-        CommonPopupMenuItem(
-          label: l10n.appPolicySharedTarget,
-          glyph: AppGlyphs.layers,
-          onPressed: () => BaseNavigator.push(
-            context,
-            const ApplicationPolicyView(
-              packages: [],
-              label: '',
-              sharedTarget: true,
-            ),
-          ),
-        ),
         CommonPopupMenuItem(
           label: l10n.appPolicyVpnScope,
           glyph: AppGlyphs.vpn,

@@ -542,10 +542,6 @@ void main() {
     expect(tray.tunEnable, isTrue);
     expect(tray.isStart, isTrue);
 
-    final vpn = container.read(vpnStateProvider);
-    expect(vpn.stack, container.read(patchClashConfigProvider).tun.stack);
-    expect(vpn.vpnProps, container.read(vpnSettingProvider));
-
     expect(container.read(shouldPatchSystemDnsProvider), isTrue);
 
     await container

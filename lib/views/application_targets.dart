@@ -8,7 +8,8 @@ import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 
 import 'application_connections.dart';
-import 'application_policy.dart';
+import 'application_host_rule.dart';
+import 'package:fl_clash/widgets/host_rule.dart';
 import 'package:fl_clash/common/application_routing.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/application_policy_status.dart';
@@ -150,27 +151,6 @@ class _ApplicationTargetsViewState
         ],
       ),
       menuItems: [
-        if (_applicationPackages.isNotEmpty)
-          CommonPopupMenuItem(
-            label: l10n.appPolicyEdit,
-            glyph: AppGlyphs.layers,
-            onPressed: () async {
-              if (!await confirmApplicationPackages(
-                    context,
-                    _applicationPackages,
-                  ) ||
-                  !context.mounted) {
-                return;
-              }
-              await BaseNavigator.push(
-                context,
-                ApplicationPolicyView(
-                  packages: _applicationPackages,
-                  label: label,
-                ),
-              );
-            },
-          ),
         if (_applicationPackages.isNotEmpty &&
             !_applicationPackages.contains('com.follow.clash.dev') &&
             !_applicationPackages.contains('com.follow.clash'))
@@ -271,6 +251,15 @@ class _ApplicationTargetsViewState
                   key: ValueKey('target:${host.key}'),
                   host: host,
                   latestConnection: latestConnections[host.key]!,
+                  packages: _applicationPackages,
+                  onRulePressed: () => BaseNavigator.push(
+                    context,
+                    ApplicationHostRuleView(
+                      host: host.target,
+                      packages: _applicationPackages,
+                      appLabel: label,
+                    ),
+                  ),
                   active: activity.fresh
                       ? host.totals.confirmedActiveCount > 0
                       : null,
@@ -398,9 +387,13 @@ class _TargetActivityRow extends StatelessWidget {
     required this.latestConnection,
     required this.active,
     required this.onPressed,
+    required this.onRulePressed,
+    required this.packages,
   });
 
   final HostActivity host;
+  final VoidCallback onRulePressed;
+  final List<String> packages;
   final TrackerInfo latestConnection;
   final bool? active;
   final VoidCallback onPressed;
@@ -408,9 +401,13 @@ class _TargetActivityRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.appLocalizations;
-    final rules = host.totals.rules;
     final exits = host.totals.exitPaths;
-    final single = host.totals.connections.first.info;
+    final chain = latestConnection.chains.isEmpty
+        ? l10n.unknown
+        : latestConnection.chains.join(' → ');
+    final route = exits.length > 1
+        ? '$chain · ${l10n.activityOtherExitPaths(exits.length - 1)}'
+        : chain;
     return Card.filled(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
@@ -427,15 +424,14 @@ class _TargetActivityRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ActivityConnectionSummary(totals: host.totals),
-            Text(
-              rules.length == 1 && exits.length == 1
-                  ? '${activityRuleText(context, single)} · ${single.chains.isEmpty ? l10n.unknown : single.chains.join(' → ')}'
-                  : l10n.activityRouteCounts(rules.length, exits.length),
-              style: context.textTheme.bodySmall,
-            ),
+            Text(route, style: context.textTheme.bodySmall),
           ],
         ),
-        trailing: const GlyphIcon(AppGlyphs.chevronForward),
+        trailing: HostRuleButton(
+          host: host.target,
+          packages: packages,
+          onPressed: onRulePressed,
+        ),
       ),
     );
   }

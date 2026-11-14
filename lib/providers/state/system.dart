@@ -119,15 +119,6 @@ TrayTitleState trayTitleState(Ref ref) {
 }
 
 @riverpod
-VpnState vpnState(Ref ref) {
-  final vpnProps = ref.watch(vpnSettingProvider);
-  final stack = ref.watch(
-    patchClashConfigProvider.select((state) => state.tun.stack),
-  );
-  return VpnState(stack: stack, vpnProps: vpnProps);
-}
-
-@riverpod
 PackageListSelectorState packageListSelectorState(Ref ref) {
   final packages = ref.watch(packagesProvider);
   final accessControlProps = ref.watch(

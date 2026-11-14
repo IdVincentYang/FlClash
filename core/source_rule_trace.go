@@ -94,6 +94,7 @@ type sourceTraceState struct {
 	applicationRuleKeys      map[string]string
 	applicationRevision      string
 	applicationRoutes        map[string]applicationRoute
+	applicationHostRoutes    map[string]map[string]applicationRoute
 	profileName              string
 	origins                  []SourceRuleOrigin
 	routeEpoch, picksVersion uint64
@@ -215,6 +216,7 @@ func recordSourceRuleSetMatch(p *preparedConfig, name string, generation *source
 func publishSourceTraceState(p *preparedConfig, id string, busy bool) {
 	state := &sourceTraceState{input: id, busy: busy, profileName: p.manifest.ProfileName, materials: map[string]string{}}
 	state.applicationRevision, state.applicationRoutes = applicationRoutesFor(p.manifest)
+	state.applicationHostRoutes = applicationHostRoutesFor(p.manifest)
 	var app applicationRouteSettings
 	if json.Unmarshal(p.manifest.AcceptedOverrides["application-routing"], &app) == nil {
 		state.applicationVersion = app.Version

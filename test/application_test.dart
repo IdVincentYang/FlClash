@@ -22,7 +22,6 @@ Widget? _childOf(Widget widget) {
     CoreManager(:final child) => child,
     ConnectivityManager(:final child) => child,
     WindowHeaderContainer(:final child) => child,
-    VpnManager(:final child) => child,
     _ => null,
   };
 }
@@ -84,7 +83,6 @@ void main() {
       AppStateManager,
       CoreManager,
       ConnectivityManager,
-      VpnManager,
     ]);
   });
 
@@ -110,13 +108,7 @@ void main() {
 
     expect(
       desktop,
-      isNot(
-        anyOf(
-          contains(AndroidManager),
-          contains(TileManager),
-          contains(VpnManager),
-        ),
-      ),
+      isNot(anyOf(contains(AndroidManager), contains(TileManager))),
     );
   });
 

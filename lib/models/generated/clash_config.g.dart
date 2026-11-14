@@ -400,6 +400,9 @@ _Rule _$RuleFromJson(Map<String, dynamic> json) => _Rule(
   noResolve: json['noResolve'] as bool? ?? false,
   src: json['src'] as bool? ?? false,
   order: json['order'] as String?,
+  hostBinding: json['hostBinding'] == null
+      ? null
+      : HostRuleBinding.fromJson(json['hostBinding'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$RuleToJson(_Rule instance) => <String, dynamic>{
@@ -412,6 +415,7 @@ Map<String, dynamic> _$RuleToJson(_Rule instance) => <String, dynamic>{
   'noResolve': instance.noResolve,
   'src': instance.src,
   'order': instance.order,
+  'hostBinding': instance.hostBinding,
 };
 
 const _$RuleActionEnumMap = {

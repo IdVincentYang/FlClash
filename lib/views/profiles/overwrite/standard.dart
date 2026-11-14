@@ -335,6 +335,7 @@ class _EditGlobalAddedRulesState extends ConsumerState<_EditGlobalAddedRules> {
         .toSet();
     final rulesState = ref.watch(globalRulesProvider);
     final rules = (rulesState.value ?? [])
+        .where((rule) => rule.hostBinding == null)
         .whereMatches(_query, (rule) => rule.searchFields, texts: _searchTexts)
         .toList();
     return CommonScaffold(

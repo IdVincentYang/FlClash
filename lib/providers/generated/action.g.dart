@@ -91,7 +91,7 @@ final class SetupActionProvider extends $NotifierProvider<SetupAction, void> {
   }
 }
 
-String _$setupActionHash() => r'5e647958e32b6aa42821a26cb2d277758bf4cbe0';
+String _$setupActionHash() => r'9fb952916bc7ef2086b19ed846dd39c84820eeca';
 
 abstract class _$SetupAction extends $Notifier<void> {
   void build();
@@ -608,7 +608,7 @@ final class GlobalGroupsActionProvider
 }
 
 String _$globalGroupsActionHash() =>
-    r'2d8aeee1afcc374113528dcbae219cfadea4cbf5';
+    r'f32e6599713f055877325e2cb3419a21407393c6';
 
 abstract class _$GlobalGroupsAction extends $Notifier<String?> {
   String? build();

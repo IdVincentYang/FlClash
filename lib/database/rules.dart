@@ -22,6 +22,8 @@ class Rules extends Table {
 
   BoolColumn get src => boolean().withDefault(const Constant(false))();
 
+  TextColumn get hostBinding => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -29,6 +31,51 @@ class Rules extends Table {
 @DriftAccessor(tables: [Rules, ProfileRuleLinks])
 class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
   RulesDao(super.attachedDatabase);
+
+  Future<List<Rule>> hostRules() async {
+    final records = await select(rules).get();
+    final links = await select(profileRuleLinks).get();
+    final result = <Rule>[];
+    for (final row in records) {
+      final rule = row.toRule();
+      final disabled = [
+        for (final link in links)
+          if (link.ruleId == row.id &&
+              link.scene == RuleScene.disabled &&
+              link.profileId != null)
+            link.profileId!,
+      ];
+      if (rule.hostBinding != null) {
+        result.add(
+          rule.copyWith(
+            hostBinding: rule.hostBinding!.copyWith(disabledProfiles: disabled),
+          ),
+        );
+      } else if (!rule.src &&
+          const {
+            RuleAction.DOMAIN,
+            RuleAction.IP_CIDR,
+            RuleAction.IP_CIDR6,
+          }.contains(rule.ruleAction)) {
+        for (final link in links.where(
+          (l) =>
+              l.ruleId == row.id &&
+              (l.profileId == null || l.scene == RuleScene.added),
+        )) {
+          result.add(
+            rule.copyWith(
+              hostBinding: HostRuleBinding(
+                profileId: link.profileId,
+                legacy: true,
+                disabledProfiles: disabled,
+              ),
+            ),
+          );
+        }
+      }
+    }
+    return result;
+  }
 
   Selectable<Rule> queryGlobalAddedRules() {
     return _query();
@@ -72,6 +119,7 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
                   profileRuleLinks.scene.equalsValue(RuleScene.added))) &
           profileRuleLinks.ruleId.isNotInQuery(disabledIdsQuery),
     );
+    query.where(rules.hostBinding.isNull());
 
     query.orderBy([
       OrderingTerm.asc(
@@ -167,25 +215,42 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
     _setWithBatch(b, rules, profileId: profileId, scene: RuleScene.custom);
   }
 
-  Future<int> putDisabledLink(int profileId, int ruleId) async {
-    return profileRuleLinks.insertOnConflictUpdate(
-      ProfileRuleLink(
-        ruleId: ruleId,
-        profileId: profileId,
-        scene: RuleScene.disabled,
-      ).toCompanion(),
-    );
+  Future<void> _touchHost(int ruleId) async {
+    final row = await (select(
+      rules,
+    )..where((t) => t.id.equals(ruleId))).getSingleOrNull();
+    if (row?.hostBinding != null) {
+      await attachedDatabase.writeApplicationRouting(
+        await attachedDatabase.readApplicationRouting(),
+      );
+    }
   }
 
-  Future<bool> delDisabledLink(int profileId, int ruleId) async {
-    return profileRuleLinks.deleteOne(
-      ProfileRuleLink(
-        profileId: profileId,
-        ruleId: ruleId,
-        scene: RuleScene.disabled,
-      ).toCompanion(),
-    );
-  }
+  Future<int> putDisabledLink(int profileId, int ruleId) =>
+      transaction(() async {
+        final result = await profileRuleLinks.insertOnConflictUpdate(
+          ProfileRuleLink(
+            ruleId: ruleId,
+            profileId: profileId,
+            scene: RuleScene.disabled,
+          ).toCompanion(),
+        );
+        await _touchHost(ruleId);
+        return result;
+      });
+
+  Future<bool> delDisabledLink(int profileId, int ruleId) =>
+      transaction(() async {
+        final result = await profileRuleLinks.deleteOne(
+          ProfileRuleLink(
+            profileId: profileId,
+            ruleId: ruleId,
+            scene: RuleScene.disabled,
+          ).toCompanion(),
+        );
+        if (result) await _touchHost(ruleId);
+        return result;
+      });
 
   Future<int> orderGlobalRule({
     required int ruleId,
@@ -340,7 +405,7 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
       if (row == 0) {
         return 0;
       }
-      return profileRuleLinks.insertOnConflictUpdate(
+      final linked = await profileRuleLinks.insertOnConflictUpdate(
         ProfileRuleLink(
           ruleId: rule.id,
           profileId: profileId,
@@ -348,12 +413,31 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
           order: rule.order,
         ).toCompanion(),
       );
+      if (rule.hostBinding != null) {
+        await attachedDatabase.writeApplicationRouting(
+          await attachedDatabase.readApplicationRouting(),
+        );
+      }
+      return linked;
     });
   }
 
   Future<void> _delAll(Iterable<int> ruleIds) {
-    return batch((b) {
-      rules.deleteInChunks(b, ruleIds, (t, chunk) => t.id.isIn(chunk));
+    final ids = ruleIds.toSet();
+    return transaction(() async {
+      final hasHost =
+          (await (select(rules)
+                    ..where((t) => t.id.isIn(ids) & t.hostBinding.isNotNull()))
+                  .get())
+              .isNotEmpty;
+      await batch((b) {
+        rules.deleteInChunks(b, ids, (t, chunk) => t.id.isIn(chunk));
+      });
+      if (hasHost) {
+        await attachedDatabase.writeApplicationRouting(
+          await attachedDatabase.readApplicationRouting(),
+        );
+      }
     });
   }
 
@@ -416,6 +500,11 @@ extension RawRuleExt on RawRule {
       noResolve: noResolve,
       src: src,
       order: order,
+      hostBinding: hostBinding == null
+          ? null
+          : HostRuleBinding.fromJson(
+              Map<String, dynamic>.from(jsonDecode(hostBinding!) as Map),
+            ),
     );
   }
 }
@@ -431,6 +520,7 @@ extension RulesCompanionExt on Rule {
       subRule: Value(subRule),
       noResolve: Value(noResolve),
       src: Value(src),
+      hostBinding: Value(hostBinding == null ? null : jsonEncode(hostBinding)),
     );
   }
 }

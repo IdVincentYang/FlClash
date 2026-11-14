@@ -16,6 +16,21 @@ import '../helpers/test_config_state.dart';
 
 class _Setup extends SetupAction {
   int reservations = 0;
+  int rebuilds = 0;
+  @override
+  Future<bool> applyProfile({
+    bool silence = false,
+    bool force = false,
+    bool allowSourceReview = false,
+    bool allowBootstrap = false,
+    Map<String, Object?>? expectedRun,
+    int? setupSequence,
+    bool rebuildVpn = false,
+  }) async {
+    rebuilds++;
+    return true;
+  }
+
   @override
   void build() {}
   @override
@@ -95,6 +110,39 @@ void main() {
   });
 
   test(
+    'host-only save retains the app switch, updates one rule and deletes without a default',
+    () async {
+      final controller = container.read(
+        applicationRoutingControllerProvider.notifier,
+      );
+      const host = Rule(
+        id: 123,
+        content: 'example.test',
+        ruleTarget: 'REJECT',
+        hostBinding: HostRuleBinding(packageName: 'a'),
+      );
+      await controller.saveHostRules([host], expectedProfileId: 7);
+      var saved = await store.readApplicationRouting();
+      expect(saved.rules['a']!.enabled, false);
+      expect(saved.rules['a']!.hasDefault, false);
+      expect(core.writes.last.containsKey('hostRules'), false);
+      await controller.setEnabled(['a'], true);
+      expect(
+        (core.writes.last['hostRules'] as List).single['target'],
+        'REJECT',
+      );
+      await controller.saveHostRules([
+        host.copyWith(ruleTarget: 'DIRECT'),
+      ], expectedProfileId: 7);
+      expect((await store.rulesDao.queryGlobalAddedRules().get()).length, 1);
+      await controller.deleteHostRules([123]);
+      saved = await store.readApplicationRouting();
+      expect(saved.hostRules, isEmpty);
+      expect(saved.rules.containsKey('a'), false);
+    },
+  );
+
+  test(
     'save and toggle change only the app policy, retaining the target',
     () async {
       final controller = container.read(
@@ -155,6 +203,22 @@ void main() {
     'an unrelated group failure cannot block a direct application policy',
     () async {
       groups.fail = true;
+      await store.rulesDao.putGlobalRule(
+        const Rule(
+          id: 789,
+          content: 'other.test',
+          ruleTarget: 'Gone',
+          hostBinding: HostRuleBinding(
+            targets: {
+              7: ApplicationRouteTarget(
+                name: 'Gone',
+                kind: ApplicationTargetKind.globalGroup,
+                groupId: 9,
+              ),
+            },
+          ),
+        ),
+      );
       await container
           .read(applicationRoutingControllerProvider.notifier)
           .setPolicy(['a'], ApplicationRouteAction.direct, enable: true);
@@ -164,6 +228,36 @@ void main() {
       ]);
     },
   );
+
+  test('promoting an old override keeps its ID and recomposes once', () async {
+    container.read(initProvider.notifier).value = true;
+    await store.profilesDao.setAll([
+      const Profile(id: 7, autoUpdateDuration: Duration(hours: 1)),
+    ]);
+    await store.rulesDao.putGlobalRule(
+      const Rule(id: 456, content: 'example.test', ruleTarget: 'DIRECT'),
+    );
+    await store.rulesDao.putDisabledLink(7, 456);
+    final old = (await store.readApplicationRouting()).hostRules.single;
+    await container
+        .read(applicationRoutingControllerProvider.notifier)
+        .saveHostRules([
+          old.copyWith(ruleTarget: 'REJECT'),
+        ], expectedProfileId: 7);
+    expect(setup.rebuilds, 1);
+    expect(core.writes, isEmpty);
+    final saved = (await store.readApplicationRouting()).hostRules.single;
+    expect(saved.id, 456);
+    expect(saved.hostBinding!.legacy, false);
+    expect(saved.hostBinding!.disabledProfiles, isEmpty);
+    await container
+        .read(applicationRoutingControllerProvider.notifier)
+        .saveHostRules([
+          saved.copyWith(ruleTarget: 'DIRECT'),
+        ], expectedProfileId: 7);
+    expect(setup.rebuilds, 1);
+    expect(core.writes, hasLength(1));
+  });
 
   test('offline preselection saves without starting Core or VPN', () async {
     core.unavailable = true;

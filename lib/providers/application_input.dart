@@ -38,6 +38,9 @@ class ApplicationInputAction extends _$ApplicationInputAction {
   @protected
   Request get requestClient => request;
 
+  @protected
+  bool get isAndroid => system.isAndroid;
+
   @override
   void build() {}
 
@@ -146,6 +149,9 @@ class ApplicationInputAction extends _$ApplicationInputAction {
         final next = update(previous);
         if (previous == next) return;
         validate?.call(previous, next, managed);
+        final vpnOptions = isAndroid && ref.read(initProvider)
+            ? ref.read(sharedStateProvider).vpnOptions
+            : null;
         failure = await setup.captureConfigFailure(requestClient);
         await beforePublish?.call();
         await requestClient.invalidate('application-config');
@@ -172,6 +178,11 @@ class ApplicationInputAction extends _$ApplicationInputAction {
           }
           throw const RequestUnavailable('preferences_save_failed');
         }
+        if (isAndroid &&
+            ref.read(initProvider) &&
+            vpnOptions != ref.read(sharedStateProvider).vpnOptions) {
+          rebuildVpn = true;
+        }
         changed = true;
       });
     } catch (_) {
@@ -182,7 +193,7 @@ class ApplicationInputAction extends _$ApplicationInputAction {
     if (changed && ref.mounted && ref.read(initProvider)) {
       final setup = ref.read(setupActionProvider.notifier);
       if (rebuildVpn) {
-        if (system.isAndroid &&
+        if (isAndroid &&
             !androidRunRequested(ref.read(nativeRequestStateProvider))) {
           return;
         }

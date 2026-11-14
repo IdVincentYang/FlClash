@@ -372,7 +372,6 @@ class PolicyMaterialCandidate {
         testUrl: _inputs.testUrl,
         picks: _inputs.picks,
         shared: _inputs.shared,
-        vpn: _inputs.vpn,
         fact: _inputs.fact,
         policy: SelectedPolicy.decode(raw),
       );
@@ -460,7 +459,6 @@ mixin _PolicyMaterialSetup on _$SetupAction {
           testUrl: ref.read(appSettingProvider).testUrl,
           picks: const {},
           shared: ref.read(sharedStateProvider),
-          vpn: ref.read(vpnStateProvider),
           fact: await _core.getConfigState(),
           policy: policy,
         );

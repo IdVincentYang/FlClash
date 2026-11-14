@@ -414,7 +414,6 @@ enum FunctionTag {
   changeProxy,
   handleWill,
   updateDelay,
-  vpnTip,
   autoLaunch,
   updatePageIndex,
   pageChange,

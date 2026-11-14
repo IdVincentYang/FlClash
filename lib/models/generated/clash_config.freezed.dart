@@ -5651,7 +5651,7 @@ as bool,
 /// @nodoc
 mixin _$Rule {
 
- int get id; RuleAction get ruleAction; String? get content; String? get ruleTarget; String? get ruleProvider; String? get subRule; bool get noResolve; bool get src; String? get order;
+ int get id; RuleAction get ruleAction; String? get content; String? get ruleTarget; String? get ruleProvider; String? get subRule; bool get noResolve; bool get src; String? get order; HostRuleBinding? get hostBinding;
 /// Create a copy of Rule
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -5665,20 +5665,20 @@ $RuleCopyWith<Rule> get copyWith => _$RuleCopyWithImpl<Rule>(this as Rule, _$ide
 @override
 bool operator ==(Object other) {
   final _this = this as Rule;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Rule&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.ruleAction, _this.ruleAction) || other.ruleAction == _this.ruleAction)&&(identical(other.content, _this.content) || other.content == _this.content)&&(identical(other.ruleTarget, _this.ruleTarget) || other.ruleTarget == _this.ruleTarget)&&(identical(other.ruleProvider, _this.ruleProvider) || other.ruleProvider == _this.ruleProvider)&&(identical(other.subRule, _this.subRule) || other.subRule == _this.subRule)&&(identical(other.noResolve, _this.noResolve) || other.noResolve == _this.noResolve)&&(identical(other.src, _this.src) || other.src == _this.src)&&(identical(other.order, _this.order) || other.order == _this.order));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Rule&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.ruleAction, _this.ruleAction) || other.ruleAction == _this.ruleAction)&&(identical(other.content, _this.content) || other.content == _this.content)&&(identical(other.ruleTarget, _this.ruleTarget) || other.ruleTarget == _this.ruleTarget)&&(identical(other.ruleProvider, _this.ruleProvider) || other.ruleProvider == _this.ruleProvider)&&(identical(other.subRule, _this.subRule) || other.subRule == _this.subRule)&&(identical(other.noResolve, _this.noResolve) || other.noResolve == _this.noResolve)&&(identical(other.src, _this.src) || other.src == _this.src)&&(identical(other.order, _this.order) || other.order == _this.order)&&(identical(other.hostBinding, _this.hostBinding) || other.hostBinding == _this.hostBinding));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Rule;
-  return Object.hash(runtimeType,_this.id,_this.ruleAction,_this.content,_this.ruleTarget,_this.ruleProvider,_this.subRule,_this.noResolve,_this.src,_this.order);
+  return Object.hash(runtimeType,_this.id,_this.ruleAction,_this.content,_this.ruleTarget,_this.ruleProvider,_this.subRule,_this.noResolve,_this.src,_this.order,_this.hostBinding);
 }
 
 @override
 String toString() {
   final _this = this as Rule;
-  return 'Rule(id: ${_this.id}, ruleAction: ${_this.ruleAction}, content: ${_this.content}, ruleTarget: ${_this.ruleTarget}, ruleProvider: ${_this.ruleProvider}, subRule: ${_this.subRule}, noResolve: ${_this.noResolve}, src: ${_this.src}, order: ${_this.order})';
+  return 'Rule(id: ${_this.id}, ruleAction: ${_this.ruleAction}, content: ${_this.content}, ruleTarget: ${_this.ruleTarget}, ruleProvider: ${_this.ruleProvider}, subRule: ${_this.subRule}, noResolve: ${_this.noResolve}, src: ${_this.src}, order: ${_this.order}, hostBinding: ${_this.hostBinding})';
 }
 
 
@@ -5689,11 +5689,11 @@ abstract mixin class $RuleCopyWith<$Res>  {
   factory $RuleCopyWith(Rule value, $Res Function(Rule) _then) = _$RuleCopyWithImpl;
 @useResult
 $Res call({
- int id, RuleAction ruleAction, String? content, String? ruleTarget, String? ruleProvider, String? subRule, bool noResolve, bool src, String? order
+ int id, RuleAction ruleAction, String? content, String? ruleTarget, String? ruleProvider, String? subRule, bool noResolve, bool src, String? order, HostRuleBinding? hostBinding
 });
 
 
-
+$HostRuleBindingCopyWith<$Res>? get hostBinding;
 
 }
 /// @nodoc
@@ -5706,7 +5706,7 @@ class _$RuleCopyWithImpl<$Res>
 
 /// Create a copy of Rule
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? ruleAction = null,Object? content = freezed,Object? ruleTarget = freezed,Object? ruleProvider = freezed,Object? subRule = freezed,Object? noResolve = null,Object? src = null,Object? order = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? ruleAction = null,Object? content = freezed,Object? ruleTarget = freezed,Object? ruleProvider = freezed,Object? subRule = freezed,Object? noResolve = null,Object? src = null,Object? order = freezed,Object? hostBinding = freezed,}) {
   return _then(Rule(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,ruleAction: null == ruleAction ? _self.ruleAction : ruleAction // ignore: cast_nullable_to_non_nullable
@@ -5717,10 +5717,23 @@ as String?,subRule: freezed == subRule ? _self.subRule : subRule // ignore: cast
 as String?,noResolve: null == noResolve ? _self.noResolve : noResolve // ignore: cast_nullable_to_non_nullable
 as bool,src: null == src ? _self.src : src // ignore: cast_nullable_to_non_nullable
 as bool,order: freezed == order ? _self.order : order // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,hostBinding: freezed == hostBinding ? _self.hostBinding : hostBinding // ignore: cast_nullable_to_non_nullable
+as HostRuleBinding?,
   ));
 }
+/// Create a copy of Rule
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$HostRuleBindingCopyWith<$Res>? get hostBinding {
+    if (_self.hostBinding == null) {
+    return null;
+  }
 
+  return $HostRuleBindingCopyWith<$Res>(_self.hostBinding!, (value) {
+    return _then(_self.copyWith(hostBinding: value));
+  });
+}
 }
 
 
@@ -5802,10 +5815,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  RuleAction ruleAction,  String? content,  String? ruleTarget,  String? ruleProvider,  String? subRule,  bool noResolve,  bool src,  String? order)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  RuleAction ruleAction,  String? content,  String? ruleTarget,  String? ruleProvider,  String? subRule,  bool noResolve,  bool src,  String? order,  HostRuleBinding? hostBinding)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Rule() when $default != null:
-return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.ruleProvider,_that.subRule,_that.noResolve,_that.src,_that.order);case _:
+return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.ruleProvider,_that.subRule,_that.noResolve,_that.src,_that.order,_that.hostBinding);case _:
   return orElse();
 
 }
@@ -5823,10 +5836,10 @@ return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.r
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  RuleAction ruleAction,  String? content,  String? ruleTarget,  String? ruleProvider,  String? subRule,  bool noResolve,  bool src,  String? order)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  RuleAction ruleAction,  String? content,  String? ruleTarget,  String? ruleProvider,  String? subRule,  bool noResolve,  bool src,  String? order,  HostRuleBinding? hostBinding)  $default,) {final _that = this;
 switch (_that) {
 case _Rule():
-return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.ruleProvider,_that.subRule,_that.noResolve,_that.src,_that.order);case _:
+return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.ruleProvider,_that.subRule,_that.noResolve,_that.src,_that.order,_that.hostBinding);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -5843,10 +5856,10 @@ return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.r
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  RuleAction ruleAction,  String? content,  String? ruleTarget,  String? ruleProvider,  String? subRule,  bool noResolve,  bool src,  String? order)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  RuleAction ruleAction,  String? content,  String? ruleTarget,  String? ruleProvider,  String? subRule,  bool noResolve,  bool src,  String? order,  HostRuleBinding? hostBinding)?  $default,) {final _that = this;
 switch (_that) {
 case _Rule() when $default != null:
-return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.ruleProvider,_that.subRule,_that.noResolve,_that.src,_that.order);case _:
+return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.ruleProvider,_that.subRule,_that.noResolve,_that.src,_that.order,_that.hostBinding);case _:
   return null;
 
 }
@@ -5858,7 +5871,7 @@ return $default(_that.id,_that.ruleAction,_that.content,_that.ruleTarget,_that.r
 @JsonSerializable()
 
 class _Rule implements Rule {
-  const _Rule({this.id = -1, this.ruleAction = RuleAction.DOMAIN, this.content, this.ruleTarget, this.ruleProvider, this.subRule, this.noResolve = false, this.src = false, this.order});
+  const _Rule({this.id = -1, this.ruleAction = RuleAction.DOMAIN, this.content, this.ruleTarget, this.ruleProvider, this.subRule, this.noResolve = false, this.src = false, this.order, this.hostBinding});
   factory _Rule.fromJson(Map<String, dynamic> json) => _$RuleFromJson(json);
 
 @override@JsonKey() final  int id;
@@ -5870,6 +5883,7 @@ class _Rule implements Rule {
 @override@JsonKey() final  bool noResolve;
 @override@JsonKey() final  bool src;
 @override final  String? order;
+@override final  HostRuleBinding? hostBinding;
 
 /// Create a copy of Rule
 /// with the given fields replaced by the non-null parameter values.
@@ -5884,18 +5898,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Rule&&(identical(other.id, id) || other.id == id)&&(identical(other.ruleAction, ruleAction) || other.ruleAction == ruleAction)&&(identical(other.content, content) || other.content == content)&&(identical(other.ruleTarget, ruleTarget) || other.ruleTarget == ruleTarget)&&(identical(other.ruleProvider, ruleProvider) || other.ruleProvider == ruleProvider)&&(identical(other.subRule, subRule) || other.subRule == subRule)&&(identical(other.noResolve, noResolve) || other.noResolve == noResolve)&&(identical(other.src, src) || other.src == src)&&(identical(other.order, order) || other.order == order));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Rule&&(identical(other.id, id) || other.id == id)&&(identical(other.ruleAction, ruleAction) || other.ruleAction == ruleAction)&&(identical(other.content, content) || other.content == content)&&(identical(other.ruleTarget, ruleTarget) || other.ruleTarget == ruleTarget)&&(identical(other.ruleProvider, ruleProvider) || other.ruleProvider == ruleProvider)&&(identical(other.subRule, subRule) || other.subRule == subRule)&&(identical(other.noResolve, noResolve) || other.noResolve == noResolve)&&(identical(other.src, src) || other.src == src)&&(identical(other.order, order) || other.order == order)&&(identical(other.hostBinding, hostBinding) || other.hostBinding == hostBinding));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,ruleAction,content,ruleTarget,ruleProvider,subRule,noResolve,src,order);
+    return Object.hash(runtimeType,id,ruleAction,content,ruleTarget,ruleProvider,subRule,noResolve,src,order,hostBinding);
 }
 
 @override
 String toString() {
-    return 'Rule(id: $id, ruleAction: $ruleAction, content: $content, ruleTarget: $ruleTarget, ruleProvider: $ruleProvider, subRule: $subRule, noResolve: $noResolve, src: $src, order: $order)';
+    return 'Rule(id: $id, ruleAction: $ruleAction, content: $content, ruleTarget: $ruleTarget, ruleProvider: $ruleProvider, subRule: $subRule, noResolve: $noResolve, src: $src, order: $order, hostBinding: $hostBinding)';
 }
 
 
@@ -5906,11 +5920,11 @@ abstract mixin class _$RuleCopyWith<$Res> implements $RuleCopyWith<$Res> {
   factory _$RuleCopyWith(_Rule value, $Res Function(_Rule) _then) = __$RuleCopyWithImpl;
 @override @useResult
 $Res call({
- int id, RuleAction ruleAction, String? content, String? ruleTarget, String? ruleProvider, String? subRule, bool noResolve, bool src, String? order
+ int id, RuleAction ruleAction, String? content, String? ruleTarget, String? ruleProvider, String? subRule, bool noResolve, bool src, String? order, HostRuleBinding? hostBinding
 });
 
 
-
+@override $HostRuleBindingCopyWith<$Res>? get hostBinding;
 
 }
 /// @nodoc
@@ -5923,7 +5937,7 @@ class __$RuleCopyWithImpl<$Res>
 
 /// Create a copy of Rule
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? ruleAction = null,Object? content = freezed,Object? ruleTarget = freezed,Object? ruleProvider = freezed,Object? subRule = freezed,Object? noResolve = null,Object? src = null,Object? order = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? ruleAction = null,Object? content = freezed,Object? ruleTarget = freezed,Object? ruleProvider = freezed,Object? subRule = freezed,Object? noResolve = null,Object? src = null,Object? order = freezed,Object? hostBinding = freezed,}) {
   return _then(_Rule(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,ruleAction: null == ruleAction ? _self.ruleAction : ruleAction // ignore: cast_nullable_to_non_nullable
@@ -5934,11 +5948,24 @@ as String?,subRule: freezed == subRule ? _self.subRule : subRule // ignore: cast
 as String?,noResolve: null == noResolve ? _self.noResolve : noResolve // ignore: cast_nullable_to_non_nullable
 as bool,src: null == src ? _self.src : src // ignore: cast_nullable_to_non_nullable
 as bool,order: freezed == order ? _self.order : order // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,hostBinding: freezed == hostBinding ? _self.hostBinding : hostBinding // ignore: cast_nullable_to_non_nullable
+as HostRuleBinding?,
   ));
 }
 
+/// Create a copy of Rule
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$HostRuleBindingCopyWith<$Res>? get hostBinding {
+    if (_self.hostBinding == null) {
+    return null;
+  }
 
+  return $HostRuleBindingCopyWith<$Res>(_self.hostBinding!, (value) {
+    return _then(_self.copyWith(hostBinding: value));
+  });
+}
 }
 
 

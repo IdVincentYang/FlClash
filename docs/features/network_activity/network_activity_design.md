@@ -1,7 +1,7 @@
 # 应用网络 Design
 
-本文记录已实现的 Android 连接观测、运行期汇总、三层活动页面、VPN 应用范围编辑与 App 默认分流。
-Host 例外尚未实现，
+本文记录已实现的 Android 连接观测、运行期汇总、三层活动页面、VPN 应用范围编辑、App 默认分流与 Host 覆盖规则。
+
 需求和交付顺序分别见 [Overview](network_activity_overview.md)与 [Plan](network_activity_plan.md)。
 
 ## 职责与数据路径
@@ -187,14 +187,15 @@ Android 的 Tools 顶部提供“应用网络”入口。ApplicationActivityView
 新事件尚未校对、停止观察或快照失败时，活跃值不能解释为零；启用中的活跃筛选暂时回退到保留列表并说明原因。
 快照真实失败保留内容及原观察器的重试入口；页面不显示常驻覆盖告警、容量说明或刷新按钮。
 
-每个 Host 项显示目标、合并的连接数／最近时间及规则／出口概况；没有域名时显示原 IPv4／IPv6，
-目标也缺失时单列未知。点击统一进入 ApplicationConnectionsView，不再展开目标汇总。
+每个 Host 项显示目标、合并的连接数／最近时间及完整分组链；没有域名时显示原 IPv4／IPv6，
+目标也缺失时单列未知。Host 项删除重复的 ProcessName、包名及命中规则描述；
+包名／UID 只在搜索框下方原身份区域显示。点击主体统一进入 ApplicationConnectionsView。
 左侧复用逐连接列表的出口图标，优先取当前 App／Host 中开始时间最新的已确认活动连接；
 没有已确认活动连接时取最新保留记录，但不自动检测。同时间按连接 ID 升序，不以插入或流量更新时间替代。
-图标只表示这个节点的出口检测，规则／出口摘要仍覆盖该 Host 保留的全部连接；检测语义见下文。
-规则与出口路径均唯一时展示实际内容，否则展示各自去重数量；长路径自然换行，因此物理行数可以不同。
-只有冻结配置明确为已知 Global／Direct 且规则为空时说明规则未参与匹配；其它缺失事实显示未知，
-不读取当前模式回填旧结果。两层连接摘要共用 ActivityConnectionSummary。
+分组链与旗帜取自同一条连接，长路径自然换行；有其它去重出口路径时附带数量，不将多条链合成一条。
+右侧 64 宽按钮展示当前策略的继承状态或 Host 例外目标；具体交互见下文 Host 覆盖规则。
+现有连接详情继续展示各条连接的实际规则及配置证据，Host 项不读取当前模式重写旧连接结果。
+两层连接摘要共用 ActivityConnectionSummary。
 
 ## 目标的逐连接详情
 
@@ -277,7 +278,7 @@ APK 哈希核对通过。未操作界面、启动／停止 VPN 或发起新的�
 
 ## App 默认策略与 VPN 范围
 
-05／06 使用同一份全局 `ApplicationRoutingSettings`，独立于连接历史。Drift schema 16 的单行
+05／06 使用同一份全局 `ApplicationRoutingSettings`，独立于连接历史。Drift schema 17 保留原单行
 `application_routing_libraries` 保存规则与逐订阅目标绑定的 JSON；每次事务写入递增 revision。
 备份恢复包含这份配置；删除订阅只清理该订阅目标，不删除全局 App 的开关与其它订阅选择。
 替换目标更新 Map 原项，不保留历史版本，也不按时间、页面打开或应用卸载清理用户配置。
@@ -308,4 +309,75 @@ App 目标页菜单“纳入 VPN”修改已有 AccessControlProps：全部、�
 从全部接管排除一个 App 时，仅创建本次排除项，不重新激活旧的未启用列表。
 运行中的修改经既有 Setup／ServiceState 重建 VPN；离线保存不启动服务。
 ServiceState 在服务就绪后发布实际采用的 captureFingerprint，页面据此表示等待；失败保留设置与具体反馈。
+配置保存事务比较实际 VpnOptions；协议栈、端口、认证、绕过地址和路由范围的依赖变化同样请求完整应用，
+无需用户再次点 Restart。Core 返回 configuration_reapply_required 时跳过来源热采用，进入原完整应用流程。
+未启动时只保存，后续 Start 使用新设置；新 Stop 与原生代次保护继续优先。
+删除按配置差异盲目弹出的 Restart 提示和其独立 VpnManager；实际失败仍由配置／服务状态及错误提示表达。
 范围开关不等同于应用路由开关，也不将系统 lockdown 下的排除保证为直连。
+
+## Host 覆盖规则
+
+### 范围与生效顺序
+
+Host item 的右侧规则按钮打开 `ApplicationHostRuleView`；点击主体仍进入逐连接列表。
+右侧只显示新连接的当前策略意图及采用／暂停／失效状态，连接摘要保留原始命中事实。
+共享 UID 只有候选 App 对当前 Host 的决策一致才使用其策略；不一致时按无 App 策略的模式路径显示与执行。
+Host 入口固定 64 宽，常态只有最多两行文字；仅配置失效显示警告图标，完整目标及状态长按查看。
+未命中 Host 例外时显示“跟随应用”或“跟随规则”；生效的 Host 例外显示目标，Direct／Global 模式保留原模式目标。
+应用和 Host 策略仅由对应 item 右侧进入，页面菜单与连接详情不重复提供设置入口。
+
+| 模式 | 新连接决策顺序 |
+| --- | --- |
+| Rule | 启用的本 App＋Host → App 整体默认 → 通用 Host → 原有规则／订阅 |
+| Direct | 启用的本 App＋Host → App 整体默认 → DIRECT |
+| Global | 原 GLOBAL；忽略 App 和 Host 覆盖 |
+
+应用策略总开关控制 App 默认及其 Host 例外；通用 Host 独立。
+`ApplicationRouteRule.hasDefault=false` 表示只设置 Host 例外，不生成整 App 的默认动作。
+保存 Host 规则不自动开启应用开关、VPN 或切换模式；
+应用总开关只在应用条目右侧操作，Host 页在应用规则关闭时显示状态提示。
+未知身份可采用通用 Host，但不会取得其它 App 的例外。内部检测流量仍跳过应用路由 hook。
+
+### 统一记录与采用
+
+规则主体与范围元数据保存在原 Rules 表。新增 nullable `host_binding`，
+包括 package、原 profile 所有权和逐订阅目标绑定；
+没有 package 是通用范围。`ApplicationRoutingSettings.hostRules` 从 Rules 与 ProfileRuleLinks 派生，
+不写入 application_routing_libraries 的 JSON，避免两份 Host 规则。App 开关和默认策略沿用原单行存储。
+数据库升级从 schema 16 增加列，旧规则不重写。备份／恢复沿用 Rule 模型和数据库快照。
+
+新入口只创建精确 DOMAIN、IPv4 /32、IPv6 /128。
+既有精确普通覆盖可在编辑页沿原 ID 转为带范围记录；
+旧复杂规则保持原匹配链。新记录从普通 queryAddedRules 排除，
+由本地 trusted `application-routing` override 统一编译，
+避免 App 范围丢失或同一规则重复执行；首次转化旧普通覆盖会完整重组一次配置以移除旧运行时副本。
+后续保存／删除走既有 Request 事务、revision、Setup 代次保护和 Native 热采用。规则并非来源更新，不触发 subscription review。
+
+编译时跳过关闭的 App 范围、非当前订阅或 disabled link，按 package＋精确条件去重，再按 ID 排序。
+旧无 Host payload 的摘要格式保持兼容；Host 列表加入同一版本摘要，Core 验证类型、数量、排序、重复条件和整体摘要。
+`ConfigFact.applicationRoutingRules` 以 `@host:<id>` 返回已采用摘要；原逐 App key 不变。
+已落盘但采用失败时 UI 留在编辑态并可重试；删除未采用时保留失败反馈，不宣称旧规则已停止。
+
+普通节点／组按订阅绑定，不猜测同名迁移；全局自建组以稳定 ID 绑定，沿既有同步流程附着至当前配置。
+删除订阅时清理其绑定，保留其它订阅选择及全局规则；失效目标标明原因，Core 按 REJECT 处理。
+关闭、暂未就绪、空成员、未绑定等状态沿用应用策略与 Group management 的校验。
+
+### 编辑器与删除状态
+
+全屏页复用现有 `RuleEditorForm` 和可搜索的分段目标选择，条件由 Host 入口固定；
+原 AddOrEditRuleDialog 也消费同一表单，Proxies 的选点逻辑独立。
+“本 App／通用”分别持有记录与草稿；不存在时预填创建，不隐式转换或复制另一范围。
+保存当前范围后留在编辑态。删除确认限定当前范围；另一条存在则切过去，两条均无则返回 Host 列表。
+离开有草稿的页面先确认丢弃。共享 UID 修改／删除前确认完整候选范围并统一提交。
+Host 元数据记录继续使用统一 Rules 存储，普通自定义规则列表不再提供第二个 Host 设置入口。
+
+### 性能与验证边界
+
+Core 在采用配置时调用 mihomo 原规则解析器建立 package／精确 Host 内存索引，新连接复用原 UID 识别及 Match。
+匹配路径不解析配置、不读取数据库，不新增网络检测或后台轮询。泛用 Host 单独存在时不要求额外身份查询。
+目标缺失保留原规则类型进行 REJECT 追踪，既有连接不被重写或强制重连。
+
+07 的专项验证覆盖 UI 草稿／删除、文件重开、升级、版本摘要、受管来源重放及 TCP／UDP 路由优先级。
+现有 API 34 AVD 的两个受控 App 已完成 11 组配置、66 次 TCP／UDP 实际请求核对，
+验证优先级、模式差异和删除回退；原数据摘要恢复一致。版本绑定与证据在任务交付提交的 Result 中保留。
+真机耗电、旧 Android 和跨入口整体验收仍属于 09。

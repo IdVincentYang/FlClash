@@ -220,7 +220,6 @@
   "stop": "Stop",
   "key": "Key",
   "value": "Value",
-  "vpnTip": "Changes take effect after restarting the VPN",
   "vpnEnableDesc": "Route all system traffic through VpnService automatically",
   "options": "Options",
   "enabled": "Enabled",
@@ -479,7 +478,6 @@
   "accessControlSettings": "Access control settings",
   "turnOn": "Turn on",
   "turnOff": "Turn off",
-  "vpnConfigChangeDetected": "VPN-related configuration change detected",
   "restart": "Restart",
   "speedStatistics": "Speed statistics",
   "resetPageChangesTip": "This page has changes. Are you sure you want to reset?",
@@ -1264,7 +1262,6 @@
   "appPolicyNodes": "Nodes",
   "appPolicyMembers": "Browse group nodes",
   "appPolicyCapture": "Include in VPN",
-  "appPolicyEdit": "App policy",
   "appPolicyCaptureSaved": "VPN scope saved. Changes apply when the VPN is running.",
   "appPolicyCapturePending": "VPN scope is waiting to apply",
   "appPolicyDirectExceptions": "Direct · {count} app exceptions",
@@ -1285,5 +1282,57 @@
   },
   "appPolicyGlobalSaved": "Saved. App policies resume in Rule or Direct mode.",
   "appPolicyFollowRule": "Follow rules",
-  "appPolicyVpnScope": "VPN app scope"
+  "appPolicyVpnScope": "VPN app scope",
+  "appHostRuleTitle": "Rules for {host}",
+  "@appHostRuleTitle": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostScope": "This app",
+  "appHostAllScope": "All apps",
+  "appHostNotCreated": "No rule for this scope. Choose a target to create one.",
+  "appHostCreate": "Create rule",
+  "appHostDeleteConfirm": "Delete the {scope} rule for {host}?",
+  "@appHostDeleteConfirm": {
+    "placeholders": {
+      "scope": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostDiscard": "Discard unsaved changes?",
+  "appHostCount": "{count} host rules",
+  "@appHostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appHostCurrent": "New connections: {target}",
+  "@appHostCurrent": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostOnlyGeneric": "This app could not be identified. You can edit the all-app rule.",
+  "appHostDeletedPending": "Deletion saved; the previous rule may still be in use until adoption succeeds.",
+  "appHostAppDisabled": "App rules are off. Enable them on the app item.",
+  "appPolicyFollowApp": "Follow app",
+  "activityOtherExitPaths": "{count, plural, one {1 other exit path} other {{count} other exit paths}}",
+  "@activityOtherExitPaths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'application_routing.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/core.dart';
@@ -842,6 +843,7 @@ abstract class Rule with _$Rule {
     @Default(false) bool noResolve,
     @Default(false) bool src,
     String? order,
+    HostRuleBinding? hostBinding,
   }) = _Rule;
 
   factory Rule.init() {
@@ -966,6 +968,10 @@ extension RuleExt on Rule {
   String get rawValue {
     final content = realContent;
     final target = realTarget;
+    final package = hostBinding?.packageName;
+    if (package != null && content != null && target != null) {
+      return 'AND,((PROCESS-NAME,$package),(${ruleAction.value},$content)),$target';
+    }
     return [
       ruleAction.value,
       if (content?.isNotEmpty == true) content!,

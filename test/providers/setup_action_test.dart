@@ -112,6 +112,7 @@ class TestSetupAction extends SetupAction {
 
   int trafficResets = 0;
   int applyProfileCalls = 0;
+  final vpnRebuildCalls = <bool>[];
   final sourceReviewCalls = <bool>[];
   bool blockCoreCalls = false;
   Error? coreRunningError;
@@ -153,6 +154,7 @@ class TestSetupAction extends SetupAction {
     int? setupSequence,
   }) async {
     applyProfileCalls++;
+    vpnRebuildCalls.add(rebuildVpn);
     sourceReviewCalls.add(allowSourceReview);
     if (requestedRunning &&
         !ref.read(safeModeProvider) &&
@@ -696,6 +698,36 @@ void main() {
   });
 
   group('updateConfig', () {
+    for (final response in [
+      'configuration_reapply_required',
+      'config is not applied',
+    ]) {
+      test(
+        'Core $response uses a full application instead of hot adoption',
+        () async {
+          final core = _newCore();
+          when(
+            () => core.updateConfig(any()),
+          ).thenAnswer((_) async => response);
+          final scopedAction = TestSetupAction();
+          final scoped = ProviderContainer(
+            overrides: [
+              profilesProvider.overrideWith(TestProfiles.new),
+              setupActionProvider.overrideWith(() => scopedAction),
+              coreHandlerProvider.overrideWithValue(
+                CoreController.scoped(core),
+              ),
+            ],
+          );
+          scoped.listen(configProvider, (_, _) {});
+          addTearDown(scoped.dispose);
+          scoped.read(setupActionProvider.notifier);
+          await scopedAction.updateConfig();
+          expect(scopedAction.vpnRebuildCalls, [true]);
+        },
+      );
+    }
+
     test('safe mode pushes tun disabled even once authorized', () async {
       final core = _newCore();
       when(() => core.updateConfig(any())).thenAnswer((_) async => '');

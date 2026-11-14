@@ -61,26 +61,56 @@ class ApplicationPolicySwitch extends ConsumerWidget {
         fact.profileId == ref.watch(currentProfileIdProvider) &&
         packages.every(
           (name) => fact.applicationRoutingRules[name] == entries[name],
-        );
+        ) &&
+        (rule.hasDefault ||
+            settings != null &&
+                fact.applicationRoutingRevision ==
+                    ref.watch(applicationRoutingWireProvider)['revision']);
+    final hostIssue = settings?.hostRules
+        .where(
+          (r) =>
+              packages.contains(r.hostBinding?.packageName) &&
+              hostRuleApplies(r, ref.watch(currentProfileIdProvider)),
+        )
+        .map((r) => hostRuleTargetState(ref, r))
+        .whereType<ApplicationTargetState>()
+        .where(
+          (s) => s.issue != null && s.issue != ApplicationTargetIssue.preparing,
+        )
+        .firstOrNull;
     final invalid =
+        rule.enabled && hostIssue != null ||
         rule.enabled &&
-        rule.action == ApplicationRouteAction.proxy &&
-        target.issue != null &&
-        target.issue != ApplicationTargetIssue.preparing;
+            rule.hasDefault &&
+            rule.action == ApplicationRouteAction.proxy &&
+            target.issue != null &&
+            target.issue != ApplicationTargetIssue.preparing;
     final policyIdentities = packages.map((name) {
       final policy = settings?.rules[name];
       if (policy == null || !policy.enabled) return '';
-      if (policy.action != ApplicationRouteAction.proxy) {
-        return policy.action.name;
-      }
-      final target = applicationTargetFor(
-        settings!,
-        policy,
-        ref.read(currentProfileIdProvider),
-      );
-      return target?.groupId != null
+      final profile = ref.read(currentProfileIdProvider);
+      final hosts =
+          settings!.hostRules
+              .where(
+                (r) =>
+                    r.hostBinding?.packageName == name &&
+                    hostRuleApplies(r, profile),
+              )
+              .map((r) {
+                final target = hostRuleTarget(r, profile);
+                return '${hostRuleCondition(r)}:${target?.groupId != null ? 'group:${target!.groupId}' : target?.name ?? r.ruleTarget}';
+              })
+              .toList()
+            ..sort();
+      final target = applicationTargetFor(settings, policy, profile);
+      final fallback = !policy.hasDefault
+          ? ''
+          : policy.action != ApplicationRouteAction.proxy
+          ? policy.action.name
+          : target?.groupId != null
           ? 'group:${target!.groupId}'
           : target?.name ?? '';
+      return '$fallback|${hosts.join('|')}';
     }).toSet();
     final sharedConflict = policyIdentities.length > 1;
     final failed =
@@ -99,6 +129,7 @@ class ApplicationPolicySwitch extends ConsumerWidget {
                 native['captureFingerprint'] !=
                     applicationCaptureFingerprint(vpn) ||
                 target.issue == ApplicationTargetIssue.preparing &&
+                    rule.hasDefault &&
                     rule.action == ApplicationRouteAction.proxy);
     final color = failed
         ? context.colorScheme.error
@@ -107,11 +138,19 @@ class ApplicationPolicySwitch extends ConsumerWidget {
         : !rule.enabled
         ? context.colorScheme.outline
         : context.colorScheme.primary;
-    final configuredName = switch (rule.action) {
-      ApplicationRouteAction.direct => 'DIRECT',
-      ApplicationRouteAction.reject => 'REJECT',
-      ApplicationRouteAction.proxy => target.target?.name ?? l.appPolicyChoose,
-    };
+    final configuredName = !rule.hasDefault
+        ? l.appHostCount(
+            settings?.hostRules
+                    .where((r) => r.hostBinding?.packageName == packages.first)
+                    .length ??
+                0,
+          )
+        : switch (rule.action) {
+            ApplicationRouteAction.direct => 'DIRECT',
+            ApplicationRouteAction.reject => 'REJECT',
+            ApplicationRouteAction.proxy =>
+              target.target?.name ?? l.appPolicyChoose,
+          };
     final name = !rule.enabled
         ? (ref.watch(patchClashConfigProvider).mode == Mode.direct
               ? 'DIRECT'
@@ -134,7 +173,10 @@ class ApplicationPolicySwitch extends ConsumerWidget {
             ? l.appPolicySharedIdentity(packages.join('\n'))
             : null) ??
         (invalid
-            ? applicationTargetIssueText(context, target.issue)
+            ? applicationTargetIssueText(
+                context,
+                hostIssue?.issue ?? target.issue,
+              )
             : global
             ? l.appPolicyGlobalPaused
             : !captured
@@ -210,6 +252,7 @@ class ApplicationPolicySwitch extends ConsumerWidget {
                           return;
                         }
                         if (enabled &&
+                            rule.hasDefault &&
                             rule.action == ApplicationRouteAction.proxy &&
                             !target.available) {
                           await BaseNavigator.push(

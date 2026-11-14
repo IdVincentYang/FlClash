@@ -1561,6 +1561,17 @@ class $RulesTable extends Rules with TableInfo<$RulesTable, RawRule> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _hostBindingMeta = const VerificationMeta(
+    'hostBinding',
+  );
+  @override
+  late final GeneratedColumn<String> hostBinding = GeneratedColumn<String>(
+    'host_binding',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1571,6 +1582,7 @@ class $RulesTable extends Rules with TableInfo<$RulesTable, RawRule> {
     subRule,
     noResolve,
     src,
+    hostBinding,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1626,6 +1638,15 @@ class $RulesTable extends Rules with TableInfo<$RulesTable, RawRule> {
         src.isAcceptableOrUnknown(data['src']!, _srcMeta),
       );
     }
+    if (data.containsKey('host_binding')) {
+      context.handle(
+        _hostBindingMeta,
+        hostBinding.isAcceptableOrUnknown(
+          data['host_binding']!,
+          _hostBindingMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1669,6 +1690,10 @@ class $RulesTable extends Rules with TableInfo<$RulesTable, RawRule> {
         DriftSqlType.bool,
         data['${effectivePrefix}src'],
       )!,
+      hostBinding: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}host_binding'],
+      ),
     );
   }
 
@@ -1690,6 +1715,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
   final String? subRule;
   final bool noResolve;
   final bool src;
+  final String? hostBinding;
   const RawRule({
     required this.id,
     required this.ruleAction,
@@ -1699,6 +1725,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
     this.subRule,
     required this.noResolve,
     required this.src,
+    this.hostBinding,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1723,6 +1750,9 @@ class RawRule extends DataClass implements Insertable<RawRule> {
     }
     map['no_resolve'] = Variable<bool>(noResolve);
     map['src'] = Variable<bool>(src);
+    if (!nullToAbsent || hostBinding != null) {
+      map['host_binding'] = Variable<String>(hostBinding);
+    }
     return map;
   }
 
@@ -1744,6 +1774,9 @@ class RawRule extends DataClass implements Insertable<RawRule> {
           : Value(subRule),
       noResolve: Value(noResolve),
       src: Value(src),
+      hostBinding: hostBinding == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hostBinding),
     );
   }
 
@@ -1763,6 +1796,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
       subRule: serializer.fromJson<String?>(json['subRule']),
       noResolve: serializer.fromJson<bool>(json['noResolve']),
       src: serializer.fromJson<bool>(json['src']),
+      hostBinding: serializer.fromJson<String?>(json['hostBinding']),
     );
   }
   @override
@@ -1779,6 +1813,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
       'subRule': serializer.toJson<String?>(subRule),
       'noResolve': serializer.toJson<bool>(noResolve),
       'src': serializer.toJson<bool>(src),
+      'hostBinding': serializer.toJson<String?>(hostBinding),
     };
   }
 
@@ -1791,6 +1826,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
     Value<String?> subRule = const Value.absent(),
     bool? noResolve,
     bool? src,
+    Value<String?> hostBinding = const Value.absent(),
   }) => RawRule(
     id: id ?? this.id,
     ruleAction: ruleAction ?? this.ruleAction,
@@ -1800,6 +1836,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
     subRule: subRule.present ? subRule.value : this.subRule,
     noResolve: noResolve ?? this.noResolve,
     src: src ?? this.src,
+    hostBinding: hostBinding.present ? hostBinding.value : this.hostBinding,
   );
   RawRule copyWithCompanion(RulesCompanion data) {
     return RawRule(
@@ -1817,6 +1854,9 @@ class RawRule extends DataClass implements Insertable<RawRule> {
       subRule: data.subRule.present ? data.subRule.value : this.subRule,
       noResolve: data.noResolve.present ? data.noResolve.value : this.noResolve,
       src: data.src.present ? data.src.value : this.src,
+      hostBinding: data.hostBinding.present
+          ? data.hostBinding.value
+          : this.hostBinding,
     );
   }
 
@@ -1830,7 +1870,8 @@ class RawRule extends DataClass implements Insertable<RawRule> {
           ..write('ruleProvider: $ruleProvider, ')
           ..write('subRule: $subRule, ')
           ..write('noResolve: $noResolve, ')
-          ..write('src: $src')
+          ..write('src: $src, ')
+          ..write('hostBinding: $hostBinding')
           ..write(')'))
         .toString();
   }
@@ -1845,6 +1886,7 @@ class RawRule extends DataClass implements Insertable<RawRule> {
     subRule,
     noResolve,
     src,
+    hostBinding,
   );
   @override
   bool operator ==(Object other) =>
@@ -1857,7 +1899,8 @@ class RawRule extends DataClass implements Insertable<RawRule> {
           other.ruleProvider == this.ruleProvider &&
           other.subRule == this.subRule &&
           other.noResolve == this.noResolve &&
-          other.src == this.src);
+          other.src == this.src &&
+          other.hostBinding == this.hostBinding);
 }
 
 class RulesCompanion extends UpdateCompanion<RawRule> {
@@ -1869,6 +1912,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
   final Value<String?> subRule;
   final Value<bool> noResolve;
   final Value<bool> src;
+  final Value<String?> hostBinding;
   const RulesCompanion({
     this.id = const Value.absent(),
     this.ruleAction = const Value.absent(),
@@ -1878,6 +1922,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
     this.subRule = const Value.absent(),
     this.noResolve = const Value.absent(),
     this.src = const Value.absent(),
+    this.hostBinding = const Value.absent(),
   });
   RulesCompanion.insert({
     this.id = const Value.absent(),
@@ -1888,6 +1933,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
     this.subRule = const Value.absent(),
     this.noResolve = const Value.absent(),
     this.src = const Value.absent(),
+    this.hostBinding = const Value.absent(),
   }) : ruleAction = Value(ruleAction);
   static Insertable<RawRule> custom({
     Expression<int>? id,
@@ -1898,6 +1944,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
     Expression<String>? subRule,
     Expression<bool>? noResolve,
     Expression<bool>? src,
+    Expression<String>? hostBinding,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1908,6 +1955,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
       if (subRule != null) 'sub_rule': subRule,
       if (noResolve != null) 'no_resolve': noResolve,
       if (src != null) 'src': src,
+      if (hostBinding != null) 'host_binding': hostBinding,
     });
   }
 
@@ -1920,6 +1968,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
     Value<String?>? subRule,
     Value<bool>? noResolve,
     Value<bool>? src,
+    Value<String?>? hostBinding,
   }) {
     return RulesCompanion(
       id: id ?? this.id,
@@ -1930,6 +1979,7 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
       subRule: subRule ?? this.subRule,
       noResolve: noResolve ?? this.noResolve,
       src: src ?? this.src,
+      hostBinding: hostBinding ?? this.hostBinding,
     );
   }
 
@@ -1962,6 +2012,9 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
     if (src.present) {
       map['src'] = Variable<bool>(src.value);
     }
+    if (hostBinding.present) {
+      map['host_binding'] = Variable<String>(hostBinding.value);
+    }
     return map;
   }
 
@@ -1975,7 +2028,8 @@ class RulesCompanion extends UpdateCompanion<RawRule> {
           ..write('ruleProvider: $ruleProvider, ')
           ..write('subRule: $subRule, ')
           ..write('noResolve: $noResolve, ')
-          ..write('src: $src')
+          ..write('src: $src, ')
+          ..write('hostBinding: $hostBinding')
           ..write(')'))
         .toString();
   }
@@ -6848,6 +6902,7 @@ typedef $$RulesTableCreateCompanionBuilder =
       Value<String?> subRule,
       Value<bool> noResolve,
       Value<bool> src,
+      Value<String?> hostBinding,
     });
 typedef $$RulesTableUpdateCompanionBuilder =
     RulesCompanion Function({
@@ -6859,6 +6914,7 @@ typedef $$RulesTableUpdateCompanionBuilder =
       Value<String?> subRule,
       Value<bool> noResolve,
       Value<bool> src,
+      Value<String?> hostBinding,
     });
 
 final class $$RulesTableReferences
@@ -6935,6 +6991,11 @@ class $$RulesTableFilterComposer extends Composer<_$Database, $RulesTable> {
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get hostBinding => $composableBuilder(
+    column: $table.hostBinding,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> profileRuleLinksRefs(
     Expression<bool> Function($$ProfileRuleLinksTableFilterComposer f) f,
   ) {
@@ -7008,6 +7069,11 @@ class $$RulesTableOrderingComposer extends Composer<_$Database, $RulesTable> {
     column: $table.src,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get hostBinding => $composableBuilder(
+    column: $table.hostBinding,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RulesTableAnnotationComposer extends Composer<_$Database, $RulesTable> {
@@ -7048,6 +7114,11 @@ class $$RulesTableAnnotationComposer extends Composer<_$Database, $RulesTable> {
 
   GeneratedColumn<bool> get src =>
       $composableBuilder(column: $table.src, builder: (column) => column);
+
+  GeneratedColumn<String> get hostBinding => $composableBuilder(
+    column: $table.hostBinding,
+    builder: (column) => column,
+  );
 
   Expression<T> profileRuleLinksRefs<T extends Object>(
     Expression<T> Function($$ProfileRuleLinksTableAnnotationComposer a) f,
@@ -7111,6 +7182,7 @@ class $$RulesTableTableManager
                 Value<String?> subRule = const Value.absent(),
                 Value<bool> noResolve = const Value.absent(),
                 Value<bool> src = const Value.absent(),
+                Value<String?> hostBinding = const Value.absent(),
               }) => RulesCompanion(
                 id: id,
                 ruleAction: ruleAction,
@@ -7120,6 +7192,7 @@ class $$RulesTableTableManager
                 subRule: subRule,
                 noResolve: noResolve,
                 src: src,
+                hostBinding: hostBinding,
               ),
           createCompanionCallback:
               ({
@@ -7131,6 +7204,7 @@ class $$RulesTableTableManager
                 Value<String?> subRule = const Value.absent(),
                 Value<bool> noResolve = const Value.absent(),
                 Value<bool> src = const Value.absent(),
+                Value<String?> hostBinding = const Value.absent(),
               }) => RulesCompanion.insert(
                 id: id,
                 ruleAction: ruleAction,
@@ -7140,6 +7214,7 @@ class $$RulesTableTableManager
                 subRule: subRule,
                 noResolve: noResolve,
                 src: src,
+                hostBinding: hostBinding,
               ),
           withReferenceMapper: (p0) => p0
               .map(

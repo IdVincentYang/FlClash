@@ -168,7 +168,12 @@ class _RuleItemLabel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          rule.ruleAction.name,
+          rule.hostBinding == null
+              ? rule.ruleAction.name
+              : rule.hostBinding!.packageName ??
+                    context.appLocalizations.appHostAllScope,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: style.copyWith(
             fontSize: context.textTheme.bodyLarge?.fontSize,
           ),
@@ -232,184 +237,197 @@ class AddOrEditRuleDialog extends StatefulWidget {
 }
 
 class _AddOrEditRuleDialogState extends State<AddOrEditRuleDialog> {
-  late RuleAction _ruleAction;
-  String _ruleTarget = '';
-  final _ruleTargetController = TextEditingController();
-  final _contentController = TextEditingController();
-  bool _noResolve = false;
-  bool _src = false;
-  List<DropdownMenuEntry> _targetItems = [];
-  final _formKey = GlobalKey<FormState>();
+  final _editor = GlobalKey<RuleEditorFormState>();
+  void _submit() {
+    final rule = _editor.currentState?.validatedValue();
+    if (rule != null) {
+      Navigator.of(
+        context,
+      ).pop(rule.copyWith(id: widget.rule?.id ?? snowflake.id));
+    }
+  }
 
-  bool _initialized = false;
+  @override
+  Widget build(BuildContext context) => CommonDialog(
+    title: widget.rule == null
+        ? context.appLocalizations.addRule
+        : context.appLocalizations.editRule,
+    actions: [
+      TextButton(
+        onPressed: _submit,
+        child: Text(context.appLocalizations.confirm),
+      ),
+    ],
+    child: RuleEditorForm(
+      key: _editor,
+      rule: widget.rule ?? Rule.init(),
+      onSubmitted: _submit,
+    ),
+  );
+}
 
+class RuleEditorForm extends StatefulWidget {
+  const RuleEditorForm({
+    super.key,
+    required this.rule,
+    this.onChanged,
+    this.onSubmitted,
+    this.fixedCondition = false,
+    this.targetBuilder,
+  });
+  final Rule rule;
+  final ValueChanged<Rule>? onChanged;
+  final VoidCallback? onSubmitted;
+  final bool fixedCondition;
+  final Widget Function(BuildContext, Rule, ValueChanged<Rule>)? targetBuilder;
+  @override
+  State<RuleEditorForm> createState() => RuleEditorFormState();
+}
+
+class RuleEditorFormState extends State<RuleEditorForm> {
+  final _content = TextEditingController();
+  final _target = TextEditingController();
+  final _form = GlobalKey<FormState>();
+  late Rule _value;
+  late List<DropdownMenuEntry> _targets;
+  bool _initialized = false, _resetting = false;
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_initialized) {
-      return;
-    }
+    if (_initialized) return;
     _initialized = true;
-    _initState();
-  }
-
-  void _initState() {
-    _targetItems = [
+    _targets = [
       ...RuleTarget.values.map(
-        (item) => DropdownMenuEntry(value: item.value, label: item.value),
+        (e) => DropdownMenuEntry(value: e.value, label: e.value),
       ),
       DropdownMenuEntry(
         value: RuleAction.MATCH.value,
         label: context.appLocalizations.matchTarget,
       ),
     ];
-    final rule = widget.rule;
-    if (rule != null) {
-      _ruleAction = rule.ruleAction;
-      _contentController.text = rule.content ?? '';
-      _selectTarget(rule.ruleTarget ?? '');
-      _noResolve = rule.noResolve;
-      _src = rule.src;
-      return;
-    }
-    _ruleAction = RuleAction.addedRuleActions.first;
-    if (_targetItems.isNotEmpty) {
-      _selectTarget(_targetItems.first.value);
-    }
+    _reset(widget.rule);
+    _content.addListener(_contentChanged);
   }
 
-  void _selectTarget(String value) {
-    _ruleTarget = value;
-    _ruleTargetController.text =
-        _targetItems.firstWhereOrNull((item) => item.value == value)?.label ??
-        value;
+  void _reset(Rule rule) {
+    _resetting = true;
+    _value = rule;
+    _content.text = rule.content ?? '';
+    _target.text =
+        _targets.firstWhereOrNull((e) => e.value == rule.ruleTarget)?.label ??
+        rule.ruleTarget ??
+        '';
+    _resetting = false;
   }
 
   @override
-  void didUpdateWidget(AddOrEditRuleDialog oldWidget) {
+  void didUpdateWidget(RuleEditorForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.rule != widget.rule) {
-      _initState();
+    if (oldWidget.rule != widget.rule && widget.rule != _value) {
+      _reset(widget.rule);
     }
   }
 
+  void _contentChanged() {
+    if (_resetting) return;
+    _value = _value.copyWith(content: _content.text);
+    widget.onChanged?.call(_value);
+  }
+
+  void _update(Rule rule) {
+    setState(() {
+      _value = rule;
+      _target.text =
+          _targets.firstWhereOrNull((e) => e.value == rule.ruleTarget)?.label ??
+          rule.ruleTarget ??
+          '';
+    });
+    widget.onChanged?.call(rule);
+  }
+
+  Rule? validatedValue() =>
+      _form.currentState?.validate() == true ? _value : null;
   @override
   void dispose() {
-    _ruleTargetController.dispose();
-    _contentController.dispose();
+    _content.dispose();
+    _target.dispose();
     super.dispose();
-  }
-
-  void _handleSubmit() {
-    final res = _formKey.currentState?.validate();
-    if (res == false) {
-      return;
-    }
-    final rule = Rule(
-      id: widget.rule?.id ?? snowflake.id,
-      ruleAction: _ruleAction,
-      content: _contentController.text,
-      ruleTarget: _ruleTarget,
-      noResolve: _noResolve,
-      src: _src,
-    );
-    Navigator.of(context).pop(rule);
   }
 
   @override
   Widget build(BuildContext context) {
-    final appLocalizations = context.appLocalizations;
-    return CommonDialog(
-      title: widget.rule != null
-          ? appLocalizations.editRule
-          : appLocalizations.addRule,
-      actions: [
-        TextButton(
-          onPressed: _handleSubmit,
-          child: Text(appLocalizations.confirm),
-        ),
-      ],
-      child: DropdownMenuTheme(
-        data: DropdownMenuThemeData(
-          inputDecorationTheme: InputDecorationTheme(
-            border: AppShape.input,
-            labelStyle: context.textTheme.bodyLarge?.copyWith(
-              overflow: TextOverflow.ellipsis,
-            ),
+    final l = context.appLocalizations;
+    return DropdownMenuTheme(
+      data: DropdownMenuThemeData(
+        inputDecorationTheme: InputDecorationTheme(
+          border: AppShape.input,
+          labelStyle: context.textTheme.bodyLarge?.copyWith(
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        child: Form(
-          key: _formKey,
-          child: LayoutBuilder(
-            builder: (_, constraints) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ElasticButton(
-                    child: FilledButton.tonal(
-                      onPressed: () async {
-                        _ruleAction =
-                            await dialogs.showCommonDialog<RuleAction>(
-                              context: context,
-                              child: OptionsDialog<RuleAction>(
-                                title: appLocalizations.ruleName,
-                                options: RuleAction.addedRuleActions,
-                                textBuilder: (item) => item.value,
-                                value: _ruleAction,
-                              ),
-                            ) ??
-                            _ruleAction;
-                        setState(() {});
-                      },
-                      child: Text(_ruleAction.value),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _RuleContentField(
-                    controller: _contentController,
-                    onSubmitted: _handleSubmit,
-                  ),
-                  const SizedBox(height: 24),
-                  _RuleTargetField(
-                    controller: _ruleTargetController,
-                    entries: _targetItems,
-                    onSelected: (value) {
-                      if (value != null) {
-                        _selectTarget(value);
+      ),
+      child: Form(
+        key: _form,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FilledButton.tonal(
+              onPressed: widget.fixedCondition
+                  ? null
+                  : () async {
+                      final action = await dialogs.showCommonDialog<RuleAction>(
+                        context: context,
+                        child: OptionsDialog<RuleAction>(
+                          title: l.ruleName,
+                          options: RuleAction.addedRuleActions,
+                          textBuilder: (item) => item.value,
+                          value: _value.ruleAction,
+                        ),
+                      );
+                      if (action != null && mounted) {
+                        _update(_value.copyWith(ruleAction: action));
                       }
                     },
+              child: Text(_value.ruleAction.value),
+            ),
+            const SizedBox(height: 24),
+            _RuleContentField(
+              controller: _content,
+              readOnly: widget.fixedCondition,
+              onSubmitted: () => widget.onSubmitted?.call(),
+            ),
+            const SizedBox(height: 24),
+            widget.targetBuilder?.call(context, _value, _update) ??
+                _RuleTargetField(
+                  controller: _target,
+                  entries: _targets,
+                  onSelected: (value) {
+                    if (value != null) {
+                      _update(_value.copyWith(ruleTarget: value));
+                    }
+                  },
+                ),
+            if (_value.ruleAction.hasParams && !widget.fixedCondition) ...[
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _RuleFlagChip(
+                    label: l.sourceIp,
+                    isSelected: _value.src,
+                    onPressed: () => _update(_value.copyWith(src: !_value.src)),
                   ),
-                  if (_ruleAction.hasParams) ...[
-                    const SizedBox(height: 20),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _RuleFlagChip(
-                          label: appLocalizations.sourceIp,
-                          isSelected: _src,
-                          onPressed: () {
-                            setState(() {
-                              _src = !_src;
-                            });
-                          },
-                        ),
-                        _RuleFlagChip(
-                          label: appLocalizations.noResolve,
-                          isSelected: _noResolve,
-                          onPressed: () {
-                            setState(() {
-                              _noResolve = !_noResolve;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 20),
+                  _RuleFlagChip(
+                    label: l.noResolve,
+                    isSelected: _value.noResolve,
+                    onPressed: () =>
+                        _update(_value.copyWith(noResolve: !_value.noResolve)),
+                  ),
                 ],
-              );
-            },
-          ),
+              ),
+            ],
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
@@ -420,15 +438,18 @@ class _RuleContentField extends StatelessWidget {
   const _RuleContentField({
     required this.controller,
     required this.onSubmitted,
+    this.readOnly = false,
   });
 
   final TextEditingController controller;
   final VoidCallback onSubmitted;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     return TextFormField(
+      readOnly: readOnly,
       keyboardType: TextInputType.text,
       inputFormatters: TextInputLimits.limit(TextInputLimits.rule),
       onFieldSubmitted: (_) {

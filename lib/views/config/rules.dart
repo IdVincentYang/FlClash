@@ -24,6 +24,7 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
 
   List<Rule> _visibleRules(List<Rule> rules) {
     return rules
+        .where((rule) => rule.hostBinding == null)
         .whereMatches(_query, (rule) => rule.searchFields, texts: _searchTexts)
         .toList();
   }
@@ -168,7 +169,18 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
                       ),
                   itemExtent: ruleItemHeight,
                   itemCount: rules.length,
-                  onReorderItem: ref.read(globalRulesProvider.notifier).order,
+                  onReorderItem: (oldIndex, newIndex) {
+                    final all = ref.read(globalRulesProvider).value ?? [];
+                    final from = all.indexWhere(
+                      (rule) => rule.id == rules[oldIndex].id,
+                    );
+                    final to = all.indexWhere(
+                      (rule) => rule.id == rules[newIndex].id,
+                    );
+                    if (from >= 0 && to >= 0) {
+                      ref.read(globalRulesProvider.notifier).order(from, to);
+                    }
+                  },
                 ),
         ),
       ),

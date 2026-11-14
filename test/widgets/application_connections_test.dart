@@ -315,6 +315,16 @@ void main() {
         ),
       ).style;
 
+  testWidgets('connection menu only changes observation scope', (tester) async {
+    store.addEvent(connection('one'));
+    await pump(tester);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('Host rules'), findsNothing);
+    expect(find.text('All apps for this target'), findsOneWidget);
+    expect(find.text('Only show active connections'), findsOneWidget);
+  });
+
   testWidgets('measured HK exit wins over a mainland entry and a node label', (
     tester,
   ) async {
@@ -400,12 +410,19 @@ void main() {
       store
         ..addEvent(active)
         ..addEvent(
-          connection('newer-ended', offset: 2, server: '114.114.114.114'),
+          connection(
+            'newer-ended',
+            offset: 2,
+            server: '114.114.114.114',
+            exit: 'Old node',
+          ),
         );
       store.applySnapshot([active], startedRevision: store.revision, now: now);
       await pump(tester, child: _targets);
       expect(find.text('🇺🇸'), findsOneWidget);
       expect(exits.requests.single.entry, '8.8.8.8');
+      expect(find.text('US 01 → Proxy · 1 other exit path'), findsOneWidget);
+      expect(find.textContaining('Old node'), findsNothing);
       expect(
         tester
             .widget<ConnectionExitIcon>(find.byType(ConnectionExitIcon))

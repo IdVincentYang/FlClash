@@ -220,7 +220,6 @@
   "stop": "暂停",
   "key": "键",
   "value": "值",
-  "vpnTip": "重启VPN后改变生效",
   "vpnEnableDesc": "通过VpnService自动路由系统所有流量",
   "options": "选项",
   "enabled": "已开启",
@@ -479,7 +478,6 @@
   "accessControlSettings": "访问控制设置",
   "turnOn": "开启",
   "turnOff": "关闭",
-  "vpnConfigChangeDetected": "检测到VPN相关配置改动",
   "restart": "重启",
   "speedStatistics": "网速统计",
   "resetPageChangesTip": "当前页面存在更改，确定重置吗？",
@@ -1264,7 +1262,6 @@
   "appPolicyNodes": "节点",
   "appPolicyMembers": "查看组内节点",
   "appPolicyCapture": "纳入 VPN",
-  "appPolicyEdit": "应用策略",
   "appPolicyCaptureSaved": "VPN 范围已保存，VPN 运行时应用。",
   "appPolicyCapturePending": "VPN 范围等待应用",
   "appPolicyDirectExceptions": "Direct · {count} 个应用例外",
@@ -1285,5 +1282,57 @@
   },
   "appPolicyGlobalSaved": "已保存，切回 Rule／Direct 后生效。",
   "appPolicyFollowRule": "跟随规则",
-  "appPolicyVpnScope": "VPN 应用范围"
+  "appPolicyVpnScope": "VPN 应用范围",
+  "appHostRuleTitle": "{host} 的规则",
+  "@appHostRuleTitle": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostScope": "本 App",
+  "appHostAllScope": "通用",
+  "appHostNotCreated": "当前范围尚未创建规则，选择策略后可创建。",
+  "appHostCreate": "创建规则",
+  "appHostDeleteConfirm": "删除 {host} 的“{scope}”规则？",
+  "@appHostDeleteConfirm": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "scope": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostDiscard": "放弃尚未保存的修改？",
+  "appHostCount": "{count} 条 Host 规则",
+  "@appHostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appHostCurrent": "新连接采用：{target}",
+  "@appHostCurrent": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostOnlyGeneric": "当前应用无法可靠识别，可编辑通用规则。",
+  "appHostDeletedPending": "删除已保存，配置采用成功前旧规则可能仍在使用。",
+  "appHostAppDisabled": "应用规则已关闭，可在应用条目右侧开启。",
+  "appPolicyFollowApp": "跟随应用",
+  "activityOtherExitPaths": "另有 {count} 条路径",
+  "@activityOtherExitPaths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -220,7 +220,6 @@
   "stop": "停止",
   "key": "キー",
   "value": "値",
-  "vpnTip": "変更はVPNの再起動後に有効になります",
   "vpnEnableDesc": "VpnServiceでシステムの全トラフィックを自動的にルーティングします",
   "options": "オプション",
   "enabled": "有効",
@@ -479,7 +478,6 @@
   "accessControlSettings": "アクセス制御の設定",
   "turnOn": "オンにする",
   "turnOff": "オフにする",
-  "vpnConfigChangeDetected": "VPN関連の設定変更を検出しました",
   "restart": "再起動",
   "speedStatistics": "速度統計",
   "resetPageChangesTip": "このページには変更があります。リセットしてもよろしいですか？",
@@ -1264,7 +1262,6 @@
   "appPolicyNodes": "ノード",
   "appPolicyMembers": "グループ内のノード",
   "appPolicyCapture": "VPN の対象にする",
-  "appPolicyEdit": "アプリのポリシー",
   "appPolicyCaptureSaved": "VPN の対象を保存しました。VPN 実行時に適用されます。",
   "appPolicyCapturePending": "VPN の対象の適用を待機中",
   "appPolicyDirectExceptions": "Direct · {count} 件のアプリ例外",
@@ -1285,5 +1282,57 @@
   },
   "appPolicyGlobalSaved": "保存しました。Rule または Direct で有効になります。",
   "appPolicyFollowRule": "ルールに従う",
-  "appPolicyVpnScope": "VPN の対象アプリ"
+  "appPolicyVpnScope": "VPN の対象アプリ",
+  "appHostRuleTitle": "{host} のルール",
+  "@appHostRuleTitle": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostScope": "このアプリ",
+  "appHostAllScope": "共通",
+  "appHostNotCreated": "この範囲のルールはありません。接続先を選んで作成できます。",
+  "appHostCreate": "ルールを作成",
+  "appHostDeleteConfirm": "{host} の「{scope}」ルールを削除しますか？",
+  "@appHostDeleteConfirm": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "scope": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostDiscard": "未保存の変更を破棄しますか？",
+  "appHostCount": "ホストルール {count} 件",
+  "@appHostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "appHostCurrent": "新しい接続：{target}",
+  "@appHostCurrent": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "appHostOnlyGeneric": "アプリを識別できません。全アプリ向けルールは編集できます。",
+  "appHostDeletedPending": "削除を保存しました。適用されるまで以前のルールが使われる場合があります。",
+  "appHostAppDisabled": "アプリのルールはオフです。アプリの項目から有効にできます。",
+  "appPolicyFollowApp": "アプリに従う",
+  "activityOtherExitPaths": "他に {count} 件の経路",
+  "@activityOtherExitPaths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

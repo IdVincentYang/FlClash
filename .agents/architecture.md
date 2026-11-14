@@ -350,7 +350,11 @@ application-window placeholders, a persistent search field below the title and a
 Confirmed-active apps lead the recent list; compact count/time rows emphasize only a positive active count.
 Normal observation/retention chrome and manual refresh are absent; actual read failures retain inline retries.
 Observation gaps remain internal rather than a persistent warning. It consumes the queries and existing package
-directory; explicit VPN-scope edits use the existing Setup/ServiceState transition owner. See the application network design above for
+directory; effective Android VPN-option changes use the existing Setup/ServiceState transition owner.
+ApplicationInputAction compares VpnOptions within the settings transaction, including TUN stack and network-derived options;
+a stopped VPN stays stopped. Core configuration_reapply_required responses use full application rather than inline source
+adoption. There is no separate configuration-difference Restart notifier; failed adoption remains authoritative in
+configuration/service state and existing error feedback. See the application network design above for
 retention, lifecycle and observation limits.
 
 ApplicationRoutingSettings uses a schema-16 Drift singleton JSON library: app intent is global, ordinary targets
@@ -802,7 +806,7 @@ AppEnvManager > LocaleManager > StatusManager > ThemeManager
   > [Desktop: WindowManager > TrayManager > HotKeyManager > ProxyManager]
     [Mobile:  AndroidManager > TileManager]
   > AppStateManager > CoreManager > ConnectivityManager
-  > [Desktop: WindowHeaderContainer] [Mobile: VpnManager]
+  > [Desktop: WindowHeaderContainer]
   > app content
 ```
 

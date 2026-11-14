@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/application_routing.dart';
@@ -11,24 +11,24 @@ import 'providers.dart';
 
 final applicationRoutingSettingsProvider =
     StreamProvider<ApplicationRoutingSettings>((ref) {
-      return database.applicationRoutingLibrary().watchSingleOrNull().map(
-        (row) => row == null
-            ? const ApplicationRoutingSettings()
-            : ApplicationRoutingSettings.fromJson(
-                Map<String, dynamic>.from(jsonDecode(row.settings) as Map),
-              ),
-      );
+      return database.watchApplicationRouting();
     });
 
-final applicationRoutingKeysProvider = Provider<Map<String, String>>((ref) {
-  final settings =
-      ref.watch(applicationRoutingSettingsProvider).value ??
-      const ApplicationRoutingSettings();
-  final wire = compileApplicationRouting(
-    settings,
+final applicationRoutingWireProvider = Provider<Map<String, dynamic>>(
+  (ref) => compileApplicationRouting(
+    ref.watch(applicationRoutingSettingsProvider).value ??
+        const ApplicationRoutingSettings(),
     ref.watch(currentProfileIdProvider),
-  );
+  ),
+);
+
+final applicationRoutingKeysProvider = Provider<Map<String, String>>((ref) {
+  final wire = ref.watch(applicationRoutingWireProvider);
   return {
+    for (final entry in wire['hostRules'] as List? ?? [])
+      '@host:${entry['id']}': hostRuleKey(
+        Map<String, dynamic>.from(entry as Map),
+      ),
     for (final entry in wire['rules'] as List)
       entry['package'] as String: applicationRuleKey(
         Map<String, dynamic>.from(entry as Map),
@@ -59,8 +59,10 @@ class ApplicationRoutingController
 
   Future<void> _change(
     Set<String> affected,
-    ApplicationRoutingSettings Function(ApplicationRoutingSettings) update,
-  ) async {
+    FutureOr<ApplicationRoutingSettings> Function(ApplicationRoutingSettings)
+    update, {
+    bool rebuild = false,
+  }) async {
     final generation = ++_generation;
     state = ApplicationRoutingOperation(
       pending: {...state.pending, ...affected},
@@ -73,24 +75,38 @@ class ApplicationRoutingController
       final saved = await request.mutate(
         () => database.transaction(() async {
           final previous = await database.readApplicationRouting();
-          return database.writeApplicationRouting(update(previous));
+          return database.writeApplicationRouting(await update(previous));
         }),
       );
       persisted = true;
       if (!ref.mounted || generation != _generation) return;
       setup.reserveSetupSequence();
-      final needsGroupBinding = affected.any((package) {
-        final rule = saved.rules[package];
-        return rule != null &&
-            rule.enabled &&
-            rule.action == ApplicationRouteAction.proxy &&
-            applicationTargetFor(
-                  saved,
-                  rule,
-                  ref.read(currentProfileIdProvider),
-                )?.kind ==
-                ApplicationTargetKind.globalGroup;
-      });
+      final needsGroupBinding =
+          saved.hostRules.any(
+            (r) =>
+                hostRuleApplies(r, ref.read(currentProfileIdProvider)) &&
+                (affected.contains('@host:${r.id}') ||
+                    affected.contains(r.hostBinding!.packageName)) &&
+                (r.hostBinding!.packageName == null ||
+                    saved.rules[r.hostBinding!.packageName]?.enabled == true) &&
+                hostRuleTarget(
+                      r,
+                      ref.read(currentProfileIdProvider),
+                    )?.groupId !=
+                    null,
+          ) ||
+          affected.any((package) {
+            final rule = saved.rules[package];
+            return rule != null &&
+                rule.enabled &&
+                rule.action == ApplicationRouteAction.proxy &&
+                applicationTargetFor(
+                      saved,
+                      rule,
+                      ref.read(currentProfileIdProvider),
+                    )?.kind ==
+                    ApplicationTargetKind.globalGroup;
+          });
       if (needsGroupBinding) {
         await ref
             .read(globalGroupsActionProvider.notifier)
@@ -107,7 +123,11 @@ class ApplicationRoutingController
         rethrow;
       }
       if (!ref.mounted || generation != _generation) return;
-      if (fact.profileId == profileId && fact.phase == 'ready') {
+      if (rebuild && ref.read(initProvider)) {
+        if (!await setup.applyProfile(force: true, allowSourceReview: false)) {
+          throw const RequestUnavailable('configuration_reapply_required');
+        }
+      } else if (fact.profileId == profileId && fact.phase == 'ready') {
         final result = await core.updateApplicationRouting(
           compileApplicationRouting(saved, profileId),
         );
@@ -175,6 +195,7 @@ class ApplicationRoutingController
         final rule =
             rules[package] ?? ApplicationRouteRule(packageName: package);
         rules[package] = rule.copyWith(
+          hasDefault: true,
           enabled: enable ?? rule.enabled,
           action: action,
           useSharedTarget: shared,
@@ -186,6 +207,78 @@ class ApplicationRoutingController
       }
       return previous.copyWith(rules: rules);
     });
+  }
+
+  Future<void> saveHostRules(
+    List<Rule> hostRules, {
+    required int expectedProfileId,
+  }) => _change(
+    {
+      for (final rule in hostRules) ...{
+        ?rule.hostBinding?.packageName,
+        '@host:${rule.id}',
+      },
+    },
+    (previous) async {
+      if (ref.read(currentProfileIdProvider) != expectedProfileId) {
+        throw MessageException(currentAppLocalizations.localGroupsChanged);
+      }
+      for (final rule in hostRules) {
+        await database.rulesDao.putGlobalRule(
+          rule.copyWith(hostBinding: rule.hostBinding!.copyWith(legacy: false)),
+        );
+        await database.rulesDao.delDisabledLink(expectedProfileId, rule.id);
+      }
+      final next = await database.readApplicationRouting();
+      final rules = Map.of(next.rules);
+      for (final rule in hostRules) {
+        final package = rule.hostBinding?.packageName;
+        if (package != null) {
+          rules.putIfAbsent(
+            package,
+            () => ApplicationRouteRule(
+              packageName: package,
+              hasDefault: false,
+              useSharedTarget: false,
+            ),
+          );
+        }
+      }
+      return next.copyWith(rules: rules);
+    },
+    rebuild: hostRules.any((r) => r.hostBinding?.legacy == true),
+  );
+
+  Future<void> deleteHostRules(Iterable<int> ids) async {
+    final keys = ids.toSet();
+    final before = await database.readApplicationRouting();
+    return _change(
+      {
+        for (final rule in before.hostRules)
+          if (keys.contains(rule.id)) ...{
+            '@host:${rule.id}',
+            ?rule.hostBinding?.packageName,
+          },
+      },
+      (previous) async {
+        await database.rulesDao.delRules(keys);
+        final next = await database.readApplicationRouting();
+        return next.copyWith(
+          rules: Map.fromEntries(
+            next.rules.entries.where(
+              (entry) =>
+                  entry.value.hasDefault ||
+                  next.hostRules.any(
+                    (rule) => rule.hostBinding?.packageName == entry.key,
+                  ),
+            ),
+          ),
+        );
+      },
+      rebuild: before.hostRules.any(
+        (r) => keys.contains(r.id) && r.hostBinding!.legacy,
+      ),
+    );
   }
 
   Future<void> setSharedTarget(

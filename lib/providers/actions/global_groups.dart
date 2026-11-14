@@ -141,6 +141,13 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
     final settings = await database.readApplicationRouting();
     attach = {
       ...attach,
+      for (final rule in settings.hostRules)
+        if (hostRuleApplies(rule, profile.id) &&
+            (rule.hostBinding!.packageName == null ||
+                settings.rules[rule.hostBinding!.packageName]?.enabled == true))
+          if (hostRuleTarget(rule, profile.id) case final target?
+              when target.groupId != null)
+            target.groupId!,
       for (final rule in settings.rules.values)
         if (rule.enabled && rule.action == ApplicationRouteAction.proxy)
           if (applicationTargetFor(settings, rule, profile.id)

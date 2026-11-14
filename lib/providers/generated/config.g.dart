@@ -756,7 +756,7 @@ final class ApplicationInputActionProvider
 }
 
 String _$applicationInputActionHash() =>
-    r'4aaccc2337aad1b78460187b92c3f66a8131e6bb';
+    r'2ac9e94e7a491828d70304ed3aba09175e4b8807';
 
 abstract class _$ApplicationInputAction extends $Notifier<void> {
   void build();

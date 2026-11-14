@@ -36,6 +36,25 @@ ApplicationTargetState applicationTargetState(
   return target;
 }
 
+ApplicationTargetState? hostRuleTargetState(WidgetRef ref, Rule rule) {
+  if (rule.hostBinding!.legacy ||
+      const {'DIRECT', 'REJECT'}.contains(rule.ruleTarget)) {
+    return null;
+  }
+  final profile = ref.watch(currentProfileProvider);
+  final fact = ref.watch(configStateProvider).fact;
+  return resolveApplicationTarget(
+    target: hostRuleTarget(rule, profile?.id),
+    profile: profile,
+    groups: ref.watch(groupsProvider),
+    definitions: ref.watch(globalLocalGroupsProvider).value ?? const [],
+    ready:
+        profile != null &&
+        fact.profileId == profile.id &&
+        fact.phase == 'ready',
+  );
+}
+
 String applicationTargetIssueText(
   BuildContext context,
   ApplicationTargetIssue? issue,
@@ -56,11 +75,23 @@ class ApplicationPolicyStatus extends ConsumerWidget {
     final mode = ref.watch(
       patchClashConfigProvider.select((value) => value.mode),
     );
-    final count = ref
-        .watch(configStateProvider)
-        .fact
-        .applicationRoutingRules
-        .length;
+    final adopted = ref.watch(configStateProvider).fact.applicationRoutingRules;
+    final keys = ref.watch(applicationRoutingKeysProvider);
+    final settings = ref.watch(applicationRoutingSettingsProvider).value;
+    final packages = {
+      for (final name in adopted.keys)
+        if (!name.startsWith('@host:')) name,
+    };
+    for (final rule in settings?.hostRules ?? <Rule>[]) {
+      final package = rule.hostBinding?.packageName;
+      final key = '@host:${rule.id}';
+      if (package != null &&
+          adopted[key] != null &&
+          adopted[key] == keys[key]) {
+        packages.add(package);
+      }
+    }
+    final count = packages.length;
     if (mode != Mode.global && (mode != Mode.direct || count == 0)) {
       return const SizedBox.shrink();
     }

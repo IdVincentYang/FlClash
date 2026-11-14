@@ -10,17 +10,23 @@ class ApplicationRoutingLibraries extends Table {
 }
 
 extension ApplicationRoutingStore on Database {
+  Stream<ApplicationRoutingSettings> watchApplicationRouting() => customSelect(
+    'SELECT settings FROM application_routing_libraries',
+    readsFrom: {applicationRoutingLibraries, rules, profileRuleLinks},
+  ).watch().asyncMap((_) => readApplicationRouting());
   Selectable<RawApplicationRouting> applicationRoutingLibrary() =>
       select(applicationRoutingLibraries)..where((row) => row.id.equals(1));
 
-  Future<ApplicationRoutingSettings> readApplicationRouting() async {
-    final row = await applicationRoutingLibrary().getSingleOrNull();
-    return row == null
-        ? const ApplicationRoutingSettings()
-        : ApplicationRoutingSettings.fromJson(
-            Map<String, dynamic>.from(jsonDecode(row.settings) as Map),
-          );
-  }
+  Future<ApplicationRoutingSettings> readApplicationRouting() =>
+      transaction(() async {
+        final row = await applicationRoutingLibrary().getSingleOrNull();
+        final settings = row == null
+            ? const ApplicationRoutingSettings()
+            : ApplicationRoutingSettings.fromJson(
+                Map<String, dynamic>.from(jsonDecode(row.settings) as Map),
+              );
+        return settings.copyWith(hostRules: await rulesDao.hostRules());
+      });
 
   Future<ApplicationRoutingSettings> writeApplicationRouting(
     ApplicationRoutingSettings settings,
@@ -48,6 +54,25 @@ extension ApplicationRoutingStore on Database {
             MapEntry(key, rule.copyWith(targets: keep(rule.targets))),
       ),
     );
-    if (next != previous) await writeApplicationRouting(next);
+    var hostsChanged = false;
+    for (final rule in previous.hostRules) {
+      final binding = rule.hostBinding!;
+      if (binding.legacy) continue;
+      if (binding.profileId != null && !profiles.contains(binding.profileId)) {
+        await rulesDao.delRules([rule.id]);
+        hostsChanged = true;
+        continue;
+      }
+      final targets = keep(binding.targets);
+      if (targets.length != binding.targets.length) {
+        hostsChanged = true;
+        await (update(rules)..where((t) => t.id.equals(rule.id))).write(
+          RulesCompanion(
+            hostBinding: Value(jsonEncode(binding.copyWith(targets: targets))),
+          ),
+        );
+      }
+    }
+    if (next != previous || hostsChanged) await writeApplicationRouting(next);
   }
 }
