@@ -268,6 +268,12 @@ class _ApplicationTargetsViewState
                     ApplicationConnectionsView(
                       appKey: widget.appKey,
                       hostKey: host.key,
+                      onOpenApplication: () {
+                        final route = ModalRoute.of(context);
+                        Navigator.of(
+                          context,
+                        ).popUntil((candidate) => candidate == route);
+                      },
                       appLabel: label,
                     ),
                   ),

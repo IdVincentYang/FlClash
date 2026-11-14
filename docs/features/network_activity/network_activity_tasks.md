@@ -1,7 +1,7 @@
 # 应用网络 Tasks
 
 本清单细化需求入口 NA-T01 的[Plan](network_activity_plan.md)，业务范围以
-[Overview](network_activity_overview.md)为准。01–07 已完成；08 方案已批准，待实施；09 未开始。
+[Overview](network_activity_overview.md)为准。01–08 已完成；09 未开始。
 02 包含可体验的第一层只读页面，后两层各自作为独立任务；页面细化在对应任务开工时进行。
 
 05／06 按已批准的[应用分流方案](application_routing_plan.md)连贯实施；
@@ -18,7 +18,7 @@
 | NA-T01-05 | [应用接管控制闭环](#na-t01-05-应用接管控制闭环) | 02 | 已完成 |
 | NA-T01-06 | [App 默认分流闭环](#na-t01-06-app-默认分流闭环) | 02 | 已完成 |
 | NA-T01-07 | [Host 例外与跨 App 操作](#na-t01-07-host-例外与跨-app-操作) | 04、06 | 已完成 |
-| NA-T01-08 | [Dashboard 与连接详情快捷入口](#na-t01-08-dashboard-与连接详情快捷入口) | 02、04 | 方案已批准，待实施 |
+| NA-T01-08 | [Dashboard 与连接详情快捷入口](#na-t01-08-dashboard-与连接详情快捷入口) | 02、04 | 已完成 |
 | NA-T01-09 | [Android 完整验收与交付](#na-t01-09-android-完整验收与交付) | 05、07、08 | 未开始 |
 
 默认按表中编号执行；可并行位置及理由见 Plan 的[依赖与实现顺序](network_activity_plan.md#依赖与实现顺序)。
@@ -137,7 +137,7 @@ Rule 顺序为本 App＋Host、App 整体、通用 Host、原有规则及订阅�
 
 ## NA-T01-08 Dashboard 与连接详情快捷入口
 
-执行者：Codex；已批准的[08 Plan](na_t01_08_plan.md)定义本次交付与验证。
+执行者：Codex；[08 Plan](na_t01_08_plan.md)定义交付，实际检查与边界见 [08 Result](na_t01_08_result.md)。
 
 提供 Dashboard 应用活动卡片及现有连接详情的 App／Host 跳转，进入与 Tools 相同的三层页面。
 卡片应用 item 与 Application network 共用 UI、导航、策略操作及状态，统一修改后一同生效。
@@ -155,3 +155,6 @@ Rule 顺序为本 App＋Host、App 整体、通用 Host、原有规则及订阅�
 验收：在实际 Android 环境中完成两个 App 访问同一 Host 的分流反例和修改闭环，不能只凭 mock 或规则文本放行。
 识别、性能、数据缺口与已有功能回归有可复核结果；各项失败和跳过分别记录，不推定旧 Android 或其它平台已支持。
 最终文档与实际交付一致，并按有效授权完成制品交付。
+
+08 的 AVD 页面验收遇到既有 BootGuard 启动检查偶发超时，卡片添加前和重开时均出现；
+重新启动后恢复。09 需继续核对启动稳定性，不把本轮入口验收解释为该问题已解决。

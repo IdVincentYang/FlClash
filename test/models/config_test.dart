@@ -18,6 +18,28 @@ T roundTrip<T>(
 }
 
 void main() {
+  test(
+    'dashboard layout with application activity survives JSON and retains existing card order',
+    () {
+      const settings = AppSettingProps(
+        dashboardWidgets: [
+          DashboardWidget.requests,
+          DashboardWidget.applicationNetwork,
+          DashboardWidget.outboundMode,
+        ],
+      );
+      final restored = roundTrip(settings.toJson, AppSettingProps.fromJson);
+      expect(restored.dashboardWidgets, settings.dashboardWidgets);
+      final old = AppSettingProps.fromJson({
+        'dashboardWidgets': ['requests', 'outboundMode'],
+      });
+      expect(old.dashboardWidgets, [
+        DashboardWidget.requests,
+        DashboardWidget.outboundMode,
+      ]);
+    },
+  );
+
   group('GeoResource JSON', () {
     test('exposes mihomo raw config keys', () {
       expect(GeoResource.MMDB.configKey, 'mmdb');

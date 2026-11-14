@@ -12,3 +12,4 @@ export 'run_time.dart';
 export 'traffic_usage.dart';
 export 'memory_info.dart';
 export 'service_status.dart';
+export 'application_network.dart';

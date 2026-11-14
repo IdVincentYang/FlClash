@@ -17,9 +17,11 @@ class ApplicationConnectionsView extends ConsumerStatefulWidget {
     required this.appKey,
     required this.hostKey,
     required this.appLabel,
+    this.onOpenApplication,
   });
 
   final String appKey, hostKey, appLabel;
+  final VoidCallback? onOpenApplication;
 
   @override
   ConsumerState<ApplicationConnectionsView> createState() =>
@@ -157,6 +159,12 @@ class _ApplicationConnectionsViewState
               'connection:${activity.runtimeEpoch}:${record.info.id}',
             ),
             record: record,
+            onOpenApplication: record.appKey == widget.appKey
+                ? widget.onOpenApplication
+                : null,
+            onOpenHost: !_allApps && record.appKey == widget.appKey
+                ? () => Navigator.of(context).pop()
+                : null,
             active: activity.fresh ? record.active : null,
             appLabel: _allApps
                 ? names[identity.packageName] ??
@@ -262,10 +270,13 @@ class _ConnectionRow extends StatelessWidget {
     required this.record,
     required this.active,
     this.appLabel,
+    this.onOpenApplication,
+    this.onOpenHost,
   });
   final ActivityConnection record;
   final bool? active;
   final String? appLabel;
+  final VoidCallback? onOpenApplication, onOpenHost;
 
   @override
   Widget build(BuildContext context) {
@@ -289,6 +300,8 @@ class _ConnectionRow extends StatelessWidget {
           builder: (_) => CommonScaffold(
             title: l.details(l.request),
             body: TrackerInfoDetailView(
+              onOpenApplication: onOpenApplication,
+              onOpenHost: onOpenHost,
               trackerInfo: info.copyWith(
                 upload: record.upload,
                 download: record.download,

@@ -4,6 +4,7 @@ import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/widgets/connection_activity_links.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -56,7 +57,10 @@ class TrackerInfoItem extends ConsumerWidget {
           context,
           builder: (_) {
             return CommonScaffold(
-              body: TrackerInfoDetailView(trackerInfo: trackerInfo),
+              body: TrackerInfoDetailView(
+                trackerInfo: trackerInfo,
+                showActivityLinks: system.isAndroid,
+              ),
               title: detailTitle,
             );
           },
@@ -205,8 +209,16 @@ class _TrackerInfoBody extends StatelessWidget {
 
 class TrackerInfoDetailView extends StatelessWidget {
   final TrackerInfo trackerInfo;
+  final VoidCallback? onOpenApplication, onOpenHost;
+  final bool showActivityLinks;
 
-  const TrackerInfoDetailView({super.key, required this.trackerInfo});
+  const TrackerInfoDetailView({
+    super.key,
+    required this.trackerInfo,
+    this.onOpenApplication,
+    this.onOpenHost,
+    this.showActivityLinks = true,
+  });
 
   Widget _buildChains(BuildContext context) {
     return DetailRow(
@@ -243,6 +255,8 @@ class TrackerInfoDetailView extends StatelessWidget {
     final appLocalizations = context.appLocalizations;
     final metadata = trackerInfo.metadata;
     final provenance = trackerInfo.provenance;
+    final hasActivity =
+        showActivityLinks && trackerInfo.observation?.version == 1;
     String shortRevision(Object? value) {
       final revision = value is String ? value : '';
       return revision.length > 12 ? revision.substring(0, 12) : revision;
@@ -266,6 +280,12 @@ class TrackerInfoDetailView extends StatelessWidget {
         horizontal: 16,
       ).copyWith(bottom: 20, top: context.contentTopPadding),
       children: [
+        if (hasActivity)
+          ConnectionActivityLinks(
+            info: trackerInfo,
+            onOpenApplication: onOpenApplication,
+            onOpenHost: onOpenHost,
+          ),
         generateSectionV3(
           title: appLocalizations.basicInfo,
           items: _buildRows([
@@ -299,7 +319,7 @@ class TrackerInfoDetailView extends StatelessWidget {
         generateSectionV3(
           title: appLocalizations.address,
           items: _buildRows([
-            (appLocalizations.host, metadata.host),
+            if (!hasActivity) (appLocalizations.host, metadata.host),
             (
               appLocalizations.source,
               _endpointText(metadata.sourceIP, metadata.sourcePort),

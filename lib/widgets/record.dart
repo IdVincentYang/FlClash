@@ -1,3 +1,4 @@
+import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:flutter/services.dart';
@@ -168,17 +169,34 @@ class DetailRow extends StatelessWidget {
   final String title;
   final Widget? value;
   final String? copyText;
+  final VoidCallback? onPressed;
 
-  const DetailRow({super.key, required this.title, this.value, this.copyText});
+  const DetailRow({
+    super.key,
+    required this.title,
+    this.value,
+    this.copyText,
+    this.onPressed,
+  });
 
-  DetailRow.text({super.key, required this.title, required String value})
-    : value = Text(value),
-      copyText = value;
+  DetailRow.text({
+    super.key,
+    required this.title,
+    required String value,
+    this.onPressed,
+  }) : value = Text(value),
+       copyText = value;
 
   Future<void> _copy(BuildContext context, String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!context.mounted) return;
-    context.showNotifier(context.appLocalizations.copySuccess);
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!context.mounted) return;
+      context.showNotifier(context.appLocalizations.copySuccess);
+    } catch (_) {
+      if (context.mounted) {
+        context.showNotifier(context.appLocalizations.clipboardWriteFailed);
+      }
+    }
   }
 
   @override
@@ -186,12 +204,14 @@ class DetailRow extends StatelessWidget {
     final value = this.value;
     final copyText = this.copyText;
     return DecorationListItem(
-      onPressed: copyText == null ? null : () => _copy(context, copyText),
+      onPressed:
+          onPressed ??
+          (copyText == null ? null : () => _copy(context, copyText)),
       title: value == null
           ? Text(title)
           : Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              spacing: 20,
+              spacing: onPressed == null ? 20 : 8,
               children: [
                 Flexible(child: Text(title)),
                 Expanded(
@@ -206,6 +226,15 @@ class DetailRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onPressed != null) ...[
+                  if (copyText != null)
+                    IconButton(
+                      tooltip: context.appLocalizations.copy,
+                      onPressed: () => _copy(context, copyText),
+                      icon: const GlyphIcon(AppGlyphs.copy, size: 20),
+                    ),
+                  const GlyphIcon(AppGlyphs.chevronForward, size: 16),
+                ],
               ],
             ),
     );

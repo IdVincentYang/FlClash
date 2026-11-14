@@ -95,6 +95,11 @@ extension DashboardWidgetView on DashboardWidget {
       crossAxisCellCount: 4,
       child: ProfilesCard(),
     ),
+    DashboardWidget.applicationNetwork => const GridItem(
+      key: ValueKey(DashboardWidget.applicationNetwork),
+      crossAxisCellCount: 8,
+      child: ApplicationNetworkCard(),
+    ),
   };
 }
 

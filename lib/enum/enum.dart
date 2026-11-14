@@ -448,7 +448,8 @@ enum DashboardWidget {
   overrideNtpButton,
   runTime,
   proxyGroups,
-  profiles;
+  profiles,
+  applicationNetwork(platforms: [SupportPlatform.Android]);
 
   final List<SupportPlatform> platforms;
 

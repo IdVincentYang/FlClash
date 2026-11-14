@@ -347,6 +347,10 @@ including application traffic to DNS server addresses; neither legacy UID nor
 missing source endpoints classify provenance. The Tools application
 network page shows non-expanding app summaries with
 application-window placeholders, a persistent search field below the title and an overflow toggle for all installed apps.
+The optional Android Dashboard application card uses the same ApplicationActivityItem and candidate presentation logic,
+including policy controls and navigation. It waits for bootstrap initProvider before subscribing to its activity/configuration
+dependencies. The card adds no polling or observation owner. Android connection detail links reuse the app/Host keys and
+existing pages; narrow return callbacks reuse an already open app or Host page.
 Confirmed-active apps lead the recent list; compact count/time rows emphasize only a positive active count.
 Normal observation/retention chrome and manual refresh are absent; actual read failures retain inline retries.
 Observation gaps remain internal rather than a persistent warning. It consumes the queries and existing package

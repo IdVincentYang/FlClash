@@ -1,3 +1,6 @@
+import 'package:fl_clash/widgets/connection_activity_links.dart';
+import 'package:fl_clash/providers/application_routing.dart';
+import '../helpers/test_profiles.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -220,6 +223,13 @@ void main() {
     notifier = _Activity(store.snapshot());
     container = ProviderContainer(
       overrides: [
+        profilesProvider.overrideWith(TestProfiles.new),
+        applicationRoutingSettingsProvider.overrideWith(
+          (_) => Stream.value(const ApplicationRoutingSettings()),
+        ),
+        globalLocalGroupsProvider.overrideWith(
+          (_) => Stream.value(const <LocalProxyGroup>[]),
+        ),
         groupsProvider.overrideWith(
           () => TestExitGroups(
             store.snapshot().connections.map((item) => item.info.chains.first),
@@ -745,6 +755,204 @@ void main() {
         ),
       );
       expect(connectionProxyServerIp(target), isNull);
+    },
+  );
+  testWidgets(
+    'connection app and Host links preserve observed identity and target scope',
+    (tester) async {
+      final info = activityConnection('link', package: 'test.app.b');
+      store.addEvent(info);
+      await pump(
+        tester,
+        child: CommonScaffold(
+          title: 'Detail fixture',
+          body: TrackerInfoDetailView(trackerInfo: info),
+        ),
+      );
+      expect(find.text('Mail B'), findsOneWidget);
+      expect(find.byType(ConnectionActivityLinks), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('connection-activity-app')));
+      await tester.pumpAndSettle();
+      final app = tester.widget<ApplicationTargetsView>(
+        find.byType(ApplicationTargetsView),
+      );
+      expect(app.appKey, 'package:test.app.b');
+      expect(app.packageName, 'test.app.b');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('connection-activity-host')));
+      await tester.pumpAndSettle();
+      final host = tester.widget<ApplicationConnectionsView>(
+        find.byType(ApplicationConnectionsView),
+      );
+      expect(host.appKey, 'package:test.app.b');
+      expect(host.hostKey, 'host:example.test');
+      expect(host.appLabel, 'Mail B');
+      expect(find.byType(TrackerInfoDetailView), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(TrackerInfoDetailView), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Host link from its own connection list returns instead of pushing a duplicate',
+    (tester) async {
+      store.addEvent(activityConnection('same-host'));
+      await pump(tester);
+      await tester.tap(find.text('Proxy → node-a'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TrackerInfoDetailView), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('connection-activity-host')));
+      await tester.pumpAndSettle();
+      expect(find.byType(TrackerInfoDetailView), findsNothing);
+      expect(find.byType(ApplicationConnectionsView), findsOneWidget);
+      expect(find.text('Proxy → node-a'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'App link returns to the existing app page through the two nested pages',
+    (tester) async {
+      store.addEvent(activityConnection('app-return'));
+      await pump(tester, child: _targets);
+      await tester.tap(find.text('example.test'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Proxy → node-a'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('connection-activity-app')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ApplicationTargetsView), findsOneWidget);
+      expect(find.byType(ApplicationConnectionsView), findsNothing);
+      expect(find.byType(TrackerInfoDetailView), findsNothing);
+    },
+  );
+
+  for (final status in ['ambiguous', 'unknown']) {
+    testWidgets(
+      'connection shortcut preserves $status rather than borrowing legacy process identity',
+      (tester) async {
+        final info =
+            activityConnection(
+              'identity-$status',
+              status: status,
+              candidates: status == 'ambiguous'
+                  ? ['test.app.a', 'test.app.b']
+                  : [],
+            ).copyWith(
+              metadata: const Metadata(
+                network: 'tcp',
+                process: 'test.app.b',
+                destinationIP: '192.0.2.1',
+              ),
+            );
+        store.addEvent(info);
+        await pump(
+          tester,
+          child: CommonScaffold(
+            title: 'Detail fixture',
+            body: TrackerInfoDetailView(trackerInfo: info),
+          ),
+        );
+        final row = tester.widget<DetailRow>(
+          find.byKey(const ValueKey('connection-activity-app')),
+        );
+        expect(
+          (row.value! as Text).data,
+          status == 'ambiguous' ? 'Shared application identity' : 'Unknown app',
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('connection-activity-host')),
+        );
+        await tester.pumpAndSettle();
+        final target = tester.widget<ApplicationConnectionsView>(
+          find.byType(ApplicationConnectionsView),
+        );
+        expect(
+          target.appKey,
+          applicationActivityKey(info.observation!.application),
+        );
+        expect(target.appKey, isNot('package:test.app.b'));
+        expect(target.hostKey, 'ip:192.0.2.1');
+      },
+    );
+  }
+
+  testWidgets(
+    'activity detail links retain explicit copy and report clipboard failures',
+    (tester) async {
+      var fail = true;
+      final copied = <String>[];
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          if (fail) throw PlatformException(code: 'clipboard-unavailable');
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      final info = activityConnection('copy');
+      await pump(
+        tester,
+        child: CommonScaffold(
+          title: 'Detail fixture',
+          body: TrackerInfoDetailView(trackerInfo: info),
+        ),
+      );
+      final app = find.byKey(const ValueKey('connection-activity-app'));
+      await tester.tap(
+        find.descendant(of: app, matching: find.byTooltip('Copy')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('copy to the clipboard'), findsOneWidget);
+      expect(find.byType(ApplicationTargetsView), findsNothing);
+      fail = false;
+      await tester.tap(
+        find.descendant(of: app, matching: find.byTooltip('Copy')),
+      );
+      await tester.pumpAndSettle();
+      expect(copied, ['test.app.a']);
+      expect(find.byType(TrackerInfoDetailView), findsOneWidget);
+    },
+  );
+
+  testWidgets('no target yields only the application shortcut', (tester) async {
+    final info = activityConnection('missing-target', host: '', ip: '');
+    await pump(
+      tester,
+      child: CommonScaffold(
+        title: 'Detail fixture',
+        body: TrackerInfoDetailView(trackerInfo: info),
+      ),
+    );
+    expect(
+      find.byKey(const ValueKey('connection-activity-app')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('connection-activity-host')),
+      findsNothing,
+    );
+  });
+  testWidgets(
+    'callers can keep non-Android connection detail free of Android shortcuts',
+    (tester) async {
+      final info = activityConnection('other-platform');
+      await pump(
+        tester,
+        child: CommonScaffold(
+          title: 'Detail fixture',
+          body: TrackerInfoDetailView(
+            trackerInfo: info,
+            showActivityLinks: false,
+          ),
+        ),
+      );
+      expect(find.byType(ConnectionActivityLinks), findsNothing);
+      expect(find.text('example.test'), findsOneWidget);
     },
   );
 }

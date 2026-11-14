@@ -1,3 +1,12 @@
+import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/core/interface.dart';
+import 'package:fl_clash/providers/core.dart';
+import '../helpers/test_profiles.dart';
+import 'package:fl_clash/widgets/scaffold.dart';
+import 'package:fl_clash/features/connection/tracker_info_item.dart';
+import 'package:fl_clash/views/dashboard/widgets/application_network.dart';
+import 'package:fl_clash/widgets/application_activity_item.dart';
+import 'package:fl_clash/views/application_policy.dart';
 import 'dart:async';
 import 'package:fl_clash/providers/application_routing.dart';
 import 'package:fl_clash/providers/database.dart';
@@ -36,6 +45,11 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/application_activity.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_config_state.dart';
+
+class _ActivityCore extends Fake implements CoreHandlerInterface {
+  @override
+  Future<Map<String, String>> lookupIpCountries(List<String> ips) async => {};
+}
 
 class _ExitCache extends ExitCacheDatabase {
   _ExitCache() : super(NativeDatabase.memory());
@@ -119,6 +133,7 @@ void main() {
     Locale? locale,
     ApplicationRoutingSettings routing = const ApplicationRoutingSettings(),
     Profile? profile,
+    bool initialized = false,
   }) async {
     tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1;
@@ -128,6 +143,11 @@ void main() {
     addTearDown(cache.close);
     container = ProviderContainer(
       overrides: [
+        profilesProvider.overrideWith(TestProfiles.new),
+        coreHandlerProvider.overrideWithValue(
+          CoreController.scoped(_ActivityCore()),
+        ),
+        initProvider.overrideWithBuild((_, _) => initialized),
         exitCacheDatabaseProvider.overrideWithValue(cache),
         viewSizeProvider.overrideWithBuild((_, _) => Size(width, 900)),
         configStateProvider.overrideWith(
@@ -1356,4 +1376,212 @@ void main() {
     expect(find.text('Copied successfully'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  Widget dashboardCard() => const Scaffold(
+    body: SingleChildScrollView(child: ApplicationNetworkCard()),
+  );
+
+  testWidgets(
+    'dashboard uses the same application items, caps at three and prioritizes active apps',
+    (tester) async {
+      final store = ApplicationActivityStore();
+      final now = DateTime.utc(2026, 11, 11, 2);
+      store.setContext('runtime-a', observing: true, now: now);
+      final active = activityConnection(
+        'a',
+        start: now.subtract(const Duration(hours: 1)),
+      );
+      store.addEvent(active);
+      for (final name in ['b', 'c', 'd']) {
+        store.addEvent(
+          activityConnection(name, package: 'test.app.$name', start: now),
+        );
+      }
+      store.applySnapshot([active], startedRevision: store.revision, now: now);
+      await pump(
+        tester,
+        activity: store.snapshot(),
+        child: dashboardCard(),
+        initialized: true,
+      );
+      final items = tester
+          .widgetList<ApplicationActivityItem>(
+            find.byType(ApplicationActivityItem),
+          )
+          .toList();
+      expect(items, hasLength(3));
+      expect(items.first.entry.key, 'package:test.app.a');
+      expect(find.text('Browser A'), findsOneWidget);
+      expect(find.byType(Switch), findsNWidgets(3));
+      expect(
+        (container.read(applicationActivityProvider.notifier) as _Activity)
+            .refreshCount,
+        0,
+      );
+      expect(cache.cleanups, 0);
+      await tester.tap(find.text('Browser A'));
+      await tester.pumpAndSettle();
+      final target = tester.widget<ApplicationTargetsView>(
+        find.byType(ApplicationTargetsView),
+      );
+      expect(target.appKey, 'package:test.app.a');
+      expect(target.packageName, 'test.app.a');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(ApplicationNetworkCard), findsOneWidget);
+      expect(find.byType(ApplicationActivityItem), findsNWidgets(3));
+      await screenshot(tester, 'dashboard-application-items');
+    },
+  );
+
+  testWidgets(
+    'dashboard header opens the full list with the same policy and observation values',
+    (tester) async {
+      const routing = ApplicationRoutingSettings(
+        rules: {
+          'test.app.a': ApplicationRouteRule(
+            packageName: 'test.app.a',
+            enabled: true,
+            action: ApplicationRouteAction.reject,
+          ),
+        },
+      );
+      await pump(
+        tester,
+        child: dashboardCard(),
+        initialized: true,
+        routing: routing,
+      );
+      final before = tester
+          .widget<ApplicationActivityItem>(
+            find.byType(ApplicationActivityItem).first,
+          )
+          .entry;
+      final switchBefore = tester.widget<Switch>(find.byType(Switch)).value;
+      expect(find.text('REJECT'), findsOneWidget);
+      await tester.tap(find.text('Application network'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ApplicationActivityView), findsOneWidget);
+      final after = tester
+          .widget<ApplicationActivityItem>(
+            find.byType(ApplicationActivityItem).first,
+          )
+          .entry;
+      expect(after.key, before.key);
+      expect(after.package, before.package);
+      expect(
+        after.activity!.totals.connectionCount,
+        before.activity!.totals.connectionCount,
+      );
+      expect(tester.widget<Switch>(find.byType(Switch)).value, switchBefore);
+      expect(find.text('REJECT'), findsOneWidget);
+    },
+  );
+
+  for (final card in [false, true]) {
+    testWidgets(
+      'application policy title opens the same picker: dashboard=$card',
+      (tester) async {
+        await pump(
+          tester,
+          child: card ? dashboardCard() : const ApplicationActivityView(),
+          initialized: card,
+        );
+        final policy = find.byType(ApplicationPolicySwitch).first;
+        await tester.tap(
+          find.descendant(of: policy, matching: find.byType(InkWell)).first,
+        );
+        await tester.pumpAndSettle();
+        final page = tester.widget<ApplicationPolicyView>(
+          find.byType(ApplicationPolicyView),
+        );
+        expect(page.packages, ['test.app.a']);
+        expect(page.label, 'Browser A');
+      },
+    );
+  }
+
+  testWidgets('empty dashboard opens all apps without starting observations', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      activity: const ApplicationActivityState(),
+      child: dashboardCard(),
+      initialized: true,
+    );
+    expect(find.text('No activity observed yet'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
+    await tester.tap(find.text('Application network'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ApplicationActivityView), findsOneWidget);
+    expect(
+      (container.read(applicationActivityProvider.notifier) as _Activity)
+          .refreshCount,
+      0,
+    );
+  });
+
+  for (final locale in [
+    const Locale('en'),
+    const Locale('zh', 'CN'),
+    const Locale('ja'),
+    const Locale('ru'),
+  ]) {
+    testWidgets(
+      'shared dashboard item supports long names and large text $locale',
+      (tester) async {
+        await pump(
+          tester,
+          child: dashboardCard(),
+          initialized: true,
+          width: 320,
+          scale: 2,
+          locale: locale,
+          packageCatalogue: [
+            _packages.first.copyWith(
+              label: 'An application with a very long translated display name',
+            ),
+          ],
+        );
+        expect(find.byType(ApplicationActivityItem), findsOneWidget);
+        expect(find.byType(Switch), findsOneWidget);
+        expect(tester.takeException(), null);
+        await screenshot(tester, 'dashboard-application-large-$locale');
+      },
+    );
+  }
+  testWidgets(
+    'dashboard waits for bootstrap before reading activity dependencies',
+    (tester) async {
+      await pump(tester, child: dashboardCard());
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byType(ApplicationActivityItem), findsNothing);
+      expect(container.exists(applicationCatalogueProvider), isFalse);
+      await tester.tap(find.text('Application network'));
+      await tester.pump();
+      expect(find.byType(ApplicationActivityView), findsNothing);
+      container.read(initProvider.notifier).value = true;
+      await tester.pumpAndSettle();
+      expect(find.byType(ApplicationActivityItem), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    },
+  );
+  testWidgets(
+    'connection navigation falls back to the observed package when the directory fails',
+    (tester) async {
+      await pump(
+        tester,
+        catalogueError: true,
+        child: CommonScaffold(
+          title: 'Detail fixture',
+          body: TrackerInfoDetailView(
+            trackerInfo: activityConnection('directory-failure'),
+          ),
+        ),
+      );
+      expect(find.text('test.app.a'), findsOneWidget);
+      expect(find.text('Unknown app'), findsNothing);
+      expect(tester.takeException(), null);
+    },
+  );
 }
