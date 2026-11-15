@@ -21,6 +21,10 @@ void main() {
   test(
     'dashboard layout with application activity survives JSON and retains existing card order',
     () {
+      expect(
+        AppSettingProps.fromJson({}).dashboardWidgets,
+        contains(DashboardWidget.applicationNetwork),
+      );
       const settings = AppSettingProps(
         dashboardWidgets: [
           DashboardWidget.requests,

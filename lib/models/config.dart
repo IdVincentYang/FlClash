@@ -69,6 +69,7 @@ const List<DashboardWidget> defaultDashboardWidgets = [
   DashboardWidget.networkDetection,
   DashboardWidget.trafficUsage,
   DashboardWidget.intranetIp,
+  DashboardWidget.applicationNetwork,
 ];
 
 const _legacyOutboundModeV2 = 'outboundModeV2';
