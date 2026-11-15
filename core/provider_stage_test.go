@@ -57,7 +57,7 @@ func stageTestEnvironment(t *testing.T) bool {
 	requestscope.OwnerHook, requestscope.PhaseHook = r.currentOwner, r.setPhase
 	requestscope.BeginHook, requestscope.ResourceHook, requestscope.ReadyHook = r.begin, r.lockResource, r.waitReady
 	requestscope.ProxyHook, requestscope.OwnerActiveHook, requestscope.BootstrapHook = r.bindProxy, r.ownerActive, r.needBootstrap
-	r.state = AppRequestState{ProcessEpoch: "stage-test", Revision: 1, IntentRunning: true, Phase: "started", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback-test", ProtectPhase: "none"}
+	r.state = AppRequestState{ProcessEpoch: "stage-test", Revision: 1, IntentRunning: true, Phase: "started", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "loopback-test", DirectNetworkID: "loopback-test", ProtectPhase: "none"}
 	r.socketGate = func(string, AppRequestState, int) error { return nil }
 	t.Cleanup(func() {
 		stagedCore.Lock()

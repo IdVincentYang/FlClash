@@ -172,14 +172,16 @@ class RequestNetworkSource(
     val observing: Boolean
         get() = synchronized(gate) { active }
 
-    fun isSystemSelectionCurrent(selection: Selection): Boolean = runCatching {
+    fun isSystemSelectionCurrent(selection: Selection, requirePhysicalNetwork: Boolean): Boolean = runCatching {
         val manager = connectivity ?: return@runCatching false
         val default = manager.activeNetwork ?: return@runCatching false
         if (default != selection.defaultNetwork) return@runCatching false
-        val network = selection.network ?: return@runCatching false
         val currentDefault = manager.getNetworkCapabilities(default)?.let(::capabilities) ?: return@runCatching false
+        if (currentDefault != selection.defaultCapabilities || !currentDefault.internet) return@runCatching false
+        if (!requirePhysicalNetwork) return@runCatching true
+        val network = selection.network ?: return@runCatching false
         val currentDirect = manager.getNetworkCapabilities(network)?.let(::capabilities) ?: return@runCatching false
-        currentDefault == selection.defaultCapabilities && currentDirect.notVpn && !currentDirect.vpn && currentDirect.internet
+        currentDirect.notVpn && !currentDirect.vpn && currentDirect.internet
     }.getOrDefault(false)
 
     fun subscribeDns(observer: (List<String>) -> Unit): () -> Unit {

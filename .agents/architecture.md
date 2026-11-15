@@ -299,6 +299,10 @@ Android deliberately keeps Flutter requests optimistic and the native layer auth
   `ServiceState.requestStart()`/`requestStop()` or the explicit system-action handlers instead of inferring intent from a
   callback.
 
+Application-request Direct routing bypasses FlClash proxy nodes and follows the system
+default Network, including another VPN. Only a live FlClash protection generation uses protect plus a physical Network
+to avoid re-entering its own TUN. Native revision/socket checks and request cancellation retain their existing owners.
+
 Quick Settings, notification, revoke, and Always-on VPN paths converge on the same owner:
 
 - With a Flutter engine attached, `ServiceState.handleStartAction()`/`handleStopAction()` forward through `TilePlugin` to

@@ -193,7 +193,7 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m79(count) => "プロキシ ${count} 件";
 
   static String m80(host) =>
-      "現在の設定ではこの項目を取得できません。今回の操作で ${host} への直接接続を許可しますか？操作の完了または接続先の変更で許可は失効します。";
+      "現在の設定ではこの項目を取得できません。今回の操作でシステムのネットワークを使って ${host} にアクセスすることを許可しますか？許可は操作の終了時または取得元の変更時に失効します。";
 
   static String m81(target) => "GLOBAL（現在の選択：${target}）";
 
@@ -1692,7 +1692,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestModeAuto": MessageLookupByLibrary.simpleMessage("自動"),
     "requestModeDirect": MessageLookupByLibrary.simpleMessage("直接接続"),
     "requestModeHelp": MessageLookupByLibrary.simpleMessage(
-      "この項目自体の通信に適用します。プロキシには有効なノードが、直接接続には利用可能な非 VPN ネットワークが必要です。",
+      "この項目の通信に適用します。直接接続は FlClash のプロキシノードを使わず、システム VPN は引き続き適用されます。プロキシには利用可能なノードが必要です。",
     ),
     "requestModeProxy": MessageLookupByLibrary.simpleMessage("プロキシ"),
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(

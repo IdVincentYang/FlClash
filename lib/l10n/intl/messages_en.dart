@@ -216,7 +216,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "${Intl.plural(count, one: '1 proxy', other: '${count} proxies')}";
 
   static String m80(host) =>
-      "The current configuration cannot fetch this item. Allow this operation to connect directly to ${host}? This permission ends when the operation finishes or its source changes.";
+      "The current configuration cannot fetch this item. Allow this operation to access ${host} using the system network? Permission ends when the operation finishes or its source changes.";
 
   static String m81(target) => "GLOBAL (current selection: ${target})";
 
@@ -2067,7 +2067,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestModeAuto": MessageLookupByLibrary.simpleMessage("Auto"),
     "requestModeDirect": MessageLookupByLibrary.simpleMessage("Direct"),
     "requestModeHelp": MessageLookupByLibrary.simpleMessage(
-      "Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.",
+      "For this item’s requests. Direct bypasses FlClash proxy nodes but still follows the system VPN. Proxy requires an available node.",
     ),
     "requestModeProxy": MessageLookupByLibrary.simpleMessage("Proxy"),
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(

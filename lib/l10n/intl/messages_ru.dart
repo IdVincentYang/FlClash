@@ -218,7 +218,7 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m79(count) => "${count} прокси";
 
   static String m80(host) =>
-      "Текущая конфигурация не позволяет загрузить этот объект. Разрешить этой операции прямое соединение с ${host}? Разрешение истечёт после завершения операции или изменения источника.";
+      "Текущая конфигурация не позволяет получить этот объект. Разрешить этой операции доступ к ${host} через системную сеть? Разрешение истекает после завершения операции или изменения источника.";
 
   static String m81(target) => "GLOBAL (текущий выбор: ${target})";
 
@@ -2140,7 +2140,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestModeAuto": MessageLookupByLibrary.simpleMessage("Авто"),
     "requestModeDirect": MessageLookupByLibrary.simpleMessage("Напрямую"),
     "requestModeHelp": MessageLookupByLibrary.simpleMessage(
-      "Для собственных запросов этого объекта. Прокси требует действующий узел; прямое соединение — доступную сеть без VPN.",
+      "Для запросов этого элемента. «Напрямую» обходит прокси-узлы FlClash, но использует системный VPN. Для «Прокси» нужен доступный узел.",
     ),
     "requestModeProxy": MessageLookupByLibrary.simpleMessage("Прокси"),
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(

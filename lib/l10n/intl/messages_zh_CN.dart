@@ -186,7 +186,8 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m79(count) => "${count} 个代理";
 
-  static String m80(host) => "当前配置无法获取此对象。是否允许本次操作直连 ${host}？许可在操作结束或来源变化后失效。";
+  static String m80(host) =>
+      "当前配置无法获取此对象。是否允许本次操作通过系统网络访问 ${host}？许可在操作结束或来源变化后失效。";
 
   static String m81(target) => "GLOBAL（当前选择：${target}）";
 
@@ -1529,7 +1530,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "requestModeAuto": MessageLookupByLibrary.simpleMessage("自动"),
     "requestModeDirect": MessageLookupByLibrary.simpleMessage("直连"),
     "requestModeHelp": MessageLookupByLibrary.simpleMessage(
-      "用于此对象自身的联网请求。代理需要有效代理节点；直连需要可用的非 VPN 网络。",
+      "用于此对象自身的请求。直连不使用 FlClash 代理节点，系统 VPN 仍生效；代理需要可用节点。",
     ),
     "requestModeProxy": MessageLookupByLibrary.simpleMessage("代理"),
     "requestPartialCommit": MessageLookupByLibrary.simpleMessage(

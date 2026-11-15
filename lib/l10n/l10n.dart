@@ -6153,10 +6153,10 @@ class AppLocalizations {
     );
   }
 
-  /// `The current configuration cannot fetch this item. Allow this operation to connect directly to {host}? This permission ends when the operation finishes or its source changes.`
+  /// `The current configuration cannot fetch this item. Allow this operation to access {host} using the system network? Permission ends when the operation finishes or its source changes.`
   String requestDirectRecoveryMessage(Object host) {
     return Intl.message(
-      'The current configuration cannot fetch this item. Allow this operation to connect directly to $host? This permission ends when the operation finishes or its source changes.',
+      'The current configuration cannot fetch this item. Allow this operation to access $host using the system network? Permission ends when the operation finishes or its source changes.',
       name: 'requestDirectRecoveryMessage',
       desc: '',
       args: [host],
@@ -6213,10 +6213,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.`
+  /// `For this item’s requests. Direct bypasses FlClash proxy nodes but still follows the system VPN. Proxy requires an available node.`
   String get requestModeHelp {
     return Intl.message(
-      'Applies to this item’s own requests. Proxy requires a valid proxy node; Direct requires an available non-VPN network.',
+      'For this item’s requests. Direct bypasses FlClash proxy nodes but still follows the system VPN. Proxy requires an available node.',
       name: 'requestModeHelp',
       desc: '',
       args: [],

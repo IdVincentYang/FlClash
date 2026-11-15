@@ -38,7 +38,7 @@ func sourceRuntimeFixture(t *testing.T) {
 		}
 		requestscope.BeginHook, requestscope.ResourceHook = begin, resourceHook
 	})
-	appRequests.state = AppRequestState{ProcessEpoch: "controlled-host-fixture", Revision: 1, IntentRunning: true, Phase: "started", DefaultNetworkKind: "nonVpn", DirectNetworkID: "localhost", ProtectPhase: "none"}
+	appRequests.state = AppRequestState{ProcessEpoch: "controlled-host-fixture", Revision: 1, IntentRunning: true, Phase: "started", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "localhost", DirectNetworkID: "localhost", ProtectPhase: "none"}
 	appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
 	t.Cleanup(settleMessageBatcher)
 }

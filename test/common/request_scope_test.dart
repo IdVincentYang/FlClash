@@ -52,6 +52,7 @@ class _Native implements Service {
     'intentRunning': running,
     'paused': paused,
     'directNetworkId': 'synthetic-network',
+    'defaultNetworkId': 'synthetic-network',
     'defaultNetworkKind': 'nonVpn',
     'protectPhase': 'none',
     'phase': nativePhase ?? (running ? 'started' : 'stopped'),

@@ -377,7 +377,7 @@ func TestManagedMaintenanceDefaultIsExplicitAndOwnerBound(t *testing.T) {
 	r := appRequests
 	r.mu.Lock()
 	r.client, r.clientReady = "managed-client", true
-	r.state = AppRequestState{ProcessEpoch: "synthetic-managed", Revision: 1, IntentRevision: 1, IntentRunning: true, Phase: "started", Reason: "userStart", DefaultNetworkKind: "nonVpn", DirectNetworkID: "synthetic-network", ProtectPhase: "none"}
+	r.state = AppRequestState{ProcessEpoch: "synthetic-managed", Revision: 1, IntentRevision: 1, IntentRunning: true, Phase: "started", Reason: "userStart", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "synthetic-network", DirectNetworkID: "synthetic-network", ProtectPhase: "none"}
 	r.mu.Unlock()
 	r.socketGate = func(string, AppRequestState, int) error { return nil }
 	previousHook := requestscope.ProxyHook

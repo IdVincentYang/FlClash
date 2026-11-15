@@ -27,7 +27,7 @@ import (
 func appRequestFixture(t *testing.T) (*appRequestRegistry, *appRequestLease) {
 	t.Helper()
 	r := newAppRequestRegistry()
-	r.publish(AppRequestState{ProcessEpoch: "synthetic", Revision: 1, Reason: "userStop", Phase: "stopped", DefaultNetworkKind: "nonVpn", DirectNetworkID: "synthetic-network", ProtectPhase: "none"})
+	r.publish(AppRequestState{ProcessEpoch: "synthetic", Revision: 1, Reason: "userStop", Phase: "stopped", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "synthetic-network", DirectNetworkID: "synthetic-network", ProtectPhase: "none"})
 	lease, err := r.begin(context.Background(), requestscope.Spec{Kind: "maintenance", Trigger: "manual", Proxy: "DIRECT", Mode: "direct", Key: "synthetic-object"})
 	if err != nil {
 		t.Fatal(err)
@@ -36,6 +36,72 @@ func appRequestFixture(t *testing.T) (*appRequestRegistry, *appRequestLease) {
 	t.Cleanup(l.Close)
 	t.Cleanup(r.closePrivate)
 	return r, l
+}
+
+func TestAppRequestMaintenanceUsesExternalVPNDefault(t *testing.T) {
+	for _, mode := range []string{"auto", "direct"} {
+		t.Run(mode, func(t *testing.T) {
+			var received atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				received.Add(1)
+				_, _ = w.Write([]byte("synthetic"))
+			}))
+			defer server.Close()
+			r := newAppRequestRegistry()
+			t.Cleanup(r.closePrivate)
+			state := AppRequestState{ProcessEpoch: "foreign-vpn", Revision: 1, Reason: "initializedIdle", Phase: "stopped",
+				DefaultNetworkKind: "vpn", DefaultNetworkID: "system-vpn", ProtectPhase: "none"}
+			r.publish(state)
+			r.socketGate = func(_ string, selected AppRequestState, _ int) error {
+				if selected.DefaultNetworkID != "system-vpn" || selected.ProtectPhase != "none" {
+					return requestscope.ErrBlocked
+				}
+				return nil
+			}
+			lease, err := r.begin(context.Background(), requestscope.Spec{Kind: "maintenance", Trigger: "manual", Proxy: "DIRECT", Mode: mode, Key: "synthetic-subscription"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer lease.Close()
+			response, err := mihomoHTTP.HttpRequest(lease.Context(), server.URL, "GET", nil, nil, mihomoHTTP.WithScope(lease))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = response.Body.Close()
+			if response.StatusCode != http.StatusOK || received.Load() != 1 {
+				t.Fatal("system-network request did not reach the target")
+			}
+			state.Revision++
+			state.DefaultNetworkID = "replacement-network"
+			r.publish(state)
+			if err := lease.Check(); err == nil {
+				t.Fatal("request survived a system-network change")
+			}
+		})
+	}
+}
+
+func TestDirectRequestNetworkAvailability(t *testing.T) {
+	for _, tc := range []struct {
+		name, kind, phase, system, physical string
+		available                           bool
+	}{
+		{"system physical", "nonVpn", "none", "wifi", "wifi", true},
+		{"external vpn without physical network", "vpn", "none", "vpn", "", true},
+		{"own vpn", "vpn", "ready", "vpn", "wifi", true},
+		{"own vpn without physical network", "vpn", "ready", "vpn", "", false},
+		{"unknown network", "unknown", "none", "vpn", "wifi", false},
+		{"no system network", "vpn", "none", "", "wifi", false},
+		{"starting protection", "vpn", "starting", "vpn", "wifi", false},
+		{"retiring protection", "vpn", "retiring", "vpn", "wifi", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := AppRequestState{DefaultNetworkKind: tc.kind, ProtectPhase: tc.phase, DefaultNetworkID: tc.system, DirectNetworkID: tc.physical}
+			if directRequestAvailable(state) != tc.available {
+				t.Fatal("unexpected request-network availability")
+			}
+		})
+	}
 }
 
 func TestAppRequestDataReadExcludesNewFrontendGrant(t *testing.T) {

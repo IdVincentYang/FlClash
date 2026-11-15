@@ -74,7 +74,7 @@ func TestApplicationInputBridge(t *testing.T) {
 			requestscope.BeginHook, requestscope.ResourceHook = appRequests.begin, appRequests.lockResource
 			requestscope.ProxyHook = appRequests.bindProxy
 			appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
-			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback", ProtectPhase: "none"})
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "loopback", DirectNetworkID: "loopback", ProtectPhase: "none"})
 			result = map[string]any{"ok": true}
 		case "inlineBlock":
 			var kind string
@@ -130,10 +130,10 @@ func TestApplicationInputBridge(t *testing.T) {
 		case "refreshState":
 			requestscope.ProxyHook = appRequests.bindProxy
 			appRequests.socketGate = func(string, AppRequestState, int) error { return nil }
-			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback"})
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 1, IntentRevision: 1, Phase: "stopped", Reason: "initializedIdle", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "loopback", DirectNetworkID: "loopback"})
 			result = map[string]any{"ok": true}
 		case "refreshRunning":
-			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 2, IntentRevision: 2, IntentRunning: true, Phase: "started", Reason: "none", DefaultNetworkKind: "nonVpn", DirectNetworkID: "loopback", ProtectPhase: "none"})
+			appRequests.publish(AppRequestState{ProcessEpoch: "refresh-fixture", Revision: 2, IntentRevision: 2, IntentRunning: true, Phase: "started", Reason: "none", DefaultNetworkKind: "nonVpn", DefaultNetworkID: "loopback", DirectNetworkID: "loopback", ProtectPhase: "none"})
 			result = map[string]any{"ok": true}
 		case "refreshRead":
 			var name string

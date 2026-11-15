@@ -1401,10 +1401,14 @@ func (l *appRequestLease) BeforeDial(metadata *C.Metadata) error {
 }
 
 func directRequestAvailable(state AppRequestState) bool {
-	if state.DirectNetworkID == "" || state.ProtectPhase == "starting" || state.ProtectPhase == "retiring" {
+	if state.ProtectPhase == "starting" || state.ProtectPhase == "retiring" ||
+		(state.DefaultNetworkKind != "nonVpn" && state.DefaultNetworkKind != "vpn") {
 		return false
 	}
-	return state.DefaultNetworkKind == "nonVpn" || state.DefaultNetworkKind == "vpn" && state.ProtectPhase == "ready"
+	if state.ProtectPhase == "ready" {
+		return state.DirectNetworkID != ""
+	}
+	return state.DefaultNetworkID != ""
 }
 
 func (r *appRequestRegistry) waitFrontendCommits(ctx context.Context) error {

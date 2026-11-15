@@ -16,27 +16,29 @@ internal interface RequestSocketAccess {
     fun isSelectionCurrent(): Boolean
     fun ownsDefaultVpn(): Boolean
     fun protect(fd: Int, expected: ApplicationRequestState): Boolean
-    fun bind(fd: Int)
+    fun bind(fd: Int, bypassVpn: Boolean)
 }
 
 internal fun prepareRequestSocket(access: RequestSocketAccess, expected: ApplicationRequestState, fd: Int): Boolean = runCatching {
     fun current(): Boolean = access.currentState() == expected && access.isSelectionCurrent()
     val input = access.networkInput()
     val selected = access.selection
+    val bypassVpn = expected.protectPhase == "ready"
+    val networkId = if (bypassVpn) expected.directNetworkId else expected.defaultNetworkId
     if (fd < 0 || expected.processEpoch.isEmpty() || !current() ||
         expected.protectPhase in setOf("starting", "retiring") || expected.reason == "exiting" ||
         selected.sourceEpoch != input.sourceEpoch || selected.revision != input.revision ||
         selected.sourceEpoch != expected.networkSourceEpoch || selected.revision != expected.networkRevision ||
         selected.directNetworkId != expected.directNetworkId || selected.defaultNetworkId != expected.defaultNetworkId ||
-        expected.directNetworkId.isEmpty()
+        networkId.isEmpty()
     ) return@runCatching false
     when (expected.defaultNetworkKind) {
         "nonVpn" -> Unit
-        "vpn" -> if (expected.protectPhase != "ready" || !access.ownsDefaultVpn()) return@runCatching false
+        "vpn" -> if (bypassVpn && !access.ownsDefaultVpn()) return@runCatching false
         else -> return@runCatching false
     }
-    if (expected.protectPhase == "ready" && (!access.protect(fd, expected) || !current())) return@runCatching false
-    access.bind(fd)
+    if (bypassVpn && (!access.protect(fd, expected) || !current())) return@runCatching false
+    access.bind(fd, bypassVpn)
     current()
 }.getOrDefault(false)
 
@@ -47,13 +49,12 @@ internal object AndroidRequestSocketGate : RequestSocketInterface {
         val expected = gson.fromJson(state, ApplicationRequestState::class.java) ?: return@runCatching false
         val source = GlobalState.networkSource ?: return@runCatching false
         val selected = source.selection()
-        val network = selected.network ?: return@runCatching false
         val protection = ServiceState.getProtection()
         prepareRequestSocket(object : RequestSocketAccess {
             override val selection = selected.facts
             override fun currentState() = ServiceState.getRequestState()
             override fun networkInput() = ServiceState.getNetworkInput()
-            override fun isSelectionCurrent() = source.isSystemSelectionCurrent(selected) && source.selection().facts == selection
+            override fun isSelectionCurrent() = source.isSystemSelectionCurrent(selected, expected.protectPhase == "ready") && source.selection().facts == selection
             override fun ownsDefaultVpn(): Boolean {
                 val ownerUid = selected.defaultCapabilities?.ownerUid
                 return protection != null && (ownerUid == null || ownerUid < 0 || ownerUid == Process.myUid())
@@ -64,7 +65,8 @@ internal object AndroidRequestSocketGate : RequestSocketInterface {
                     VpnService.prepare(GlobalState.application) == null && service.isRequestLockdownEnabled() != true &&
                     service.protectRequestSocket(fd, identity)
             }
-            override fun bind(fd: Int) {
+            override fun bind(fd: Int, bypassVpn: Boolean) {
+                val network = requireNotNull(if (bypassVpn) selected.network else selected.defaultNetwork)
                 ParcelFileDescriptor.fromFd(fd).use { network.bindSocket(it.fileDescriptor) }
             }
         }, expected, fd)

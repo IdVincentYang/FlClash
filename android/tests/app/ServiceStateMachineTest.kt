@@ -957,7 +957,7 @@ class ServiceStateMachineTest {
             override fun isSelectionCurrent() = true
             override fun ownsDefaultVpn() = false
             override fun protect(fd: Int, expected: ApplicationRequestState) = false
-            override fun bind(fd: Int) { bindings++ }
+            override fun bind(fd: Int, bypassVpn: Boolean) { bindings++ }
         }
         for (revision in listOf(1L, 3L, 2L, 4L)) {
             val facts = RequestNetworkFacts(activeEpoch, revision, "nonVpn", "physical", "physical", true)
