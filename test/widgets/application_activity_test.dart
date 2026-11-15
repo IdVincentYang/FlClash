@@ -1381,7 +1381,7 @@ void main() {
   );
 
   testWidgets(
-    'dashboard uses the same application items, caps at three and prioritizes active apps',
+    'dashboard uses the same application items, caps at five and prioritizes active apps',
     (tester) async {
       final store = ApplicationActivityStore();
       final now = DateTime.utc(2026, 11, 11, 2);
@@ -1391,7 +1391,7 @@ void main() {
         start: now.subtract(const Duration(hours: 1)),
       );
       store.addEvent(active);
-      for (final name in ['b', 'c', 'd']) {
+      for (final name in ['b', 'c', 'd', 'e', 'f']) {
         store.addEvent(
           activityConnection(name, package: 'test.app.$name', start: now),
         );
@@ -1408,10 +1408,10 @@ void main() {
             find.byType(ApplicationActivityItem),
           )
           .toList();
-      expect(items, hasLength(3));
+      expect(items, hasLength(5));
       expect(items.first.entry.key, 'package:test.app.a');
       expect(find.text('Browser A'), findsOneWidget);
-      expect(find.byType(Switch), findsNWidgets(3));
+      expect(find.byType(Switch), findsNWidgets(5));
       expect(
         (container.read(applicationActivityProvider.notifier) as _Activity)
             .refreshCount,
@@ -1428,7 +1428,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.byType(ApplicationNetworkCard), findsOneWidget);
-      expect(find.byType(ApplicationActivityItem), findsNWidgets(3));
+      expect(find.byType(ApplicationActivityItem), findsNWidgets(5));
       await screenshot(tester, 'dashboard-application-items');
     },
   );

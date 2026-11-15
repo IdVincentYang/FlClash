@@ -80,7 +80,7 @@ class _ApplicationNetworkCardState
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               child: Text(l.activityNoObserved),
             ),
-          for (final entry in entries.take(3))
+          for (final entry in entries.take(5))
             ApplicationActivityItem(
               key: ValueKey('activity:${entry.key}'),
               entry: entry,
