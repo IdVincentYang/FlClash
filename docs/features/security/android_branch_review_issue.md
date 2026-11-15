@@ -2,7 +2,8 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-所有条目均待处理；本轮只做评审与文档交付，没有修复产品或升级验收状态。
+R01 已修复并完成本地交付；R02–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
 ## 对象与覆盖
@@ -70,7 +71,23 @@ P3 为影响使用或复核的文档问题。优先级不替代项目排期。
 
 处理目标：在恢复事务中同步三类目标引用，保留已有合并语义；覆盖不同 ID 的等价定义、
 共用／独立 App 目标、Host 目标及恢复后的真实解析。契约见[自建组设计](../proxies/local_groups_design.md)
-和应用网络设计的备份／稳定 ID 约束；尚未分派修复任务。
+和应用网络设计的备份／稳定 ID 约束。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复提交 `e344c45f3cad37df16a20056501a902b3c1e3b47` 位于 `security/android`；
+新版全局映射及旧版按 Profile 区分的映射共同供导入引用使用，既有保留目标不套用导入映射。
+[恢复回归](../../../test/database/global_group_restore_test.dart)与
+[迁移回归](../../../test/common/global_proxy_groups_test.dart)共 13 项通过；
+相同恢复测试在旧实现为 3 通过、6 失败。覆盖生产目标解析／wire、冲突、重复恢复、
+未导入数据保持、事务回滚及文件数据库重开。
+
+验证由 D 执行，M 读取代码、测试与绑定日志，没有代跑编译或测试。
+扩展回归 86 通过、4 项基线失败；未验证 APK、设备或 VPN。
+本地、未入库证据为 `.buildlog/r01-group-restore-20261116/implementation-review.json`
+及同目录 `pre-merge-01/delivery.json`；后者记录的 `6cf2ad7` 仅由 M amend 提交说明，
+最终修复提交的 Tree、父提交及 6 个文件与已审对象保持一致。
+可用 `flutter test --no-pub test/database/global_group_restore_test.dart test/common/global_proxy_groups_test.dart`
+复跑直接专项；四项既有失败留待 R03 核对，不计入 R01 已解决范围。
 
 ### R02：退出检查与运行意图发布不在同一临界区
 
