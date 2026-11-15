@@ -261,6 +261,37 @@ class Database extends _$Database {
         definitions: globalGroups,
       );
       profiles = migrated.profiles;
+      ApplicationRouteTarget remapTarget(
+        int profileId,
+        ApplicationRouteTarget target,
+      ) {
+        if (target.kind != ApplicationTargetKind.globalGroup) return target;
+        final ids = globalGroups == null
+            ? migrated.profileIds[profileId]
+            : migrated.globalIds;
+        final id = ids?[target.groupId];
+        return id == null || id == target.groupId
+            ? target
+            : target.copyWith(groupId: id);
+      }
+
+      Map<int, ApplicationRouteTarget> remapTargets(
+        Map<int, ApplicationRouteTarget> targets,
+      ) => targets.map(
+        (profileId, target) =>
+            MapEntry(profileId, remapTarget(profileId, target)),
+      );
+
+      rules = rules.map((rule) {
+        final binding = rule.hostBinding;
+        return binding == null
+            ? rule
+            : rule.copyWith(
+                hostBinding: binding.copyWith(
+                  targets: remapTargets(binding.targets),
+                ),
+              );
+      }).toList();
       await writeGlobalGroups(migrated.groups);
       // Backups taken while foreign keys were off may carry orphaned rows.
       await customStatement('PRAGMA defer_foreign_keys = ON');
@@ -305,6 +336,7 @@ class Database extends _$Database {
         );
       });
       if (applicationRouting != null) {
+        final incoming = applicationRouting;
         final previous = isOverride
             ? const ApplicationRoutingSettings()
             : await readApplicationRouting();
@@ -312,15 +344,15 @@ class Database extends _$Database {
           previous.copyWith(
             sharedTargets: {
               ...previous.sharedTargets,
-              ...applicationRouting.sharedTargets,
+              ...remapTargets(incoming.sharedTargets),
             },
             rules: {
               ...previous.rules,
-              for (final entry in applicationRouting.rules.entries)
+              for (final entry in incoming.rules.entries)
                 entry.key: entry.value.copyWith(
                   targets: {
                     ...?previous.rules[entry.key]?.targets,
-                    ...entry.value.targets,
+                    ...remapTargets(entry.value.targets),
                   },
                 ),
             },

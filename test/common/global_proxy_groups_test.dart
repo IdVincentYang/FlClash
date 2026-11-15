@@ -24,6 +24,11 @@ void main() {
       expect(migrated.groups, [globalGroupDefinition(original)]);
       expect(migrated.profiles[0].localGroups.single, a);
       expect(migrated.profiles[1].localGroups.single, b.copyWith(id: 7));
+      expect(migrated.globalIds, isEmpty);
+      expect(migrated.profileIds, {
+        1: {7: 7},
+        2: {8: 7},
+      });
     },
   );
 
@@ -38,6 +43,10 @@ void main() {
       expect(migrated.profiles.last.localGroups.single.name, 'Mine');
       expect(migrated.profiles.last.localGroups.single.parents, ['Other']);
       expect(migrated.profiles.last.selectedMap, before.last.selectedMap);
+      expect(migrated.profileIds, {
+        1: {7: 7},
+        2: {7: 0},
+      });
       final again = migrateGlobalGroups(
         migrated.groups,
         before,
@@ -60,6 +69,8 @@ void main() {
       expect(imported.groups, hasLength(2));
       expect(imported.groups.last.name, 'Mine (2)');
       expect(imported.profiles.single.localGroups.single, b);
+      expect(imported.globalIds, {8: 8});
+      expect(imported.profileIds, isEmpty);
       final again = migrateGlobalGroups(
         imported.groups,
         [profile(2, b)],
@@ -71,6 +82,20 @@ void main() {
         migrateGlobalGroups([], [], definitions: [original]).groups,
         hasLength(1),
       );
+    },
+  );
+
+  test(
+    'explicit equivalent definitions expose their mapping without a Profile',
+    () {
+      final migrated = migrateGlobalGroups(
+        [globalGroupDefinition(original)],
+        [],
+        definitions: [original.copyWith(id: 9)],
+      );
+      expect(migrated.groups, [globalGroupDefinition(original)]);
+      expect(migrated.globalIds, {9: 7});
+      expect(migrated.profileIds, isEmpty);
     },
   );
 }

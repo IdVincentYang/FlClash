@@ -13,6 +13,8 @@ bool sameGlobalGroupDefinition(LocalProxyGroup left, LocalProxyGroup right) =>
 typedef GlobalGroupMigration = ({
   List<LocalProxyGroup> groups,
   List<Profile> profiles,
+  Map<int, int> globalIds,
+  Map<int, Map<int, int>> profileIds,
 });
 
 GlobalGroupMigration migrateGlobalGroups(
@@ -27,6 +29,7 @@ GlobalGroupMigration migrateGlobalGroups(
     for (final profile in profiles)
       ...profile.localGroups.map((group) => group.id),
   };
+  final profileIds = <int, Map<int, int>>{};
   var nextId = 0;
   LocalProxyGroup definition(LocalProxyGroup group) =>
       globalGroupDefinition(group).copyWith(id: 0);
@@ -81,6 +84,7 @@ GlobalGroupMigration migrateGlobalGroups(
       ).copyWith(id: id, name: uniqueName(snapshot.name));
       result.add(selected);
     }
+    (profileIds[profile.id] ??= {})[snapshot.id] = selected.id;
     return selected;
   }
 
@@ -117,5 +121,10 @@ GlobalGroupMigration migrateGlobalGroups(
         ],
       ),
   ];
-  return (groups: result, profiles: migrated);
+  return (
+    groups: result,
+    profiles: migrated,
+    globalIds: importedIds,
+    profileIds: profileIds,
+  );
 }
