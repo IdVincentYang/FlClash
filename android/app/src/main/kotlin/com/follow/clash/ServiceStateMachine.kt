@@ -542,7 +542,10 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
         host.showToast(sharedState.startTip)
         return try {
-            val input = host.replayConfigInput().apply { addProperty("requestId", request.id) }
+            val input = host.replayConfigInput().apply {
+                addProperty("requestId", request.id)
+                addProperty("active", true)
+            }
             val result = applyConfig(input).await()
             if (result.status != "activated") {
                 showConfigError(result.message)

@@ -138,7 +138,7 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
         lastSetupParams = Gson().toJson(storedSharedState.setupParams)
         val result = setupResult.getOrThrow()
         check(result.isEmpty()) { result }
-        return JsonParser.parseString("{\"inputId\":\""+"a".repeat(64)+"\"}").asJsonObject
+        return JsonParser.parseString("{\"inputId\":\""+"a".repeat(64)+"\",\"active\":false,\"replay\":true}").asJsonObject
     }
     override suspend fun configPhase(method: String, receipt: ConfigReceipt): ConfigApplyResult {
         if (heldPhase == method) {
@@ -682,7 +682,7 @@ class ServiceStateMachineTest {
     }
 
     @Test
-    fun `handleStartAction loads the stored configuration and sets the core up`() = runTest {
+    fun `handleStartAction activates a stored inactive replay request`() = runTest {
         val host = ConfigServiceTestHost(backgroundScope)
         val machine = host.createMachine()
 
@@ -691,11 +691,38 @@ class ServiceStateMachineTest {
         assertEquals(1, host.setupCalls)
         assertEquals(1, host.startCalls)
         assertEquals(RunState.STARTED, machine.runState.value)
+        assertTrue(host.lastConfigFact.businessActive)
+        assertFalse(host.toasts.contains(INVALID_CONFIG_MESSAGE))
         assertEquals(
             ServiceStateMachine.initParams(host.homeDirPath, host.sdkInt),
             host.lastInitParams,
         )
         assertEquals(Gson().toJson(host.storedSharedState.setupParams), host.lastSetupParams)
+    }
+
+    @Test
+    fun `stop while loading a replay prevents its later activation`() = runTest {
+        val host = ConfigServiceTestHost(backgroundScope)
+        val entered = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val machine = host.createMachine(object : ServiceStateHost by host {
+            override suspend fun replayConfigInput(): JsonObject {
+                val input = host.replayConfigInput()
+                entered.complete(Unit)
+                resume.await()
+                return input
+            }
+        })
+        val start = backgroundScope.launch { machine.handleStartAction() }
+        entered.await()
+
+        machine.requestStop().await()
+        resume.complete(Unit)
+        start.join()
+
+        assertEquals(0, host.startCalls)
+        assertEquals(RunState.STOPPED, machine.runState.value)
+        assertFalse(machine.getRequestState().intentRunning)
     }
 
     @Test

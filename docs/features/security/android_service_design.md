@@ -12,6 +12,9 @@ ServiceState 的 arbiter/publication 拥有最新运行意图；ServiceControlle
 VpnService/ProxyService 拥有服务资源，ConfigInput/T01 拥有配置接受与业务入口资格。
 Flutter 发出命令、观察事实，不以计时或成功分配 requestId 推导服务已经启动/停止。
 
+无 Flutter 的通知栏、快捷开关和 Always-on 启动复用已验证的 checkpoint，并明确将恢复输入作为激活请求提交。
+恢复接口返回的 inactive 初始值不代表本次启动意图；实际激活仍受原生 requestId、最新运行意图及暂停状态约束。
+
 `preparePauseIntent(paused)` 在同一 native publication 内读取当前运行意图、更新 paused，
 分配 intentRevision，返回该次实际发布快照。退出或 publication 失败不返回可分派的成功请求；
 失败回退同步清理 intentRunning，保留 failed 事实并封闭既有请求门。
