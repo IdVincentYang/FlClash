@@ -6,6 +6,23 @@ import 'package:fl_clash/models/models.dart';
 const localProxyGroupsLimit = 64;
 const localProxyGroupMembersLimit = 1024;
 
+String? localGroupDefaultEntrance(
+  List<Group> groups,
+  Iterable<LocalProxyGroup> localGroups,
+) {
+  final localNames = localGroups.map((group) => group.name).toSet();
+  return groups
+      .where(
+        (group) =>
+            group.name != 'GLOBAL' &&
+            group.hidden != true &&
+            group.type == GroupType.Selector &&
+            !localNames.contains(group.name),
+      )
+      .firstOrNull
+      ?.name;
+}
+
 List<Proxy> localGroupNodes(List<Group> groups) {
   final names = groups.map((group) => group.name).toSet();
   final nodes = <String, Proxy>{};

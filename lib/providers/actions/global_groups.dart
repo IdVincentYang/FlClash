@@ -5,6 +5,7 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
   bool _setupBusy = false, _scheduled = false, _syncing = false, _again = false;
   String? _failedStamp;
   bool _watching = false;
+  int _referenceActivation = 0, _completedReferenceActivation = -1;
 
   @protected
   Request get requestClient => request;
@@ -25,6 +26,7 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
     }
     _watching = true;
     ref.listen(currentProfileIdProvider, (_, _) {
+      _referenceActivation++;
       state = null;
       _schedule();
     });
@@ -84,6 +86,8 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
     Profile profile, {
     Set<int> attach = const {},
     Map<int, List<String>> references = const {},
+    String? defaultParent,
+    bool restoreDefaultParent = false,
   }) async {
     final names = localGroupNodes(
       ref.read(groupsProvider),
@@ -116,8 +120,13 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
           parent: null,
           parents:
               references[definition.id] ??
-              binding?.entrances.toList() ??
-              const [],
+              [
+                ...?binding?.entrances,
+                if (defaultParent != null &&
+                    (binding == null || restoreDefaultParent) &&
+                    binding?.entrances.contains(defaultParent) != true)
+                  defaultParent,
+              ],
           matchedNodes: matches,
         ),
       );
@@ -126,39 +135,30 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
   }
 
   Future<void> _synchronize({
-    Set<int> attach = const {},
     bool explicit = false,
     int? expectedProfileId,
   }) async {
     final profile = ref.read(currentProfileProvider);
     final fact = ref.read(configStateProvider).fact;
+    final referenceActivation = _referenceActivation;
     if (profile == null ||
         expectedProfileId != null && profile.id != expectedProfileId ||
         fact.profileId != profile.id ||
+        fact.isManaged ||
         !const {'ready', 'installed'}.contains(fact.phase)) {
       return;
     }
-    final settings = await database.readApplicationRouting();
-    attach = {
-      ...attach,
-      for (final rule in settings.hostRules)
-        if (hostRuleApplies(rule, profile.id) &&
-            (rule.hostBinding!.packageName == null ||
-                settings.rules[rule.hostBinding!.packageName]?.enabled == true))
-          if (hostRuleTarget(rule, profile.id) case final target?
-              when target.groupId != null)
-            target.groupId!,
-      for (final rule in settings.rules.values)
-        if (rule.enabled && rule.action == ApplicationRouteAction.proxy)
-          if (applicationTargetFor(settings, rule, profile.id)
-              case final target?
-              when target.kind == ApplicationTargetKind.globalGroup)
-            target.groupId!,
-    };
     final definitions = await database.readGlobalGroups();
     if (!ref.mounted || ref.read(currentProfileIdProvider) != profile.id) {
       return;
     }
+    final attach = definitions.map((group) => group.id).toSet();
+    final defaultParent = localGroupDefaultEntrance(ref.read(groupsProvider), [
+      ...definitions,
+      ...profile.localGroups,
+    ]);
+    final restoreDefaultParent =
+        referenceActivation != _completedReferenceActivation;
     final synchronized =
         attach.every(
           (id) => profile.localGroups.any((group) => group.id == id),
@@ -169,13 +169,21 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
               definitions.any(
                 (definition) => sameGlobalGroupDefinition(group, definition),
               ),
-        );
+        ) &&
+        (!restoreDefaultParent ||
+            defaultParent == null ||
+            profile.localGroups.every(
+              (group) => group.entrances.contains(defaultParent),
+            ));
     if (synchronized) {
+      _completeReferenceActivation(referenceActivation, profile.id);
       if (ref.mounted) state = null;
       return;
     }
     final stamp = SourceAcceptance.fingerprint({
       'profile': profile.id,
+      'referenceActivation': referenceActivation,
+      'defaultParent': defaultParent,
       'input': fact.fence,
       'nodes': localGroupNodes(
         ref.read(groupsProvider),
@@ -192,10 +200,17 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
       return;
     }
     try {
-      final after = await _materialize(definitions, profile, attach: attach);
+      final after = await _materialize(
+        definitions,
+        profile,
+        attach: attach,
+        defaultParent: defaultParent,
+        restoreDefaultParent: restoreDefaultParent,
+      );
       await ref
           .read(profilesActionProvider.notifier)
           .saveLocalGroups(profile, after, expectedGlobalGroups: definitions);
+      _completeReferenceActivation(referenceActivation, profile.id);
       _failedStamp = null;
       if (ref.mounted) state = null;
     } catch (_) {
@@ -204,11 +219,18 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
     }
   }
 
+  void _completeReferenceActivation(int activation, int profileId) {
+    if (ref.mounted &&
+        _referenceActivation == activation &&
+        ref.read(currentProfileIdProvider) == profileId) {
+      _completedReferenceActivation = activation;
+    }
+  }
+
   Future<void> save(
     List<LocalProxyGroup> expected,
     List<LocalProxyGroup> groups, {
     int? profileId,
-    int? activate,
     void Function()? onSaved,
   }) async {
     final definitions = groups.map(globalGroupDefinition).toList();
@@ -265,11 +287,7 @@ class GlobalGroupsAction extends _$GlobalGroupsAction {
     });
     if (ref.mounted) state = null;
     onSaved?.call();
-    await _synchronize(
-      attach: {?activate},
-      explicit: true,
-      expectedProfileId: profileId,
-    );
+    await _synchronize(explicit: true, expectedProfileId: profileId);
   }
 
   Future<void> saveReferences(

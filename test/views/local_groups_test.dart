@@ -134,20 +134,22 @@ class _GlobalGroups extends GlobalGroupsAction {
     List<LocalProxyGroup> expected,
     List<LocalProxyGroup> groups, {
     int? profileId,
-    int? activate,
     void Function()? onSaved,
   }) async {
     library = groups.map(globalGroupDefinition).toList();
     ref.invalidate(globalLocalGroupsProvider);
     final profile = ref.read(currentProfileProvider)!;
     final bindings = {for (final group in profile.localGroups) group.id: group};
+    final parent = localGroupDefaultEntrance(ref.read(groupsProvider), [
+      ...groups,
+      ...profile.localGroups,
+    ]);
     await ref.read(profilesActionProvider.notifier).saveLocalGroups(profile, [
       for (final group in groups)
-        if (bindings.containsKey(group.id) || activate == group.id)
-          group.copyWith(
-            parents: bindings[group.id]?.entrances.toList() ?? const [],
-            matchedNodes: group.nodes,
-          ),
+        group.copyWith(
+          parents: bindings[group.id]?.entrances.toList() ?? [?parent],
+          matchedNodes: group.nodes,
+        ),
     ], onSaved: onSaved);
   }
 

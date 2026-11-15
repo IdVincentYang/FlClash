@@ -52,7 +52,6 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
     List<LocalProxyGroup> expected,
     List<LocalProxyGroup> groups, {
     int? profileId,
-    int? activate,
     void Function()? onSaved,
   }) async {
     if (_busy) return;
@@ -63,13 +62,7 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
     try {
       await ref
           .read(globalGroupsActionProvider.notifier)
-          .save(
-            expected,
-            groups,
-            profileId: profileId,
-            activate: activate,
-            onSaved: onSaved,
-          );
+          .save(expected, groups, profileId: profileId, onSaved: onSaved);
     } catch (error) {
       if (mounted) setState(() => _error = error);
       rethrow;
@@ -82,7 +75,6 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
     List<LocalProxyGroup> expected,
     List<LocalProxyGroup> groups, {
     int? profileId,
-    int? activate,
   }) {
     final saved = Completer<void>();
     unawaited(
@@ -90,7 +82,6 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
         expected,
         groups,
         profileId: profileId,
-        activate: activate,
         onSaved: () {
           if (!saved.isCompleted) saved.complete();
         },
@@ -234,16 +225,11 @@ class _LocalGroupsViewState extends ConsumerState<LocalGroupsView> {
               .where((item) => item.id != value.id)
               .map((item) => item.name),
         },
-        onSave: (next) => _saveEditor(
-          definitions,
-          [
-            for (final item in definitions)
-              if (item.id != next.id) item,
-            next,
-          ],
-          profileId: profile?.id,
-          activate: group == null ? next.id : null,
-        ),
+        onSave: (next) => _saveEditor(definitions, [
+          for (final item in definitions)
+            if (item.id != next.id) item,
+          next,
+        ], profileId: profile?.id),
       ),
     );
   }

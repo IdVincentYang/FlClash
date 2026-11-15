@@ -6,6 +6,30 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('default entrance is the first visible subscription selector', () {
+    final groups = [
+      const Group(name: 'GLOBAL', type: GroupType.Selector),
+      const Group(name: 'Mine', type: GroupType.Selector),
+      const Group(name: 'Hidden', type: GroupType.Selector, hidden: true),
+      const Group(name: 'Auto', type: GroupType.URLTest),
+      const Group(name: 'Subscription', type: GroupType.Selector),
+      const Group(name: 'Media', type: GroupType.Selector),
+    ];
+    expect(
+      localGroupDefaultEntrance(groups, [
+        const LocalProxyGroup(id: 7, name: 'Mine'),
+      ]),
+      'Subscription',
+    );
+    expect(localGroupDefaultEntrance(groups.take(4).toList(), []), 'Mine');
+    expect(
+      localGroupDefaultEntrance(groups.take(4).toList(), [
+        const LocalProxyGroup(id: 7, name: 'Mine'),
+      ]),
+      isNull,
+    );
+  });
+
   const local = LocalProxyGroup(
     id: 7,
     name: 'Mine',

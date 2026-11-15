@@ -862,8 +862,10 @@ directives, so consumers continue to import the same public API:
 - `GeoResourceAction`: geo resource updates and URL configuration.
 - `UpdatingAction`: stale sweep over `UpdatingKeys`.
 
-Proxies exposes per-Profile local group management. `Profile.localGroups` stores the definitions; the composition
-layer appends enabled groups after the existing override pipeline. `ProfilesAction.saveLocalGroups` applies a
+Proxies manages globally saved local group definitions; `Profile.localGroups` stores subscription bindings and member snapshots.
+`GlobalGroupsAction` attaches the library when a subscription becomes ready and restores references to its first visible
+subscription Selector on each profile activation. New groups join that entrance; existing selector choices and other
+references remain intact. The composition layer appends enabled groups after the existing override pipeline. `ProfilesAction.saveLocalGroups` applies a
 fenced, group-only delta over the accepted input and preserves current selector choices. On Android, Core derives the
 candidate from its current accepted configuration; Setup applies that approved local input through the existing queue
 and lifecycle path without refreshing or reviewing a remote candidate. The base input, source grants and material

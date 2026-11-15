@@ -45,8 +45,13 @@ class _Core implements CoreController {
 class _Fact extends ConfigState {
   @override
   ConfigViewState build() => const ConfigViewState();
-  void ready(int id) => state = ConfigViewState(
-    fact: ConfigFact(profileId: id, phase: 'ready', inputId: 'input-$id'),
+  void ready(int id, {bool managed = false}) => state = ConfigViewState(
+    fact: ConfigFact(
+      profileId: id,
+      phase: 'ready',
+      inputId: 'input-$id',
+      policyVersion: managed ? 2 : 0,
+    ),
   );
 }
 
@@ -136,11 +141,17 @@ void main() {
     await store.close();
   });
 
-  void ready(Profile profile, String node) {
+  void ready(Profile profile, String node, {String main = 'Main'}) {
     container.read(currentProfileIdProvider.notifier).value = profile.id;
     container.read(groupsProvider.notifier).value = [
       Group(
-        name: 'Main',
+        name: main,
+        type: GroupType.Selector,
+        all: [Proxy(name: node, type: 'ss')],
+        now: node,
+      ),
+      Group(
+        name: 'Media',
         type: GroupType.Selector,
         all: [Proxy(name: node, type: 'ss')],
         now: node,
@@ -150,7 +161,120 @@ void main() {
   }
 
   test(
-    'enabled app policy attaches its stable global group without selector references',
+    'new groups join the main selector without changing its selection',
+    () async {
+      ready(a, 'A node');
+      await action.synchronizeApplicationGroups();
+      await action.saveReferences(
+        container.read(currentProfileProvider)!,
+        [manual, regex],
+        manual.id,
+        ['Media'],
+      );
+      const created = LocalProxyGroup(id: 3, name: 'New', nodes: ['A node']);
+      await action.save(
+        [manual, regex],
+        [manual, regex, created],
+        profileId: a.id,
+      );
+      final bindings = profiles.writes.last.localGroups;
+      expect(bindings.map((group) => group.id), [
+        manual.id,
+        regex.id,
+        created.id,
+      ]);
+      expect(bindings.first.entrances, {'Media'});
+      expect(bindings.last.entrances, {'Main'});
+      expect(bindings.last.effectiveNodes, ['A node']);
+      expect(container.read(groupsProvider).first.now, 'A node');
+      expect(
+        container.read(currentProfileProvider)!.selectedMap,
+        a.selectedMap,
+      );
+    },
+  );
+
+  test(
+    'switching back restores default references while retaining other parents',
+    () async {
+      ready(a, 'A node');
+      await action.synchronizeApplicationGroups();
+      await action.saveReferences(
+        container.read(currentProfileProvider)!,
+        [manual, regex],
+        manual.id,
+        ['Media'],
+      );
+      final writes = profiles.writes.length;
+      await action.synchronizeApplicationGroups();
+      expect(profiles.writes, hasLength(writes));
+      expect(
+        container.read(currentProfileProvider)!.localGroups.first.entrances,
+        {'Media'},
+      );
+      container.read(initProvider.notifier).value = true;
+      profiles.next = Completer<void>();
+      var applied = profiles.next!.future;
+      ready(b, 'B node', main: 'Subscription B');
+      await applied.timeout(const Duration(seconds: 5));
+      expect(profiles.writes.last.localGroups, hasLength(2));
+      expect(
+        profiles.writes.last.localGroups.every(
+          (g) => g.entrances.contains('Subscription B'),
+        ),
+        isTrue,
+      );
+      expect(profiles.writes.last.localGroups.first.effectiveNodes, ['B node']);
+      profiles.next = Completer<void>();
+      applied = profiles.next!.future;
+      ready(a, 'A node');
+      await applied.timeout(const Duration(seconds: 5));
+      final group = container.read(currentProfileProvider)!.localGroups.first;
+      expect(group.entrances, {'Main', 'Media'});
+      expect(group.parents.where((parent) => parent == 'Main'), hasLength(1));
+      expect(group.effectiveNodes, ['A node']);
+      expect(container.read(groupsProvider).first.now, 'A node');
+    },
+  );
+
+  test('without a subscription selector groups remain independent', () async {
+    ready(a, 'A node');
+    container.read(groupsProvider.notifier).value = const [
+      Group(
+        name: 'GLOBAL',
+        type: GroupType.Selector,
+        all: [Proxy(name: 'A node', type: 'ss')],
+      ),
+      Group(
+        name: 'Auto',
+        type: GroupType.URLTest,
+        all: [Proxy(name: 'A node', type: 'ss')],
+      ),
+    ];
+    await action.synchronizeApplicationGroups();
+    expect(profiles.writes.last.localGroups, hasLength(2));
+    expect(
+      profiles.writes.last.localGroups.every((g) => g.entrances.isEmpty),
+      isTrue,
+    );
+  });
+
+  test(
+    'managed policies do not receive subscription group injections',
+    () async {
+      ready(a, 'A node');
+      (container.read(configStateProvider.notifier) as _Fact).ready(
+        a.id,
+        managed: true,
+      );
+      await action.synchronizeApplicationGroups();
+      expect(profiles.writes, isEmpty);
+      expect(await store.readGlobalGroups(), [manual, regex]);
+    },
+  );
+
+  test(
+    'all global groups are available to app policies and the subscription entrance',
     () async {
       ready(a, 'A node');
       await store.writeApplicationRouting(
@@ -168,10 +292,13 @@ void main() {
         ),
       );
       await action.synchronizeApplicationGroups();
-      final binding = profiles.writes.last.localGroups.single;
+      final binding = profiles.writes.last.localGroups.firstWhere(
+        (group) => group.id == regex.id,
+      );
+      expect(profiles.writes.last.localGroups, hasLength(2));
       expect(binding.id, regex.id);
       expect(binding.effectiveNodes, ['A node']);
-      expect(binding.entrances, isEmpty);
+      expect(binding.entrances, {'Main'});
     },
   );
 
@@ -237,13 +364,20 @@ void main() {
       final changed = manual.copyWith(type: GroupType.URLTest);
       await action.save([manual, regex], [changed, regex]);
       expect(profiles.writes.last.id, b.id);
-      expect(profiles.writes.last.localGroups.single.type, GroupType.URLTest);
+      expect(
+        profiles.writes.last.localGroups
+            .firstWhere((g) => g.id == manual.id)
+            .type,
+        GroupType.URLTest,
+      );
       container.read(initProvider.notifier).value = true;
       profiles.next = Completer<void>();
       final applied = profiles.next!.future;
       ready(a, 'A node');
       await applied.timeout(const Duration(seconds: 5));
-      final binding = profiles.writes.last.localGroups.single;
+      final binding = profiles.writes.last.localGroups.firstWhere(
+        (group) => group.id == manual.id,
+      );
       expect(binding.type, GroupType.URLTest);
       expect(binding.entrances, {'Main'});
       expect(binding.effectiveNodes, ['A node']);
@@ -299,13 +433,20 @@ void main() {
           ),
         ),
       );
-      await action.save(
-        [manual, regex],
-        [manual, regex],
-        profileId: a.id,
-        activate: manual.id,
+      await action.save([manual, regex], [manual, regex], profileId: a.id);
+      expect(
+        profiles.writes.last.localGroups
+            .firstWhere((group) => group.id == manual.id)
+            .effectiveNodes,
+        isEmpty,
       );
-      expect(profiles.writes.last.localGroups.single.effectiveNodes, isEmpty);
+      expect(
+        profiles.writes.last.localGroups
+            .firstWhere((group) => group.id == manual.id)
+            .entrances,
+        {'Main'},
+      );
+      expect(container.read(groupsProvider).first.now, 'other node');
       expect((await store.readGlobalGroups()).first.nodes, manual.nodes);
     },
   );
@@ -318,7 +459,6 @@ void main() {
         [manual, regex],
         [manual, regex],
         profileId: a.id,
-        activate: manual.id,
         onSaved: () => ready(b, 'B node'),
       );
       expect(profiles.writes, isEmpty);
