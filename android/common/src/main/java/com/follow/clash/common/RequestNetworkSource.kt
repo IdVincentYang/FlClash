@@ -40,6 +40,13 @@ class RequestNetworkSource(
         val losingUntilMillis: Long = 0,
     )
 
+    private data class Observation(
+        val entries: Map<Network, Entry>,
+        val defaultNetwork: Network?,
+        val defaultEntry: Entry,
+        val selectedNetwork: Network?,
+    )
+
     private val connectivity = application.getSystemService<ConnectivityManager>()
     private val handler = Handler(Looper.getMainLooper())
     private val gate = Any()
@@ -52,6 +59,7 @@ class RequestNetworkSource(
     private var revision = 0L
     private var defaultNetwork: Network? = null
     private var defaultEntry = Entry()
+    private var lastObservation: Observation? = null
     private var lastDns = emptyList<String>()
     private val dnsTask = Runnable(::publishDns)
 
@@ -75,6 +83,9 @@ class RequestNetworkSource(
         val facts = synchronized(gate) {
             if (!active) return
             action()
+            val observation = Observation(entries.toMap(), defaultNetwork, defaultEntry, selectionLocked().network)
+            if (observation == lastObservation) return
+            lastObservation = observation
             revision++
             selectionLocked().facts
         }
@@ -209,6 +220,7 @@ class RequestNetworkSource(
             entries.clear()
             defaultNetwork = null
             defaultEntry = Entry()
+            lastObservation = null
             revision++
             selectionLocked().facts
         }

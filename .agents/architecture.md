@@ -302,6 +302,8 @@ Android deliberately keeps Flutter requests optimistic and the native layer auth
 Application-request Direct routing bypasses FlClash proxy nodes and follows the system
 default Network, including another VPN. Only a live FlClash protection generation uses protect plus a physical Network
 to avoid re-entering its own TUN. Native revision/socket checks and request cancellation retain their existing owners.
+`RequestNetworkSource` advances request revisions when normalized observations (including DNS and blocking state) change.
+Equivalent capability callbacks, such as repeated bandwidth updates, do not revoke in-flight requests.
 
 Quick Settings, notification, revoke, and Always-on VPN paths converge on the same owner:
 
