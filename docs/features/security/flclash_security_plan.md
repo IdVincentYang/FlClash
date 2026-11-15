@@ -16,6 +16,8 @@
 
 其它平台待定。
 
+累计改动评审：[Android 分枝 Review Issue](android_branch_review_issue.md)（相对 main 的已确认问题与验证边界）。
+
 当前能力契约：[IP 查询设计](ip_lookup_design.md)（触发、接收方、数据及失败边界）；
 [受管使用指南](managed_profile_guide.md)及
 [R1 未解决风险](deferred_security_items.md#l2-t02-r1-共享-ip-与域名身份)；
