@@ -63,6 +63,23 @@ func TestAppRequestDartSpec(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &input); err != nil {
 		t.Fatal(err)
 	}
+	var original struct{ State map[string]any }
+	if err := json.Unmarshal([]byte(raw), &original); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(input.State)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored map[string]any
+	if err := json.Unmarshal(encoded, &restored); err != nil {
+		t.Fatal(err)
+	}
+	for key, value := range original.State {
+		if restoredValue, ok := restored[key]; !ok || !reflect.DeepEqual(restoredValue, value) {
+			t.Fatalf("native request state field %s did not survive Go serialization", key)
+		}
+	}
 	r := newAppRequestRegistry()
 	defer r.closePrivate()
 	r.publish(input.State)

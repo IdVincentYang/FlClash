@@ -2,6 +2,7 @@ package com.follow.clash
 
 import com.follow.clash.common.ApplicationRequestState
 import com.follow.clash.common.RequestNetworkFacts
+import com.google.gson.Gson
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -43,6 +44,18 @@ class RequestSocketGateTest {
         assertEquals(false, access.boundPhysical)
         assertEquals(0, access.protections)
         assertEquals(1, access.bindings)
+    }
+
+    @Test fun `wire snapshot preserves empty and active capture fingerprints`() {
+        val gson = Gson()
+        for (fingerprint in listOf("", "synthetic-capture")) {
+            val access = Access().apply { state = state.copy(captureFingerprint = fingerprint) }
+            val wire = gson.toJsonTree(access.state).asJsonObject
+            assertTrue(prepareRequestSocket(access, gson.fromJson(wire, ApplicationRequestState::class.java), 42))
+            wire.remove("captureFingerprint")
+            assertFalse(prepareRequestSocket(access, gson.fromJson(wire, ApplicationRequestState::class.java), 42))
+            assertEquals(1, access.bindings)
+        }
     }
 
     @Test fun `unknown transitional and mismatched protection states never bind`() {

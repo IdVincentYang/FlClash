@@ -55,6 +55,7 @@ class _Native implements Service {
     'defaultNetworkId': 'synthetic-network',
     'defaultNetworkKind': 'nonVpn',
     'protectPhase': 'none',
+    'captureFingerprint': running ? 'synthetic-capture' : '',
     'phase': nativePhase ?? (running ? 'started' : 'stopped'),
     'reason': running ? 'none' : stopReason,
   };

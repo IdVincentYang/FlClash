@@ -49,6 +49,7 @@ type AppRequestState struct {
 	DirectNetworkID    string `json:"directNetworkId"`
 	ProtectGeneration  uint64 `json:"protectGeneration"`
 	ProtectPhase       string `json:"protectPhase"`
+	CaptureFingerprint string `json:"captureFingerprint"`
 }
 
 type appRequestRegistry struct {
