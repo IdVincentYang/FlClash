@@ -2,9 +2,10 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R07 已修复并完成本地交付；R08–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R08 已修复并完成本地交付；R09–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
-共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
+原评审收录 11 项：3 项 P1、7 项 P2、1 项 P3。修复中另确认 F01（P2），作为独立未解决跟进记录，
+不并入 R08 已解决声明，也不改变本轮 R09–R11 的修复顺序。
 
 ## 对象与覆盖
 
@@ -372,6 +373,42 @@ detach／attach 后两表仍各有 1000 项，活动 lease 为零。
 处理目标：在来源、客户端或请求生命周期结束时安全回收，或使用有界且不会重用旧资格的代次方案；
 不能简单删计数后归零，让旧 ticket 再次有效。验证长时间多 key、反复 attach 及迟到旧请求拒绝。
 
+**处置：已修复，M 复审通过并完成本地交付（2026-11-16）。**
+修复提交为 `3f92145b9a9f5efc3d733ec29b7d702764a8efbd`，目标分枝为 `security/android`。
+[Dart 版本表](../../../lib/common/request_versions.dart)与[Core 版本表](../../../core/request_versions.go)
+保留活动持有及每表至多 4096 个冷项；有序 LRU 同时限制辅助记录，不再按历史 key 数永久累积。
+高水位不随 detach 回退，重建跳过一值、已有版本仍递增一；缺项拒绝旧资格。
+超过 JSON 精确整数上限时终止资格授予，取消、Complete 和释放仍可执行。
+这约束历史元信息，不是进程物理内存上限保证；无活动持有的旧审核快照可在压力下失效并需重新获取。
+
+在途 begin／session、lease／receipt 和有资格的配置依赖分别持有版本记录。
+[Script](../../../lib/providers/actions/scripts.dart)在写入前通过私有 retainCompletion 获取有限续接持有，
+交给 [SetupAction](../../../lib/providers/actions/setup.dart)直到 debounce／队列中的真实回调结束；
+替换、Stop、dispose 和失败释放，网络及写入资格仍按原 session／receipt 收尾。
+[provider 退休](../../../core/provider_stage.go)释放 lease／completion，receipt 独立保留到 Complete；
+[guarded shutdown](../../../core/provider_lifecycle.go)在真实初始化／关闭及物理资源关闭后、丢弃配置指针前释放配置持有。
+源码契约见[请求版本与续接寿命](source_acceptance_design.md#请求版本与续接寿命)。
+
+D 的反例与回归覆盖 ABA、冷项平台期、迟到 begin／Close、配置及材料持有、真实图标下载和出口检测 churn。
+退休反例原先遗留 source／operation 各 3 pin、geo 1 pin；四轮 shutdown 的配置 pin 原先累积为
+3／6／9／12，修复后每轮归零，未用替换 registry 掩盖残留。
+普通 Go 441 个 top-level／680 个 pass 事件、40 skip；no_zerotier 452／703／40，两种 vet 通过。
+定向 helper-overlay race 为 14／23，真实 Script 续接 11 个业务用例通过；复用未变源码的
+Android 控制编译／3 测试、pub get／codegen 及其它 Flutter 成功证据，analyze 保持 42 条既有 info。
+
+首轮完整 Flutter 记录为 4916 个成功、32 skip、9 个错误完成事件，原失败记录保留。
+旧版与新版的相同未改夹具、独立临时目录对照，均在无 receipt 的 clearPartialCommit teardown 失败；
+仅修夹具的 finally 清理及目录隔离后，整组 10 个业务用例通过，业务断言主体未改。
+未重新跑完整 Flutter 根套件；stock race 仍有既有 CGO helper 标签构建限制。
+本项 pin 的定向并发回归在 collector 已退出后受控重新初始化；独立竞争见 F01，不能据此声明
+完整 shutdown／init 无竞争。无 APK／设备验收；编译和测试均由 D 执行，M 只审代码、测试方案与证据。
+
+本地、未入库证据位于 `.buildlog/r08-request-keys-20261116/`，首轮与设计记录冻结；修订入口为
+`revision-02/implementation-source.json`，最终绑定为 `revision-02/refine/delivery-summary.json`。
+54 文件与已审快照仅 Plan 状态行不同；D 提交 `45922def` 仅由 M amend Details，Tree 与父提交未变。
+完成 Plan 已从当前树清理，定稿可用
+`git show 3f92145:docs/features/security/r08_request_keys_plan.md` 取回。
+
 ### R09：新增 JNI 入口绕过既有 panic 隔离
 
 位置：[Core JNI exports](../../../core/lib.go)的 `requestControl`、`setRequestSocketListener`、
@@ -422,6 +459,33 @@ Android 上可能终止整个应用。这里确认的是缺少恢复边界，未
 
 处理目标：只同步仍有效的当前陈述，解释 Core 新旧证据适用边界、节点 fallback 的条件及当前 VPN 操作。
 旧基线的冻结证据不改写；修正文档不授予修改 Core、取消保护或提升验收状态的许可。
+
+## 修复中确认的独立跟进
+
+### F01：配置 collector 与重新初始化并发访问 HomeDir
+
+**状态：已确认，未修复；P2，独立于本轮 R01–R11 的修复范围。**
+D 在 R08 生命周期回归中发现，M 核对原基线生产 overlay 与竞争堆栈后确认。
+复现基线为 `ee6b7f559a921f97232fbd6f40671db9e4ee6c18`；R08 未修改此竞争的读写路径。
+
+正常 activate 会调用 [queueInputCollection](../../../core/config_inputs.go)启动异步材料回收。
+随后实际 guarded shutdown 返回并重新 init 时，collector 可仍在进入
+[lockConfigInputRead](../../../core/config_apply.go)：它在取得 configMu 之前调用
+[beginRequestDataRead](../../../core/app_requests.go)读取 `C.Path.HomeDir()`。
+另一侧 guardedInitClash 虽持有 configMu，initializeCore 仍会直接调用 `C.SetHomeDir`；
+[底层 getter／setter](../../../core/Clash.Meta/constant/path.go)没有同步，关闭流程也未等待该 collector 完成。
+因此 init 的锁不能保护锁外先行读取。
+
+预期旧回收任务与新初始化之间具有一致的目录所有权和同步关系；实际旧 collector 的读取与新 init 写入存在数据竞争。
+D 在原生产代码上运行真实 apply→shutdown→init 循环，race detector 报告这两个具体访问竞争；
+未证明文件被误删、用户数据丢失或设备崩溃，不将这些可能后果写成已发生事实。
+
+后续应在 FlClash 侧明确 collector 的目录快照／生命周期和同步边界，避免把等待条件仅放在测试中；
+保留现有请求资格、回收锁顺序与 shutdown 隔离，不直接扩大到修改 Core 子模块。
+验收应包含无需测试预先等待 collector 的真实循环、迟到旧任务及目录切换，具体方案尚未决定。
+本地证据位于 R08 的 `revision-02/`：`baseline-home-race-source.json`、
+`baseline-home-race-probe_test.go`、`baseline-home-race-overlay.json` 和 `go-race-home-baseline.jsonl`。
+overlay 恢复原基线生产，只增加独立 probe 并移除 IPC 测试 helper 的 `!cgo` 标签；不是原仓库完整 race。
 
 ## 验证证据与限制
 
