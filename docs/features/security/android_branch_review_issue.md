@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R02 已修复并完成本地交付；R03–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R03 已修复并完成本地交付；R04–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
@@ -145,7 +145,41 @@ Always-on 拒绝返回 0 且不继续 bind／dispatch。契约见[服务设计](
 先前任务已知这些失败，不改变相对 main 的累计引入归因；本结果也不证明正式手动更新功能本身失效。
 
 处理目标：使用允许的 UI 导入，更新夹具及 schema 预期，保留数据迁移、成功、取消及资格失效的独立断言；
-不得放宽生产资格检查或跳过门禁来消除失败。尚未分派修复任务。
+不得放宽生产资格检查或跳过门禁来消除失败。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复在 `security/android` 分为三个 fixup：`346f445` 同步生命周期请求消费者，
+`8d4dd47` 修复空备份与卡片布局，`2eed93544697a173c3b850972fb4fce0cd29fc42` 完成 Host 删除、
+schema 消费者和任务定稿。更新弹窗通过真实 Request 获取合格结果；迁移保留数据／约束断言，
+DAV、Bootstrap 和 manager 夹具匹配实际所有权，没有放宽生产资格或新增 skip。
+
+关联回归中另外确认并修复三处生产缺陷，均先由 M 与 D 核验并批准范围：
+
+- 合法空数据库备份被解析成显式空组／默认 routing，override 因而删除已有数据。
+  parser 在完整解析和关系校验后恢复 Config-only 语义；禁用 App、shared／Host 等非空数据仍保留，
+  显式 `Database.restore(globalGroups: [])` 清空契约不变。见
+  [空备份回归](../../../test/common/empty_backup_archive_test.dart)及[恢复契约](../proxies/local_groups_design.md#保存许可与并发)。
+- 删除 33,000 条规则时，删除前的 Host 查询使用未分批的 IN 参数而失败。
+  同一事务内按既有 900 参数边界查询和删除，仅命中 Host 时更新一次 revision；
+  [分块回归](../../../test/database/rule_delete_chunks_test.dart)覆盖跨批命中和数据／revision 一起回滚。
+- Home 从 1440 缩至 380 时，ProfileItem 尾部文字动作在 106px 约束下溢出约 71px。
+  按卡片实际空间、标签宽度和字体缩放切换文字／图标动作，保留选择、审核禁用、菜单和进度；
+  [布局回归](../../../test/widgets/profile_action_layout_test.dart)覆盖阈值、俄语、2 倍文字及交互，
+  原 Home resize 条件和异常断言保持。
+
+D 完整运行根 Flutter 测试：4239 通过、115 个既有环境依赖跳过，0 失败、0 未完成；
+真实 test assets 与 Rust hook 启用，仅 Go setup hook 按 CI 测试方法临时关闭并恢复原配置字节。
+跳过项依赖未提供的 JVM／Core bridge 或 managed compiler，不计通过。analyze 无 error／warning，
+42 条 info 与基线一致；format、文档 lint、diff 及提交 hooks 通过。
+M 审阅代码、测试方案及绑定证据，未代跑编译或产品测试。
+未验证 APK、设备、VPN、Linux CI、真实更新服务或全部 bridge，不升级整体 Android 验收。
+
+本地、未入库证据为 `.buildlog/r03-test-consumers-20261116/implementation-source.json`、
+`root-tests-02.log`、`root-tests-02-summary.json` 和 `delivery-summary.json`。
+最终 25 文件与获审快照的唯一差异为 Plan 状态；`delivery-summary.json` 中的 `832326f`
+仅由 M amend Details，Tree 与父提交保持不变。R01 所列四项基线失败已在本项处理；
+各专项存在重叠，不与完整根计数相加。定稿 Plan 保存在上述最终交付提交的历史中，
+可用 `git show 2eed935:docs/features/security/r03_test_consumers_plan.md` 取回复核方案、命令及验证限制。
 
 ### R04：ConfigFact 的版本检查与赋值可并发失序
 
