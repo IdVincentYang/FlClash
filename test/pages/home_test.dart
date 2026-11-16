@@ -498,6 +498,7 @@ void main() {
       final profile = Profile.normal();
       final container = ProviderContainer(
         overrides: [
+          configStateProvider.overrideWith(TestConfigState.new),
           profilesProvider.overrideWith(() => _HomeTestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           versionProvider.overrideWithBuild((_, _) => 15),
@@ -538,7 +539,9 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [configStateProvider.overrideWith(TestConfigState.new)],
+      );
       addTearDown(container.dispose);
       globalState.container = container;
       container.read(viewSizeProvider.notifier).value = const Size(1400, 1000);

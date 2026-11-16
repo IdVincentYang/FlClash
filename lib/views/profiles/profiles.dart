@@ -187,6 +187,10 @@ class _ProfilesGrid extends ConsumerWidget {
 }
 
 class ProfileItem extends ConsumerWidget {
+  static const _actionSize = 40.0;
+  static const _titleGap = 8.0;
+  static const _itemPadding = EdgeInsets.only(left: 16, right: 6);
+
   final Profile profile;
   final int? groupValue;
   final void Function(int? value) onChanged;
@@ -445,6 +449,43 @@ class ProfileItem extends ConsumerWidget {
         : null;
     final needsReview =
         reviewStatus?.asData?.value == SourceReviewStatus.required;
+    final selected = profile.id == groupValue;
+    final label = selected
+        ? context.appLocalizations.selected
+        : context.appLocalizations.useProfile;
+    final onSelect = selected || needsReview
+        ? null
+        : () => onChanged(profile.id);
+    final states = {if (onSelect == null) WidgetState.disabled};
+    final buttonStyle = TextButtonTheme.of(context).style;
+    final labelStyle =
+        buttonStyle?.textStyle?.resolve(states) ?? context.textTheme.labelLarge;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final buttonPadding =
+        buttonStyle?.padding?.resolve(states) ??
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+    final labelWidth = TextPainter.computeWidth(
+      text: TextSpan(text: label, style: labelStyle),
+      textDirection: Directionality.of(context),
+      textScaler: textScaler,
+      locale: Localizations.localeOf(context),
+    );
+    final buttonWidth =
+        (labelWidth +
+                buttonPadding.resolve(Directionality.of(context)).horizontal)
+            .clamp(
+              buttonStyle?.minimumSize?.resolve(states)?.width ?? 64,
+              double.infinity,
+            );
+    // Three scaled title ems remain beside the measured action, menu, padding and gap.
+    final titleWidth =
+        textScaler.scale(context.textTheme.titleMedium?.fontSize ?? 16) * 3;
+    final textLayoutWidth =
+        _itemPadding.horizontal +
+        _titleGap +
+        titleWidth +
+        buttonWidth +
+        _actionSize;
     return CommonCard(
       enterActionsOnRight: true,
       radius: AppCorner.xl,
@@ -458,94 +499,112 @@ class ProfileItem extends ConsumerWidget {
           _handleShowEditExtendPage(context);
         }
       },
-      child: ListItem(
-        key: Key(profile.id.toString()),
-        horizontalTitleGap: 8,
-        minVerticalPadding: 12,
-        padding: const EdgeInsets.only(left: 16, right: 6),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton(
-              onPressed: profile.id == groupValue || needsReview
-                  ? null
-                  : () => onChanged(profile.id),
-              child: Text(
-                profile.id == groupValue
-                    ? context.appLocalizations.selected
-                    : context.appLocalizations.useProfile,
-              ),
-            ),
-            SizedBox(
-              height: 40,
-              width: 40,
-              child: Consumer(
-                builder: (context, ref, _) {
-                  final isUpdating = ref.watch(
-                    isUpdatingProvider(profile.updatingKey),
-                  );
-                  return FadeThroughBox(
-                    alignment: Alignment.center,
-                    child: isUpdating
-                        ? const Padding(
-                            key: ValueKey('loading'),
-                            padding: EdgeInsets.all(8),
-                            child: CommonCircleLoading(),
-                          )
-                        : CommonPopupBox(
-                            key: const ValueKey('menu'),
-                            popupBuilder: (_) => CommonPopupMenu(
-                              items: _menuItems(context, ref),
-                            ),
-                            targetBuilder: (open) {
-                              return IconButton(
-                                style: IconButton.styleFrom(
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.standard,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < textLayoutWidth;
+          return ListItem(
+            key: Key(profile.id.toString()),
+            horizontalTitleGap: _titleGap,
+            minVerticalPadding: 12,
+            padding: _itemPadding,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (compact)
+                  SizedBox.square(
+                    dimension: _actionSize,
+                    child: IconButton(
+                      style: IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.standard,
+                      ),
+                      tooltip: label,
+                      onPressed: onSelect,
+                      icon: GlyphIcon(
+                        selected ? AppGlyphs.checkCircle : AppGlyphs.check,
+                      ),
+                    ),
+                  )
+                else
+                  TextButton(
+                    style: ButtonStyle(
+                      padding: WidgetStatePropertyAll(buttonPadding),
+                    ),
+                    onPressed: onSelect,
+                    child: Text(label),
+                  ),
+                SizedBox(
+                  height: 40,
+                  width: 40,
+                  child: Consumer(
+                    builder: (context, ref, _) {
+                      final isUpdating = ref.watch(
+                        isUpdatingProvider(profile.updatingKey),
+                      );
+                      return FadeThroughBox(
+                        alignment: Alignment.center,
+                        child: isUpdating
+                            ? const Padding(
+                                key: ValueKey('loading'),
+                                padding: EdgeInsets.all(8),
+                                child: CommonCircleLoading(),
+                              )
+                            : CommonPopupBox(
+                                key: const ValueKey('menu'),
+                                popupBuilder: (_) => CommonPopupMenu(
+                                  items: _menuItems(context, ref),
                                 ),
-                                tooltip: context.appLocalizations.more,
-                                onPressed: () {
-                                  open();
+                                targetBuilder: (open) {
+                                  return IconButton(
+                                    style: IconButton.styleFrom(
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.standard,
+                                    ),
+                                    tooltip: context.appLocalizations.more,
+                                    onPressed: () {
+                                      open();
+                                    },
+                                    icon: const GlyphIcon(AppGlyphs.more),
+                                  );
                                 },
-                                icon: const GlyphIcon(AppGlyphs.more),
-                              );
-                            },
-                          ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-        title: _ProfileCardTitle(
-          profile: profile,
-          info: [
-            ...switch (profile.type) {
-              ProfileType.file => _buildFileProfileInfo(context),
-              ProfileType.url => _buildUrlProfileInfo(context),
-            },
-            if (needsReview)
-              Text(
-                context.appLocalizations.sourceReviewPending,
-                style: context.textTheme.labelMedium?.copyWith(
-                  color: context.colorScheme.error,
+                              ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            if (reviewStatus?.isLoading == true)
-              Text(
-                context.appLocalizations.sourceStatusChecking,
-                style: context.textTheme.bodySmall,
-              ),
-            if (reviewStatus?.hasError == true)
-              TextButton(
-                onPressed: () =>
-                    ref.invalidate(profileReviewStatusProvider(profile)),
-                child: Text(context.appLocalizations.sourceStatusRetry),
-              ),
-          ],
-        ),
-        tileTitleAlignment: ListTileTitleAlignment.top,
+              ],
+            ),
+            title: _ProfileCardTitle(
+              profile: profile,
+              info: [
+                ...switch (profile.type) {
+                  ProfileType.file => _buildFileProfileInfo(context),
+                  ProfileType.url => _buildUrlProfileInfo(context),
+                },
+                if (needsReview)
+                  Text(
+                    context.appLocalizations.sourceReviewPending,
+                    style: context.textTheme.labelMedium?.copyWith(
+                      color: context.colorScheme.error,
+                    ),
+                  ),
+                if (reviewStatus?.isLoading == true)
+                  Text(
+                    context.appLocalizations.sourceStatusChecking,
+                    style: context.textTheme.bodySmall,
+                  ),
+                if (reviewStatus?.hasError == true)
+                  TextButton(
+                    onPressed: () =>
+                        ref.invalidate(profileReviewStatusProvider(profile)),
+                    child: Text(context.appLocalizations.sourceStatusRetry),
+                  ),
+              ],
+            ),
+            tileTitleAlignment: ListTileTitleAlignment.top,
+          );
+        },
       ),
     );
   }

@@ -334,6 +334,34 @@ void main() {
         for (final override in [false, true]) {
           final target = await newDb();
           await seed(target, 'preserved');
+          await target.profilePolicySelectionsDao.compareAndWrite(
+            1,
+            expected: null,
+            selection: const ProfilePolicySelection(
+              profileId: 1,
+              rawContent: 'opaque-kept',
+            ),
+          );
+          const group = LocalProxyGroup(id: 7, name: 'Kept', nodes: ['node']);
+          await target.writeGlobalGroups([group]);
+          await target.writeApplicationRouting(
+            const ApplicationRoutingSettings(
+              rules: {
+                'fixture.app': ApplicationRouteRule(
+                  packageName: 'fixture.app',
+                  enabled: true,
+                ),
+              },
+              sharedTargets: {
+                1: ApplicationRouteTarget(
+                  name: 'Kept',
+                  kind: ApplicationTargetKind.globalGroup,
+                  groupId: 7,
+                ),
+              },
+            ),
+          );
+          final routingBefore = await target.readApplicationRouting();
           final c = container();
           c
               .read(appSettingProvider.notifier)
@@ -352,6 +380,14 @@ void main() {
             'preserved',
           );
           expect(await target.profilesDao.query().get(), hasLength(1));
+          expect(
+            (await target.profilePolicySelectionsDao.query().get())
+                .single
+                .rawContent,
+            'opaque-kept',
+          );
+          expect(await target.readGlobalGroups(), [group]);
+          expect(await target.readApplicationRouting(), routingBefore);
         }
       }
     },

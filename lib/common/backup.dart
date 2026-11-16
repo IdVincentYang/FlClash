@@ -216,11 +216,19 @@ Future<MigrationData> readBackupArchive({
     )) {
       throw const BackupException(BackupFailure.invalid);
     }
+    final globalGroups = results[9].cast<LocalProxyGroup>();
+    final applicationRouting = await database.readApplicationRouting();
+    if (results.every((rows) => rows.isEmpty) &&
+        applicationRouting.rules.isEmpty &&
+        applicationRouting.sharedTargets.isEmpty &&
+        applicationRouting.hostRules.isEmpty) {
+      return MigrationData(configMap: configMap);
+    }
     return MigrationData(
       configMap: configMap,
       profiles: results[0].cast<Profile>(),
-      globalGroups: results[9].cast<LocalProxyGroup>(),
-      applicationRouting: await database.readApplicationRouting(),
+      globalGroups: globalGroups,
+      applicationRouting: applicationRouting,
       scripts: results[1].cast<Script>(),
       rules: results[2].cast<Rule>(),
       links: results[3].cast<ProfileRuleLink>(),
