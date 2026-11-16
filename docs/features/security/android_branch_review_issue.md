@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R06 已修复并完成本地交付；R07–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R07 已修复并完成本地交付；R08–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
@@ -325,6 +325,33 @@ pending 为 0／128／1024／2047 时，每轮约 14／88／643／1275 µs；每
 
 处理目标：降低逐规则重复过期维护及分配，保持准确 provenance、容量和过期边界；
 回归高 pending、长规则链及真实 tracker 消费，不以关闭追溯换性能。具体实现尚未决定。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复提交 `122c2e4db6f3fce85c31d88f3af1730e869d21a7` 位于 `security/android`。
+普通 Match 和 App hook 共用原锁内的一秒维护门，provider map 在首个合格回调时创建；
+pending 发布时复核 2048 上限，修复两个已准入匹配完成后可从 2047 增至 2049 的窗口。
+满额仍执行实际匹配，frame 起始时间、bind 的一分钟有效期和冻结事实不变；
+空闲过期引用等待下一次维护，两表各保持有界。当前契约见[轻量连接追溯](source_acceptance_design.md#轻量连接追溯)。
+
+[生命周期与容量回归](../../../core/source_trace_work_test.go)在旧生产有提前分配、pending=2049 两项失败，
+修复后通过；配合[维护门回归](../../../core/source_trace_maintenance_test.go)，新专项共 9 个 top-level、
+含子项 16 个 pass 事件，覆盖迟到回调、满表恢复、共享时间门及过期拒绝。
+真实 Tracker 的 provider 换代、PASS、sub-rule 和 R06 模式事实回归继续通过。
+[基准](../../../core/source_trace_bench_test.go)前后各 14 配置、每配置 5 个样本；
+同一 wrapper 每轮 100 次未命中、pending=2047 时，中位耗时 1272.984→13.887 µs，
+分配 200→100 次。空表中位耗时增加约 1–2%，单次清扫仍为 O(active＋pending)，锁次数未减少。
+这些 host 数据不证明 Android 吞吐、耗电或最坏延迟。
+
+Go wrapper 测试与 vet 通过：426 个 top-level、含子项 656 个 pass 事件，40 个既有条件 skip。
+原仓库 CGO=1 race 在构建阶段因既有 IPC 测试 helper 标签失败；仅移除该测试文件标签的本地 overlay
+下，新专项定向 race 为 9 个 top-level／16 个 pass 事件，无 skip，不是原仓库完整 race 通过。
+Flutter 四专项 111 通过、2 个既有桥接输入 skip，analyze 保持 42 条既有 info；本次未重新生成桥接输入。
+验证由 D 执行，M 审代码、测试方案及绑定日志，未代跑编译或产品测试；未覆盖 APK、JNI、设备或 VPN。
+
+本地、未入库证据位于 `.buildlog/r07-source-trace-20261116/`，入口为 `implementation-source.json`、
+`before-source.json`、`bench-comparison.json`、`race-overlay-source.json` 及 `delivery-summary.json`。
+八文件交付与获审对象仅 Plan 状态不同，55 个绑定证据未变；交付记录中的 `eca4420` 仅由 M amend Details，
+Tree 与父提交不变。定稿可用 `git show 122c2e4:docs/features/security/r07_source_trace_plan.md` 取回。
 
 ### R08：活动请求有界，历史 key 却永久保留
 
