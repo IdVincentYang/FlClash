@@ -249,6 +249,9 @@ func TestApplicationInputBridge(t *testing.T) {
 				t.Fatal(err)
 			}
 			result = appRequests.control(params)
+		case "exitFault":
+			requestNativeFault.Store(true)
+			result = map[string]bool{"ok": true}
 		case "requestKeyChurn":
 			var count int
 			if err := json.Unmarshal(call.Arguments, &count); err != nil || count < 0 || count > 32768 {
@@ -264,6 +267,8 @@ func TestApplicationInputBridge(t *testing.T) {
 				"sources": len(appRequests.sources), "sourceEntries": len(appRequests.sourceVersions.entries), "sourceCold": appRequests.sourceVersions.cold.Len(),
 				"operations": len(appRequests.operations), "operationEntries": len(appRequests.operationVersions.entries), "operationCold": appRequests.operationVersions.cold.Len(),
 				"holds": len(appRequests.completionHolds), "leases": len(appRequests.leases), "commits": len(appRequests.commits),
+				"client": appRequests.client, "clientReady": appRequests.clientReady,
+				"writers": unknownRequestWriters.Load(), "fault": requestNativeFault.Load(),
 			}
 			appRequests.mu.Unlock()
 		case "fact":

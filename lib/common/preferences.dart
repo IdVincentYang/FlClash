@@ -95,8 +95,15 @@ class Preferences {
   }
 
   Future<bool> saveConfig(Config config) async {
+    final write = await prepareConfigWriter();
+    return write(config);
+  }
+
+  Future<Future<bool> Function(Config)> prepareConfigWriter() async {
     final preferences = await sharedPreferencesCompleter.future;
-    return preferences?.setString(configKey, json.encode(config)) ?? false;
+    return (config) =>
+        preferences?.setString(configKey, json.encode(config)) ??
+        Future<bool>.value(false);
   }
 
   Future<SystemDnsRecord?> getSystemDnsRecord() async {

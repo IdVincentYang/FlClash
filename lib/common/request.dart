@@ -18,6 +18,12 @@ import 'request_versions.dart';
 
 final dataMutations = SerialTaskScheduler();
 
+typedef RequestLocalCommit = Future<void> Function(Future<void> Function());
+typedef RequestExitCleanup = ({
+  RequestLocalCommit commit,
+  Future<void> Function() detach,
+});
+
 class RequestUnavailable implements Exception {
   const RequestUnavailable(this.code);
   final String code;
@@ -646,11 +652,10 @@ class Request with ServiceListener {
     _receipt?.applicationInputsInvalidated = true;
   }
 
-  Future<void> detach() async {
+  ({String? client, int revision}) _quiesce() {
     final client = _client;
     final revision = ++_attachmentRevision;
     _datasetRevision++;
-    _client = null;
     _container = null;
     _attachment = null;
     _nativeState = null;
@@ -659,12 +664,56 @@ class Request with ServiceListener {
       session.close();
     }
     _cancellations.clearCold();
+    return (client: client, revision: revision);
+  }
+
+  RequestExitCleanup quiesceForExit() {
+    final owner = _quiesce();
+    void checkOwner() {
+      if (_attachmentRevision != owner.revision || _client != owner.client) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+    }
+
+    return (
+      commit: (action) => dataMutations.run(() async {
+        checkOwner();
+        final client = owner.client;
+        if (_isAndroid && client == null) {
+          throw const RequestUnavailable('request_state_unavailable');
+        }
+        final receipt = _isAndroid
+            ? await _commitControl({
+                'action': 'lock',
+                'client': client,
+              }, () async => checkOwner())
+            : null;
+        await _runReceipt(receipt?['id'] as String?, () async {
+          checkOwner();
+          await action();
+        }, client: client);
+      }),
+      detach: () => _detach(owner.client, owner.revision),
+    );
+  }
+
+  Future<void> detach() async {
+    final owner = _quiesce();
+    await _detach(owner.client, owner.revision);
+  }
+
+  Future<void> _detach(String? client, int revision) async {
+    if (revision != _attachmentRevision || client != _client) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+    final detachedRevision = ++_attachmentRevision;
+    _client = null;
     if (_isAndroid && client != null) {
       try {
         await _control({'action': 'detach', 'client': client});
       } on RequestUnavailable catch (error) {
         if (error.code != 'request_cancelled' ||
-            revision == _attachmentRevision) {
+            detachedRevision == _attachmentRevision) {
           rethrow;
         }
       }

@@ -163,6 +163,13 @@ Profile沿原age解密器及已配置密钥先解密后分类／投影，密封�
 待提交同意没有SourceUse，不能提前撤销仍供本次下载的旧scope；运行消费者只接受唯一规范grant。
 网络材料绑定实际RequestSession及GrantCommit，本地import／save绑定显式local-material操作的专用receipt；
 普通lock不能消费材料同意。候选preflight仅纯解析／投影，不执行未正式许可Script、下载嵌套材料或调用工厂。
+退出保存先 quiesce Dart Request 的会话和新请求入口，再申请原 client 的 lock／beginCommit／complete，
+最后 native detach；后者撤销 clientReady，不能仅凭 lock 成功声称 post-detach 保存合格。
+退出作用域只捕获原 attachment／client，在排队、授予后和写前核对；新 attach 同时撤销旧保存及旧 final detach。
+preferences 存储句柄在提交 closure 前异步准备；closure 内读取最新 Config，owner 检查后不经 await
+直接调用存储写入口。即使 preferences 已初始化，也不能在该检查与写入口之间再次 await 其 Future。
+Android 退出缺 client 时明确拒绝，不降级无 receipt；fault／未知写者仍拒绝写入。已经开始的物理写不可假撤回，
+真实 receipt 继续承担完成与恢复 marker 责任。该局部作用域不保留 detached client、不恢复 ready 或网络资格。
 父Go比较并记录实际receipt自己的唯一source失效，文件＋DB耐久保存后核真实目标hash与原grant，才正式发布并reconcile。
 跨语言写入窗口沿既有request-recovery-required保护；失败不假回滚已发布权限或真实已存材料。
 失败终止释放receipt并唤醒等待者，保留带所有权的屏障；旧cleanup不能覆盖新工作。

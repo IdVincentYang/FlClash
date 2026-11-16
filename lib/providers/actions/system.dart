@@ -7,6 +7,21 @@ class SystemAction extends _$SystemAction {
   @protected
   BootGuard get startupGuard => bootGuard;
 
+  @protected
+  Request get requestClient => request;
+
+  @protected
+  Service? get nativeService => service;
+
+  @protected
+  Future<void> shutdownTray() async => await trayPort?.shutdown();
+
+  @protected
+  Future<void> shutdownDns() async => await systemDnsCoordinator?.shutdown();
+
+  @protected
+  Future<void> stopSystemProxy() async => await proxy?.stopProxy();
+
   SystemExitCoordinator? _exitCoordinator;
 
   @override
@@ -29,7 +44,14 @@ class SystemAction extends _$SystemAction {
   }
 
   Future<void> handleExit([bool needSave = true]) {
-    unawaited(startupGuard.markClosed());
+    unawaited(
+      Future<void>.sync(startupGuard.markClosed).catchError((Object error) {
+        commonPrint.log(
+          'Startup close failed: ${compactError(error)}',
+          logLevel: LogLevel.error,
+        );
+      }),
+    );
     final coordinator = _exitCoordinator ??= SystemExitCoordinator(
       watchdogDuration: exitWatchdogDuration,
       closeWindow: closeWindow,
@@ -44,24 +66,50 @@ class SystemAction extends _$SystemAction {
 
   @protected
   Future<void> cleanupExitResources(bool needSave) async {
-    await service?.prepareRunIntent(running: false, source: 'exit');
-    await request.detach();
-    final saveOperation = needSave ? _savePreferencesSafely() : null;
-    final tray = trayPort;
-    if (tray != null) {
-      await tray.shutdown().onError<Object>((error, stackTrace) {
+    Object? firstError;
+    StackTrace? firstStack;
+    Future<void> runStep(String name, Future<void> Function() step) async {
+      try {
+        await step();
+      } catch (error, stack) {
+        firstError ??= error;
+        firstStack ??= stack;
         commonPrint.log(
-          'Tray shutdown failed: ${compactError(error)}',
+          'Exit $name failed: ${compactError(error)}',
           logLevel: LogLevel.error,
         );
+      }
+    }
+
+    RequestExitCleanup? scope;
+    final quiesced = runStep('request quiesce', () async {
+      scope = requestClient.quiesceForExit();
+    });
+    final independent = [
+      runStep('startup close', startupGuard.markClosed),
+      runStep('tray', shutdownTray),
+      runStep('DNS', shutdownDns),
+      runStep('system proxy', stopSystemProxy),
+    ];
+    await quiesced;
+    await runStep('intent', () async {
+      await nativeService?.prepareRunIntent(running: false, source: 'exit');
+    });
+    if (needSave) {
+      await runStep('preferences', () async {
+        final owner = scope;
+        if (owner == null) throw const RequestUnavailable('request_cancelled');
+        await savePreferences(commit: owner.commit);
       });
     }
-    await Future.wait([
-      ?saveOperation,
-      startupGuard.markClosed(),
-      if (systemDnsCoordinator != null) systemDnsCoordinator!.shutdown(),
-      if (proxy != null) proxy!.stopProxy(),
-    ]);
+    await runStep('request detach', () async {
+      final owner = scope;
+      if (owner == null) throw const RequestUnavailable('request_cancelled');
+      await owner.detach();
+    });
+    await Future.wait(independent);
+    final error = firstError;
+    if (error != null) Error.throwWithStackTrace(error, firstStack!);
   }
 
   Future<void> _savePreferencesSafely() async {
@@ -76,7 +124,7 @@ class SystemAction extends _$SystemAction {
   }
 
   @protected
-  Future<void> savePreferences() async {
+  Future<void> savePreferences({RequestLocalCommit? commit}) async {
     final port = windowPort;
     if (port != null) {
       try {
@@ -92,8 +140,9 @@ class SystemAction extends _$SystemAction {
         );
       }
     }
-    await request.mutate(() async {
-      if (!await preferences.saveConfig(ref.read(configProvider))) {
+    final writeConfig = await preferences.prepareConfigWriter();
+    await (commit ?? requestClient.mutate<void>)(() async {
+      if (!await writeConfig(ref.read(configProvider))) {
         throw const RequestUnavailable('preferences_save_failed');
       }
     });

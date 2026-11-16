@@ -251,13 +251,22 @@ for snapshot deletion, bounded export and provider failure semantics.
 
 Application exit is centralized in `SystemAction` and `SystemExitCoordinator`:
 
-1. Optionally save config and clean up DNS, system proxy, and tray resources in parallel.
+1. Revoke Dart Request sessions and new request admission, then attempt native exit intent,
+   optional qualified saving, and native detach in that order. Saving uses the original
+   attachment's client while native `clientReady` still permits `beginCommit`; Android exit
+   has no receipt-less save fallback. A replacement attachment invalidates both the old
+   save and its final detach. Prepare the preferences storage handle before entering the
+   commit closure; read the latest Config and invoke storage without an intervening await
+   after its owner check. Independent BootGuard, DNS, system proxy and tray cleanup
+   starts after local revocation and is attempted despite failures in the sequential path.
 2. Close the desktop window.
 3. Call terminal `CoreController.close()`.
 4. Exit the application exactly once.
 
-The coordinator is idempotent, continues later cleanup steps after an earlier error, preserves the first error for the
-caller, and uses a three-second watchdog as an emergency application-exit path. `Application.dispose()` and
+Each cleanup step records its own failure; the first observed error and stack reach the caller.
+BootGuard revokes startup permission at exit entry; cleanup awaits the same idempotent close.
+The coordinator is idempotent and uses a three-second watchdog as an emergency application-exit path;
+emergency exit does not prove saving or native detach completed. `Application.dispose()` and
 `CoreManager.onCrash()` do not independently destroy Core; this avoids competing shutdown owners.
 
 ### Desktop Lifecycle
