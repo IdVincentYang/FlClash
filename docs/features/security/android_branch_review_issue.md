@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R05 已修复并完成本地交付；R06–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R06 已修复并完成本地交付；R07–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
@@ -281,6 +281,32 @@ D 的 Core 消费链夹具中 `tunnel.Mode()` 为 `direct`，冻结的 `observat
 
 处理目标：区分普通 matcher 和应用规则来源，保留可证明的实际模式；覆盖 Direct／Rule 的
 App＋Host、App 默认和普通规则，继续禁止用新配置回填旧连接事实。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复提交 `081e235d829c186d7ad731c483132a791ab66594` 位于 `security/android`。
+仅有 AppliedRevision、实际非空 Rule 和非负 matcher 索引时才补 Rule 模式；App hook 索引为 -1，
+保留稳定快照证明的 Direct，否则不猜模式。同名 application-rules 来源的普通 YAML 规则仍可证明 Rule。
+实际路由、DTO、Native、DB、Core gitlink 和 carrier 不变，契约见
+[连接事实与版本](../network_activity/network_activity_design.md#连接事实与版本)。
+
+[模式回归](../../../core/connection_mode_test.go)包括 14 项真实 Core TCP Tracker 和 18 项局部 bind 边界。
+同一测试源码在原生产有 7 项真实模式断言、5 项局部边界失败，修复后两组全部通过。
+真实组以 Tracker 已包含 rule／chain、观测尚未 bind 的门控制合法配置更新；
+13 项 localhost echo 成功，完整 ConfigInput 替换一项确认旧 lease 失效并终止载荷，超时不计成功。
+覆盖 App／App＋Host、普通规则、Global bypass、模式往返及冻结后再次更新；
+局部组的入口版本与追溯失效夹具仅证明事实组合边界，不冒充真实网络交错。
+
+Go wrapper 测试与 vet 通过：417 个 top-level 通过（含子测试 640 个 pass 事件），
+40 个既有条件 skip 不计通过；新增两专项无 skip。Dart 四专项 111 通过、2 个既有桥接输入跳过，
+实际消费 14 条新 Core JSON；常规测试始终覆盖 mode 缺省，request／snapshot／JSON 往返不补造模式或路由戳。
+analyze 保持 42 条既有 info。验证由 D 执行，M 审阅源码、测试与绑定证据，未代跑编译或产品测试。
+范围限 host Core／Dart，不证明真实 JNI、Android 调度、APK、设备或 VPN。
+
+本地、未入库证据位于 `.buildlog/r06-observation-mode-20261116/`，入口为 `implementation-source.json`、
+`before-source.json`、`modes-before-04.json`、`modes-after.json` 及 `delivery-summary.json`。
+前两次 Go 夹具准备错误保留为 setup 记录，最终旧基线为 `go-before-04.log`。
+五文件交付与获审对象仅 Plan 状态不同；`delivery-summary.json` 的 `be8eee3` 仅由 M amend Details，
+Tree 与父提交不变。定稿可用 `git show 081e235:docs/features/security/r06_observation_mode_plan.md` 取回。
 
 ### R07：规则追溯在逐条匹配中重复扫描全局表
 
