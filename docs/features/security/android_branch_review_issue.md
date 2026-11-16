@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01 已修复并完成本地交付；R02–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R02 已修复并完成本地交付；R03–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
@@ -104,6 +104,21 @@ D 用未修改的已编译 JVM 类复现，并确认 Core publication 接受后�
 
 处理目标：让终态判断与意图创建／发布具有同一线性化边界，覆盖等待中的 Tile Start、
 Stop、重复退出和过期请求，保持 Native 为唯一服务意图所有者。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复提交 `82be1097eeee1b3b310f6d95368088ee2d3181b7` 位于 `security/android`。
+终态判断、token 创建和 publication 共用既有锁；公开异常协议保持，原生动作正常消费拒绝，
+Always-on 拒绝返回 0 且不继续 bind／dispatch。契约见[服务设计](android_service_design.md#权威与请求)。
+
+[退出专项](../../../android/tests/app/ServiceExitStateMachineTest.kt)包含 15 项生产状态机测试；
+旧实现兼容用例实际执行 10 项，4 通过、6 失败。修复后相关 6 suites 共 96 通过、0 失败、0 跳过，
+受影响 app Kotlin 编译通过。验证由 D 执行，M 核对代码、测试及绑定证据，没有代跑。
+覆盖 host JVM 和生产 Always-on owner；未验证 APK、设备、VPN、系统 callback 注册或 JNI／Go 端到端。
+
+本地、未入库证据为 `.buildlog/r02-exit-intent-20261116/implementation-review.json`
+及同目录 `pre-merge-01/delivery.json`，前者保存可复跑命令与源码／日志／XML Hash。
+后者的交付版本 `1a8945e` 仅由 M amend 提交说明，最终修复提交的 Tree、父提交及 4 个文件保持一致。
+原有 R03 门禁失败不纳入本项通过范围。
 
 ### R03：累计迁移未同步测试消费者
 
