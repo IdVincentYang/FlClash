@@ -1141,6 +1141,12 @@ void main() {
         activityConnection('unknown', status: 'lookupFailed', candidates: []),
       );
     await pump(tester, activity: store.snapshot());
+    final policy = find.byType(ApplicationPolicySwitch);
+    expect(tester.widget<ApplicationPolicySwitch>(policy).packages, isEmpty);
+    expect(
+      find.descendant(of: policy, matching: find.byType(Switch)),
+      findsNothing,
+    );
     await tester.tap(find.text('Unknown app'));
     await tester.pumpAndSettle();
     expect(find.text('Unknown app'), findsOneWidget);

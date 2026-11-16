@@ -102,7 +102,7 @@ void main() {
     },
   );
 
-  test('shared uid candidates and other users are never a unique package', () {
+  test('unresolved identities never provide a unique package', () {
     for (final identity in [
       const ApplicationIdentity(
         status: 'ambiguous',
@@ -115,6 +115,12 @@ void main() {
         uid: 1010123,
         userScope: 'other',
         packages: ['test.a'],
+      ),
+      const ApplicationIdentity(
+        status: 'lookupFailed',
+        uid: 10123,
+        userScope: 'unknown',
+        method: 'androidUid',
       ),
     ]) {
       expect(identity.packageName, isNull);

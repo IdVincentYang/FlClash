@@ -31,7 +31,10 @@ Android 29 及以上使用 `ConnectivityManager.getConnectionOwnerUid`；低版�
 对多个 UID、读取失败和不确定结果保守返回未知。后者的表解析有自动化测试，尚无旧版 Android 系统验收。
 
 JNI 保留 resolve_uid、resolve_package 两步。后一个回调返回含 status、userScope、packages 的 JSON，
-`UidPackageResolver` 去重、排序并限制最多 64 个候选，不再长期缓存 UID→首个包名。
+`UidPackageResolver` 不再长期缓存 UID→首个包名。
+最多收集 65 个去重非空候选，第 65 项即返回 lookupFailed／unknown／空候选；
+只有完整的 0–64 项才排序并按原状态发送，不能把部分列表作为 ambiguous。
+此上限约束 resolver 的去重集合、排序和 wire 工作，不限制 PackageManager 已返回的原始数组。
 JSON 使用显式字段构造，避免发行版混淆改变反射字段名。
 Go 使用实际查询得到的 UID，不能从回调 JSON 或默认值推断 UID；旧纯包名字符串不作为降级成功。
 Native 模块与 Go 库须一起构建交付。
@@ -42,7 +45,7 @@ Native 模块与 Go 库须一起构建交付。
 | userScope | current、other 或 unknown；不同用户的 UID 不套用当前用户的包名目录 |
 | known | 当前用户内存在唯一包名；仅此状态可提供确定的 packageName |
 | ambiguous | 同一个 UID 有多个包名候选；保留候选，不选第一个，也不声称能区分共享 UID 内的应用 |
-| notFound／otherUser／lookupFailed | UID 已取得，但包名不存在、不属于当前用户或查找失败 |
+| notFound／otherUser／lookupFailed | UID 已取得，但包名不存在、不属于当前用户或无法取得协议可完整表示的身份（包括查询失败及候选超限） |
 | unknown／unsupported | 系统未给出 UID，或没有适用的 socket 信息／协议 |
 | serviceUnavailable／serviceChanged | 查询所属的 VPN 回调已释放或服务代次改变 |
 | notObserved | 没有保留下可关联的入口事实；也用于观测保留上限以外的快照 |
@@ -68,6 +71,12 @@ VPN HTTP proxy 使部分应用直接连接本机代理，绕过 TUN 入口。这
 
 包名候选每次新连接查询，不沿用卸载／重装前的 UID 缓存。已冻结的旧连接保留当时观察，
 不因应用更新、UID 变化或当前目录改变而重标。系统代发、已结束且无法查询的 socket 等仍可能未知。
+
+超限身份不取得 App／App＋Host 策略，Direct 沿 DIRECT，Rule 沿原通用 Host／订阅规则。
+完整 64 项仍可采用共同策略；完整 65 项即使实际一致也不推测。未知条目不借安装目录补齐归属或开放共同设置入口。
+旧 Native 的截断 DTO 与完整 64 项无法区分，仍须 Native／Go 同构建交付，不支持混装旧生产者。
+跨语言合成夹具由 `:service:generateUidPackageIdentityFixture` 任务调用真实 resolver 生成，
+Native 测试校对，Go 常规测试消费；测试源码和生成入口随仓库保存。
 
 ## 连接事实与版本
 
@@ -304,7 +313,7 @@ Core 只消费本地 acceptedOverrides 中的类型化策略；远程订阅 YAML
 受管来源的应用策略同样由本地 accepted override 持有，重放保留原 ManagedPolicy 描述；不改写原受管规则图或解锁其它受限配置。
 Mihomo 的最小 ApplicationRoutingHook 在新 TCP／UDP 的 Rule／Direct 模式分派前运行，Global 与 Inner 跳过。
 它使用原入口捕获的系统 UID／当前用户包名身份，不用前台 App、目标 IP 或其它连接猜测身份。
-共享 UID 只有所有候选包配置一致才采用；UI 修改前明确确认共同影响的包。
+共享 UID 只有可完整表示的全部候选包配置一致才采用；UI 修改前明确确认共同影响的包。
 安装应用目录另外附带 PackageManager.getPackagesForUid 的完整候选，不因目录隐藏 android 等包而少改同一 UID 的应用。未知身份沿原模式处理。
 策略的版本与订阅身份校验阻止迟到或跨订阅更新覆盖当前目标，checkpoint 保存已采用设置供 Native 重放。
 新增 hook 与测试随完整源码 carrier 交付，公开 base 与恢复方式保持原契约。
