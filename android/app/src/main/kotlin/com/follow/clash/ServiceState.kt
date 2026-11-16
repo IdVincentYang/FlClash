@@ -51,13 +51,14 @@ object ServiceState {
     fun observeServiceLost(serviceId: String, requestId: Long) = machine.observeServiceLost(serviceId, requestId)
 
     internal fun bindRequestObservers() {
-        Core.setRequestSocketListener(AndroidRequestSocketGate)
+        runCatching { Core.setRequestSocketListener(AndroidRequestSocketGate) }
+            .onFailure { GlobalState.log("Request socket registration failed; restart the application") }
         RequestObservations.handler = object : RequestObservationHandler {
             override fun onNetworkChanged(facts: RequestNetworkFacts) = machine.observeNetwork(facts)
             override fun onProtectionChanged(service: RequestProtection, identity: RequestServiceIdentity, phase: String, reason: String): Long =
                 machine.observeProtection(service, identity, phase, reason)
             override fun onServiceLost(serviceId: String, requestId: Long) = machine.observeServiceLost(serviceId, requestId)
-            override fun onVpnStartRequested(serviceId: String): Long = machine.handleVpnStartRequest(serviceId)
+            override fun onVpnStartRequested(serviceId: String): Long = machine.handleVpnStartRequest()
         }
     }
 

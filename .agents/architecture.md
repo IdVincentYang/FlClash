@@ -12,6 +12,9 @@ Android lib mode:
 - `lib/core/lib.dart` (`CoreLib`) implements the shared Core interface, gates method calls on its connection completer,
   initializes and synchronizes Android shared state, and closes the native service path exactly once.
 - Because Core is in the application process on Android, application RSS already includes Core memory.
+- Request JNI exports isolate synchronous Go panic and retain a process-lifetime fault veto. Error and cleanup
+  ownership follow the [JNI failure contract](../docs/features/security/source_acceptance_design.md#jni-同步失败边界);
+  Kotlin must not publish ready or stopped before native confirmation.
 
 Desktop core mode:
 
@@ -298,7 +301,9 @@ Android deliberately keeps Flutter requests optimistic and the native layer auth
 - `ServiceController` owns exactly one `ManagedServiceBinding`, selects `VpnService` or `ProxyService` from `VpnOptions`,
   binds with a five-second connection timeout, invokes `ManagedService.start()`/`stopOwned()` off the main thread, and clears
   binding/run-time state after owned cleanup or disconnection. Failed starts retain the binding until
-  `ServiceState` finishes identity-owned cleanup.
+  `ServiceState` finishes identity-owned cleanup. Failed start/adopt calls also record the service's retained identity.
+  Unconfirmed bound-service cleanup retains binding/run time and does not request system destruction;
+  lifecycle callbacks contain cleanup errors, while programmatic callers receive failure.
 - Generic service creation/destruction is lifecycle evidence, not user intent. New commands must flow through
   `ServiceState.requestStart()`/`requestStop()` or the explicit system-action handlers instead of inferring intent from a
   callback.

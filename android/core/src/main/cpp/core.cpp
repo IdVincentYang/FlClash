@@ -6,6 +6,14 @@
 #include "libclash.h"
 #include "bride.h"
 
+static void request_failure(JNIEnv *env, int status) {
+    const auto exception = env->FindClass("java/lang/IllegalStateException");
+    if (exception != nullptr) {
+        env->ThrowNew(exception, status < 0 ? "request_restart_required" : "request_unavailable");
+        env->DeleteLocalRef(exception);
+    }
+}
+
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_follow_clash_core_Core_startTun(JNIEnv *env, jobject thiz, jint fd, jobject cb,
@@ -19,7 +27,12 @@ Java_com_follow_clash_core_Core_startTun(JNIEnv *env, jobject thiz, jint fd, job
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_follow_clash_core_Core_stopTunRequest(JNIEnv *env, jobject thiz, jstring service_id, jlong generation) {
-    return stopTunRequest(get_string(service_id), generation) ? JNI_TRUE : JNI_FALSE;
+    const auto status = stopTunRequest(get_string(service_id), generation);
+    if (status < 0) {
+        request_failure(env, status);
+        return JNI_FALSE;
+    }
+    return status > 0 ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C"
@@ -38,13 +51,15 @@ Java_com_follow_clash_core_Core_requestControl(JNIEnv *env, jobject thiz, jstrin
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_setRequestSocketListener(JNIEnv *env, jobject thiz, jobject cb) {
-    setRequestSocketListener(cb == nullptr ? nullptr : new_global(cb));
+    const auto status = setRequestSocketListener(cb == nullptr ? nullptr : new_global(cb));
+    if (status <= 0) request_failure(env, status);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_setTunRequestIdentity(JNIEnv *env, jobject thiz, jstring service_id, jlong generation) {
-    setTunRequestIdentity(get_string(service_id), generation);
+    const auto status = setTunRequestIdentity(get_string(service_id), generation);
+    if (status <= 0) request_failure(env, status);
 }
 
 extern "C"

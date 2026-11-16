@@ -477,9 +477,11 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         if (getRequestState().reason == "vpnRevoked") reconcileStopped()
     }
 
-    fun handleVpnStartRequest(serviceId: String): Long {
+    fun handleVpnStartRequest(): Long {
         val requestId = tryPrepareRunIntent(running = true, source = "alwaysOn") ?: return 0
-        if (!bindService(serviceId, requestId)) return 0
+        if (preparedRequest(requestId)?.running != true) return 0
+        // A system start intent does not transfer the existing service owner. Controller binds
+        // the actual service when it starts it; until then cleanup must use the retained owner.
         host.scope.launch { handlePreparedStartAction(requestId) }
         return requestId
     }

@@ -127,7 +127,9 @@ type appRequestReceipt struct {
 func (receipt *appRequestReceipt) Complete() {
 	receipt.once.Do(func() {
 		r := receipt.registry
-		r.mu.Lock()
+		registryLock := requestLockScope{mu: &r.mu}
+		defer registryLock.finish()
+		registryLock.Lock()
 		delete(r.commits, receipt.id)
 		if receipt.releaseVersions != nil {
 			receipt.releaseVersions()
@@ -138,7 +140,7 @@ func (receipt *appRequestReceipt) Complete() {
 			unknownRequestWriters.Add(-1)
 		}
 		r.changedLocked()
-		r.mu.Unlock()
+		registryLock.Unlock()
 	})
 }
 func (receipt *appRequestReceipt) Fail(error) { receipt.Complete() }
@@ -223,9 +225,15 @@ func (r *appRequestRegistry) publish(state AppRequestState) bool {
 }
 
 func (r *appRequestRegistry) publishPrepared(state AppRequestState) bool {
-	r.mu.Lock()
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
+	if requestNativeFault.Load() && state.IntentRunning && !state.Paused && state.Phase != "failed" && state.Phase != "stopping" {
+		return false
+	}
 	if state.ProcessEpoch == "" || state.ProcessEpoch == r.state.ProcessEpoch && state.Revision <= r.state.Revision {
-		r.mu.Unlock()
+		registryLock.Unlock()
 		return false
 	}
 	previous := r.state
@@ -243,16 +251,19 @@ func (r *appRequestRegistry) publishPrepared(state AppRequestState) bool {
 		})
 	}
 	r.pendingCleanups = append(r.pendingCleanups, r.invalidateLocked()...)
-	r.mu.Unlock()
+	registryLock.Unlock()
 	return true
 }
 
 func (r *appRequestRegistry) flushCleanup() {
-	r.mu.Lock()
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
 	cleanups := r.pendingCleanups
 	r.pendingCleanups = nil
 	exiting := r.state.Reason == "exiting"
-	r.mu.Unlock()
+	registryLock.Unlock()
 	finishRequestCleanup(cleanups)
 	if exiting {
 		r.closePrivate()
@@ -341,6 +352,9 @@ func (r *appRequestRegistry) allowedLocked(spec requestscope.Spec) bool {
 }
 
 func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spec) (requestscope.Lease, error) {
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
 	id, entropyErr := randomRequestToken()
 	if entropyErr != nil {
 		return nil, requestscope.ErrBlocked
@@ -354,27 +368,27 @@ func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spe
 	if spec.Mode == "proxy" && spec.Proxy == "" {
 		spec.Proxy = "GLOBAL"
 	}
-	r.mu.Lock()
+	registryLock.Lock()
 	if parent.Err() != nil {
-		r.mu.Unlock()
+		registryLock.Unlock()
 		return nil, requestscope.ErrCancelled
 	}
 	if inherited := requestscope.FromContext(parent); inherited != nil {
 		lease, ok := inherited.(*appRequestLease)
 		if !ok || lease == nil || lease.registry != r || !lease.validLocked() || lease.granted || lease.ctx.Err() != nil {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return nil, requestscope.ErrCancelled
 		}
 	}
 	if spec.Client != "" {
 		if spec.ExpectedState == nil || spec.ExpectedState.Epoch != r.state.ProcessEpoch || spec.ExpectedState.Revision != r.state.Revision || spec.Owner != r.owner {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return nil, requestscope.ErrCancelled
 		}
 		if spec.Operation == 0 {
 			spec.Operation = r.advanceOperationVersionLocked(spec.Key)
 			if spec.Operation == 0 {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				r.flushCleanup()
 				return nil, requestscope.ErrBlocked
 			}
@@ -383,17 +397,17 @@ func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spe
 			permit, ok := r.permits[spec.Permit]
 			delete(r.permits, spec.Permit)
 			if !ok || permit.Client != spec.Client || permit.Key != spec.Key || permit.URL != spec.URL || permit.Dataset != spec.Dataset || permit.SourceRevision != spec.SourceRevision || permit.ExpectedState == nil || *permit.ExpectedState != *spec.ExpectedState {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				return nil, requestscope.ErrBlocked
 			}
 		}
 	}
 	if r.namespace == "" || !r.allowedLocked(spec) {
-		r.mu.Unlock()
+		registryLock.Unlock()
 		return nil, requestscope.ErrBlocked
 	}
 	if len(r.leases) >= 128 {
-		r.mu.Unlock()
+		registryLock.Unlock()
 		return nil, requestscope.ErrBlocked
 	}
 	ctx, cancel := context.WithCancel(parent)
@@ -405,7 +419,7 @@ func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spe
 	if spec.Client == "" && (spec.Kind == "geo" || spec.Kind == "geo-batch") {
 		lease.spec.Operation = r.advanceOperationVersionLocked("internal:" + key)
 		if lease.spec.Operation == 0 {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			cancel()
 			r.flushCleanup()
 			return nil, requestscope.ErrBlocked
@@ -415,7 +429,7 @@ func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spe
 	previous := r.latest[key]
 	r.latest[key] = lease
 	r.leases[lease.id] = lease
-	r.mu.Unlock()
+	registryLock.Unlock()
 	if previous != nil {
 		previous.Close()
 	}
@@ -594,8 +608,11 @@ func (l *appRequestLease) SelectProxy(proxy C.Proxy, metadata *C.Metadata) (C.Pr
 }
 
 func (l *appRequestLease) routeCurrentLocked() bool {
-	l.choiceMu.Lock()
-	defer l.choiceMu.Unlock()
+	choiceLock := requestLockScope{mu: &l.choiceMu}
+	defer choiceLock.finish()
+
+	choiceLock.Lock()
+
 	if l.routePicks == nil {
 		return true
 	}
@@ -634,8 +651,11 @@ func (l *appRequestLease) routeCurrentLocked() bool {
 }
 
 func (l *appRequestLease) current() bool {
-	selectMu.Lock()
-	defer selectMu.Unlock()
+	selectionLock := requestLockScope{mu: &selectMu}
+	defer selectionLock.finish()
+
+	selectionLock.Lock()
+
 	return l.routeCurrentLocked() && l.Check() == nil
 }
 
@@ -646,9 +666,12 @@ func (l *appRequestLease) validLocked() bool {
 }
 
 func (l *appRequestLease) Check() error {
-	l.registry.mu.Lock()
+	registryLock := requestLockScope{mu: &l.registry.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
 	valid := l.validLocked()
-	l.registry.mu.Unlock()
+	registryLock.Unlock()
 	if !valid || l.ctx.Err() != nil {
 		return requestscope.ErrCancelled
 	}
@@ -656,9 +679,12 @@ func (l *appRequestLease) Check() error {
 }
 
 func (l *appRequestLease) checkNetwork() error {
-	l.registry.mu.Lock()
+	registryLock := requestLockScope{mu: &l.registry.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
 	valid := l.validLocked() && !l.granted
-	l.registry.mu.Unlock()
+	registryLock.Unlock()
 	if !valid || l.ctx.Err() != nil {
 		return requestscope.ErrCancelled
 	}
@@ -724,13 +750,19 @@ func (l *appRequestLease) CheckTarget(url string) error {
 }
 
 func (l *appRequestLease) GrantCommit() (requestscope.Receipt, error) {
-	selectMu.Lock()
-	defer selectMu.Unlock()
+	selectionLock := requestLockScope{mu: &selectMu}
+	defer selectionLock.finish()
+
+	registryLock := requestLockScope{mu: &l.registry.mu}
+	defer registryLock.finish()
+
+	selectionLock.Lock()
+
 	if !l.routeCurrentLocked() {
 		return nil, requestscope.ErrCancelled
 	}
-	l.registry.mu.Lock()
-	defer l.registry.mu.Unlock()
+	registryLock.Lock()
+
 	if !l.validLocked() || l.granted {
 		return nil, requestscope.ErrCancelled
 	}
@@ -753,9 +785,11 @@ func (l *appRequestLease) Close() { l.prepareClose()() }
 
 func (l *appRequestLease) prepareClose() func() {
 	r := l.registry
-	r.mu.Lock()
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+	registryLock.Lock()
 	if l.closed {
-		r.mu.Unlock()
+		registryLock.Unlock()
 		return func() {}
 	}
 	l.closed = true
@@ -773,7 +807,7 @@ func (l *appRequestLease) prepareClose() func() {
 	}
 	closers := l.closers
 	l.closers = nil
-	r.mu.Unlock()
+	registryLock.Unlock()
 	return func() {
 		l.cancel()
 		for conn := range closers {
@@ -821,13 +855,22 @@ func handleRequestControl(data string) string {
 
 func (r *appRequestRegistry) inspect(params appRequestControl) any {
 	result := func() any {
-		selectMu.Lock()
-		defer selectMu.Unlock()
-		checkpointMu.Lock()
-		defer checkpointMu.Unlock()
-		r.mu.Lock()
+		selectionLock := requestLockScope{mu: &selectMu}
+		defer selectionLock.finish()
+
+		checkpointLock := requestLockScope{mu: &checkpointMu}
+		defer checkpointLock.finish()
+
+		registryLock := requestLockScope{mu: &r.mu}
+		defer registryLock.finish()
+
+		selectionLock.Lock()
+
+		checkpointLock.Lock()
+
+		registryLock.Lock()
 		if params.Client == "" || params.Client != r.client {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return map[string]string{"error": "request_cancelled"}
 		}
 		commits := len(r.commits)
@@ -835,7 +878,7 @@ func (r *appRequestRegistry) inspect(params appRequestControl) any {
 			commits--
 		}
 		snapshot := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sourceVersionLocked(params.Key), "operation": r.operationVersionLocked(params.Key), "commits": commits, "bootstrap": r.bootstrap, "policyVersion": configFact.PolicyVersion, "maintenanceProxy": configFact.MaintenanceProxy}
-		r.mu.Unlock()
+		registryLock.Unlock()
 		proxyConfigured := false
 		for _, proxy := range tunnel.AllProxies() {
 			switch proxy.Type() {
@@ -855,19 +898,35 @@ func (r *appRequestRegistry) inspect(params appRequestControl) any {
 }
 
 func (r *appRequestRegistry) control(params appRequestControl) any {
+	configLock := requestLockScope{mu: &configMu}
+	defer configLock.finish()
+
+	checkpointLock := requestLockScope{mu: &checkpointMu}
+	defer checkpointLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	if requestNativeFault.Load() && !requestFaultCleanup(params.Action) {
+		return map[string]string{"error": "request_restart_required"}
+	}
 	if params.Action == "registerConfigInput" {
 		if params.ConfigInput == nil || !validInputID(params.ConfigInput.InputID) {
 			return map[string]string{"error": "invalid_config_input"}
 		}
-		return registerConfigOperation(methodCallSeq.Add(1), *params.ConfigInput)
+		receipt := registerConfigOperation(methodCallSeq.Add(1), *params.ConfigInput)
+		if requestNativeFault.Load() {
+			return map[string]string{"error": "request_restart_required"}
+		}
+		return receipt
 	}
 	if params.Action == "attach" || params.Action == "engineDetach" || params.Action == "detach" {
-		configMu.Lock()
-		defer configMu.Unlock()
+		configLock.Lock()
+
 	}
 	if params.Action == "invalidate" || params.Action == "invalidateDataset" {
-		checkpointMu.Lock()
-		defer checkpointMu.Unlock()
+		checkpointLock.Lock()
+
 	}
 
 	failure := func(code string) any { return map[string]string{"error": code} }
@@ -882,9 +941,9 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 	case "publish":
 		return map[string]any{"applied": r.publishPrepared(params.State)}
 	case "block":
-		r.mu.Lock()
+		registryLock.Lock()
 		state := r.state
-		r.mu.Unlock()
+		registryLock.Unlock()
 		state.Revision++
 		state.Phase, state.Reason = "failed", "vpnRevoked"
 		return map[string]bool{"ok": r.publishPrepared(state)}
@@ -911,7 +970,10 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		if err != nil {
 			return failure("request_blocked")
 		}
-		r.mu.Lock()
+		registryLock.Lock()
+		if requestNativeFault.Load() {
+			return failure("request_restart_required")
+		}
 		r.client, r.clientReady = client, false
 		r.dataset++
 		var old []*appRequestLease
@@ -920,15 +982,15 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 				old = append(old, lease)
 			}
 		}
-		r.mu.Unlock()
+		registryLock.Unlock()
 		for _, lease := range old {
 			lease.Close()
 		}
 		return map[string]any{"client": client}
 	case "detach":
-		r.mu.Lock()
+		registryLock.Lock()
 		valid := params.Client != "" && params.Client == r.client
-		r.mu.Unlock()
+		registryLock.Unlock()
 		if !valid {
 			return failure("request_cancelled")
 		}
@@ -937,13 +999,16 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 	case "inspect":
 		return r.inspect(params)
 	case "ready", "invalidate", "invalidateDataset", "permit":
-		r.mu.Lock()
+		registryLock.Lock()
+		if requestNativeFault.Load() {
+			return failure("request_restart_required")
+		}
 		if params.Client == "" || params.Client != r.client {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return failure("request_cancelled")
 		}
 		if receipt := r.commits[params.ID]; receipt != nil && receipt.retired {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return failure("request_cancelled")
 		}
 		var old []*appRequestLease
@@ -951,7 +1016,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		case "ready":
 			for _, receipt := range r.commits {
 				if receipt.client != "" && receipt.client != params.Client && !receipt.retired {
-					r.mu.Unlock()
+					registryLock.Unlock()
 					return map[string]bool{"ready": false}
 				}
 			}
@@ -980,20 +1045,20 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			}
 		case "permit":
 			if err := requestWriterError(); err != nil {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				return failure(err.Error())
 			}
 			if !r.clientReady || params.ExpectedState == nil || params.ExpectedState.Epoch != r.state.ProcessEpoch || params.ExpectedState.Revision != r.state.Revision || params.Dataset != r.dataset || !r.sourceVersions.matches(params.Key, params.SourceRevision) || params.URL == "" || len(r.permits) >= 32 {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				return failure("request_cancelled")
 			}
 			permit, err := randomRequestToken()
 			if err != nil {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				return failure("request_blocked")
 			}
 			r.permits[permit] = requestscope.Spec{Client: params.Client, Key: params.Key, URL: params.URL, Dataset: params.Dataset, SourceRevision: params.SourceRevision, ExpectedState: params.ExpectedState}
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return map[string]string{"permit": permit}
 		}
 		if params.Action == "invalidate" || params.Action == "invalidateDataset" || params.Action == "detach" {
@@ -1005,11 +1070,11 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			}
 		}
 		if params.Action == "invalidate" || params.Action == "invalidateDataset" {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			err := invalidateConfigCheckpointLocked(params.Key, params.Action == "invalidateDataset")
-			r.mu.Lock()
+			registryLock.Lock()
 			if err != nil {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				return failure("request_commit_recovery_required")
 			}
 		}
@@ -1018,76 +1083,14 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			commits--
 		}
 		result := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sourceVersions.get(params.Key), "operation": r.operationVersions.get(params.Key), "commits": commits, "bootstrap": r.bootstrap, "hasProxy": false, "policyVersion": 0, "maintenanceProxy": ""}
-		r.mu.Unlock()
+		registryLock.Unlock()
 		for _, lease := range old {
 			lease.Close()
 		}
 		r.flushCleanup()
 		return result
 	case "begin":
-		if params.Mode == "proxy" {
-			selectMu.Lock()
-			checkpointMu.Lock()
-			if configFact.PolicyVersion != 0 {
-				p := appliedConfig
-				if params.Proxy == "" || params.Proxy == "GLOBAL" {
-					params.Proxy = configFact.MaintenanceProxy
-				}
-				valid := params.Owner == configFact.Owner && p != nil && p.raw != nil && configFact.Phase == "ready" && (isManagedProxy(p.raw, params.Proxy) || len(managedGroup(p.raw, params.Proxy)) != 0)
-				checkpointMu.Unlock()
-				selectMu.Unlock()
-				if !valid {
-					return failure("managed_maintenance_target_required")
-				}
-			} else {
-				checkpointMu.Unlock()
-				selectMu.Unlock()
-			}
-		}
-		if params.Mode != "direct" && params.Proxy != "DIRECT" {
-			if auth := authStore.Default.Authenticator(); auth != nil && !auth.Verify(params.User, params.Password) {
-				return failure("proxy_authentication_required")
-			}
-		}
-		r.mu.Lock()
-		if params.Client == "" || params.Client != r.client || !r.clientReady || params.Dataset != r.dataset || !r.sourceVersions.matches(params.Key, params.SourceRevision) || params.Owner != r.owner.ID {
-			r.mu.Unlock()
-			return failure("request_cancelled")
-		}
-		params.Operation = r.advanceOperationVersionLocked(params.Key)
-		r.pruneCompletionHoldsLocked()
-		releaseBegin := r.retainSpecVersionsLocked(requestscope.Spec{Client: params.Client, Key: params.Key})
-		defer func() { r.mu.Lock(); releaseBegin(); r.mu.Unlock() }()
-		var old []*appRequestLease
-		for _, lease := range r.leases {
-			if lease.spec.Client == params.Client && lease.spec.Key == params.Key {
-				old = append(old, lease)
-			}
-		}
-		r.mu.Unlock()
-		for _, lease := range old {
-			lease.Close()
-		}
-		r.flushCleanup()
-		lease, err := r.begin(context.Background(), requestscope.Spec{Owner: requestscope.Owner{ID: params.Owner}, Kind: params.Kind, Trigger: params.Trigger, Key: params.Key, Proxy: params.Proxy, Mode: params.Mode, URL: params.URL, Client: params.Client, Dataset: params.Dataset, SourceRevision: params.SourceRevision, Operation: params.Operation, ExpectedState: params.ExpectedState, Permit: params.Permit})
-		if err != nil {
-			return failure("request_blocked")
-		}
-		l := lease.(*appRequestLease)
-		endpoint, err := r.privateEndpoint()
-		if err != nil {
-			l.Close()
-			return failure("request_channel_unavailable")
-		}
-		password, err := randomRequestToken()
-		if err != nil {
-			l.Close()
-			return failure("request_blocked")
-		}
-		r.mu.Lock()
-		l.user, l.password, l.originalUser = "flclash-request-"+r.namespace+"-"+l.id, password, params.User
-		r.mu.Unlock()
-		return map[string]any{"id": l.id, "user": l.user, "password": l.password, "owner": params.Owner, "endpoint": endpoint, "dataset": params.Dataset, "sourceRevision": params.SourceRevision, "operation": params.Operation}
+		return r.beginControl(params)
 	case "retainCompletion", "releaseCompletion":
 		return r.controlCompletion(params)
 	case "lock":
@@ -1095,35 +1098,35 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		if err != nil {
 			return failure("request_blocked")
 		}
-		r.mu.Lock()
+		registryLock.Lock()
 		if params.Client == "" || params.Client != r.client {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return failure("request_cancelled")
 		}
 		if err := requestWriterError(); err != nil {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return failure(err.Error())
 		}
 		if len(r.dataReaders) != 0 || r.frontendCommitCountLocked() >= frontendCommitLimit {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return failure("request_commit_busy")
 		}
 		for _, receipt := range r.commits {
 			if receipt.client != "" && receipt.client != params.Client && !receipt.retired {
-				r.mu.Unlock()
+				registryLock.Unlock()
 				return failure("request_commit_recovery_required")
 			}
 		}
 		r.commits[id] = &appRequestReceipt{registry: r, id: id, client: params.Client}
-		r.mu.Unlock()
+		registryLock.Unlock()
 		return map[string]string{"id": id}
 
 	case "complete":
 		return completeRequestCommit(r, params)
 	case "cancel", "grant", "check":
-		r.mu.Lock()
+		registryLock.Lock()
 		lease := r.leases[params.ID]
-		r.mu.Unlock()
+		registryLock.Unlock()
 		if lease == nil || lease.spec.Client != params.Client {
 			return failure("request_cancelled")
 		}
@@ -1141,6 +1144,95 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		return map[string]bool{"ok": lease.current()}
 	}
 	return failure("invalid_request_control")
+}
+
+func requestControlFailure(code string) any { return map[string]string{"error": code} }
+
+func (r *appRequestRegistry) beginControl(params appRequestControl) any {
+	var releaseBegin func()
+	var ownedLease *appRequestLease
+	defer func() {
+		if ownedLease != nil {
+			ownedLease.Close()
+		}
+		if releaseBegin != nil {
+			lock := requestLockScope{mu: &r.mu}
+			defer lock.finish()
+			lock.Lock()
+			releaseBegin()
+		}
+	}()
+	selectionLock := requestLockScope{mu: &selectMu}
+	defer selectionLock.finish()
+
+	checkpointLock := requestLockScope{mu: &checkpointMu}
+	defer checkpointLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	if params.Mode == "proxy" {
+		selectionLock.Lock()
+		checkpointLock.Lock()
+		if configFact.PolicyVersion != 0 {
+			p := appliedConfig
+			if params.Proxy == "" || params.Proxy == "GLOBAL" {
+				params.Proxy = configFact.MaintenanceProxy
+			}
+			valid := params.Owner == configFact.Owner && p != nil && p.raw != nil && configFact.Phase == "ready" && (isManagedProxy(p.raw, params.Proxy) || len(managedGroup(p.raw, params.Proxy)) != 0)
+			checkpointLock.Unlock()
+			selectionLock.Unlock()
+			if !valid {
+				return requestControlFailure("managed_maintenance_target_required")
+			}
+		} else {
+			checkpointLock.Unlock()
+			selectionLock.Unlock()
+		}
+	}
+	if params.Mode != "direct" && params.Proxy != "DIRECT" {
+		if auth := authStore.Default.Authenticator(); auth != nil && !auth.Verify(params.User, params.Password) {
+			return requestControlFailure("proxy_authentication_required")
+		}
+	}
+	registryLock.Lock()
+	if params.Client == "" || params.Client != r.client || !r.clientReady || params.Dataset != r.dataset || !r.sourceVersions.matches(params.Key, params.SourceRevision) || params.Owner != r.owner.ID {
+		registryLock.Unlock()
+		return requestControlFailure("request_cancelled")
+	}
+	params.Operation = r.advanceOperationVersionLocked(params.Key)
+	r.pruneCompletionHoldsLocked()
+	releaseBegin = r.retainSpecVersionsLocked(requestscope.Spec{Client: params.Client, Key: params.Key})
+	var old []*appRequestLease
+	for _, lease := range r.leases {
+		if lease.spec.Client == params.Client && lease.spec.Key == params.Key {
+			old = append(old, lease)
+		}
+	}
+	registryLock.Unlock()
+	for _, lease := range old {
+		lease.Close()
+	}
+	r.flushCleanup()
+	lease, err := r.begin(context.Background(), requestscope.Spec{Owner: requestscope.Owner{ID: params.Owner}, Kind: params.Kind, Trigger: params.Trigger, Key: params.Key, Proxy: params.Proxy, Mode: params.Mode, URL: params.URL, Client: params.Client, Dataset: params.Dataset, SourceRevision: params.SourceRevision, Operation: params.Operation, ExpectedState: params.ExpectedState, Permit: params.Permit})
+	if err != nil {
+		return requestControlFailure("request_blocked")
+	}
+	l := lease.(*appRequestLease)
+	ownedLease = l
+	endpoint, err := r.privateEndpoint()
+	if err != nil {
+		return requestControlFailure("request_channel_unavailable")
+	}
+	password, err := randomRequestToken()
+	if err != nil {
+		return requestControlFailure("request_blocked")
+	}
+	registryLock.Lock()
+	l.user, l.password, l.originalUser = "flclash-request-"+r.namespace+"-"+l.id, password, params.User
+	registryLock.Unlock()
+	ownedLease = nil
+	return map[string]any{"id": l.id, "user": l.user, "password": l.password, "owner": params.Owner, "endpoint": endpoint, "dataset": params.Dataset, "sourceRevision": params.SourceRevision, "operation": params.Operation}
 }
 
 type appRequestDialer struct{ lease *appRequestLease }
@@ -1313,11 +1405,17 @@ func invalidateAppRequestGroup(name string) {
 }
 
 func (r *appRequestRegistry) privateEndpoint() (string, error) {
-	r.privateMu.Lock()
-	defer r.privateMu.Unlock()
-	r.mu.Lock()
+	privateLock := requestLockScope{mu: &r.privateMu}
+	defer privateLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	privateLock.Lock()
+
+	registryLock.Lock()
 	exiting := r.state.Reason == "exiting"
-	r.mu.Unlock()
+	registryLock.Unlock()
 	if exiting {
 		return "", requestscope.ErrBlocked
 	}
@@ -1370,12 +1468,15 @@ func (r *appRequestRegistry) privateEndpoint() (string, error) {
 }
 
 func (r *appRequestRegistry) closePrivate() {
-	r.privateMu.Lock()
+	privateLock := requestLockScope{mu: &r.privateMu}
+	defer privateLock.finish()
+
+	privateLock.Lock()
 	listener := r.privateListener
 	r.privateListener = nil
 	conns := r.privateConns
 	r.privateConns = nil
-	r.privateMu.Unlock()
+	privateLock.Unlock()
 	if listener != nil {
 		_ = listener.Close()
 	}
@@ -1451,6 +1552,9 @@ func directRequestAvailable(state AppRequestState) bool {
 }
 
 func (r *appRequestRegistry) waitFrontendCommits(ctx context.Context) error {
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
 	if err := requestWriterError(); err != nil {
 		return err
 	}
@@ -1458,9 +1562,9 @@ func (r *appRequestRegistry) waitFrontendCommits(ctx context.Context) error {
 		return nil
 	}
 	for {
-		r.mu.Lock()
+		registryLock.Lock()
 		if err := requestWriterError(); err != nil {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return err
 		}
 		busy := false
@@ -1471,7 +1575,7 @@ func (r *appRequestRegistry) waitFrontendCommits(ctx context.Context) error {
 			}
 		}
 		changed := r.changed
-		r.mu.Unlock()
+		registryLock.Unlock()
 		if !busy {
 			return nil
 		}
@@ -1494,14 +1598,17 @@ func waitRequestDataCommit() error {
 var errRequestCommitBusy = errors.New("request_commit_busy")
 
 func (r *appRequestRegistry) beginDataRead(ctx context.Context) (string, error) {
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
 	id, err := randomRequestToken()
 	if err != nil {
 		return "", err
 	}
 	for {
-		r.mu.Lock()
+		registryLock.Lock()
 		if err := requestWriterError(); err != nil {
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return "", err
 		}
 		busy := false
@@ -1516,11 +1623,11 @@ func (r *appRequestRegistry) beginDataRead(ctx context.Context) (string, error) 
 				r.dataReaders = make(map[string]struct{})
 			}
 			r.dataReaders[id] = struct{}{}
-			r.mu.Unlock()
+			registryLock.Unlock()
 			return id, nil
 		}
 		changed := r.changed
-		r.mu.Unlock()
+		registryLock.Unlock()
 		select {
 		case <-ctx.Done():
 			return "", requestscope.ErrBlocked
@@ -1530,10 +1637,13 @@ func (r *appRequestRegistry) beginDataRead(ctx context.Context) (string, error) 
 }
 
 func (r *appRequestRegistry) endDataRead(id string) {
-	r.mu.Lock()
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
 	delete(r.dataReaders, id)
 	r.changedLocked()
-	r.mu.Unlock()
+	registryLock.Unlock()
 }
 
 func beginRequestDataRead() (string, error) {
@@ -1585,7 +1695,10 @@ func (r *appRequestRegistry) ownerActive(owner requestscope.Owner) bool {
 }
 
 func (r *appRequestRegistry) detachFrontend() {
-	r.mu.Lock()
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
 	r.clientReady = false
 	r.pruneCompletionHoldsLocked()
 	uncertain := r.retireFrontendCommitsLocked()
@@ -1601,7 +1714,7 @@ func (r *appRequestRegistry) detachFrontend() {
 			}
 		}
 	}
-	r.mu.Unlock()
+	registryLock.Unlock()
 	r.discardDetachedSourceReviews()
 	if uncertain {
 		r.retireFrontendQualification()
@@ -1610,8 +1723,8 @@ func (r *appRequestRegistry) detachFrontend() {
 	for _, lease := range leases {
 		lease.Close()
 	}
-	r.mu.Lock()
+	registryLock.Lock()
 	r.operationVersions.clearCold()
 	r.sourceVersions.clearCold()
-	r.mu.Unlock()
+	registryLock.Unlock()
 }

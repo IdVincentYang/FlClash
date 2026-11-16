@@ -116,12 +116,15 @@ object ServiceController {
 
         val currentBinding = binding ?: return@withLock 0L
         val result = currentBinding.useService { service ->
-            check(ServiceState.bindService(service.requestIdentity.serviceId, requestId)) { "Service request was superseded" }
-            service.attachRequest(requestId)
-            currentBinding.requestIdentity = service.requestIdentity
-            service.start()
-            check(service.requestIdentity.requestId == requestId) { "Service request was superseded" }
-            currentBinding.requestIdentity = service.requestIdentity
+            try {
+                check(ServiceState.bindService(service.requestIdentity.serviceId, requestId)) { "Service request was superseded" }
+                service.attachRequest(requestId)
+                currentBinding.requestIdentity = service.requestIdentity
+                service.start()
+                check(service.requestIdentity.requestId == requestId) { "Service request was superseded" }
+            } finally {
+                currentBinding.requestIdentity = service.requestIdentity
+            }
         }
         if (result.isFailure) {
             GlobalState.log("Unable to start background service: ${result.exceptionOrNull()}")
@@ -152,19 +155,19 @@ object ServiceController {
     suspend fun adoptRequest(requestId: Long) = lock.withLock {
         val current = binding ?: return@withLock
         current.useService { service ->
-            check(ServiceState.bindService(service.requestIdentity.serviceId, requestId)) { "Service request was superseded" }
-            service.attachRequest(requestId)
-            current.requestIdentity = service.requestIdentity
+            try {
+                check(ServiceState.bindService(service.requestIdentity.serviceId, requestId)) { "Service request was superseded" }
+                service.attachRequest(requestId)
+            } finally {
+                current.requestIdentity = service.requestIdentity
+            }
         }.getOrThrow()
     }
 
     private suspend fun tearDownServices() {
-        try {
-            binding?.useService { service -> service.stop() }?.getOrThrow()
-            clearBinding()
-        } finally {
-            stopServices()
-        }
+        binding?.useService { service -> service.stop() }?.getOrThrow()
+        clearBinding()
+        stopServices()
     }
 
     // A service the system started itself — always-on VPN, or the sticky restart

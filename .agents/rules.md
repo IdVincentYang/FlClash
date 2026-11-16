@@ -174,6 +174,8 @@ leaving a repo-wide policy as a comment reaches only the reader of that one file
   crash in unrelated code. For the same reason every one of those wrappers checks its `tun_interface`/`invoke_interface`
   for `nullptr` first: ART aborts on a call through a null object, and a callback released by `TunHandler.clear` while a
   connection is still resolving is exactly that.
+- A synchronous native method may deliberately return a Java exception to its Kotlin caller after a failed Go export.
+  Return immediately with that exception pending; do not clear it as though it were a callback failure.
 - The Android bridge resolves an owner in two steps — `resolve_uid` then `resolve_package` — because mihomo fills
   `metadata.Uid` from a procfs lookup that Android Q closed off. Collapsing them back into one call that returns only a
   package name is what left every connection reporting uid 0, so `UID` rules matched nothing.

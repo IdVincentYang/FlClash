@@ -448,33 +448,105 @@ var requestSocketMu sync.RWMutex
 var requestSocketCallback unsafe.Pointer
 
 //export requestControl
-func requestControl(data *C.char) *C.char {
-	return C.CString(handleRequestControl(takeCString(data)))
+func requestControl(data *C.char) (result *C.char) {
+	defer func() {
+		if recover() != nil {
+			requestNativeFault.Store(true)
+			result = C.CString(`{"error":"request_restart_required"}`)
+		}
+	}()
+	defer C.free_string(data)
+	return C.CString(handleRequestControl(C.GoString(data)))
 }
 
 //export setRequestSocketListener
-func setRequestSocketListener(callback unsafe.Pointer) {
-	requestSocketMu.Lock()
+func setRequestSocketListener(callback unsafe.Pointer) (status C.int) {
+	status = -1
+	defer func() {
+		if recover() != nil {
+			requestNativeFault.Store(true)
+			status = -1
+		}
+	}()
+	owned := callback
+	defer func() {
+		if owned != nil {
+			releaseObject(owned)
+		}
+	}()
+	lock := requestLockScope{mu: &requestSocketMu}
+	defer lock.finish()
+	lock.Lock()
 	previous := requestSocketCallback
-	requestSocketCallback = callback
-	requestSocketMu.Unlock()
+	requestSocketCallback = nil
+	published, completed := false, false
+	defer func() {
+		if !completed {
+			requestNativeFault.Store(true)
+			if published {
+				requestSocketCallback = nil
+				owned = callback
+			}
+		}
+		if previous != nil {
+			releaseObject(previous)
+		}
+	}()
 	if previous != nil {
 		releaseObject(previous)
+		previous = nil
 	}
+	if requestNativeFault.Load() && callback != nil {
+		completed = true
+		return -1
+	}
+	requestSocketCallback, owned = callback, nil
+	published = true
+	completed = true
+	return 1
 }
 
 //export setTunRequestIdentity
-func setTunRequestIdentity(serviceID *C.char, generation C.longlong) {
-	identity := takeCString(serviceID)
-	tunLock.Lock()
-	defer tunLock.Unlock()
-	if tunHandler == nil {
-		return
+func setTunRequestIdentity(serviceID *C.char, generation C.longlong) (status C.int) {
+	status = -1
+	defer func() {
+		if recover() != nil {
+			requestNativeFault.Store(true)
+			status = -1
+		}
+	}()
+	defer C.free_string(serviceID)
+	identity := C.GoString(serviceID)
+	lock := requestLockScope{mu: &tunLock}
+	defer lock.finish()
+	lock.Lock()
+	if requestNativeFault.Load() {
+		return -1
 	}
-	tunHandler.mu.Lock()
-	tunHandler.serviceID = identity
-	tunHandler.protectGeneration = uint64(generation)
-	tunHandler.mu.Unlock()
+	handler := tunHandler
+	if handler == nil {
+		return 0
+	}
+	stateLock := requestLockScope{mu: &handler.mu}
+	defer stateLock.finish()
+	stateLock.Lock()
+	if requestNativeFault.Load() {
+		return -1
+	}
+	if handler.serviceID != identity || generation <= 0 || uint64(generation) < handler.protectGeneration {
+		return 0
+	}
+	previousID, previousGeneration := handler.serviceID, handler.protectGeneration
+	committed := false
+	defer func() {
+		if !committed {
+			handler.serviceID, handler.protectGeneration = previousID, previousGeneration
+		}
+	}()
+	handler.serviceID = identity
+	handler.protectGeneration = uint64(generation)
+	committed = true
+	return 1
 }
 
 func prepareAppRequestSocket(id string, state AppRequestState, fd int) error {
@@ -507,6 +579,9 @@ func prepareAppRequestSocket(id string, state AppRequestState, fd int) error {
 func init() { appRequests.socketGate = prepareAppRequestSocket }
 
 func canStartRequestTun(serviceID string, generation uint64) bool {
+	if requestNativeFault.Load() {
+		return false
+	}
 	prepared := preparedConfigGate.Load()
 	if prepared == nil || !prepared.current() || !prepared.op.request.Active || prepared.mixed.Validate() != nil {
 		return false
@@ -518,21 +593,70 @@ func canStartRequestTun(serviceID string, generation uint64) bool {
 }
 
 //export stopTunRequest
-func stopTunRequest(serviceID *C.char, generation C.longlong) bool {
-	return handleStopTunIdentity(takeCString(serviceID), uint64(generation))
+func stopTunRequest(serviceID *C.char, generation C.longlong) (status C.int) {
+	status = -1
+	defer func() {
+		if recover() != nil {
+			requestNativeFault.Store(true)
+			status = -1
+		}
+	}()
+	defer C.free_string(serviceID)
+	stopped, err := handleStopTunIdentity(C.GoString(serviceID), uint64(generation))
+	if err != nil {
+		return -1
+	}
+	if stopped {
+		return 1
+	}
+	return 0
 }
 
-func handleStopTunIdentity(identity string, generation uint64) bool {
-	tunLock.Lock()
-	defer tunLock.Unlock()
+func handleStopTunIdentity(identity string, generation uint64) (bool, error) {
+	lock := requestLockScope{mu: &tunLock}
+	defer lock.finish()
+	lock.Lock()
 	if tunHandler == nil {
-		return false
+		return false, nil
 	}
-	tunHandler.mu.RLock()
-	matches := tunHandler.serviceID == identity && tunHandler.protectGeneration == generation
-	tunHandler.mu.RUnlock()
-	if !matches {
-		return false
+	handler := tunHandler
+	current := func() requestTunIdentity {
+		stateLock := requestLockScope{mu: handler.mu.RLocker()}
+		defer stateLock.finish()
+		stateLock.Lock()
+		return requestTunIdentity{handler.serviceID, handler.protectGeneration}
+	}()
+	var closeErr error
+	stopped := stopOwnedRequestService(requestTunIdentity{identity, generation}, current, func() {
+		closeErr = handler.closeRequest()
+		if closeErr == nil {
+			tunHandler = nil
+		}
+	})
+	if closeErr != nil {
+		requestNativeFault.Store(true)
 	}
-	return stopOwnedRequestService(requestTunIdentity{identity, generation}, requestTunIdentity{tunHandler.serviceID, tunHandler.protectGeneration}, stopTunLocked)
+	return stopped && closeErr == nil, closeErr
+}
+
+func (th *TunHandler) closeRequest() error {
+	lock := requestLockScope{mu: &th.mu}
+	defer lock.finish()
+	lock.Lock()
+	th.removeHook()
+	callback := th.callback
+	th.callback = nil
+	if callback != nil {
+		releaseObject(callback)
+	}
+	listener := th.listener
+	lock.Unlock()
+	if listener != nil {
+		if err := listener.Close(); err != nil {
+			return err
+		}
+		lock.Lock()
+		th.listener = nil
+	}
+	return nil
 }

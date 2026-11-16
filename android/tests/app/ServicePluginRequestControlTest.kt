@@ -3,6 +3,8 @@ package com.follow.clash
 import android.app.Application
 import android.os.Looper
 import com.follow.clash.core.Core
+import com.follow.clash.core.RequestSocketInterface
+import com.follow.clash.core.TunInterface
 import com.follow.clash.plugins.ServicePlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -99,7 +101,39 @@ class RequestControlCoreShadow {
         return response
     }
 
+    @Implementation fun setRequestSocketListener(callback: RequestSocketInterface?) {
+        registrations++
+        if (registrationFailure) error("request_restart_required")
+    }
+    @Implementation fun setTunRequestIdentity(serviceId: String, generation: Long) {
+        beforeAdopt()
+        if (adoptFailure) error("request_restart_required")
+    }
+    @Implementation fun stopTunRequest(serviceId: String, generation: Long): Boolean {
+        stops += serviceId to generation
+        if (stopFailure) error("request_restart_required")
+        return stopResult
+    }
+    @Implementation fun startTun(fd: Int, cb: TunInterface, stack: String, address: String, dns: String, serviceId: String, generation: Long): Boolean {
+        starts++
+        check(fd == 42)
+        return startResult
+    }
+
     companion object {
+        var registrations = 0
+        var starts = 0
+        var startResult = false
+        var registrationFailure = false
+        var adoptFailure = false
+        var stopFailure = false
+        var stopResult = true
+        var beforeAdopt: () -> Unit = {}
+        val stops = mutableListOf<Pair<String, Long>>()
+        fun reset() {
+            registrations = 0; starts = 0; startResult = false; registrationFailure = false; adoptFailure = false; stopFailure = false
+            stopResult = true; beforeAdopt = {}; stops.clear(); received = null; response = "{}"
+        }
         var received: String? = null
         var response = "{}"
         @JvmStatic @Implementation fun __staticInitializer__() {

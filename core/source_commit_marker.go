@@ -34,8 +34,11 @@ func readRequestRecoveryMarker(home string) ([]byte, error) {
 }
 
 func ensureRequestRecoveryMarker(home string) error {
-	requestRecoveryMu.Lock()
-	defer requestRecoveryMu.Unlock()
+	recoveryLock := requestLockScope{mu: &requestRecoveryMu}
+	defer recoveryLock.finish()
+
+	recoveryLock.Lock()
+
 	data, err := readRequestRecoveryMarker(home)
 	if err != nil || data != nil {
 		return err
@@ -44,20 +47,29 @@ func ensureRequestRecoveryMarker(home string) error {
 }
 
 func beginRequestCommitMarker(r *appRequestRegistry, params appRequestControl) any {
-	configMu.Lock()
-	defer configMu.Unlock()
+	configLock := requestLockScope{mu: &configMu}
+	defer configLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	recoveryLock := requestLockScope{mu: &requestRecoveryMu}
+	defer recoveryLock.finish()
+
+	configLock.Lock()
+
 	if err := requestWriterError(); err != nil {
 		return map[string]string{"error": err.Error()}
 	}
-	r.mu.Lock()
+	registryLock.Lock()
 	receipt := r.commits[params.ID]
 	valid := receipt != nil && !receipt.retired && receipt.client == params.Client && r.client == params.Client && r.clientReady
-	r.mu.Unlock()
+	registryLock.Unlock()
 	if !valid {
 		return map[string]string{"error": "request_cancelled"}
 	}
-	requestRecoveryMu.Lock()
-	defer requestRecoveryMu.Unlock()
+	recoveryLock.Lock()
+
 	home := C.Path.HomeDir()
 	data, err := readRequestRecoveryMarker(home)
 	if err != nil {
@@ -82,15 +94,21 @@ func beginRequestCommitMarker(r *appRequestRegistry, params appRequestControl) a
 }
 
 func markRequestCommitRecovery(r *appRequestRegistry, params appRequestControl) any {
-	configMu.Lock()
-	defer configMu.Unlock()
-	r.mu.Lock()
+	configLock := requestLockScope{mu: &configMu}
+	defer configLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	configLock.Lock()
+
+	registryLock.Lock()
 	valid := r.client == params.Client && params.Client != ""
 	receipt := r.commits[params.ID]
 	if receipt != nil && receipt.client == params.Client {
 		receipt.failed = true
 	}
-	r.mu.Unlock()
+	registryLock.Unlock()
 	if !valid || receipt != nil && receipt.retired {
 		return map[string]string{"error": "request_cancelled"}
 	}
@@ -101,8 +119,11 @@ func markRequestCommitRecovery(r *appRequestRegistry, params appRequestControl) 
 }
 
 func clearOwnedRequestMarker(home, hash string) error {
-	requestRecoveryMu.Lock()
-	defer requestRecoveryMu.Unlock()
+	recoveryLock := requestLockScope{mu: &requestRecoveryMu}
+	defer recoveryLock.finish()
+
+	recoveryLock.Lock()
+
 	data, err := readRequestRecoveryMarker(home)
 	if err != nil || data == nil {
 		return err
@@ -122,13 +143,22 @@ func clearOwnedRequestMarker(home, hash string) error {
 }
 
 func completeRequestCommit(r *appRequestRegistry, params appRequestControl) any {
-	configMu.Lock()
-	defer configMu.Unlock()
-	r.mu.Lock()
+	configLock := requestLockScope{mu: &configMu}
+	defer configLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	configLock.Lock()
+
+	registryLock.Lock()
 	receipt := r.commits[params.ID]
-	r.mu.Unlock()
+	registryLock.Unlock()
 	if receipt == nil || receipt.client != params.Client {
 		return map[string]string{"error": "request_cancelled"}
+	}
+	if requestNativeFault.Load() {
+		receipt.failed = true
 	}
 	if receipt.retired {
 		_ = finishSourceMaterialCommit(receipt)
@@ -153,13 +183,19 @@ func completeRequestCommit(r *appRequestRegistry, params appRequestControl) any 
 }
 
 func clearRestoredRequestRecovery(r *appRequestRegistry, params appRequestControl) any {
-	configMu.Lock()
-	defer configMu.Unlock()
+	configLock := requestLockScope{mu: &configMu}
+	defer configLock.finish()
+
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	configLock.Lock()
+
 	if err := requestWriterError(); err != nil {
 		return map[string]string{"error": err.Error()}
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	registryLock.Lock()
+
 	receipt := r.commits[params.ID]
 	valid := receipt != nil && receipt.registry == r && receipt.begun && !receipt.retired && !receipt.failed &&
 		receipt.client == params.Client && r.client == params.Client && r.clientReady && receipt.datasetInvalidated

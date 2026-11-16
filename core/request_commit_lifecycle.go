@@ -14,7 +14,7 @@ var unknownRequestWriters atomic.Int32
 var errRequestWriterUnknown = errors.New("request_restart_required")
 
 func requestWriterError() error {
-	if unknownRequestWriters.Load() != 0 {
+	if requestNativeFault.Load() || unknownRequestWriters.Load() != 0 {
 		return errRequestWriterUnknown
 	}
 	return nil
@@ -56,8 +56,11 @@ func (r *appRequestRegistry) retireFrontendCommitsLocked() bool {
 }
 
 func (r *appRequestRegistry) discardDetachedSourceReviews() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	registryLock.Lock()
+
 	for key, candidate := range pendingSourceReviews {
 		if candidate.request.Source.Client == "" || candidate.request.Source.Client != r.client {
 			continue
@@ -77,8 +80,11 @@ func (r *appRequestRegistry) discardDetachedSourceReviews() {
 }
 
 func (r *appRequestRegistry) retireFrontendQualification() {
-	checkpointMu.Lock()
-	defer checkpointMu.Unlock()
+	checkpointLock := requestLockScope{mu: &checkpointMu}
+	defer checkpointLock.finish()
+
+	checkpointLock.Lock()
+
 	_ = ensureRequestRecoveryMarker(C.Path.HomeDir())
 	_ = invalidateConfigCheckpointLocked("", true)
 	if scope := activeBusiness.Load(); scope != nil {

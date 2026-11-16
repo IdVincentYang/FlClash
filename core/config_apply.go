@@ -207,6 +207,9 @@ func registerConfigInput(call *MethodCall, response MethodResponse) {
 }
 
 func registerConfigOperation(sequence uint64, request ConfigInputRequest) ConfigReceipt {
+	registryLock := requestLockScope{mu: &appRequests.mu}
+	defer registryLock.finish()
+
 	op := &configOperation{token: sequence, request: request}
 	op.reading.Store(true)
 	for {
@@ -216,9 +219,9 @@ func registerConfigOperation(sequence uint64, request ConfigInputRequest) Config
 		}
 		if latestConfig.CompareAndSwap(previous, op) {
 			if providerStageEnabled {
-				appRequests.mu.Lock()
+				registryLock.Lock()
 				appRequests.changedLocked()
-				appRequests.mu.Unlock()
+				registryLock.Unlock()
 			}
 			break
 		}
@@ -252,6 +255,9 @@ func sourceTicketValidLocked(ticket ConfigSourceTicket, keys []string) bool {
 }
 
 func operationRunValidLocked(op *configOperation) bool {
+	if requestNativeFault.Load() {
+		return false
+	}
 	if !features.Android {
 		return true
 	}
@@ -797,7 +803,7 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 }
 
 func businessAllowed(p *preparedConfig) bool {
-	if coreLifecycleUnavailable(0) {
+	if requestNativeFault.Load() || coreLifecycleUnavailable(0) {
 		return false
 	}
 	appRequests.mu.Lock()

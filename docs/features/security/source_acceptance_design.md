@@ -78,6 +78,36 @@ Android ServicePlugin 白名单转发这两条 action；旧 Core 不支持时明
 原提交的一次 source invalidate 不撤销其记录持有，但再次失效不能通过原后继校验。
 释放不依赖仍可授予资格，非 Android 不发新增控制请求；不增加持久状态或改变 Spec／ConfigInput 格式。
 
+## JNI 同步失败边界
+
+Android 的 requestControl、request socket callback 注册、TUN 身份更新与按身份停止，
+各自在实际 Go export 隔离同步 Go panic。FlClash 自有临界区在释放锁前发布进程寿命的 fault veto；
+输入 C string 由 Go 消费一次，输出由 JNI scoped cleanup 释放，GlobalRef 只由其当前所有者释放。
+callback 替换排空在途 reader；身份更新仅接受同 service 的正数且非递减 generation，
+身份对在同一临界区更新，失败不发布半个身份；
+Close 未确认的 TUN 保留其资源所有者并停止参与新工作，不由旧身份清理后来对象。
+
+panic 返回 `request_restart_required`：requestControl 使用既有 JSON error，setter 与停止的私有 C status
+由 JNI 转为 Java exception；正常停止的身份不匹配仍为 false，不等于失败已关闭资源。
+fault 与未知写者计数相互独立；拒绝新资格、旧资格续用、ConfigInput、business 使用和新 TUN start，
+attach／Init／Service 重建不能复位。cancel、endRead、releaseCompletion、complete、detach、block／flush
+及匹配 owner 的停止仍可收尾，不清空未知写者、不放弃真实 receipt 写者责任。
+任意部分修改不承诺回滚；须结束整个应用进程后重开，原有耐久恢复核验仍适用。
+
+Application 注册失败不能逃逸初始化；已有 TUN adopt 仅在 Go 确认后更新公开 requestIdentity，
+未确认时保留旧身份；Go 已接管但后续发布失败时，保存新实际身份供清理，不发布 ready。
+首次 start 的 starting 身份在失败且未确认清理时也继续保存。
+仅在停止已确认后清空对应身份／发布 none，清理失败不能掩盖原失败或逃逸 Android lifecycle callback。
+程序化 stop／stopOwned 的未确认清理必须向 Controller／ServiceState 传播失败，
+不得清除 binding、清零 runtime 或报告 cleaned；系统 onDestroy／onRevoke 捕获失败，启动失败保持原错误。
+Controller 在 start／adopt 失败时也保存服务实际保留的身份；旧 owner 清理仍须完整身份匹配。
+系统 start 回调仅产生新 intent，不提前重标已有 TUN 或 machine 的 service owner；
+Controller 实际 attach／start 才进入 bind 流程，替换先按旧完整身份确认清理，未确认时不建立新 TUN。
+同一 intent 且 options 相容才可复用已有服务；新的系统 intent 不冒用旧 owner 的复用资格。
+ServiceState 保持生命周期权威，不另建重试调度或 UI 状态权威。
+此边界不覆盖原 startTUN、异步 goroutine、native abort、runtime fatal、OOM 或依赖内部锁损坏。
+host JVM／JNI 及 Android 编译的证据不等于 ART／真实 TUN／设备验证。
+
 ## 自动规则与用途投影
 
 节点维护与规则自动准则分别判断：已知纯代理组可在相同协议能力内维护TCP节点，即使这些节点不支持UDP；

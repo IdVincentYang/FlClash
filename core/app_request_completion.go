@@ -85,11 +85,14 @@ func (r *appRequestRegistry) retainSourceSnapshotLocked(sources map[string]uint6
 }
 
 func (p *preparedConfig) releaseSourceVersions() {
+	registryLock := requestLockScope{mu: &appRequests.mu}
+	defer registryLock.finish()
+
 	if p == nil {
 		return
 	}
-	appRequests.mu.Lock()
-	defer appRequests.mu.Unlock()
+	registryLock.Lock()
+
 	if p.sourcePins != nil {
 		p.sourcePins()
 		p.sourcePins = nil
@@ -113,9 +116,15 @@ func (r *appRequestRegistry) pruneCompletionHoldsLocked() {
 }
 
 func (r *appRequestRegistry) controlCompletion(params appRequestControl) any {
+	registryLock := requestLockScope{mu: &r.mu}
+	defer registryLock.finish()
+
+	selectionLock := requestLockScope{mu: &selectMu}
+	defer selectionLock.finish()
+
 	if params.Action == "releaseCompletion" {
-		r.mu.Lock()
-		defer r.mu.Unlock()
+		registryLock.Lock()
+
 		if hold := r.completionHolds[params.ID]; hold != nil {
 			if params.Client == "" || hold.spec.Client != params.Client {
 				return map[string]string{"error": "request_cancelled"}
@@ -129,16 +138,16 @@ func (r *appRequestRegistry) controlCompletion(params appRequestControl) any {
 	if err != nil {
 		return map[string]string{"error": "request_blocked"}
 	}
-	selectMu.Lock()
-	defer selectMu.Unlock()
-	r.mu.Lock()
+	selectionLock.Lock()
+
+	registryLock.Lock()
 	lease := r.leases[params.ID]
-	r.mu.Unlock()
+	registryLock.Unlock()
 	if lease == nil || !lease.routeCurrentLocked() {
 		return map[string]string{"error": "request_cancelled"}
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	registryLock.Lock()
+
 	if params.Client == "" || lease.spec.Client != params.Client || !lease.validLocked() || lease.granted || lease.ctx.Err() != nil {
 		return map[string]string{"error": "request_cancelled"}
 	}

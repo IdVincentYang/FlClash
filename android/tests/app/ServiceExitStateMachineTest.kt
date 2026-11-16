@@ -116,7 +116,7 @@ class ServiceExitStateMachineTest {
 
     @Test fun `waiting always-on request returns zero without binding or dispatch after exit`() {
         assertNull(exitBeforeWaitingRequest {
-            assertEquals(0L, machine.handleVpnStartRequest("waiting-vpn"))
+            assertEquals(0L, machine.handleVpnStartRequest())
         })
         assertEquals("", machine.getRequestState().serviceId)
     }
@@ -128,7 +128,7 @@ class ServiceExitStateMachineTest {
         machine.handleStartAction()
         machine.handleStopAction()
         machine.handleToggleAction()
-        assertEquals(0L, machine.handleVpnStartRequest("rejected-vpn"))
+        assertEquals(0L, machine.handleVpnStartRequest())
         assertEquals(before, machine.getRequestState())
         assertSame(token, machine.captureRequestToken())
         assertEquals(1, host.requestPublications.size)
@@ -185,14 +185,14 @@ class ServiceExitStateMachineTest {
         assertEquals(listOf(1L, 2L), host.requestPublications.map { it.intentRevision })
     }
 
-    @Test fun `always-on request binds and dispatches its accepted token`() {
-        assertEquals(1L, machine.handleVpnStartRequest("accepted-vpn"))
+    @Test fun `always-on request dispatches its accepted token without claiming a service`() {
+        assertEquals(1L, machine.handleVpnStartRequest())
         val state = machine.getRequestState()
-        assertEquals("accepted-vpn", state.serviceId)
+        assertEquals("", state.serviceId)
         assertEquals("alwaysOn", state.source)
         assertTrue(state.intentRunning)
         assertEquals(1L, state.intentRevision)
-        assertEquals(2L, state.revision)
+        assertEquals(1L, state.revision)
         assertEquals(1, startDispatches)
         assertEquals(0, stopDispatches)
         assertEquals(0, host.startCalls)
@@ -200,7 +200,7 @@ class ServiceExitStateMachineTest {
 
     @Test fun `paused always-on request cannot bind or dispatch`() {
         machine.preparePauseIntent(true)
-        assertEquals(0L, machine.handleVpnStartRequest("paused-vpn"))
+        assertEquals(0L, machine.handleVpnStartRequest())
         val state = machine.getRequestState()
         assertEquals("", state.serviceId)
         assertTrue(state.intentRunning)
@@ -238,7 +238,7 @@ class ServiceExitStateMachineTest {
 
     @Test fun `always-on publication failure keeps the failure and does not bind or dispatch`() {
         host.publishAccepted = false
-        assertEquals(0L, machine.handleVpnStartRequest("failed-vpn"))
+        assertEquals(0L, machine.handleVpnStartRequest())
         val state = machine.getRequestState()
         assertEquals("failed", state.phase)
         assertEquals("setupFailed", state.reason)
