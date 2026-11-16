@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R09 已修复并完成本地交付；R10–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R10 已修复并完成本地交付；R11 尚未解决，由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 原评审收录 11 项：3 项 P1、7 项 P2、1 项 P3。修复中另确认 F01（P2），作为独立未解决跟进记录，
 不并入 R08 已解决声明，也不改变本轮 R09–R11 的修复顺序。
@@ -489,6 +489,37 @@ ART、真实 Android 调度、TUN、APK、设备、完整 stock race 或完整 F
 
 处理目标：分别记录前置失败并尝试其它允许的收尾，保留原错误反馈和退出 watchdog；
 保存仍须遵守现有提交资格，不能为收尾绕过权限。覆盖两处前置异常及后续步骤执行顺序。
+
+**处置：已解决。** 本地修复为 `ad14f366b52cc3df6545a97bfbfbb221971219d1`。
+[SystemAction](../../../lib/providers/actions/system.dart)先撤销 Dart 请求入口，再依次尝试退出 intent、
+合格保存和 native detach；独立资源收尾不因前置失败被跳过，保留首次捕获的原 error／StackTrace。
+[Request](../../../lib/common/request.dart)的局部退出作用域绑定原 attachment／client，
+新 attach 使旧保存与最终 detach 失效；缺 client、fault 或未知写者不能降级成无 receipt 保存。
+BootGuard 保留入口处的早期撤权并等待幂等关闭，不把关闭尝试声明为成功持久化；
+退出 coordinator 与一次性 watchdog 继续使用原实现。
+
+实现评审另确认并修复 I1：即使 preferences 已初始化，saveConfig 内再次 await 已完成 Future，
+仍可能在写前被新 attachment 替换而写入旧配置。相同反例修复前实际写一次、修复后零次。
+[Preferences](../../../lib/common/preferences.dart)现在先准备存储句柄，合格 commit 内读取最新 Config，
+从 owner 检查到实际存储调用之间没有 await；已交给存储的写仍承担原 receipt 完成与恢复 marker 责任。
+长期契约见[架构文档](../../../.agents/architecture.md)的 Application exit 和[来源接受设计](source_acceptance_design.md)。
+
+验证由 D 执行，M 审查代码、断言及冻结记录，未代跑编译或产品测试：
+
+- [退出消费者测试](../../../test/providers/system_exit_cleanup_bridge_test.dart)有 32 项，实际 SystemAction／Request
+  转发生产 Go registry，覆盖正常保存、真实 admission 反序拒绝、前置及并行失败、attachment 替换、
+  无 client／fault／未知写者、ack／marker、重复退出和 watchdog；平台资源及存储为受控叶子。
+- 获审修订的 12 文件共 182 pass，0 fail／skip；refine 仅去掉重复 detach 检查及 async 包装，
+  相关 3 文件共 69 pass，包含全部 32 项退出测试，不与前者相加。analyze 保留原 42 条 info，无新增问题。
+- 未变 Go 证据沿用：444 个顶层 test、683 个含 subtest 的 pass events、40 个既有 skip，host vet 通过。
+  Core production、JNI、gitlink 与 carrier 未改；未验证真实 Android 存储、JNI／TUN／设备或完整 Flutter。
+  紧急 exit 不表示保存或 detach 完成，已经开始的物理写不能声称可撤回。
+
+证据位于本地忽略目录 `.buildlog/r10-exit-cleanup-20261116/`：`implementation/` 保留首轮反例，
+`revision-02/` 绑定 I1 相同正文反例与 182 项回归，`delivery/` 绑定最终 9 文件和 69 项收尾回归。
+D 的 `dad8a669` 仅由 M amend Details，Tree 与父提交未变；完成任务文档已从当前树清理，
+定稿可用 `git show ad14f36:docs/features/security/r10_exit_cleanup_plan.md` 和
+`git show ad14f36:docs/features/security/r10_exit_cleanup_result.md` 取回。
 
 ### R11：当前文档与已实现契约不同步
 
