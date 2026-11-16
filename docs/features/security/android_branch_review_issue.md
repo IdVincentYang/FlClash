@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R03 已修复并完成本地交付；R04–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R04 已修复并完成本地交付；R05–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
@@ -196,6 +196,30 @@ D 在复制类中仅加入调度 latch，复现合法交错 v3→v2；生产源�
 这是分枝新增镜像的并发缺陷，结论不扩大到 Go 配置权威或业务授权失守。
 
 处理目标：串行执行 epoch／版本判定、更新及投影；回归乱序事件、直接应用并发及新 epoch 的权威切换。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复提交 `fb92a1cc3576ee71fe404f03f2770cd538e143f3` 位于 `security/android`。
+既有 publicationLock 覆盖事实接受、替换与通知提交；phase／SharedState 的独立投影和 refresh
+也在同锁内读取快照。原 epoch、authoritative、同版本接受规则及 R02 exiting 契约保持，
+Go 仍拥有业务资格。当前规则见[事实镜像契约](android_service_design.md#配置事实镜像与投影)。
+
+[生产状态机回归](../../../android/tests/app/ConfigFactStateMachineTest.kt)使用真实 ServiceConfig StateFlow，
+控制通知提交交错，并核对竞争线程的 monitor、持有线程和生产方法栈；超时或未调度不算成功。
+同一专项在未改生产上为 5 通过、7 失败，其中 6 项显示旧通知覆盖新投影，1 项显示 refresh
+绕过尚未结束的提交；这与原复制字节码的比较／赋值反例分开，不声称直接测到了该两行间的插入点。
+修复后专项 12 通过；含 R02 全部 96 项及 ServiceConfig 4 项的关联 JVM 回归共 112 通过，
+0 失败／错误／跳过。JDK 17、ARM64 目标配置的 app Kotlin 编译通过。
+
+验证由 D 执行，M 审阅源码、测试方案及绑定日志，未代跑编译或产品测试。
+覆盖同 epoch 乱序／同版本更新、真实 apply 回执、新 epoch／旧事件、通知异常释放与同线程重入。
+范围限 host JVM／StateFlow／Kotlin 编译；未验证真实 JNI 调度、Android 通知显示、APK、设备或 VPN。
+Dart、依赖与分析配置未变，复用 R03 的已审验证，没有重复全量 Flutter。
+
+本地、未入库证据为 `.buildlog/r04-config-fact-20261116/implementation-source.json`、
+`before-02-summary.json`、`after-regression-results.json` 及对应日志／XML。
+`delivery-summary.json` 中的 `89fe4a9` 仅由 M amend Details，Tree、父提交保持不变；
+四文件交付与获审快照仅有 Plan 状态差异，源码、测试和服务契约逐字节一致。
+定稿可用 `git show fb92a1c:docs/features/security/r04_config_fact_plan.md` 取回，包含复跑命令与限制。
 
 ### R05：共享 UID 的不完整候选被当作完整集合
 
