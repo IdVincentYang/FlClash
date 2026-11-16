@@ -474,14 +474,18 @@ ART、真实 Android 调度、TUN、APK、设备、完整 stock race 或完整 F
 和 [SystemExitCoordinator](../../../lib/providers/actions/system_exit.dart)。
 
 触发条件是 Android 前置 `prepareRunIntent(source: exit)` 或 `request.detach()` 返回异常。
-两次 await 都位于创建退出保存操作、调用 `startupGuard.markClosed()` 之前，且没有独立错误收集；
-其中任何一步失败都会使这些后续操作根本未被调用。外层 coordinator 把整个 cleanup 当作一步，
-捕获后继续尝试关闭 Core 和退出，无法补上已跳过的内部步骤。
+两次 await 都位于创建退出保存操作和 cleanup 内等待 BootGuard 关闭之前，且没有独立错误收集；
+其中任何一步失败都会跳过保存、tray 及后续并发收尾。`handleExit` 已提前发起幂等的
+`startupGuard.markClosed()`，因此不能将缺少等待写成完全没有关闭尝试。
+外层 coordinator 把整个 cleanup 当作一步，捕获后继续尝试关闭 Core 和退出，无法补上内部步骤。
 
-预期控制通道失败仍尝试相互独立的必要收尾。实际最后一次退出保存及关闭记录会被跳过；
+预期控制通道失败仍尝试相互独立的必要收尾。实际最后一次退出保存及部分收尾等待会被跳过；
 数据是否受影响取决于此前自动保存是否完成。本轮只确认源码控制流缺口，未复现用户数据丢失，
 不表示正常退出必然保存失败，也没有据此推断网络资源泄漏。
-新前置调用来自本分枝；普通成功 detach 后 local commit 仍可按 client 身份保存，不属于本问题。
+新前置调用来自本分枝。设计复核还确认：Dart detach 清空 client 后，localCommit 走无 receipt 路径，
+不能声称当前退出保存已通过 Core 提交资格检查。只保留原 client 也不足以修复：Core detach
+置 clientReady 为 false，虽可取得 lock，[beginCommit](../../../core/source_commit_marker.go)
+仍会拒绝。保存顺序和提交资格须一起修订。
 
 处理目标：分别记录前置失败并尝试其它允许的收尾，保留原错误反馈和退出 watchdog；
 保存仍须遵守现有提交资格，不能为收尾绕过权限。覆盖两处前置异常及后续步骤执行顺序。
