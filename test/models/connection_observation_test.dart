@@ -138,6 +138,62 @@ void main() {
     expect(observation.configuration.inputId, isEmpty);
   });
 
+  test(
+    'optional connection mode survives request and snapshot decoding',
+    () async {
+      final partial = _connection();
+      (partial['observation']! as Map)['configuration'] = {
+        'status': 'known',
+        'inputId': 'matched-input',
+      };
+      final direct = _connection();
+      (direct['observation']! as Map)['configuration'] = {
+        'status': 'known',
+        'inputId': 'matched-input',
+        'mode': 'direct',
+      };
+      final cases = <Map<String, Object?>>[
+        {'expectedMode': '', 'connection': partial},
+        {'expectedMode': 'direct', 'connection': direct},
+      ];
+      final path = Platform.environment['FLCLASH_CONNECTION_MODE_FIXTURE'];
+      if (path != null) {
+        final actual = jsonDecode(File(path).readAsStringSync()) as List;
+        expect(actual, hasLength(14));
+        cases.addAll(actual.cast<Map<String, Object?>>());
+      }
+      for (final entry in cases) {
+        final wire = entry['connection']! as Map<String, dynamic>;
+        final snapshot = TrackerInfo.fromJson(wire);
+        final listener = _RequestListener();
+        coreEventManager.addListener(listener);
+        try {
+          coreEventManager.sendEvent(
+            coreEventsFromData({'type': 'request', 'data': wire}).single,
+          );
+          final event = await listener.received.future;
+          final configuration = event.observation!.configuration;
+          expect(configuration, snapshot.observation!.configuration);
+          expect(configuration.status, 'known');
+          expect(configuration.inputId, isNotEmpty);
+          expect(configuration.mode, entry['expectedMode']);
+          if (configuration.mode.isEmpty) {
+            expect(configuration.routeEpoch, isNull);
+            expect(configuration.picksVersion, isNull);
+          }
+          final roundTrip = TrackerInfo.fromJson(
+            jsonDecode(jsonEncode(event.toJson())) as Map<String, dynamic>,
+          );
+          expect(roundTrip.observation!.configuration, configuration);
+          expect(event.rule, snapshot.rule);
+          expect(event.chains, snapshot.chains);
+        } finally {
+          coreEventManager.removeListener(listener);
+        }
+      }
+    },
+  );
+
   final bridge = Platform.environment['FLCLASH_CONNECTION_OBSERVATION_FIXTURE'];
   test('decodes actual Go encoder output', () {
     final tracker = TrackerInfo.fromJson(
@@ -181,7 +237,7 @@ void main() {
           expect(observation.configuration.inputId, isNotEmpty);
           expect(
             observation.configuration.mode,
-            isIn(['rule', 'global', 'direct']),
+            isIn(['', 'rule', 'global', 'direct']),
           );
         } else {
           expect(observation.configuration.inputId, isEmpty);

@@ -214,8 +214,8 @@ func (s *connectionObservationStore) bind(info *statistic.TrackerInfo, provenanc
 	if provenance.AppliedRevision != "" && observation.Configuration.InputID != provenance.AppliedRevision {
 		observation.Configuration = connectionConfiguration{Status: "known", InputID: provenance.AppliedRevision}
 	}
-	if provenance.AppliedRevision != "" && info.Rule != "" {
-		// Global and Direct bypass the rule matcher; this evidence belongs to Rule mode.
+	if provenance.AppliedRevision != "" && provenance.Index >= 0 && info.Rule != "" {
+		// App-hook traces have index -1 and can also originate in Direct mode.
 		observation.Configuration.Mode = "rule"
 	}
 	metadata := *info.Metadata

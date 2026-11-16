@@ -93,8 +93,13 @@ processEpoch 是不同字段，不随单次切换订阅或 VPN 重建而充当�
 | TrackerInfo.provenance | 原来源追溯；版本已知与规则来源已知是不同结论 |
 
 配置和路由戳在入口与 Tracker 加入时核对。读取配置使用非阻塞锁：遇到 Core 占用配置边界或
-前后不一致时不阻塞业务连接，缺失版本保留 unknown。实际 matcher 的来源追溯可以证明匹配时的
-inputId；非空的实际规则还能证明 Rule 模式。Global／Direct 绕过规则匹配，不伪造一条命中规则。
+前后不一致时不阻塞业务连接，缺失版本保留 unknown。实际来源追溯可以证明匹配时的 inputId。
+仅已关联主规则索引（非负）、有 AppliedRevision 且实际 Rule 非空的普通 matcher
+追溯能够额外证明 Rule 模式；App hook 索引为 -1，在 Direct 也能返回规则，不能据此推断 Rule。
+普通 YAML 的用户添加规则也可标为 application-rules，来源作者名称不作为模式区分依据。
+App hook 只有入口和 Tracker 的 inputId、mode、routeEpoch、picksVersion 全部一致才保留完整模式事实；
+否则只保留追溯能够证明的 inputId，mode 可缺省，不以当前配置补历史。Global 跳过 App hook；
+Direct 跳过普通 matcher，但允许 App／App＋Host 命中，不伪造普通规则证据。
 路由版本是已有观察器的版本戳；实际出口仍以该连接自己的 chains 为准。
 
 request 在 Tracker 加入时冻结 observation 和 metadata；快照只读取冻结记录，不重新查询 UID、
