@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R04 已修复并完成本地交付；R05–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R05 已修复并完成本地交付；R06–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 共收录 11 项：3 项 P1、7 项 P2、1 项 P3。
 
@@ -239,6 +239,33 @@ D 用未修改 resolver 输入 65 个包，DTO 实际只有 64 个；Go 将该 D
 
 处理目标：保留 DTO 上限，但显式表达不完整／未知，Core 不用不完整集合授予共同策略；
 覆盖 64／65 候选及末项未配置或冲突，不能以选首包解决。
+
+处置：2026-11-16 已解决，D 实现并 refine，M 评审及本地交付对账通过。
+修复提交 `0c297aa59b50914decc5a97212a7a33883abd818` 位于 `security/android`。
+Native 第 65 个去重非空候选返回既有 lookupFailed／unknown／空列表；完整 0–64 项保持原状态与排序。
+未知身份不取得 App／App＋Host 策略，保留 Direct 与 Rule 通用 Host／订阅回退；不扩 DTO，
+不改 Go／Dart 生产代码、DB、Core gitlink 或 carrier。边界见[身份契约](../network_activity/network_activity_design.md#应用身份)。
+
+[Native 专项](../../../android/tests/service/UidPackageResolverTest.kt)在原实现 9 项中 2 项超限失败，
+修复后专项 9 项及 service 全部 33 项通过，0 失败／错误／跳过，Kotlin 编译通过。
+[真实 producer](../../../android/tests/service/UidPackageIdentityFixture.kt)生成入库合成夹具，
+Native 常规测试校对，Go 常规测试消费；可用 `:service:generateUidPackageIdentityFixture` 重生成。
+[跨语言回归](../../../core/application_identity_native_test.go)的同一测试源码消费实际旧／新 Native 产物：
+66 个配置由 48 通过、18 超限失败变为全部通过，覆盖完整／超限、末项缺失／冲突／一致、
+App／App＋Host 及 Direct／Rule 回退。TCP／UDP 均验证路由决策，TCP 另经真实 tunnel 访问 localhost；
+超时不算拒绝成功，UDP 未做真实传输。
+
+Go wrapper 常规测试与 vet 通过，415 个 top-level 通过（含子测试共 638 个 pass 事件），
+40 个既有条件 skip 事件不计通过；新增三专项没有 skip。Dart 模型／聚合／组件 77 通过，
+2 项既有桥接输入跳过；analyze 只有与 R03 相同的 42 条 info。
+验证由 D 执行，M 审阅代码、测试方案和绑定证据，未代跑编译或产品测试。
+上述结果不证明真实 UID 规模频率、PackageManager 安装态、JNI、APK、设备或 VPN。
+
+本地、未入库证据位于 `.buildlog/r05-uid-identity-20261116/`，入口为 `implementation-source.json`、
+`before-final-source.json`、`matrix-before-03.json`、`matrix-after.json` 及 `delivery-summary.json`。
+早期 Go 夹具准备失败保持冻结，不用作产品反例。交付与获审十文件仅 Plan 状态不同；
+`delivery-summary.json` 中的 `c5d75d9` 仅由 M amend Details，Tree 与父提交不变。
+定稿可用 `git show 0c297aa:docs/features/security/r05_uid_identity_plan.md` 取回复跑命令及限制。
 
 ### R06：应用规则命中把实际 Direct 模式重标为 Rule
 
