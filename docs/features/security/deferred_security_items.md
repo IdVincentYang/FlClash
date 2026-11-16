@@ -5,12 +5,25 @@ L2-T02-R1 保留已证实缺陷及上游跟踪，Loop6 T02/T03等待后续Core�
 也不构成自动修改 Core、恢复其它任务或扩大权限的授权。
 共同目标见[安全要求](security_requirements.md)，当前用途和局部保护见[联网用途清单](android_network_inventory.md)。
 
+- [当前 Core 与历史证据](#当前-core-与历史证据)
 - [T04 服务身份、认证与跳转](#t04服务身份认证与跳转)
 - [T05 日志与错误信息脱敏](#t05日志与错误信息脱敏)
 - [L2-T02-R1 共享 IP 与域名身份](#l2-t02-r1-共享-ip-与域名身份)
 - [Core 完整安装的日志级别并发](#core-完整安装的日志级别并发)
 - [Loop6 T02/T03 Geo 更新与实际采用](#loop6-t02t03-geo-更新与实际采用)
 - [Loop5 T03 EasyTier WASM 源码与生成对应](#loop5-t03-easytier-wasm-源码与生成对应)
+
+## 当前 Core 与历史证据
+
+当前 gitlink、Core checkout 与 [carrier manifest](../../../core/patches/l1_t03/manifest.json)均指向
+`7a620b930bdcb85e466450880313d34add46252b`，tree 为 `9df3b9d4fc95bff70a8ef60651e6b9e191ed23e0`。
+来源仍为 configured [FlClash Core fork](https://github.com/chen08209/Clash.Meta) 的公开基线
+`8597778c7df410ebe88c57e59eaab32d203156df` 加既有 carrier，不等同于最新 MetaCubeX release。
+
+下文 `6c6e3e472bb246cc55f2e8577d9eddccc2623afc` 是 R1、日志并发、Geo 调查及 EasyTier 原包的历史对象，
+原时间、日志和摘要继续绑定当时版本。新旧 Core 的 DNS／resolver／fakeip／profile cache、Geo 组件及
+`log/log.go` 相关路径静态对照无差异；这不是在当前版本重跑旧反例或完整运行验收的证据。
+Core 版本变化及本文同步均不关闭下列风险，不改变暂缓决定或授权修改 Core。
 
 ## T04：服务身份、认证与跳转
 
@@ -55,12 +68,9 @@ IP-only 入站据此恢复 Host，可能使原 A 业务使用 B 的路由，即�
 显式域名 SOCKS A/B 对照各自正确；未建立 mapping 前，同一 IP 按显式地址默认 REJECT 被拒绝。
 这是独立业务收件反例，不只依据 Core 最后恢复出的 Host、界面文案或 YAML 判断。
 
-当前固定 Core 为 `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`，
-由 configured [FlClash Core fork](https://github.com/chen08209/Clash.Meta) 的公共基线
-`8597778c7df410ebe88c57e59eaab32d203156df` 加既有 carrier 恢复，
-来源关系由[carrier manifest](../../../core/patches/l1_t03/manifest.json)维护。
-该基线与当前 Core 的 DNS mapping/enhancer 和 fake-ip pool/store 相关文件相同；
-本轮不修改 Core 源码、gitlink 或 carrier，不把它等同于最新 MetaCubeX release。
+上述宿主 TCP 及下列 fake-ip 调查使用当时固定的 Core `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`。
+当前对象和相关路径的静态对照见[版本边界](#当前-core-与历史证据)；原反例不改绑到新版本，
+也不能因版本号更新就认为 DNS 身份问题已解决。
 
 受影响的用户理解入口包括 Policy draft、Generated draft preview、Save and request application、
 Actual accepted configuration、Start 与 Android service。保存、采用成功或 VPN active 只说明各自事实，
@@ -146,7 +156,7 @@ CGO_ENABLED=0 GOTELEMETRY=off FLCLASH_FAKEIP_LIFECYCLE=1 \
   commit `e4dd968de9e10ecc6770acfafd306edeb578eb52`，
   [v1.19.33](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.33)
   包含同范围复制 allocator 状态的修复。
-  已读 tagged 源码，但该变化未进入当前固定 Core；不代表 R1 全部解决。
+  已读 tagged 源码，但该变化未进入当时调查的固定 Core；不代表 R1 全部解决。
 - [PR #3313](https://github.com/MetaCubeX/mihomo/pull/3313)
   查询时 Open，涉及持久化 pool 重建清掉在用缓存。
 - [issue #2997](https://github.com/MetaCubeX/mihomo/issues/2997)
@@ -162,17 +172,17 @@ release notes、issue关闭、API改动、退出码或短时未收件不足以�
 
 ## Core 完整安装的日志级别并发
 
-固定Core为`6c6e3e472bb246cc55f2e8577d9eddccc2623afc`。2026-11-04在macOS ARM64宿主、Go 1.26.4的
+2026-11-04在当时固定Core `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`、macOS ARM64宿主、Go 1.26.4的
 `TestAppRequestInspectionCompletesWithMatcherAndQueuedInstall`实际完整安装与旧TCP matcher并发中，race detector报告：
 
 - 读：`log.print`（Core `log/log.go:83`）经`Warnln`、`tunnel.handleTCPConnScoped`（`tunnel/tunnel.go:658`）。
 - 写：`log.SetLevel`（`log/log.go:79`）经`executor.applyConfig`（`hub/executor/executor.go:99`）、
   `ApplyConfigStaged`与父`installConfig`。
 
-本次Source＋AppRequest race选集失败，日志为本机忽略目录
+该次Source＋AppRequest race选集失败，日志为本机忽略目录
 `build/verification/l2-t05/go_r3_source_requests_race_wip.log`，SHA256为
 `05d7e3215caba94eab5d2d9faae71cdd64a61de218fc44f3dba49c93a2c854e4`。
-测试文件及上述Core读写实现未改，但共用`writeTestInput`夹具在本轮生成v2输入、SourceUses，
+测试文件及上述Core读写实现未改，但共用`writeTestInput`夹具在该次调查生成v2输入、SourceUses，
 rule trace可能参与；未在旧基线做同输入实测对照，不能据此把完整归因或产品影响断言为既有无害问题。
 当前证据只证明该完整安装并发路径出现冲突，不是所有Source字段或整个AppRequest race通过的证明。
 
@@ -199,8 +209,9 @@ rule trace可能参与；未在旧基线做同输入实测对照，不能据此�
   确认实际发布的接口及完整reader／规则／DNS handle寿命边界。只调用Reload或无限等冷进程不是已接受替代。
   曾评审的最小Core候选涉及reader／缓存／规则handle七处文件及carrier/gitlink，用户未批准实施；
   技术设计与纯构件仅留本地证据，未进入产品，也不是已经复现全部运行故障的结论。
-- 固定版本与限制：Core仍为`6c6e3e472bb246cc55f2e8577d9eddccc2623afc`，来源及恢复由既有
-  [carrier](../../../core/patches/l1_t03/manifest.json)维护；Core／依赖源码／gitlink／carrier不改。
+- 版本与限制：原调查及延期决定对应当时的 Core `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`；
+  当前对象见[版本边界](#当前-core-与历史证据)，相关路径无差异不等于已获得新 reader 接口或通过运行验收。
+  本次文档同步不改 Core／依赖源码／gitlink／carrier。
   不靠停正常自动更新、清规则、静默DIRECT、全连接中断或另造matcher／状态机关闭本项。
 - 后续复查：有相关Core修复或用户重新安排时，先只读核实实际API、reader寿命及全部消费者覆盖，
   不能只凭release说明或issue关闭判定解决；变更当前Core／依赖／gitlink／carrier仍须新的明确许可。
@@ -216,7 +227,7 @@ rule trace可能参与；未在旧基线做同输入实测对照，不能据此�
 仅将原EasyTier WASM源码／生成关系移出本次T03交付出口；其余T03成果按调整范围通过实现评审并已本地合入`security/android`。
 这项范围决定不表示来源可信、行为安全、独立生成已证或剩余风险被接受，也不自动完成Loop5／T04／T05。
 
-- 对象：固定Core `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`的easytier-go模块
+- 对象：当时固定Core `6c6e3e472bb246cc55f2e8577d9eddccc2623afc`的easytier-go模块
   `v0.0.0-20260910071355-3d0c9c3ca5e2`所嵌入的6,850,909-byte WASM；
   SHA-256为`8b82f37d62fba2ffe8e256386096fddf448d4261d51c495d5bd97cd11bbb24a0`。
   payload及Go binding声明源码`63519db2b5f2a6a1b9b7f20905f036dab54eb829`。

@@ -8,7 +8,9 @@ JVM/Core、专用 AVD 与物理设备证据分别判断；范围和限制见下�
 
 1. Dashboard 使用 Start/Stop；准备启动时可以 Stop 取消。
 2. Tools → Advanced configuration → Network 配置 VPN、IPv6 和 Allow apps to bypass VPN。
-   运行中修改后，按提示 Restart，或 Stop 后重新 Start，才采用新的 VPN Builder 设置。
+   初始化后，实际 VpnOptions 变化且仍有运行意图时，会自动完整重新应用 VPN 设置，无需另点 Restart。
+   未启动时只保存，后续 Start 使用新设置；保存成功不等于已采用，应查看实际服务状态和错误反馈。
+   自动应用失败时可按反馈处理后手动 Stop／Start 重试；新的 Stop 优先，不会因保存而自动恢复运行。
    VPN 关闭时仅有代理服务，不代表其它应用自动经过代理。
 3. Tools → Access control 决定哪些应用进入 VPN；被排除应用不受该 VPN 的分流保证。
 4. Tools → General → On demand → Exclude SSIDs 仅在已授权且可观察的 SSID 匹配时暂停。
@@ -81,7 +83,9 @@ proxy 只连接 guest 的 `127.0.0.1:7890`，用于 Proxy only；dns 只查询�
 - 正常代理：proxyConnections 与 proxyTarget 各增加；DIRECT 端只增加 directTarget。
 - 宿主访问 `/proxy/off` 后，代理请求失败且业务收件不增加；`/proxy/on` 后恢复。
 - 在 Network 设置中切换 bypass、在 Access control 排除/恢复测试客户端后，
-  保存并 Stop/Start，再比较收件；desired 设置本身不是已生效证据。
+  保存后等待自动重新应用，再比较实际状态和收件；desired 设置本身不是已生效证据。
+  自动应用失败时按反馈处理，可另做 Stop／Start 重试或验证显式重启场景。
+  此处是当前复现步骤；原专用 AVD 的拓扑与收件记录仍绑定原受测版本，不证明本次已重验自动重建。
 - 系统 Settings → VPN → FlClash → Disconnect 后，查看 Start 和 Service unavailable；
   普通流量已回到系统路径。明确 Start 后再核对恢复。
 - Proxy only 下，显式 proxy 请求仍经 Core，普通请求不会自动经过它。
