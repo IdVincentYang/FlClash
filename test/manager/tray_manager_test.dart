@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/manager/locale_manager.dart';
 import 'package:fl_clash/manager/tray_manager.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -9,10 +10,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:tray/tray.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/test_config_state.dart';
 
 const _trayChannel = MethodChannel('tray');
 const _windowChannel = MethodChannel('window');
@@ -56,6 +59,8 @@ void main() {
   late List<String> windowCalls;
 
   setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await preferences.isInit;
     await AppLocalizations.load(const Locale('en'));
   });
 
@@ -95,6 +100,7 @@ void main() {
   }) async {
     container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(
           systemAction ?? _RecordingSystemAction.new,
@@ -102,6 +108,7 @@ void main() {
       ],
     );
     globalState.container = container;
+    container.listen(configProvider, (_, _) {});
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -166,9 +173,13 @@ void main() {
     await pumpTrayManager(tester);
     _RecordingSystemAction.updateTrayCount = 0;
 
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(mixedPort: state.mixedPort + 1));
+    await tester.runAsync(
+      () => container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch(
+            (state) => state.copyWith(mixedPort: state.mixedPort + 1),
+          ),
+    );
     await tester.pumpAndSettle();
 
     expect(_RecordingSystemAction.updateTrayCount, 1);
@@ -180,9 +191,11 @@ void main() {
     await pumpTrayManager(tester);
     _RecordingSystemAction.updateTrayCount = 0;
 
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(mixedPort: state.mixedPort));
+    await tester.runAsync(
+      () => container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch((state) => state.copyWith(mixedPort: state.mixedPort)),
+    );
     await tester.pumpAndSettle();
 
     expect(_RecordingSystemAction.updateTrayCount, 0);
@@ -193,9 +206,13 @@ void main() {
   ) async {
     await pumpTrayManager(tester, systemAction: _FailingSystemAction.new);
 
-    container
-        .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(mixedPort: state.mixedPort + 1));
+    await tester.runAsync(
+      () => container
+          .read(applicationInputActionProvider.notifier)
+          .updatePatch(
+            (state) => state.copyWith(mixedPort: state.mixedPort + 1),
+          ),
+    );
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -212,9 +229,13 @@ void main() {
     );
 
     for (var i = 0; i < 2; i++) {
-      container
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith(mixedPort: state.mixedPort + 1));
+      await tester.runAsync(
+        () => container
+            .read(applicationInputActionProvider.notifier)
+            .updatePatch(
+              (state) => state.copyWith(mixedPort: state.mixedPort + 1),
+            ),
+      );
       await tester.pump();
     }
     expect(_SlowFirstFailureSystemAction.updateTrayCount, 1);
@@ -232,11 +253,13 @@ void main() {
     addTearDown(() => AppLocalizations.load(const Locale('en')));
     container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(_RecordingSystemAction.new),
       ],
     );
     globalState.container = container;
+    container.listen(configProvider, (_, _) {});
     await pumpLocalizedTrayManager(tester, const Locale('en'));
     _RecordingSystemAction.updateTrayCount = 0;
     _RecordingSystemAction.updateTrayLocales.clear();
@@ -252,11 +275,13 @@ void main() {
   ) async {
     container = ProviderContainer(
       overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(_RecordingSystemAction.new),
       ],
     );
     globalState.container = container;
+    container.listen(configProvider, (_, _) {});
     await pumpLocalizedTrayManager(tester, const Locale('en'));
     _RecordingSystemAction.updateTrayCount = 0;
 

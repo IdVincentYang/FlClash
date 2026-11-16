@@ -2,8 +2,7 @@ import 'dart:convert';
 
 import 'package:fl_clash/manager/android_manager.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/providers/config.dart';
-import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_app.dart';
+import '../helpers/test_config_state.dart';
 import '../helpers/test_profiles.dart';
 
 void main() {
@@ -24,9 +24,13 @@ void main() {
     store = await SharedPreferences.getInstance();
     await store.clear();
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [
+        configStateProvider.overrideWith(TestConfigState.new),
+        profilesProvider.overrideWith(TestProfiles.new),
+      ],
     );
     globalState.container = container;
+    container.listen(configProvider, (_, _) {});
   });
 
   tearDown(() => container.dispose());
@@ -58,9 +62,11 @@ void main() {
     await pumpAndroidManager(tester);
     expect(store.getString('sharedState'), isNull);
 
-    container.read(appSettingProvider.notifier).value = const AppSettingProps(
-      testUrl: 'http://shared.test',
-    );
+    await container
+        .read(applicationInputActionProvider.notifier)
+        .updateAppSetting(
+          (state) => state.copyWith(testUrl: 'http://shared.test'),
+        );
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();

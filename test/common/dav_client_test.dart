@@ -5,9 +5,22 @@ import 'dart:io';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/dav_client.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
+import 'package:fl_clash/l10n/l10n.dart';
+import 'package:flutter/widgets.dart' show Locale;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+
+class _ScopedDAVClient extends DAVClient {
+  _ScopedDAVClient(super.props, this.requests);
+  final Request requests;
+  @override
+  Request get requestClient => requests;
+}
 
 class _FakeDAVClient extends DAVClient {
   _FakeDAVClient(super.dav, this.result, [this.onPing]);
@@ -215,7 +228,14 @@ void main() {
 
     // appPath resolves the data directory once per process, so every test in
     // this group has to share one root.
-    setUpAll(() {
+    setUpAll(() async {
+      await AppLocalizations.load(const Locale('en'));
+      globalState.packageInfo = PackageInfo(
+        appName: 'Fixture',
+        packageName: 'fixture',
+        version: '1',
+        buildNumber: '1',
+      );
       root = Directory.systemTemp.createTempSync('dav_client_test');
       PathProviderPlatform.instance = _FakePathProvider(root.path);
     });
@@ -226,6 +246,8 @@ void main() {
       } catch (_) {}
     });
 
+    final clients = <(_ScopedDAVClient, Request, ProviderContainer)>[];
+
     setUp(() async {
       // The widget test binding installs an override that answers every
       // request with 400 instead of opening a socket.
@@ -235,24 +257,93 @@ void main() {
     });
 
     tearDown(() async {
+      for (final (dav, requests, container) in clients) {
+        dav.close();
+        await requests.detach();
+        container.dispose();
+      }
+      clients.clear();
       HttpOverrides.global = testOverrides;
       await server.close();
     });
 
-    DAVClient buildClient({String path = ''}) {
-      return DAVClient(
-        DAVProps(
-          uri: '${server.uri}$path',
-          user: 'user',
-          password: 'secret',
-          fileName: 'backup.zip',
-        ),
+    DAVClient buildClient({
+      String path = '',
+      String user = 'user',
+      String password = 'secret',
+    }) {
+      final props = DAVProps(
+        uri: '${server.uri}$path',
+        user: user,
+        password: password,
+        fileName: 'backup.zip',
       );
+      final container = ProviderContainer(
+        overrides: [davSettingProvider.overrideWithBuild((_, _) => props)],
+      );
+      container.listen(configProvider, (_, _) {});
+      final requests = Request()..attach(container);
+      final dav = _ScopedDAVClient(props, requests);
+      clients.add((dav, requests, container));
+      expect(requests.isAttached, isTrue);
+      expect(requests.isDAVCurrent(props), isTrue);
+      return dav;
     }
 
     File writeArchive(List<int> bytes) {
       return File(join(root.path, 'source.zip'))..writeAsBytesSync(bytes);
     }
+
+    test(
+      'an unattached Request rejects DAV before transport or action',
+      () async {
+        final requests = Request();
+        final dav = _ScopedDAVClient(
+          DAVProps(uri: server.uri, user: '', password: ''),
+          requests,
+        );
+        var ran = false;
+        await expectLater(
+          dav.operation('restore', (_) async {
+            ran = true;
+          }),
+          throwsA(
+            isA<RequestUnavailable>().having(
+              (error) => error.code,
+              'code',
+              'request_cancelled',
+            ),
+          ),
+        );
+        expect(ran, isFalse);
+        expect(server.requests, isEmpty);
+        dav.close();
+        await requests.detach();
+      },
+    );
+
+    test(
+      'a changed DAV configuration revokes the original client before I/O',
+      () async {
+        final dav = buildClient();
+        final (_, requests, container) = clients.single;
+        container.read(davSettingProvider.notifier).value = dav.props.copyWith(
+          user: 'replaced',
+        );
+        expect(requests.isDAVCurrent(dav.props), isFalse);
+        await expectLater(
+          dav.operation('restore', (_) async {}),
+          throwsA(
+            isA<RequestUnavailable>().having(
+              (error) => error.code,
+              'code',
+              'request_cancelled',
+            ),
+          ),
+        );
+        expect(server.requests, isEmpty);
+      },
+    );
 
     test('ping reports a server that answers OPTIONS', () async {
       expect(await buildClient().ping(), isTrue);
@@ -364,7 +455,7 @@ void main() {
     });
 
     test('anonymous access sends no authorization header', () async {
-      await DAVClient(DAVProps(uri: server.uri, user: '', password: '')).ping();
+      expect(await buildClient(user: '', password: '').ping(), isTrue);
 
       expect(server.requests.single.authorization, isNull);
     });

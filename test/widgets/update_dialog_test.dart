@@ -1,3 +1,8 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart'
+    show HttpClientAdapter, RequestOptions, ResponseBody;
+import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -5,6 +10,7 @@ import 'package:fl_clash/state.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../helpers/test_app.dart';
@@ -31,6 +37,30 @@ Map<String, dynamic> release(String? body) => <String, dynamic>{
   'tag_name': 'v0.8.96',
   'body': body,
 };
+
+class _ReleaseAdapter implements HttpClientAdapter {
+  String? body;
+  final requests = <Uri>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? stream,
+    Future<void>? cancel,
+  ) async {
+    requests.add(options.uri);
+    return ResponseBody.fromString(
+      jsonEncode(release(body)),
+      200,
+      headers: {
+        'content-type': ['application/json'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
 
 Future<ProviderContainer> pumpApp(WidgetTester tester, {Locale? locale}) async {
   final container = ProviderContainer();
@@ -64,6 +94,53 @@ Future<void> tapCancel(WidgetTester tester) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late HttpClientAdapter originalAdapter;
+  late _ReleaseAdapter adapter;
+  Map<String, dynamic>? latest;
+  final launched = <String>[];
+  const channel = MethodChannel('plugins.flutter.io/url_launcher');
+
+  setUp(() {
+    // This tests desktop result ownership; Android attached authorization has separate suites.
+    expect(request.isAttached, isFalse);
+    originalAdapter = request.dio.httpClientAdapter;
+    adapter = _ReleaseAdapter();
+    request.dio.httpClientAdapter = adapter;
+    latest = null;
+    launched.clear();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          launched.add((call.arguments as Map)['url'] as String);
+          return true;
+        });
+  });
+  tearDown(() {
+    if (latest != null) request.releaseVersionResult(latest!);
+    request.cancelKey('versionCheck');
+    request.dio.httpClientAdapter = originalAdapter;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+  });
+
+  Future<Map<String, dynamic>> loadRelease(
+    WidgetTester tester,
+    String? body,
+  ) async {
+    adapter.body = body;
+    final data = await tester.runAsync(request.checkForUpdate);
+    expect(data, isNotNull);
+    latest = data!;
+    return data;
+  }
+
+  final cancelled = throwsA(
+    isA<RequestUnavailable>().having(
+      (error) => error.code,
+      'code',
+      'request_cancelled',
+    ),
+  );
   setUpAll(() {
     globalState.packageInfo = PackageInfo(
       appName: 'FlClash',
@@ -78,9 +155,10 @@ void main() {
   ) async {
     final container = await pumpApp(tester);
 
+    final data = await loadRelease(tester, _bodyWith(_payload));
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bodyWith(_payload)));
+        .checkUpdateResultHandle(data: data);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('v0.8.96'), findsOneWidget);
@@ -90,6 +168,8 @@ void main() {
 
     await tapCancel(tester);
     await shown;
+    await expectLater(request.validateVersionResult(data), cancelled);
+    expect(launched, isEmpty);
   });
 
   testWidgets('localizes the group titles but not the entries', (tester) async {
@@ -97,7 +177,9 @@ void main() {
 
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bodyWith(_payload)));
+        .checkUpdateResultHandle(
+          data: await loadRelease(tester, _bodyWith(_payload)),
+        );
     await tester.pumpAndSettle();
 
     // Entry copy comes from the release payload and is English only; the group
@@ -116,7 +198,7 @@ void main() {
 
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bulletsOnly));
+        .checkUpdateResultHandle(data: await loadRelease(tester, _bulletsOnly));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('- Override scripts'), findsOneWidget);
@@ -124,6 +206,72 @@ void main() {
     await tapCancel(tester);
     await shown;
   });
+
+  testWidgets('valid confirmation launches once and releases the result', (
+    tester,
+  ) async {
+    final container = await pumpApp(tester);
+    final data = await loadRelease(tester, _bulletsOnly);
+    final shown = container
+        .read(commonActionProvider.notifier)
+        .checkUpdateResultHandle(data: data);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Download'));
+    await tester.pumpAndSettle();
+    await shown;
+    expect(launched, ['https://github.com/chen08209/FlClash/releases/latest']);
+    expect(adapter.requests.single.host, 'api.github.com');
+    expect(
+      adapter.requests.single.path,
+      '/repos/chen08209/FlClash/releases/latest',
+    );
+    await expectLater(request.validateVersionResult(data), cancelled);
+  });
+
+  testWidgets('a cloned result cannot open a dialog or release its original', (
+    tester,
+  ) async {
+    final container = await pumpApp(tester);
+    final data = await loadRelease(tester, _bulletsOnly);
+    await expectLater(
+      container
+          .read(commonActionProvider.notifier)
+          .checkUpdateResultHandle(data: Map.of(data)),
+      cancelled,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(launched, isEmpty);
+    await request.validateVersionResult(data);
+  });
+
+  for (final replacement in [false, true]) {
+    testWidgets(
+      'an open dialog rejects ${replacement ? 'replaced' : 'cancelled'} ownership',
+      (tester) async {
+        final container = await pumpApp(tester);
+        final original = await loadRelease(tester, _bulletsOnly);
+        final shown = container
+            .read(commonActionProvider.notifier)
+            .checkUpdateResultHandle(data: original);
+        await tester.pumpAndSettle();
+        Map<String, dynamic>? newer;
+        if (replacement) {
+          newer = await loadRelease(tester, _bodyWith(_payload));
+        } else {
+          request.cancelKey('versionCheck');
+        }
+        final rejected = expectLater(shown, cancelled);
+        await tester.tap(find.text('Download'));
+        await tester.pumpAndSettle();
+        await rejected;
+        expect(launched, isEmpty);
+        expect(find.byType(AlertDialog), findsNothing);
+        await expectLater(request.validateVersionResult(original), cancelled);
+        if (newer != null) await request.validateVersionResult(newer);
+      },
+    );
+  }
 
   testWidgets('a manual check reports a failure', (tester) async {
     final container = await pumpApp(tester);
