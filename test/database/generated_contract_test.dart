@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -142,6 +142,7 @@ void main() {
   });
 
   test('rule and link generated classes preserve nullable contracts', () {
+    const host = '{"packageName":"fixture.app","targets":{}}';
     const rule = RawRule(
       id: 10,
       ruleAction: RuleAction.RULE_SET,
@@ -151,11 +152,14 @@ void main() {
       subRule: 'sub',
       noResolve: true,
       src: true,
+      hostBinding: host,
     );
 
-    expect(rule.toColumns(true), hasLength(8));
-    expect(rule.toCompanion(true).toColumns(true), hasLength(8));
+    expect(rule.toColumns(true), hasLength(9));
+    expect(rule.toCompanion(true).toColumns(true), hasLength(9));
     expect(RawRule.fromJson(rule.toJson()), rule);
+    expect(rule.toColumns(false), contains('host_binding'));
+    expect(rule.copyWith(hostBinding: const Value(null)).hostBinding, isNull);
     expect(rule.copyWith(content: const Value(null)).content, null);
     expect(
       rule
@@ -178,7 +182,7 @@ void main() {
       src: false,
     );
     expect(emptyRule.toColumns(true), hasLength(4));
-    expect(emptyRule.toColumns(false), hasLength(8));
+    expect(emptyRule.toColumns(false), hasLength(9));
 
     final ruleCompanion =
         RulesCompanion.insert(ruleAction: RuleAction.DOMAIN_SUFFIX).copyWith(
@@ -189,8 +193,18 @@ void main() {
           subRule: const Value('sub'),
           noResolve: const Value(true),
           src: const Value(true),
+          hostBinding: const Value(host),
         );
-    expect(ruleCompanion.toColumns(true), hasLength(8));
+    expect(ruleCompanion.toColumns(true), hasLength(9));
+    expect(ruleCompanion.hostBinding.value, host);
+    expect(RawRule.fromJson(emptyRule.toJson()).hostBinding, isNull);
+    final absent = RulesCompanion.insert(ruleAction: RuleAction.DOMAIN);
+    expect(absent.hostBinding.present, isFalse);
+    expect(absent.toColumns(true), isNot(contains('host_binding')));
+    final cleared = ruleCompanion.copyWith(hostBinding: const Value(null));
+    expect(cleared.hostBinding.present, isTrue);
+    expect(cleared.hostBinding.value, isNull);
+    expect(cleared.toColumns(true), contains('host_binding'));
     expect(ruleCompanion.toString(), contains('DOMAIN_SUFFIX'));
     expect(
       RulesCompanion.custom(
@@ -202,8 +216,9 @@ void main() {
         subRule: const Variable('sub'),
         noResolve: const Variable(true),
         src: const Variable(false),
+        hostBinding: const Variable(host),
       ).toColumns(false),
-      hasLength(8),
+      hasLength(9),
     );
 
     const link = RawProfileRuleLink(

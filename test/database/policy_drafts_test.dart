@@ -220,7 +220,7 @@ void main() {
                   .data
                   .values
                   .single,
-              14,
+              upgraded.schemaVersion,
             );
           } finally {
             await upgraded.close();

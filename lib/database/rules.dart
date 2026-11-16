@@ -425,11 +425,17 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
   Future<void> _delAll(Iterable<int> ruleIds) {
     final ids = ruleIds.toSet();
     return transaction(() async {
-      final hasHost =
-          (await (select(rules)
-                    ..where((t) => t.id.isIn(ids) & t.hostBinding.isNotNull()))
-                  .get())
-              .isNotEmpty;
+      var hasHost = false;
+      for (final chunk in ids.chunks(_maxBoundValues)) {
+        final host = selectOnly(rules)
+          ..addColumns([rules.id])
+          ..where(rules.id.isIn(chunk) & rules.hostBinding.isNotNull())
+          ..limit(1);
+        if ((await host.get()).isNotEmpty) {
+          hasHost = true;
+          break;
+        }
+      }
       await batch((b) {
         rules.deleteInChunks(b, ids, (t, chunk) => t.id.isIn(chunk));
       });

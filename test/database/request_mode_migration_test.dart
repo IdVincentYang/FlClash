@@ -74,10 +74,43 @@ void main() {
             .data
             .values
             .single,
-        14,
+        database.schemaVersion,
       );
     } finally {
       await database.close();
+    }
+    final reopened = db.Database(NativeDatabase(file));
+    try {
+      expect(
+        (await reopened.profilesDao.query().get()).single.label,
+        'Old profile',
+      );
+      expect(
+        (await reopened.scriptsDao.query().get()).single.label,
+        'Old script',
+      );
+      expect(
+        (await reopened.customSelect('PRAGMA foreign_key_check').get()),
+        isEmpty,
+      );
+      expect(
+        (await reopened
+                .customSelect(
+                  'SELECT COUNT(*) AS n FROM global_group_libraries',
+                )
+                .getSingle())
+            .read<int>('n'),
+        1,
+      );
+      expect(
+        (await reopened.customSelect('PRAGMA user_version').getSingle())
+            .data
+            .values
+            .single,
+        reopened.schemaVersion,
+      );
+    } finally {
+      await reopened.close();
     }
   });
 

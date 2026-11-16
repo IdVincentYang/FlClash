@@ -4,26 +4,52 @@ import 'package:drift/native.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart' hide Database;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+Future<sqlite.Database> legacySchema(int version) async {
+  final raw = sqlite.sqlite3.openInMemory();
+  final seed = Database(
+    NativeDatabase.opened(raw, closeUnderlyingOnClose: false),
+  );
+  await seed.customSelect('SELECT 1').get();
+  await seed.close();
+  raw.execute('DROP TABLE application_routing_libraries');
+  raw.execute('DROP TABLE global_group_libraries');
+  raw.execute('ALTER TABLE rules DROP COLUMN host_binding');
+  if (version == 13) {
+    raw.execute('ALTER TABLE profiles DROP COLUMN local_groups');
+  }
+  raw.execute('PRAGMA user_version = $version');
+  final tables = raw
+      .select("SELECT name FROM sqlite_master WHERE type='table'")
+      .map((row) => row['name']);
+  expect(
+    tables,
+    containsAll(['profiles', 'scripts', 'rules', 'profile_rule_mapping']),
+  );
+  expect(tables, isNot(contains('global_group_libraries')));
+  expect(tables, isNot(contains('application_routing_libraries')));
+  expect(
+    raw.select('PRAGMA table_info(rules)').map((row) => row['name']),
+    isNot(contains('host_binding')),
+  );
+  expect(
+    raw.select('PRAGMA table_info(profiles)').map((row) => row['name']),
+    version == 13 ? isNot(contains('local_groups')) : contains('local_groups'),
+  );
+  return raw;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'schema 13 gains an empty local group field without losing profiles',
     () async {
-      final raw = sqlite3.openInMemory();
-      raw.execute('''CREATE TABLE profiles (
-      id INTEGER PRIMARY KEY NOT NULL, label TEXT NOT NULL, current_group_name TEXT,
-      url TEXT NOT NULL, last_update_date INTEGER, overwrite_type TEXT NOT NULL,
-      script_id INTEGER, match_target TEXT, auto_update_duration_millis INTEGER NOT NULL,
-      subscription_info TEXT, auto_update INTEGER NOT NULL, selected_map TEXT NOT NULL,
-      unfold_set TEXT NOT NULL, request_mode TEXT NOT NULL DEFAULT 'auto', request_proxy TEXT, "order" INTEGER
-    )''');
+      final raw = await legacySchema(13);
       raw.execute(
         '''INSERT INTO profiles(id,label,url,overwrite_type,auto_update_duration_millis,auto_update,selected_map,unfold_set)
       VALUES(1,'Fixture','https://example.invalid/profile','standard',3600000,1,'{}','[]')''',
       );
-      raw.execute('PRAGMA user_version = 13');
       final store = Database(NativeDatabase.opened(raw));
       addTearDown(store.close);
       final profile = (await store.profilesDao.query().get()).single;
@@ -39,15 +65,7 @@ void main() {
   test(
     'schema 14 migrates legacy groups globally without rewriting selections or references',
     () async {
-      final raw = sqlite3.openInMemory();
-      raw.execute('''CREATE TABLE profiles (
-      id INTEGER PRIMARY KEY NOT NULL, label TEXT NOT NULL, current_group_name TEXT,
-      url TEXT NOT NULL, last_update_date INTEGER, overwrite_type TEXT NOT NULL,
-      script_id INTEGER, match_target TEXT, auto_update_duration_millis INTEGER NOT NULL,
-      subscription_info TEXT, auto_update INTEGER NOT NULL, selected_map TEXT NOT NULL,
-      unfold_set TEXT NOT NULL, request_mode TEXT NOT NULL DEFAULT 'auto', request_proxy TEXT,
-      "order" INTEGER, local_groups TEXT NOT NULL DEFAULT '[]'
-    )''');
+      final raw = await legacySchema(14);
       const legacy = LocalProxyGroup(
         id: 7,
         name: 'Mine',
@@ -68,7 +86,6 @@ void main() {
           ],
         );
       }
-      raw.execute('PRAGMA user_version = 14');
       final store = Database(NativeDatabase.opened(raw));
       addTearDown(store.close);
       final profiles = await store.profilesDao.query().get();

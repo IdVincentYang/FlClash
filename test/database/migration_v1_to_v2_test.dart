@@ -100,12 +100,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Database raw;
+  late int currentVersion;
 
   setUp(() async {
     raw = sqlite3.openInMemory();
     final seed = fl.Database(
       NativeDatabase.opened(raw, closeUnderlyingOnClose: false),
     );
+    currentVersion = seed.schemaVersion;
     await seed.customSelect('SELECT 1').get();
     await seed.close();
   });
@@ -118,6 +120,11 @@ void main() {
     );
     addTearDown(database.close);
     await database.customSelect('SELECT 1').get();
+    expect(_columnsOf(raw, 'rules'), contains('host_binding'));
+    expect(_hasTable(raw, 'global_group_libraries'), isTrue);
+    expect(_hasTable(raw, 'application_routing_libraries'), isTrue);
+    expect(raw.select('PRAGMA foreign_keys').single.values.single, 1);
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     return database;
   }
 
@@ -127,7 +134,7 @@ void main() {
 
     await openAndMigrate();
 
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
   });
 
   test('the v3 upgrade adds match_target to profiles', () async {
@@ -137,7 +144,7 @@ void main() {
     await openAndMigrate();
 
     expect(_columnsOf(raw, 'profiles'), contains('match_target'));
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
   });
 
   test('the v4 upgrade adds url to scripts', () async {
@@ -151,7 +158,7 @@ void main() {
     final database = await openAndMigrate();
 
     expect(_columnsOf(raw, 'scripts'), contains('url'));
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
     final scripts = await database.scriptsDao.query().get();
     expect(scripts.single.label, 'Local');
     expect(scripts.single.url, isNull);
@@ -168,7 +175,7 @@ void main() {
     final database = await openAndMigrate();
 
     expect(_columnsOf(raw, 'scripts'), contains('order'));
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
     final scripts = await database.scriptsDao.query().get();
     expect(scripts.map((item) => item.label), ['First', 'Second']);
     expect(scripts.map((item) => item.order), [null, null]);
@@ -183,7 +190,7 @@ void main() {
       await openAndMigrate();
 
       expect(_columnsOf(raw, 'profiles'), contains('match_target'));
-      expect(_userVersion(raw), 14);
+      expect(_userVersion(raw), currentVersion);
     },
   );
 
@@ -194,7 +201,7 @@ void main() {
     final database = await openAndMigrate();
 
     expect(_hasTable(raw, 'clash_providers'), isTrue);
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
     expect(
       await database.clashProvidersDao.query(ProviderKind.proxy).get(),
       isEmpty,
@@ -210,7 +217,7 @@ void main() {
       await openAndMigrate();
 
       expect(_hasTable(raw, 'clash_providers'), isTrue);
-      expect(_userVersion(raw), 14);
+      expect(_userVersion(raw), currentVersion);
     },
   );
 
@@ -224,7 +231,7 @@ void main() {
       _columnsOf(raw, 'proxy_groups'),
       containsAll(['tolerance', 'strategy']),
     );
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
   });
 
   test(
@@ -236,7 +243,7 @@ void main() {
       await openAndMigrate();
 
       expect(_columnsOf(raw, 'proxy_groups'), contains('strategy'));
-      expect(_userVersion(raw), 14);
+      expect(_userVersion(raw), currentVersion);
     },
   );
 
@@ -261,7 +268,7 @@ void main() {
         _columnsOf(raw, 'clash_providers'),
         isNot(anyOf(contains('interval'), contains('filter'))),
       );
-      expect(_userVersion(raw), 14);
+      expect(_userVersion(raw), currentVersion);
       expect(
         (await database.clashProvidersDao.queryAll().get()).single.label,
         'Kept',
@@ -382,7 +389,7 @@ void main() {
       ),
       isNotEmpty,
     );
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
     expect(await database.customProxiesDao.query(1).get(), isEmpty);
   });
 
@@ -391,7 +398,7 @@ void main() {
 
     final database = await openAndMigrate();
 
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
     expect(await database.customSelect('SELECT * FROM rules').get(), isEmpty);
   });
 
@@ -401,7 +408,7 @@ void main() {
     await openAndMigrate();
 
     expect(_columnsOf(raw, 'rules'), before);
-    expect(_userVersion(raw), 14);
+    expect(_userVersion(raw), currentVersion);
     expect(_hasTable(raw, 'proxy_groups'), isTrue);
   });
 }

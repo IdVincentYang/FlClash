@@ -36,7 +36,7 @@ void main() {
   });
 
   test(
-    'schema 11 persists object route and rejects unknown database modes',
+    'current schema persists object route and rejects unknown database modes',
     () async {
       final db = Database(NativeDatabase.memory());
       addTearDown(db.close);
@@ -48,7 +48,13 @@ void main() {
       );
       await db.profiles.put(profile.toCompanion());
       final saved = (await db.profilesDao.query().get()).single;
-      expect(db.schemaVersion, 11);
+      expect(
+        (await db.customSelect('PRAGMA user_version').getSingle())
+            .data
+            .values
+            .single,
+        db.schemaVersion,
+      );
       expect(saved.requestMode, RequestMode.proxy);
       expect(saved.requestProxy, 'synthetic-node');
       await db.customStatement(
