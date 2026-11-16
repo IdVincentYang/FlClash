@@ -45,6 +45,22 @@ VPN 设置提示的 Restart 提交一次新的运行请求；配置接受按当�
 options fingerprint 清理/重建资源。UI 不串联独立的 Stop 与 Start，避免等待中的新 Stop
 被旧 Restart 的后半段覆盖。
 
+## 配置事实镜像与投影
+
+Go 拥有 ConfigFact 事实及业务资格；ServiceStateMachine 只维护 Native 镜像。
+Core 事件与直接配置回执在同一 publicationLock 内完成 epoch／版本判断、镜像替换及通知提交。
+空 epoch 拒绝；初始可接受有效事件；同 epoch 只拒绝较小版本，同版本仍可补充实际状态。
+不同 epoch 只允许既有 authoritative 回执切换，切换后拒绝原 epoch 的普通迟到事件。
+authoritative 不绕过同 epoch 的版本检查，不给普通事件增加资格。
+
+phase 或 SharedState 引起的通知刷新也在此锁内各取一次 request、ConfigFact 和 desired 快照，
+不发布先前计算的过期投影。refresh 在同锁内检查 started／businessActive，保留原实际运行时间含义。
+版本用于拒绝迟到观察，不参与业务接受或运行意图仲裁。
+
+既有 transitionLock 可以进入 publicationLock，反向不取得 transitionLock 或 startPreparationLock。
+镜像及通知临界区不调用 Go/JNI、不等待 I/O 或 suspend；现有 host 只向 ServiceConfig StateFlow 赋值。
+同线程投影允许 monitor 重入，异常保留原传播方式并释放 monitor，不增加第二 Owner 或异步队列。
+
 ## 界面依据
 
 控制目标与实际运行分别派生；isStart/run time 保持实际计时含义。

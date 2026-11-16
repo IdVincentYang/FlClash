@@ -184,9 +184,11 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
     }
 
-    fun observeConfigFact(fact: ConfigFact, authoritative: Boolean = false) {
+    fun observeConfigFact(fact: ConfigFact, authoritative: Boolean = false) = synchronized(publicationLock) {
         val previous = configFact
-        if (fact.runtimeEpoch.isEmpty() || !authoritative && previous.runtimeEpoch.isNotEmpty() && fact.runtimeEpoch != previous.runtimeEpoch || fact.runtimeEpoch == previous.runtimeEpoch && fact.version < previous.version) return
+        if (fact.runtimeEpoch.isEmpty()) return@synchronized
+        if (!authoritative && previous.runtimeEpoch.isNotEmpty() && fact.runtimeEpoch != previous.runtimeEpoch) return@synchronized
+        if (fact.runtimeEpoch == previous.runtimeEpoch && fact.version < previous.version) return@synchronized
         configFact = fact
         applySharedState()
     }
@@ -428,7 +430,11 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
     }
 
-    suspend fun refresh(): Long = if (getRequestState().phase == "started" && configFact.businessActive) runTimeMillis else 0L
+    suspend fun refresh(): Long = synchronized(publicationLock) {
+        val state = getRequestState()
+        val fact = configFact
+        if (state.phase == "started" && fact.businessActive) runTimeMillis else 0L
+    }
 
     fun captureRequestToken(): RunRequest = arbiter.current()
 
@@ -567,14 +573,16 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
     }
 
-    private fun applySharedState() {
+    private fun applySharedState() = synchronized(publicationLock) {
         val state = getRequestState()
+        val fact = configFact
+        val desired = sharedState
         val title = when {
-            state.phase == "started" && configFact.businessActive && configFact.phase == "ready" -> configFact.profileName.ifEmpty { "FlClash" }
-            state.phase in setOf("preparing", "starting") -> sharedState.configApplyingTip
-            else -> sharedState.configInactiveTip
+            state.phase == "started" && fact.businessActive && fact.phase == "ready" -> fact.profileName.ifEmpty { "FlClash" }
+            state.phase in setOf("preparing", "starting") -> desired.configApplyingTip
+            else -> desired.configInactiveTip
         }
-        host.updateNotificationParams(notificationParams(sharedState).copy(title = title))
+        host.updateNotificationParams(notificationParams(desired).copy(title = title))
     }
 
     private fun showConfigError(message: String?) {
