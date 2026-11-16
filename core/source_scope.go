@@ -29,6 +29,7 @@ func reconcileSourceScopesLocked(home string) error {
 			}
 			checkpointMu.Lock()
 			p.eligible = false
+			p.releaseSourceVersions()
 			if configFact.Owner == p.receipt.Owner {
 				configFact.BusinessActive = false
 				configFact.ReplayEligible = false

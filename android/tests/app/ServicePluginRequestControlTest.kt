@@ -70,7 +70,7 @@ class ServicePluginRequestControlTest {
 
     @Test fun commitActionsReachCoreWithoutRewritingReceiptOwnership() {
         val plugin = ServicePlugin()
-        for (action in listOf("beginCommit", "markRecovery", "clearRecovery", "complete")) {
+        for (action in listOf("beginCommit", "markRecovery", "clearRecovery", "complete", "retainCompletion", "releaseCompletion")) {
             val payload = """{"action":"$action","id":"owned-receipt","client":"owned-client"}"""
             RequestControlCoreShadow.received = null
             RequestControlCoreShadow.response = """{"error":"request_restart_required"}"""

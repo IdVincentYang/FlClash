@@ -63,7 +63,7 @@ func checkSourceMaterialCapture(request sourceAcceptanceRequest) error {
 	}
 	appRequests.mu.Lock()
 	defer appRequests.mu.Unlock()
-	if !sourceTicketValidLocked(request.Source, []string{request.Key}) || request.ExpectedState.Epoch == "" || request.ExpectedState.Epoch != appRequests.state.ProcessEpoch || request.ExpectedState.Revision != appRequests.state.Revision || request.Owner != appRequests.owner.ID || request.Operation != appRequests.operations[request.Key] {
+	if !sourceTicketValidLocked(request.Source, []string{request.Key}) || request.ExpectedState.Epoch == "" || request.ExpectedState.Epoch != appRequests.state.ProcessEpoch || request.ExpectedState.Revision != appRequests.state.Revision || request.Owner != appRequests.owner.ID || !appRequests.operationVersions.matches(request.Key, request.Operation) {
 		return errSourceSuperseded
 	}
 	return nil
@@ -140,7 +140,7 @@ func sourceMaterialCommitCurrentLocked(receipt *appRequestReceipt, candidate *so
 		}
 		owner, operation = receipt.spec.Owner.ID, receipt.spec.Operation
 	}
-	return owner == r.owner.ID && operation == r.operations[candidate.request.Key]
+	return owner == r.owner.ID && r.operationVersions.matches(candidate.request.Key, operation)
 }
 
 func handleSourceMaterialCommit(home string, request sourceAcceptanceRequest) (bool, sourceAcceptanceResult, error) {
@@ -206,7 +206,7 @@ func sourceMaterialCommitAction(home string, request sourceAcceptanceRequest, ca
 		}
 		appRequests.mu.Lock()
 		defer appRequests.mu.Unlock()
-		if !sourceTicketValidLocked(candidate.request.Source, []string{candidate.request.Key}) || candidate.request.ExpectedState.Epoch != appRequests.state.ProcessEpoch || candidate.request.ExpectedState.Revision != appRequests.state.Revision || candidate.request.Owner != appRequests.owner.ID || candidate.request.Operation != appRequests.operations[candidate.request.Key] {
+		if !sourceTicketValidLocked(candidate.request.Source, []string{candidate.request.Key}) || candidate.request.ExpectedState.Epoch != appRequests.state.ProcessEpoch || candidate.request.ExpectedState.Revision != appRequests.state.Revision || candidate.request.Owner != appRequests.owner.ID || !appRequests.operationVersions.matches(candidate.request.Key, candidate.request.Operation) {
 			return sourceAcceptanceResult{}, errSourceSuperseded
 		}
 		if len(appRequests.dataReaders) != 0 {
@@ -217,7 +217,7 @@ func sourceMaterialCommitAction(home string, request sourceAcceptanceRequest, ca
 				return sourceAcceptanceResult{}, errRequestCommitBusy
 			}
 		}
-		appRequests.commits[id] = &appRequestReceipt{registry: appRequests, id: id, client: candidate.request.Source.Client, material: &sourceMaterialCommit{candidate: candidate}}
+		appRequests.commits[id] = &appRequestReceipt{registry: appRequests, id: id, client: candidate.request.Source.Client, material: &sourceMaterialCommit{candidate: candidate}, releaseVersions: appRequests.retainSpecVersionsLocked(requestscope.Spec{Client: candidate.request.Source.Client, Key: candidate.request.Key})}
 		candidate.material.receipt = id
 		return sourceAcceptanceResult{Status: "granted", Receipt: id}, nil
 	}
@@ -236,7 +236,7 @@ func sourceMaterialCommitAction(home string, request sourceAcceptanceRequest, ca
 			return sourceAcceptanceResult{}, errSourceStore
 		}
 		appRequests.mu.Lock()
-		current := appRequests.sources[candidate.request.Key] == candidate.request.Source.Sources[candidate.request.Key]
+		current := appRequests.sourceVersions.matches(candidate.request.Key, candidate.request.Source.Sources[candidate.request.Key])
 		appRequests.mu.Unlock()
 		if !current || receipt.material != nil && receipt.material.prepared {
 			return sourceAcceptanceResult{}, errSourceSuperseded
@@ -256,7 +256,7 @@ func sourceMaterialCommitAction(home string, request sourceAcceptanceRequest, ca
 		return sourceAcceptanceResult{Status: "invalidated"}, nil
 	}
 	appRequests.mu.Lock()
-	current := commit.revision != 0 && appRequests.sources[candidate.request.Key] == commit.revision
+	current := commit.revision != 0 && appRequests.sourceVersions.matches(candidate.request.Key, commit.revision)
 	appRequests.mu.Unlock()
 	if !current {
 		return sourceAcceptanceResult{}, errSourceSuperseded
@@ -298,7 +298,7 @@ func sourceMaterialCommitAction(home string, request sourceAcceptanceRequest, ca
 		return sourceAcceptanceResult{}, err
 	}
 	appRequests.mu.Lock()
-	if !sourceMaterialCommitCurrentLocked(receipt, candidate) || appRequests.sources[candidate.request.Key] != commit.revision {
+	if !sourceMaterialCommitCurrentLocked(receipt, candidate) || !appRequests.sourceVersions.matches(candidate.request.Key, commit.revision) {
 		appRequests.mu.Unlock()
 		return sourceAcceptanceResult{}, errSourceSuperseded
 	}
@@ -322,12 +322,12 @@ func invalidateSourceMaterialCommit(home string, receipt *appRequestReceipt) err
 	checkpointMu.Lock()
 	defer checkpointMu.Unlock()
 	r.mu.Lock()
-	if !sourceMaterialCommitCurrentLocked(receipt, candidate) || commit.revision != 0 || r.sources[candidate.request.Key] != candidate.request.Source.Sources[candidate.request.Key] {
+	if !sourceMaterialCommitCurrentLocked(receipt, candidate) || commit.revision != 0 || !r.sourceVersions.matches(candidate.request.Key, candidate.request.Source.Sources[candidate.request.Key]) {
 		r.mu.Unlock()
 		return errSourceSuperseded
 	}
-	r.sources[candidate.request.Key]++
-	commit.revision = r.sources[candidate.request.Key]
+	commit.revision = r.advanceSourceVersionLocked(candidate.request.Key)
+	r.pruneCompletionHoldsLocked()
 	r.permits = map[string]requestscope.Spec{}
 	var leases []*appRequestLease
 	for _, lease := range r.leases {
@@ -340,6 +340,10 @@ func invalidateSourceMaterialCommit(home string, receipt *appRequestReceipt) err
 	err := invalidateConfigCheckpointLocked(candidate.request.Key, false)
 	for _, lease := range leases {
 		lease.Close()
+	}
+	r.flushCleanup()
+	if err == nil && commit.revision == 0 {
+		return errSourceSuperseded
 	}
 	return err
 }

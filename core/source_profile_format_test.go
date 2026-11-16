@@ -25,7 +25,7 @@ func TestSourceAgeProfileUsesOriginalDecoderBeforeAcceptanceAndProjection(t *tes
 	if raw, _, err := decodeConfigDocument(encrypted); err != nil || len(raw.Proxy) != 1 {
 		t.Fatal("original profile decoder did not accept the controlled age body", err)
 	}
-	request := sourceAcceptanceRequest{Action: "review", Key: "profile:40", Kind: "profile", Identity: inputHash([]byte("controlled encrypted profile")), Settings: inputHash(nil), Body: string(encrypted), Source: ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{"profile:40": 0}}}
+	request := sourceAcceptanceRequest{Action: "review", Key: "profile:40", Kind: "profile", Identity: inputHash([]byte("controlled encrypted profile")), Settings: inputHash(nil), Body: string(encrypted), Source: ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{"profile:40": requestTestSourceVersion(appRequests, "profile:40")}}}
 	first := sourceMaterialRPCOK(t, request)
 	request.Action, request.Candidate, request.Routing = "accept", first.Candidate, "source"
 	accepted := sourceMaterialRPCOK(t, request)

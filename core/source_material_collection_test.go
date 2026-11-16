@@ -75,7 +75,7 @@ func TestSourceMaterialRPCLeaseCanBeReleasedAfterItsSourceTicketExpires(t *testi
 	}
 	sourceRuntimeFixture(t)
 	appRequests.client, appRequests.clientReady = "material-client", true
-	request := sourceAcceptanceRequest{Action: "review", Key: "profile:8", Kind: "profile", Body: "mode: rule\n", Identity: inputHash([]byte("rpc source")), Settings: inputHash([]byte("settings")), Source: ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{"profile:8": 0}}}
+	request := sourceAcceptanceRequest{Action: "review", Key: "profile:8", Kind: "profile", Body: "mode: rule\n", Identity: inputHash([]byte("rpc source")), Settings: inputHash([]byte("settings")), Source: ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{"profile:8": requestTestSourceVersion(appRequests, "profile:8")}}}
 	rpc := func(request sourceAcceptanceRequest) sourceAcceptanceResult {
 		t.Helper()
 		data, _ := json.Marshal(request)
@@ -100,7 +100,7 @@ func TestSourceMaterialRPCLeaseCanBeReleasedAfterItsSourceTicketExpires(t *testi
 	collectSourceMaterialFixture(t)
 	sourceMaterialExists(t, result.MaterialHash, true)
 	appRequests.mu.Lock()
-	appRequests.sources["profile:8"]++
+	appRequests.sourceVersions.advance("profile:8", false)
 	appRequests.mu.Unlock()
 	released := rpc(sourceAcceptanceRequest{Action: "releaseMaterial", MaterialLease: result.MaterialLease, Source: request.Source})
 	if released.Status != "released" {

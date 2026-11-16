@@ -158,6 +158,7 @@ type preparedConfig struct {
 	scope               *requestscope.BusinessScope
 	stage               *providerStage
 	sources             map[string]uint64
+	sourcePins          func()
 	dataset             uint64
 	eligible            bool
 }
@@ -243,7 +244,7 @@ func sourceTicketValidLocked(ticket ConfigSourceTicket, keys []string) bool {
 	}
 	for _, key := range keys {
 		value, ok := ticket.Sources[key]
-		if !ok || value != appRequests.sources[key] {
+		if !ok || !appRequests.sourceVersions.matches(key, value) {
 			return false
 		}
 	}
@@ -374,6 +375,7 @@ func lockConfigInputRead() (string, error) {
 }
 
 func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
+	defer appRequests.flushCleanup()
 	if coreLifecycleUnavailable(receipt.Token) {
 		return ConfigApplyResult{Status: "blocked", Receipt: receipt, Message: errCoreLifecycleUnavailable.Error()}
 	}
@@ -438,9 +440,21 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	sources := make(map[string]uint64, len(manifest.Dependencies))
 	dataset := appRequests.dataset
 	for _, key := range manifest.Dependencies {
-		sources[key] = appRequests.sources[key]
+		sources[key] = appRequests.sourceVersionLocked(key)
+	}
+	var sourcePins func()
+	if valid {
+		sourcePins = appRequests.retainSourceSnapshotLocked(sources)
+		valid = sourcePins != nil
 	}
 	appRequests.mu.Unlock()
+	defer func() {
+		if sourcePins != nil {
+			appRequests.mu.Lock()
+			sourcePins()
+			appRequests.mu.Unlock()
+		}
+	}()
 	if !valid {
 		checkpointMu.Unlock()
 		selectMu.Unlock()
@@ -476,12 +490,17 @@ func prepareConfig(receipt ConfigReceipt) ConfigApplyResult {
 	appRequests.configToken = op.token
 	appRequests.mu.Unlock()
 	receipt.Owner = owner.ID
-	p := &preparedConfig{op: op, manifest: manifest, bytes: bytes, raw: raw, receipt: receipt, sources: sources, dataset: dataset, eligible: true}
+	p := &preparedConfig{op: op, manifest: manifest, bytes: bytes, raw: raw, receipt: receipt, sources: sources, dataset: dataset, eligible: true, sourcePins: sourcePins}
 	p.scope = requestscope.NewBusinessScope(receipt.Token, func() bool { return businessAllowed(p) })
 	p.inputVersion = manifest.Version
 	p.coreParams = ServiceCoreParams{MixedPort: raw.MixedPort, LocalReachable: !raw.AllowLan || raw.BindAddress == "*" || raw.BindAddress == "0.0.0.0" || raw.BindAddress == "127.0.0.1" || raw.BindAddress == "", AuthenticationRequired: len(config.ParseAuthentication(raw.Authentication)) != 0}
 	previousPrepared := pendingConfig
+	pendingConfig.releaseSourceVersions()
+	if appliedConfig != pendingConfig {
+		appliedConfig.releaseSourceVersions()
+	}
 	pendingConfig = p
+	sourcePins = nil
 	appliedConfig = nil
 	configFact = ConfigFact{RuntimeEpoch: configRuntimeEpoch, Version: configFactSequence.Add(1), Token: receipt.Token, Owner: owner.ID, InputID: receipt.InputID, YAMLSHA256: manifest.YAMLSHA256, ParsedSHA256: parsedSHA, ProfileID: manifest.ProfileID, ProfileName: manifest.ProfileName, Phase: "parsing", ReplayEligible: true}
 	configFact.MixedPort = raw.MixedPort
@@ -535,7 +554,7 @@ func pendingForReceipt(receipt ConfigReceipt) (*preparedConfig, error) {
 	appRequests.mu.Lock()
 	valid := isInit.Load() && appRequests.phase != "failed" && appRequests.phase != "retired" && appRequests.owner.ID == receipt.Owner && appRequests.dataset == p.dataset && operationRunValidLocked(p.op)
 	for key, revision := range p.sources {
-		if revision != appRequests.sources[key] {
+		if !appRequests.sourceVersions.matches(key, revision) {
 			valid = false
 		}
 	}
@@ -722,7 +741,7 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 		valid = valid && receipt.ServiceID != "" && receipt.ServiceID == state.ServiceID && state.Phase == "starting" && (receipt.ProtectGeneration == 0 && state.ProtectPhase == "none" || receipt.ProtectGeneration != 0 && receipt.ProtectGeneration == state.ProtectGeneration && state.ProtectPhase == "ready") && receipt.OptionsFingerprint != ""
 	}
 	for key, revision := range p.sources {
-		if revision != appRequests.sources[key] {
+		if !appRequests.sourceVersions.matches(key, revision) {
 			valid = false
 		}
 	}
@@ -836,6 +855,7 @@ func blockConfigLocked(p *preparedConfig, err error) ConfigApplyResult {
 	}
 	p.cfg, p.raw, p.bytes = nil, nil, nil
 	p.eligible = false
+	p.releaseSourceVersions()
 	if appliedConfig == p {
 		appliedConfig = nil
 	}

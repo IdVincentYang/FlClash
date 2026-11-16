@@ -38,6 +38,10 @@ func (r *appRequestRegistry) retireFrontendCommitsLocked() bool {
 		}
 		if !receipt.begun {
 			delete(r.commits, id)
+			if receipt.releaseVersions != nil {
+				receipt.releaseVersions()
+				receipt.releaseVersions = nil
+			}
 			_ = finishSourceMaterialCommit(receipt)
 			continue
 		}

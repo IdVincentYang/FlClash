@@ -86,8 +86,12 @@ func stageTestEnvironment(t *testing.T) bool {
 func stageInput(t *testing.T, port int, providers, groups string) ConfigReceipt {
 	t.Helper()
 	yaml := fmt.Sprintf("mixed-port: %d\nmode: rule\nfind-process-mode: off\ngeo-auto-update: false\nexternal-controller: ''\ndns: {enable: false}\nntp: {enable: false}\nprofile: {store-selected: false, store-fake-ip: false}\n%s\n%s\nrules: [\"MATCH,pick\"]\n", port, providers, groups)
-	input := writeLegacyTestInput(t, yaml)
-	registered := registerConfigOperation(methodCallSeq.Add(1), ConfigInputRequest{InputID: input, Active: true})
+	registered := func() ConfigReceipt {
+		configMu.Lock()
+		defer configMu.Unlock()
+		input := writeLegacyTestInput(t, yaml)
+		return registerConfigOperation(methodCallSeq.Add(1), ConfigInputRequest{InputID: input, Active: true})
+	}()
 	result := prepareConfig(registered)
 	if result.Status != "prepared" {
 		t.Fatal(result)
@@ -415,6 +419,7 @@ func TestProviderStageShutdownTimeoutKeepsInitialQuarantined(t *testing.T) {
 	t.Cleanup(unblock)
 	configMu.Lock()
 	work := pendingConfig.stage
+	prepared := pendingConfig
 	original := pendingConfig.cfg.Providers["source"].(*stagedProxyProvider).ProxySetProvider
 	original.SetAfterUpdate(func() { close(returning); <-allowReturn })
 	configMu.Unlock()
@@ -428,6 +433,12 @@ func TestProviderStageShutdownTimeoutKeepsInitialQuarantined(t *testing.T) {
 	stagedCore.Unlock()
 	if !isInit.Load() || handleInitClash(&InitParams{HomeDir: C.Path.HomeDir()}) {
 		t.Fatal("timed out Shutdown released Init")
+	}
+	configMu.Lock()
+	retainedVersions := !prepared.eligible || prepared.sourcePins != nil
+	configMu.Unlock()
+	if !retainedVersions {
+		t.Fatal("qualified configuration lost version ownership before physical shutdown")
 	}
 	if handleShutdown() {
 		t.Fatal("repeat Shutdown falsely completed")
@@ -444,6 +455,9 @@ func TestProviderStageShutdownTimeoutKeepsInitialQuarantined(t *testing.T) {
 	stageAwait(t, closing.done)
 	if isInit.Load() || !shutdownGuardedCore(methodCallSeq.Load()) {
 		t.Fatal("actual closure did not finish")
+	}
+	if prepared.sourcePins != nil {
+		t.Fatal("physical closure retained configuration version ownership")
 	}
 	if !handleInitClash(&InitParams{HomeDir: C.Path.HomeDir()}) {
 		t.Fatal("fresh Init could not recover")
@@ -584,7 +598,11 @@ func TestZeroTierDisabledRejectsConfigMaterials(t *testing.T) {
 			var legacy []byte
 			checkpoint := filepath.Join(inputDirectory(C.Path.HomeDir()), "checkpoint.json")
 			if kind == "checkpoint" {
-				legacy, _ = json.Marshal(configCheckpoint{Version: 1, InputID: receipt.InputID, Dependencies: []string{"profile:7", "script:9"}})
+				manifest, _, _, _, err := readConfigInput(C.Path.HomeDir(), receipt.InputID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				legacy, _ = json.Marshal(configCheckpoint{Version: 1, InputID: receipt.InputID, Dependencies: manifest.Dependencies})
 				if err := atomicConfigFile(checkpoint, legacy); err != nil {
 					t.Fatal(err)
 				}

@@ -53,32 +53,35 @@ type AppRequestState struct {
 }
 
 type appRequestRegistry struct {
-	mu              sync.Mutex
-	state           AppRequestState
-	owner           requestscope.Owner
-	phase           string
-	configToken     uint64
-	next            uint64
-	leases          map[string]*appRequestLease
-	latest          map[string]*appRequestLease
-	locks           map[string]chan struct{}
-	changed         chan struct{}
-	namespace       string
-	socketGate      func(string, AppRequestState, int) error
-	privateMu       sync.Mutex
-	privateListener net.Listener
-	privateConns    map[net.Conn]struct{}
-	routeBusy       int
-	pendingCleanups []func()
-	client          string
-	clientReady     bool
-	dataset         uint64
-	sources         map[string]uint64
-	operations      map[string]uint64
-	permits         map[string]requestscope.Spec
-	commits         map[string]*appRequestReceipt
-	dataReaders     map[string]struct{}
-	bootstrap       *bootstrapResource
+	mu                                sync.Mutex
+	state                             AppRequestState
+	owner                             requestscope.Owner
+	phase                             string
+	configToken                       uint64
+	next                              uint64
+	leases                            map[string]*appRequestLease
+	latest                            map[string]*appRequestLease
+	locks                             map[string]chan struct{}
+	changed                           chan struct{}
+	namespace                         string
+	socketGate                        func(string, AppRequestState, int) error
+	privateMu                         sync.Mutex
+	privateListener                   net.Listener
+	privateConns                      map[net.Conn]struct{}
+	routeBusy                         int
+	pendingCleanups                   []func()
+	client                            string
+	clientReady                       bool
+	dataset                           uint64
+	sources                           map[string]uint64
+	operations                        map[string]uint64
+	sourceVersions, operationVersions *requestVersions
+	versionsRevoked                   bool
+	completionHolds                   map[string]*appRequestCompletionHold
+	permits                           map[string]requestscope.Spec
+	commits                           map[string]*appRequestReceipt
+	dataReaders                       map[string]struct{}
+	bootstrap                         *bootstrapResource
 }
 
 type bootstrapResource struct {
@@ -94,6 +97,7 @@ type appRequestLease struct {
 	ctx                              context.Context
 	cancel                           context.CancelFunc
 	granted, closed                  bool
+	releaseVersions                  func()
 	closers                          map[io.Closer]struct{}
 	choiceMu                         sync.Mutex
 	fixedProxy                       C.Proxy
@@ -117,6 +121,7 @@ type appRequestReceipt struct {
 	datasetInvalidated bool
 	begun              bool
 	retired            bool
+	releaseVersions    func()
 }
 
 func (receipt *appRequestReceipt) Complete() {
@@ -124,6 +129,10 @@ func (receipt *appRequestReceipt) Complete() {
 		r := receipt.registry
 		r.mu.Lock()
 		delete(r.commits, receipt.id)
+		if receipt.releaseVersions != nil {
+			receipt.releaseVersions()
+			receipt.releaseVersions = nil
+		}
 		if receipt.retired {
 			receipt.retired = false
 			unknownRequestWriters.Add(-1)
@@ -147,8 +156,10 @@ func randomRequestToken() (string, error) {
 
 func newAppRequestRegistry() *appRequestRegistry {
 	namespace, _ := randomRequestToken()
-	return &appRequestRegistry{leases: map[string]*appRequestLease{}, latest: map[string]*appRequestLease{}, locks: map[string]chan struct{}{}, changed: make(chan struct{}), namespace: namespace,
-		sources: map[string]uint64{}, operations: map[string]uint64{}, permits: map[string]requestscope.Spec{}, commits: map[string]*appRequestReceipt{}}
+	r := &appRequestRegistry{leases: map[string]*appRequestLease{}, latest: map[string]*appRequestLease{}, locks: map[string]chan struct{}{}, changed: make(chan struct{}), namespace: namespace,
+		sources: map[string]uint64{}, operations: map[string]uint64{}, permits: map[string]requestscope.Spec{}, commits: map[string]*appRequestReceipt{}, completionHolds: map[string]*appRequestCompletionHold{}}
+	r.sourceVersions, r.operationVersions = newRequestVersions(r.sources), newRequestVersions(r.operations)
+	return r
 }
 
 func installAppRequests() {
@@ -177,10 +188,15 @@ func (r *appRequestRegistry) currentOwner() requestscope.Owner {
 }
 
 func (r *appRequestRegistry) invalidateLocked() []func() {
+	r.pruneCompletionHoldsLocked()
 	r.permits = map[string]requestscope.Spec{}
 	var cleanups []func()
 	for _, lease := range r.leases {
 		lease.closed = true
+		if lease.releaseVersions != nil {
+			lease.releaseVersions()
+			lease.releaseVersions = nil
+		}
 		cancel := lease.cancel
 		cleanups = append(cleanups, cancel)
 		for conn := range lease.closers {
@@ -283,7 +299,7 @@ func (r *appRequestRegistry) setPhase(owner requestscope.Owner, phase string) {
 }
 
 func (r *appRequestRegistry) allowedLocked(spec requestscope.Spec) bool {
-	if requestWriterError() != nil {
+	if r.versionsRevoked || requestWriterError() != nil {
 		return false
 	}
 	if r.configToken != 0 && r.phase != "ready" && spec.Owner == r.owner {
@@ -292,7 +308,7 @@ func (r *appRequestRegistry) allowedLocked(spec requestscope.Spec) bool {
 		}
 	}
 
-	if spec.Client != "" && (!r.clientReady || spec.Client != r.client || spec.Dataset != r.dataset || spec.SourceRevision != r.sources[spec.Key] || spec.Operation != r.operations[spec.Key]) {
+	if spec.Client != "" && (!r.clientReady || spec.Client != r.client || spec.Dataset != r.dataset || !r.sourceVersions.matches(spec.Key, spec.SourceRevision) || !r.operationVersions.matches(spec.Key, spec.Operation)) {
 		return false
 	}
 	if r.routeBusy > 0 || r.state.ProcessEpoch == "" || r.state.Reason == "exiting" || spec.Proxy == "DIRECT" && !directRequestAvailable(r.state) {
@@ -356,8 +372,12 @@ func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spe
 			return nil, requestscope.ErrCancelled
 		}
 		if spec.Operation == 0 {
-			r.operations[spec.Key]++
-			spec.Operation = r.operations[spec.Key]
+			spec.Operation = r.advanceOperationVersionLocked(spec.Key)
+			if spec.Operation == 0 {
+				r.mu.Unlock()
+				r.flushCleanup()
+				return nil, requestscope.ErrBlocked
+			}
 		}
 		if spec.Kind == "bootstrap" {
 			permit, ok := r.permits[spec.Permit]
@@ -383,9 +403,15 @@ func (r *appRequestRegistry) begin(parent context.Context, spec requestscope.Spe
 		key = "provider:" + spec.Key
 	}
 	if spec.Client == "" && (spec.Kind == "geo" || spec.Kind == "geo-batch") {
-		r.operations["internal:"+key]++
-		lease.spec.Operation = r.operations["internal:"+key]
+		lease.spec.Operation = r.advanceOperationVersionLocked("internal:" + key)
+		if lease.spec.Operation == 0 {
+			r.mu.Unlock()
+			cancel()
+			r.flushCleanup()
+			return nil, requestscope.ErrBlocked
+		}
 	}
+	lease.releaseVersions = r.retainSpecVersionsLocked(lease.spec)
 	previous := r.latest[key]
 	r.latest[key] = lease
 	r.leases[lease.id] = lease
@@ -469,7 +495,7 @@ func (r *appRequestRegistry) completionCurrentLocked(completion requestscope.Com
 	if strings.HasPrefix(spec.Kind, "provider") {
 		key = "provider:" + spec.Key
 	}
-	return spec.Operation != 0 && r.operations["internal:"+key] == spec.Operation
+	return r.operationVersions.matches("internal:"+key, spec.Operation)
 }
 
 func (l *appRequestLease) ProxyName() string { return l.spec.Proxy }
@@ -718,6 +744,7 @@ func (l *appRequestLease) GrantCommit() (requestscope.Receipt, error) {
 	receipt := &appRequestReceipt{registry: l.registry, id: l.id, client: l.spec.Client}
 	spec := l.spec
 	receipt.spec = &spec
+	receipt.releaseVersions = l.registry.retainSpecVersionsLocked(spec)
 	l.registry.commits[l.id] = receipt
 	return receipt, nil
 }
@@ -732,6 +759,10 @@ func (l *appRequestLease) prepareClose() func() {
 		return func() {}
 	}
 	l.closed = true
+	if l.releaseVersions != nil {
+		l.releaseVersions()
+		l.releaseVersions = nil
+	}
 	delete(r.leases, l.id)
 	key := l.spec.Kind + ":" + l.spec.Key
 	if strings.HasPrefix(l.spec.Kind, "provider") {
@@ -803,7 +834,7 @@ func (r *appRequestRegistry) inspect(params appRequestControl) any {
 		if r.commits[params.ID] != nil {
 			commits--
 		}
-		snapshot := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sources[params.Key], "operation": r.operations[params.Key], "commits": commits, "bootstrap": r.bootstrap, "policyVersion": configFact.PolicyVersion, "maintenanceProxy": configFact.MaintenanceProxy}
+		snapshot := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sourceVersionLocked(params.Key), "operation": r.operationVersionLocked(params.Key), "commits": commits, "bootstrap": r.bootstrap, "policyVersion": configFact.PolicyVersion, "maintenanceProxy": configFact.MaintenanceProxy}
 		r.mu.Unlock()
 		proxyConfigured := false
 		for _, proxy := range tunnel.AllProxies() {
@@ -928,12 +959,14 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		case "detach":
 			r.clientReady = false
 		case "invalidate":
-			r.sources[params.Key]++
+			r.advanceSourceVersionLocked(params.Key)
+			r.pruneCompletionHoldsLocked()
 			if providerStageEnabled {
 				r.changedLocked()
 			}
 		case "invalidateDataset":
 			r.dataset++
+			r.pruneCompletionHoldsLocked()
 			if receipt := r.commits[params.ID]; receipt != nil && receipt.client == params.Client {
 				receipt.datasetInvalidated = true
 			}
@@ -950,7 +983,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 				r.mu.Unlock()
 				return failure(err.Error())
 			}
-			if !r.clientReady || params.ExpectedState == nil || params.ExpectedState.Epoch != r.state.ProcessEpoch || params.ExpectedState.Revision != r.state.Revision || params.Dataset != r.dataset || params.SourceRevision != r.sources[params.Key] || params.URL == "" || len(r.permits) >= 32 {
+			if !r.clientReady || params.ExpectedState == nil || params.ExpectedState.Epoch != r.state.ProcessEpoch || params.ExpectedState.Revision != r.state.Revision || params.Dataset != r.dataset || !r.sourceVersions.matches(params.Key, params.SourceRevision) || params.URL == "" || len(r.permits) >= 32 {
 				r.mu.Unlock()
 				return failure("request_cancelled")
 			}
@@ -984,7 +1017,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		if r.commits[params.ID] != nil {
 			commits--
 		}
-		result := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sources[params.Key], "operation": r.operations[params.Key], "commits": commits, "bootstrap": r.bootstrap, "hasProxy": false, "policyVersion": 0, "maintenanceProxy": ""}
+		result := map[string]any{"state": r.state, "owner": r.owner.ID, "phase": r.phase, "dataset": r.dataset, "sourceRevision": r.sourceVersions.get(params.Key), "operation": r.operationVersions.get(params.Key), "commits": commits, "bootstrap": r.bootstrap, "hasProxy": false, "policyVersion": 0, "maintenanceProxy": ""}
 		r.mu.Unlock()
 		for _, lease := range old {
 			lease.Close()
@@ -1017,12 +1050,14 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 			}
 		}
 		r.mu.Lock()
-		if params.Client == "" || params.Client != r.client || !r.clientReady || params.Dataset != r.dataset || params.SourceRevision != r.sources[params.Key] || params.Owner != r.owner.ID {
+		if params.Client == "" || params.Client != r.client || !r.clientReady || params.Dataset != r.dataset || !r.sourceVersions.matches(params.Key, params.SourceRevision) || params.Owner != r.owner.ID {
 			r.mu.Unlock()
 			return failure("request_cancelled")
 		}
-		r.operations[params.Key]++
-		params.Operation = r.operations[params.Key]
+		params.Operation = r.advanceOperationVersionLocked(params.Key)
+		r.pruneCompletionHoldsLocked()
+		releaseBegin := r.retainSpecVersionsLocked(requestscope.Spec{Client: params.Client, Key: params.Key})
+		defer func() { r.mu.Lock(); releaseBegin(); r.mu.Unlock() }()
 		var old []*appRequestLease
 		for _, lease := range r.leases {
 			if lease.spec.Client == params.Client && lease.spec.Key == params.Key {
@@ -1033,6 +1068,7 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		for _, lease := range old {
 			lease.Close()
 		}
+		r.flushCleanup()
 		lease, err := r.begin(context.Background(), requestscope.Spec{Owner: requestscope.Owner{ID: params.Owner}, Kind: params.Kind, Trigger: params.Trigger, Key: params.Key, Proxy: params.Proxy, Mode: params.Mode, URL: params.URL, Client: params.Client, Dataset: params.Dataset, SourceRevision: params.SourceRevision, Operation: params.Operation, ExpectedState: params.ExpectedState, Permit: params.Permit})
 		if err != nil {
 			return failure("request_blocked")
@@ -1052,6 +1088,8 @@ func (r *appRequestRegistry) control(params appRequestControl) any {
 		l.user, l.password, l.originalUser = "flclash-request-"+r.namespace+"-"+l.id, password, params.User
 		r.mu.Unlock()
 		return map[string]any{"id": l.id, "user": l.user, "password": l.password, "owner": params.Owner, "endpoint": endpoint, "dataset": params.Dataset, "sourceRevision": params.SourceRevision, "operation": params.Operation}
+	case "retainCompletion", "releaseCompletion":
+		return r.controlCompletion(params)
 	case "lock":
 		id, err := randomRequestToken()
 		if err != nil {
@@ -1549,6 +1587,7 @@ func (r *appRequestRegistry) ownerActive(owner requestscope.Owner) bool {
 func (r *appRequestRegistry) detachFrontend() {
 	r.mu.Lock()
 	r.clientReady = false
+	r.pruneCompletionHoldsLocked()
 	uncertain := r.retireFrontendCommitsLocked()
 	var cleanups []func()
 	var leases []*appRequestLease
@@ -1571,4 +1610,8 @@ func (r *appRequestRegistry) detachFrontend() {
 	for _, lease := range leases {
 		lease.Close()
 	}
+	r.mu.Lock()
+	r.operationVersions.clearCold()
+	r.sourceVersions.clearCold()
+	r.mu.Unlock()
 }

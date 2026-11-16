@@ -147,6 +147,38 @@ void main() {
   });
 
   test(
+    'R08 real exit consumer bounds keys across configuration churn',
+    () async {
+      for (var i = 0; i < 4097; i++) {
+        final input = 'r08-input-$i';
+        (container.read(configStateProvider.notifier) as _Config).replace(
+          input,
+        );
+        final target = ConnectionExitTarget('A', '8.8.8.8', input, 'id-a');
+        cache.time += const Duration(seconds: 31);
+        cache.watch(target, automatic: false);
+        expect(cache.refresh(target), ExitRefreshResult.accepted);
+        for (var wait = 0; wait < 1000; wait++) {
+          if (calls.length == i + 1 &&
+              container.read(connectionExitsProvider)[target]?.busy == false) {
+            break;
+          }
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(calls.length, i + 1);
+        expect(
+          container.read(connectionExitsProvider)[target]?.phase,
+          ProbePhase.fresh,
+        );
+        cache.unwatch(target, automatic: false);
+        expect(client.retainedKeyCounts.total, lessThanOrEqualTo(4096));
+      }
+      expect(client.retainedKeyCounts.total, client.retainedKeyCounts.cold);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test(
     'deduplicates visible apps and reuses the same node and entry cache',
     () async {
       cache.watch(a, automatic: true);

@@ -188,12 +188,14 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
   DateTime? _startTime;
   int _setupSequence = 0;
   int _setupGeneration = 0;
+  RequestCompletion? _pendingProfileCompletion;
 
   bool get _isRunning => _startTime != null && _startTime!.isBeforeNow;
 
   @override
   void build() {
     ref.onDispose(_stopRuntimeTicker);
+    ref.onDispose(_discardPendingProfileCompletion);
     if (_isAndroid) {
       ref.listen(nativeRequestStateProvider, (_, next) {
         if (next['phase'] != 'started') {
@@ -246,6 +248,7 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     if (!running) {
       _startTime = null;
       debouncer.cancel(FunctionTag.applyProfile);
+      _discardPendingProfileCompletion();
       _updateRunTime();
       return;
     }
@@ -684,26 +687,53 @@ class SetupAction extends _$SetupAction with _PolicyMaterialSetup {
     });
   }
 
+  void _discardPendingProfileCompletion() {
+    final pending = _pendingProfileCompletion;
+    _pendingProfileCompletion = null;
+    if (pending != null) {
+      unawaited(
+        pending.close().catchError((Object error) {
+          commonPrint.log('Completion cleanup failed: ${compactError(error)}');
+        }),
+      );
+    }
+  }
+
   void applyProfileDebounce({
     bool silence = false,
     bool force = false,
     bool allowSourceReview = false,
     Future<bool> Function()? isCurrent,
+    RequestCompletion? completion,
   }) {
+    _discardPendingProfileCompletion();
+    _pendingProfileCompletion = completion;
     debouncer.call(FunctionTag.applyProfile, () async {
-      if (isCurrent == null) {
-        await applyProfile(
-          silence: silence,
-          force: force,
-          allowSourceReview: allowSourceReview,
-        );
-      } else {
-        await _runSetup(
-          silence: silence,
-          force: force,
-          isCurrent: isCurrent,
-          allowSourceReview: allowSourceReview,
-        );
+      if (identical(_pendingProfileCompletion, completion)) {
+        _pendingProfileCompletion = null;
+      }
+      try {
+        if (!ref.mounted) return;
+        if (isCurrent == null && completion == null) {
+          await applyProfile(
+            silence: silence,
+            force: force,
+            allowSourceReview: allowSourceReview,
+          );
+        } else {
+          await _runSetup(
+            silence: silence,
+            force: force,
+            isCurrent: () async =>
+                ref.mounted &&
+                (completion == null || await completion.isCurrent()) &&
+                ref.mounted &&
+                (isCurrent == null || await isCurrent()),
+            allowSourceReview: allowSourceReview,
+          );
+        }
+      } finally {
+        await completion?.close();
       }
     });
   }

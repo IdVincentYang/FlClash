@@ -108,6 +108,9 @@ func TestAppRequestDataReadExcludesNewFrontendGrant(t *testing.T) {
 	r, lease := appRequestFixture(t)
 	lease.spec.Client = "synthetic-client"
 	r.client, r.clientReady = lease.spec.Client, true
+	lease.spec.SourceRevision = requestTestSourceVersion(r, lease.spec.Key)
+	lease.spec.Operation = requestTestOperationVersion(r, lease.spec.Key)
+	lease.releaseVersions = r.retainSpecVersionsLocked(lease.spec)
 	id, err := r.beginDataRead(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -388,7 +391,7 @@ func TestAppRequestFrontendGenerationsAndReceiptDrain(t *testing.T) {
 	r, _ := appRequestFixture(t)
 	client := r.control(appRequestControl{Action: "attach"}).(map[string]any)["client"].(string)
 	r.control(appRequestControl{Action: "ready", Client: client})
-	params := appRequestControl{Action: "begin", Client: client, Dataset: r.dataset, Key: "profile:synthetic", Kind: "maintenance", Trigger: "manual", Mode: "direct", Proxy: "DIRECT", ExpectedState: &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}}
+	params := appRequestControl{Action: "begin", Client: client, Dataset: r.dataset, Key: "profile:synthetic", SourceRevision: requestTestSourceVersion(r, "profile:synthetic"), Kind: "maintenance", Trigger: "manual", Mode: "direct", Proxy: "DIRECT", ExpectedState: &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}}
 	first := r.control(params).(map[string]any)
 	id := first["id"].(string)
 	lease := r.leases[id]
@@ -429,7 +432,7 @@ func TestAppRequestBootstrapPermitIsSingleUseAndVersionBound(t *testing.T) {
 	client := r.control(appRequestControl{Action: "attach"}).(map[string]any)["client"].(string)
 	r.control(appRequestControl{Action: "ready", Client: client})
 	version := &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}
-	params := appRequestControl{Action: "permit", Client: client, Dataset: r.dataset, Key: "geo:MMDB", URL: "http://127.0.0.1:1234/synthetic", ExpectedState: version}
+	params := appRequestControl{Action: "permit", Client: client, Dataset: r.dataset, Key: "geo:MMDB", SourceRevision: requestTestSourceVersion(r, "geo:MMDB"), URL: "http://127.0.0.1:1234/synthetic", ExpectedState: version}
 	permit := r.control(params).(map[string]string)["permit"]
 	params.Action, params.Kind, params.Trigger, params.Mode, params.Proxy, params.Permit = "begin", "bootstrap", "manual", "direct", "DIRECT", permit
 	created := r.control(params).(map[string]any)
@@ -464,7 +467,7 @@ func TestAppRequestProviderRecoveryPermitKeepsExactURLAndLatestState(t *testing.
 			state.Phase, state.Reason, state.IntentRunning = phase, "setupFailed", phase == "preparing"
 			state.Revision++
 			r.publish(state)
-			params := appRequestControl{Action: "permit", Client: client, Dataset: r.dataset, Key: "provider-proxy:recovery", URL: "http://127.0.0.1:1234/nodes?revision=1", ExpectedState: &requestscope.StateVersion{Epoch: state.ProcessEpoch, Revision: state.Revision}}
+			params := appRequestControl{Action: "permit", Client: client, Dataset: r.dataset, Key: "provider-proxy:recovery", SourceRevision: requestTestSourceVersion(r, "provider-proxy:recovery"), URL: "http://127.0.0.1:1234/nodes?revision=1", ExpectedState: &requestscope.StateVersion{Epoch: state.ProcessEpoch, Revision: state.Revision}}
 			permit, ok := r.control(params).(map[string]string)
 			if !ok || permit["permit"] == "" {
 				t.Fatal(permit)

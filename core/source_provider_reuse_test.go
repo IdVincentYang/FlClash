@@ -47,7 +47,7 @@ func TestSourceProviderReuseBeforeStartNeedsAcceptedCheckpoint(t *testing.T) {
 	appRequests.client, appRequests.clientReady = "reuse-client", true
 	appRequests.state.Phase = "preparing"
 	appRequests.mu.Unlock()
-	request := sourceAcceptanceRequest{Action: "reuseProvider", Key: plan.Key, Kind: plan.Kind, ProviderName: plan.Name, Use: &root, MaterialHash: inputHash([]byte(yaml)), Source: ConfigSourceTicket{Client: "reuse-client", Dataset: appRequests.dataset, Sources: map[string]uint64{plan.Key: appRequests.sources[plan.Key]}}}
+	request := sourceAcceptanceRequest{Action: "reuseProvider", Key: plan.Key, Kind: plan.Kind, ProviderName: plan.Name, Use: &root, MaterialHash: inputHash([]byte(yaml)), Source: ConfigSourceTicket{Client: "reuse-client", Dataset: appRequests.dataset, Sources: map[string]uint64{plan.Key: requestTestSourceVersion(appRequests, plan.Key)}}}
 	invoke := func(request sourceAcceptanceRequest) (sourceAcceptanceResult, *MethodError) {
 		t.Helper()
 		data, _ := json.Marshal(request)
@@ -228,7 +228,7 @@ func TestSourceProviderCacheSurvivesConfigInvalidationAndFrontendRestart(t *test
 	appRequests.clientReady = true
 	appRequests.mu.Unlock()
 	request := sourceAcceptanceRequest{Action: "reuseCachedProvider", Key: plan.Key, Kind: plan.Kind, ProviderName: plan.Name, Use: &root, MaterialHash: manifest.YAMLSHA256,
-		Source: ConfigSourceTicket{Client: "new-frontend", Dataset: appRequests.dataset, Sources: map[string]uint64{plan.Key: appRequests.sources[plan.Key]}}}
+		Source: ConfigSourceTicket{Client: "new-frontend", Dataset: appRequests.dataset, Sources: map[string]uint64{plan.Key: requestTestSourceVersion(appRequests, plan.Key)}}}
 	t.Run("cache bytes do not require replaying the previous configuration", func(t *testing.T) {
 		checkpoint := filepath.Join(inputDirectory(home), "checkpoint.json")
 		savedCheckpoint, err := os.ReadFile(checkpoint)
@@ -327,7 +327,7 @@ func TestSourceProviderBatchCacheValidatesCurrentScopeOnce(t *testing.T) {
 	}
 	appRequests.client, appRequests.clientReady = "batch-client", true
 	req := sourceAcceptanceRequest{Action: "reuseCachedProviders", Key: root.Key, Kind: "config", Use: &root, MaterialHash: appliedConfig.manifest.YAMLSHA256,
-		Source: ConfigSourceTicket{Client: "batch-client", Dataset: appRequests.dataset, Sources: map[string]uint64{"application-config": 0}}}
+		Source: ConfigSourceTicket{Client: "batch-client", Dataset: appRequests.dataset, Sources: map[string]uint64{"application-config": requestTestSourceVersion(appRequests, "application-config")}}}
 	before, _ := os.ReadFile(sourcePermissionsPath(home))
 	result, err := reuseCachedSourceProviders(home, req)
 	if err != nil || result.Status != "accepted" || len(result.ProviderMaterials) != 1 || len(result.MaterialLeases) != 1 || result.BodyBase64 != "" {

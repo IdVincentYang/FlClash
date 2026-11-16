@@ -181,7 +181,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun requestControl(call: MethodCall, result: MethodChannel.Result) {
         val data = call.arguments as? String ?: return result.error("INVALID_ARGUMENT", "Missing request control", null)
         val action = runCatching { JsonParser.parseString(data).asJsonObject.get("action").asString }.getOrNull()
-        if (action !in setOf("begin", "cancel", "check", "grant", "attach", "ready", "inspect", "permit", "invalidate", "invalidateDataset", "lock", "beginCommit", "markRecovery", "clearRecovery", "complete", "detach")) {
+        if (action !in setOf("begin", "cancel", "check", "grant", "attach", "ready", "inspect", "permit", "invalidate", "invalidateDataset", "lock", "beginCommit", "markRecovery", "clearRecovery", "complete", "detach", "retainCompletion", "releaseCompletion")) {
             result.error("INVALID_ARGUMENT", "Invalid request control", null)
             return
         }

@@ -166,6 +166,11 @@ class _Scripts extends ScriptsAction {
 class _BridgeCore extends CoreHandlerInterface {
   _BridgeCore(this.bridge);
   final PolicyCoreBridge bridge;
+  @override
+  Future<bool> stopListener() async =>
+      (await bridge.call('stop'))['stopped'] == true;
+  @override
+  void resetTraffic() {}
   final calls = <CoreMethod>[];
   final sourceReviews = <Map<String, Object?>>[];
   Map<String, Object?>? pendingReviewInput;
@@ -2310,6 +2315,268 @@ void main() {
     },
     skip: executable == null,
   );
+
+  Future<Script> completionScriptFixture() async {
+    await initEditorNative();
+    when(
+      () => native.prepareRunIntent(
+        running: false,
+        source: any(named: 'source'),
+        paused: any(named: 'paused'),
+      ),
+    ).thenAnswer((_) async => 3);
+    final script = Script(
+      id: 91,
+      label: 'controlled continuation',
+      url: 'http://127.0.0.1:${server.port}/script-r08',
+      requestMode: RequestMode.direct,
+      lastUpdateTime: DateTime(2026),
+    );
+    await store.scriptsDao.setAll([script]);
+    await script.save('function main(config) { return config; }');
+    await put([
+      profile(1).copyWith(overwriteType: OverwriteType.script, scriptId: 91),
+      profile(2),
+    ]);
+    expect(
+      await setup.applyProfile(force: true, allowSourceReview: true),
+      true,
+    );
+    await bridge.call('refreshRunning');
+    expect(
+      await setup.setRunning(true, initialize: true, preparedRequestId: 2),
+      true,
+    );
+    responses['/script-r08'] =
+        'function main(config) { const revision = 2; return config; }';
+    return script;
+  }
+
+  for (final exit in [
+    'stop',
+    'replace',
+    'dispose',
+    'profile',
+    'unused',
+    'save failure',
+    'unsupported core',
+    'running replacement',
+    'running disposal',
+  ]) {
+    test(
+      'R08 real script completion releases on $exit',
+      () async {
+        final script = await completionScriptFixture();
+        final scripts = container.read(scriptsActionProvider.notifier);
+        final before = await File(await script.path).readAsString();
+        if (exit == 'unused') {
+          container.read(currentProfileIdProvider.notifier).value = 2;
+        }
+        if (exit == 'save failure') {
+          await store.customStatement(
+            "CREATE TRIGGER fail_r08 BEFORE UPDATE ON scripts BEGIN SELECT RAISE(ABORT, 'controlled DB failure'); END",
+          );
+        }
+        if (exit == 'unsupported core') {
+          when(() => native.requestControl(any())).thenAnswer((call) async {
+            final command = Map<String, Object?>.from(
+              call.positionalArguments.single as Map,
+            );
+            controls.add(command);
+            if (command['action'] == 'retainCompletion') return {};
+            return bridge.call('control', command);
+          });
+        }
+        if (exit == 'save failure' || exit == 'unsupported core') {
+          await expectLater(
+            scripts.updateScript(script),
+            throwsA(isA<RequestUnavailable>()),
+          );
+          expect(await File(await script.path).readAsString(), before);
+          if (exit == 'unsupported core') {
+            expect(controls.where((c) => c['action'] == 'grant'), isEmpty);
+          }
+        } else {
+          await scripts.updateScript(script);
+          if (exit != 'unused') {
+            expect((await bridge.call('requestKeyStats'))['holds'], 1);
+          }
+          if (exit.startsWith('running ')) {
+            final entered = Completer<void>(), gate = Completer<void>();
+            when(() => native.requestControl(any())).thenAnswer((call) async {
+              final command = Map<String, Object?>.from(
+                call.positionalArguments.single as Map,
+              );
+              controls.add(command);
+              if (command['action'] == 'inspect' &&
+                  command['key'] == 'script:91' &&
+                  !entered.isCompleted) {
+                entered.complete();
+                await gate.future;
+              }
+              return bridge.call('control', command);
+            });
+            debouncer.flush(FunctionTag.applyProfile);
+            await entered.future.timeout(const Duration(seconds: 5));
+            try {
+              if (exit == 'running replacement') {
+                await scripts.updateScript(script);
+                expect((await bridge.call('requestKeyStats'))['holds'], 1);
+              } else {
+                container.dispose();
+                containerDisposed = true;
+              }
+            } finally {
+              gate.complete();
+            }
+            await until(
+              () async =>
+                  controls.any((c) => c['action'] == 'releaseCompletion'),
+            );
+            if (exit == 'running replacement') {
+              expect((await bridge.call('requestKeyStats'))['holds'], 1);
+              await setup.setRunning(false);
+            }
+          } else if (exit == 'stop') {
+            await setup.setRunning(false);
+          } else if (exit == 'replace') {
+            setup.applyProfileDebounce();
+          } else if (exit == 'dispose') {
+            container.dispose();
+            containerDisposed = true;
+          } else if (exit == 'profile') {
+            container.read(currentProfileIdProvider.notifier).value = 2;
+            debouncer.flush(FunctionTag.applyProfile);
+          }
+        }
+        await until(
+          () async => (await bridge.call('requestKeyStats'))['holds'] == 0,
+        );
+        if (exit != 'unsupported core') {
+          expect(
+            controls.where((c) => c['action'] == 'releaseCompletion'),
+            isNotEmpty,
+          );
+        }
+      },
+      skip: executable == null,
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+  }
+
+  for (final superseded in [false, true]) {
+    test(
+      'R08 script completion survives key pressure and rejects superseded=$superseded',
+      () async {
+        await initEditorNative();
+        final evaluator = scriptEvaluator;
+        final evaluations = <String>[];
+        scriptEvaluator =
+            ({required String script, required String config}) async {
+              evaluations.add(script);
+              return evaluator(script: script, config: config);
+            };
+        addTearDown(() => scriptEvaluator = evaluator);
+        const oldBody = 'function main(config) { return config; }';
+        const nextBody =
+            'function main(config) { const revision = 2; return config; }';
+        final script = Script(
+          id: 91,
+          label: 'controlled network script',
+          url: 'http://127.0.0.1:${server.port}/script-r08',
+          requestMode: RequestMode.direct,
+          lastUpdateTime: DateTime(2026),
+        );
+        await store.scriptsDao.setAll([script]);
+        await script.save(oldBody);
+        await put([
+          profile(
+            1,
+          ).copyWith(overwriteType: OverwriteType.script, scriptId: script.id),
+        ]);
+        expect(
+          await setup.applyProfile(force: true, allowSourceReview: true),
+          true,
+          reason: '${core.sourceReviews}',
+        );
+        await bridge.call('refreshRunning');
+        expect(
+          await setup.setRunning(true, initialize: true, preparedRequestId: 2),
+          true,
+        );
+        responses['/script-r08'] = nextBody;
+        final entered = Completer<void>();
+        final gate = Completer<void>();
+        var intercept = false;
+        when(() => native.requestControl(any())).thenAnswer((call) async {
+          final command = Map<String, Object?>.from(
+            call.positionalArguments.single as Map,
+          );
+          controls.add(command);
+          if (intercept &&
+              command['action'] == 'inspect' &&
+              command['key'] == 'script:91' &&
+              !entered.isCompleted) {
+            entered.complete();
+            await gate.future;
+          }
+          return bridge.call('control', command);
+        });
+        final scripts = container.read(scriptsActionProvider.notifier);
+        await scripts.updateScript(script);
+        expect(await File(await script.path).readAsString(), nextBody);
+        final pending = await bridge.call('requestKeyStats');
+        expect(pending['holds'], 1);
+        expect(pending['leases'], 0);
+        expect(pending['commits'], 0);
+        evaluations.clear();
+        intercept = true;
+        final before = await bridge.call('fact');
+        try {
+          await entered.future.timeout(const Duration(seconds: 5));
+          await bridge.call('requestKeyChurn', 8192);
+          final pressure = await bridge.call('requestKeyStats');
+          expect(pressure['holds'], 1);
+          expect(pressure['operationCold'], lessThanOrEqualTo(4096));
+          expect(pressure['sourceCold'], lessThanOrEqualTo(4096));
+          expect(pressure['sources'], pressure['sourceEntries']);
+          expect(pressure['operations'], pressure['operationEntries']);
+          if (superseded) {
+            final next = await client.begin(
+              key: 'script:91',
+              url: script.url!,
+              mode: RequestMode.direct,
+            );
+            next.close();
+          }
+        } finally {
+          gate.complete();
+        }
+        await until(
+          () async =>
+              controls.any(
+                (command) => command['action'] == 'releaseCompletion',
+              ) &&
+              (await bridge.call('requestKeyStats'))['holds'] == 0,
+          evidence: () => core.sourceReviews,
+        );
+        if (superseded) {
+          expect(evaluations, isEmpty);
+          expect((await bridge.call('fact'))['inputId'], before['inputId']);
+        } else {
+          expect(evaluations, contains(nextBody));
+          expect((await bridge.call('fact'))['phase'], 'ready');
+          expect(
+            (await bridge.call('fact'))['inputId'],
+            isNot(before['inputId']),
+            reason: '${core.sourceReviews}',
+          );
+        }
+      },
+      skip: executable == null,
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+  }
 
   test(
     'R3 local Script save publishes exact code and DB failure keeps the old code',

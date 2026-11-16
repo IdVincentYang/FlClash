@@ -37,7 +37,7 @@ func sourceLocalApprovalFixture(t *testing.T, routing string) (sourceAcceptanceR
 	t.Helper()
 	sourceRuntimeFixture(t)
 	appRequests.client, appRequests.clientReady = "material-commit-client", true
-	request := sourceAcceptanceRequest{Action: "review", Key: "profile:10", Kind: "profile", Identity: inputHash([]byte("original source")), Settings: inputHash(nil), Body: "mode: rule\nrules: [\"MATCH,DIRECT\"]\n", Source: ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{"profile:10": 0}}}
+	request := sourceAcceptanceRequest{Action: "review", Key: "profile:10", Kind: "profile", Identity: inputHash([]byte("original source")), Settings: inputHash(nil), Body: "mode: rule\nrules: [\"MATCH,DIRECT\"]\n", Source: ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{"profile:10": requestTestSourceVersion(appRequests, "profile:10")}}}
 	first := sourceMaterialRPCOK(t, request)
 	request.Action, request.Candidate, request.Routing = "accept", first.Candidate, "source"
 	accepted := sourceMaterialRPCOK(t, request)
@@ -47,7 +47,7 @@ func sourceLocalApprovalFixture(t *testing.T, routing string) (sourceAcceptanceR
 	request.Action, request.Candidate, request.Routing = "review", "", routing
 	request.MaterialOperation, request.Fresh = "local", routing == "source"
 	request.ExpectedState = &requestscope.StateVersion{Epoch: appRequests.state.ProcessEpoch, Revision: appRequests.state.Revision}
-	request.Owner, request.Operation = appRequests.owner.ID, appRequests.operations[request.Key]
+	request.Owner, request.Operation = appRequests.owner.ID, requestTestOperationVersion(appRequests, request.Key)
 	first = sourceMaterialRPCOK(t, request)
 	if first.Status != "reviewRequired" {
 		t.Fatal("fresh/routing material unexpectedly reused formal permission", first)
@@ -149,7 +149,7 @@ func TestSourceIncompleteMaterialReceiptTerminatesAndRecoversWithoutPromotingApp
 	if result, ok := ready.(map[string]bool); ok && result["ready"] == false {
 		t.Fatal("ended receipt blocked the new frontend", ready)
 	}
-	recovery := sourceAcceptanceRequest{Action: "inspectMaterialRecovery", Key: "application-config", Kind: "config", Source: ConfigSourceTicket{Client: client, Dataset: appRequests.dataset, Sources: map[string]uint64{"application-config": appRequests.sources["application-config"]}}, Recovery: &sourceRecoverySnapshot{Rows: []sourceRecoveryRow{{Key: previous.Key, Identity: request.Identity}}}}
+	recovery := sourceAcceptanceRequest{Action: "inspectMaterialRecovery", Key: "application-config", Kind: "config", Source: ConfigSourceTicket{Client: client, Dataset: appRequests.dataset, Sources: map[string]uint64{"application-config": requestTestSourceVersion(appRequests, "application-config")}}, Recovery: &sourceRecoverySnapshot{Rows: []sourceRecoveryRow{{Key: previous.Key, Identity: request.Identity}}}}
 	snapshot := sourceMaterialRPCOK(t, recovery)
 	if snapshot.Recovery == nil {
 		t.Fatal(snapshot)

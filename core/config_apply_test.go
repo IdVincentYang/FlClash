@@ -786,6 +786,7 @@ func TestConfigCheckpointRevokeOrderingAndHotSnapshot(t *testing.T) {
 			appRequests.clientReady = true
 			appRequests.mu.Unlock()
 			owner := appRequests.currentOwner()
+			priorSource := appliedConfig.sources["script:9"]
 			epoch, picks := routeStamp()
 			configMu.Lock()
 			candidate, err := prepareCheckpointCandidate(nil, nil)
@@ -827,7 +828,7 @@ func TestConfigCheckpointRevokeOrderingAndHotSnapshot(t *testing.T) {
 			if err = updateConfig(&UpdateParams{Mode: &mode}); err != nil {
 				t.Fatal(err)
 			}
-			if appliedConfig.eligible || appliedConfig.sources["script:9"] != 0 {
+			if appliedConfig.eligible || appliedConfig.sources["script:9"] != priorSource {
 				t.Fatal("hot update recaptured source permission")
 			}
 			if _, err = replayConfigInput(&InitParams{HomeDir: C.Path.HomeDir()}); err == nil {

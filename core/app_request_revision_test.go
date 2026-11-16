@@ -86,6 +86,8 @@ func TestAppRequestDartSpec(t *testing.T) {
 	r.owner = requestscope.Owner{ID: input.Params.Owner}
 	r.phase = "ready"
 	r.client, r.clientReady, r.dataset = input.Params.Client, true, input.Params.Dataset
+	r.sourceVersions.ensure(input.Params.Key)
+	r.operationVersions.ensure(input.Params.Key)
 	result := r.control(input.Params)
 	if failure, ok := result.(map[string]string); ok {
 		t.Fatal(failure)

@@ -63,7 +63,7 @@ func sourceInlineTestRequest(t *testing.T, id string) ConfigInputRequest {
 	appRequests.mu.Lock()
 	source := ConfigSourceTicket{Client: appRequests.client, Dataset: appRequests.dataset, Sources: map[string]uint64{}}
 	for _, key := range manifest.Dependencies {
-		source.Sources[key] = appRequests.sources[key]
+		source.Sources[key] = appRequests.sourceVersionLocked(key)
 	}
 	state := appRequests.state
 	appRequests.mu.Unlock()

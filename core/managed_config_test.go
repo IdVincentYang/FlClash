@@ -340,7 +340,7 @@ func TestManagedMaintenanceInspectionKeepsDefaultAndOwnerTogether(t *testing.T) 
 	}
 	begin := func(snapshot map[string]any) any {
 		state := snapshot["state"].(AppRequestState)
-		return r.control(appRequestControl{Action: "begin", Client: "inspection-client", Owner: snapshot["owner"].(uint64), Dataset: snapshot["dataset"].(uint64), Kind: "maintenance", Trigger: "manual", Key: "coherent-inspection", Mode: "proxy", Proxy: snapshot["maintenanceProxy"].(string), URL: "http://maintenance.test/", ExpectedState: &requestscope.StateVersion{Epoch: state.ProcessEpoch, Revision: state.Revision}})
+		return r.control(appRequestControl{Action: "begin", Client: "inspection-client", Owner: snapshot["owner"].(uint64), Dataset: snapshot["dataset"].(uint64), Kind: "maintenance", Trigger: "manual", Key: "coherent-inspection", SourceRevision: snapshot["sourceRevision"].(uint64), Mode: "proxy", Proxy: snapshot["maintenanceProxy"].(string), URL: "http://maintenance.test/", ExpectedState: &requestscope.StateVersion{Epoch: state.ProcessEpoch, Revision: state.Revision}})
 	}
 	if result := begin(old); result.(map[string]string)["error"] != "managed_maintenance_target_required" {
 		t.Fatal("old inspection acquired the new owner", result)
@@ -384,7 +384,7 @@ func TestManagedMaintenanceDefaultIsExplicitAndOwnerBound(t *testing.T) {
 	requestscope.ProxyHook = r.bindProxy
 	t.Cleanup(func() { requestscope.ProxyHook = previousHook; r.closePrivate() })
 	begin := func(target string, owner uint64) any {
-		return r.control(appRequestControl{Action: "begin", Client: r.client, Owner: owner, Dataset: r.dataset, Kind: "maintenance", Trigger: "manual", Key: "managed-maintenance", Mode: "proxy", Proxy: target, URL: "http://maintenance.test/", ExpectedState: &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}})
+		return r.control(appRequestControl{Action: "begin", Client: r.client, Owner: owner, Dataset: r.dataset, Kind: "maintenance", Trigger: "manual", Key: "managed-maintenance", SourceRevision: requestTestSourceVersion(r, "managed-maintenance"), Mode: "proxy", Proxy: target, URL: "http://maintenance.test/", ExpectedState: &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}})
 	}
 	if result := begin("GLOBAL", configFact.Owner); result.(map[string]string)["error"] != "managed_maintenance_target_required" {
 		t.Fatal(result)

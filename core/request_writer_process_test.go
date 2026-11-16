@@ -71,7 +71,7 @@ func TestSourceUnknownWriterProcessExitRetainsRecoveryBarrier(t *testing.T) {
 	if _, err := beginRequestDataRead(); err == nil {
 		t.Fatal("new process silently trusted retained save")
 	}
-	request := sourceAcceptanceRequest{Action: "inspectMaterialRecovery", Key: "application-config", Kind: "config", Source: ConfigSourceTicket{Client: r.client, Dataset: r.dataset, Sources: map[string]uint64{"application-config": 0}}, Recovery: &sourceRecoverySnapshot{Rows: []sourceRecoveryRow{{Key: "profile:10", Identity: inputHash([]byte("synthetic DB identity"))}}}}
+	request := sourceAcceptanceRequest{Action: "inspectMaterialRecovery", Key: "application-config", Kind: "config", Source: ConfigSourceTicket{Client: r.client, Dataset: r.dataset, Sources: map[string]uint64{"application-config": requestTestSourceVersion(r, "application-config")}}, Recovery: &sourceRecoverySnapshot{Rows: []sourceRecoveryRow{{Key: "profile:10", Identity: inputHash([]byte("synthetic DB identity"))}}}}
 	result, err := recoverSourceMaterialCommit(home, request)
 	if err != nil || result.Recovery == nil || len(result.Recovery.Rows) != 1 || result.Recovery.Rows[0].FileHash == "" || result.Recovery.Rows[0].Permission != "" {
 		t.Fatal("actual file was not checked independently of permission", result, err)

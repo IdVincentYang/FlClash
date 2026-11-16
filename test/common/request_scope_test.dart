@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/request_versions.dart';
 import 'package:fl_clash/common/dav_client.dart';
 import 'package:fl_clash/common/ip_lookup.dart';
 import 'package:drift/native.dart';
@@ -46,6 +47,7 @@ class _Native implements Service {
   var valid = true;
   var dataset = 1;
   final sources = <String, int>{};
+  final operations = <String, int>{};
   Map<String, Object?> get snapshot => {
     'processEpoch': epoch,
     'revision': revision,
@@ -94,6 +96,14 @@ class _Native implements Service {
   @override
   Future<Map<String, Object?>> requestControl(Map<String, Object?> data) async {
     calls.add(Map.of(data));
+    final key = data['key'] as String?;
+    if (data['action'] == 'inspect' && key != null) {
+      sources.putIfAbsent(key, () => 2);
+      operations.putIfAbsent(key, () => 2);
+    }
+    if (data['action'] == 'begin' && key != null) {
+      operations[key] = (operations[key] ?? 2) + 1;
+    }
     if (data['action'] == 'invalidateDataset') dataset++;
     if (data['action'] == 'invalidate') {
       final key = data['key']! as String;
@@ -122,6 +132,7 @@ class _Native implements Service {
         'phase': corePhase,
         'dataset': dataset,
         'sourceRevision': sources[data['key']] ?? 0,
+        'operation': operations[data['key']] ?? 0,
         'commits': 0,
         'hasProxy': hasProxy,
       },
@@ -132,13 +143,14 @@ class _Native implements Service {
                 'id': 'scope-${calls.length}',
                 'owner': 1,
                 'dataset': 1,
-                'sourceRevision': 0,
-                'operation': 1,
+                'sourceRevision': sources[key],
+                'operation': operations[key],
                 'user': 'scoped',
                 'password': 'synthetic',
                 'endpoint': endpoint,
               },
       'lock' => {'id': 'local-${calls.length}'},
+      'retainCompletion' => {'id': 'completion-${calls.length}'},
       'permit' => {'permit': 'synthetic-permit'},
       'check' || 'grant' => {'ok': valid},
       _ => {'ok': true},
@@ -362,6 +374,19 @@ void main() {
     await proxy.close();
     container.dispose();
     await database.close();
+  });
+
+  test('completion successor cannot cross the wire version limit', () async {
+    native.sources['script:limit'] = requestVersionLimit;
+    final session = await client.begin(
+      key: 'script:limit',
+      url: 'http://127.0.0.1/',
+      mode: RequestMode.direct,
+    );
+    native.calls.clear();
+    expect(await session.lifecycleCurrent(sourceInvalidated: true), isFalse);
+    expect(native.calls, isEmpty);
+    session.close();
   });
 
   test(

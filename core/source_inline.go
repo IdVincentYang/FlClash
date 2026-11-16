@@ -180,6 +180,23 @@ func adoptSourceInlineLocked(p *preparedConfig, request *ConfigInputRequest) ([]
 	if err := sourceInlineCurrentLocked(p, request, manifest.Dependencies); err != nil {
 		return nil, err
 	}
+	newSources := make(map[string]uint64, len(manifest.Dependencies))
+	for _, key := range manifest.Dependencies {
+		newSources[key] = request.Source.Sources[key]
+	}
+	appRequests.mu.Lock()
+	sourcePins := appRequests.retainSourceSnapshotLocked(newSources)
+	appRequests.mu.Unlock()
+	if sourcePins == nil {
+		return nil, errSourceSuperseded
+	}
+	defer func() {
+		if sourcePins != nil {
+			appRequests.mu.Lock()
+			sourcePins()
+			appRequests.mu.Unlock()
+		}
+	}()
 	old, _, err := decodeConfigDocument(p.bytes)
 	if err != nil {
 		return nil, err
@@ -306,10 +323,13 @@ func adoptSourceInlineLocked(p *preparedConfig, request *ConfigInputRequest) ([]
 	}
 	p.manifest, p.bytes, p.raw = manifest, body, next
 	p.receipt.InputID = target
-	p.sources = make(map[string]uint64, len(manifest.Dependencies))
-	for _, key := range manifest.Dependencies {
-		p.sources[key] = request.Source.Sources[key]
+	appRequests.mu.Lock()
+	if p.sourcePins != nil {
+		p.sourcePins()
 	}
+	p.sources, p.sourcePins = newSources, sourcePins
+	sourcePins = nil
+	appRequests.mu.Unlock()
 	for _, plan := range plans {
 		r := p.sourceProviders[plan.Key]
 		r.plan.Parent, r.plan.Context, r.plan.ContextMaterialHash = plan.Parent, plan.Context, plan.ContextMaterialHash
@@ -350,7 +370,23 @@ func acknowledgeSourceInlineLocked(p *preparedConfig, request *ConfigInputReques
 	defer checkpointMu.Unlock()
 	appRequests.mu.Lock()
 	valid := p.current() && sourceTicketValidLocked(request.Source, p.manifest.Dependencies) && p.dataset == appRequests.dataset
+	newSources := make(map[string]uint64, len(p.manifest.Dependencies))
+	for _, key := range p.manifest.Dependencies {
+		newSources[key] = request.Source.Sources[key]
+	}
+	var sourcePins func()
+	if valid {
+		sourcePins = appRequests.retainSourceSnapshotLocked(newSources)
+		valid = sourcePins != nil
+	}
 	appRequests.mu.Unlock()
+	defer func() {
+		if sourcePins != nil {
+			appRequests.mu.Lock()
+			sourcePins()
+			appRequests.mu.Unlock()
+		}
+	}()
 	if !valid || p.scope.Check() != nil {
 		return errSourceSuperseded
 	}
@@ -371,10 +407,13 @@ func acknowledgeSourceInlineLocked(p *preparedConfig, request *ConfigInputReques
 		configFact.Version = configFactSequence.Add(1)
 		return err
 	}
-	p.sources = make(map[string]uint64, len(p.manifest.Dependencies))
-	for _, key := range p.manifest.Dependencies {
-		p.sources[key] = request.Source.Sources[key]
+	appRequests.mu.Lock()
+	if p.sourcePins != nil {
+		p.sourcePins()
 	}
+	p.sources, p.sourcePins = newSources, sourcePins
+	sourcePins = nil
+	appRequests.mu.Unlock()
 	changed := !p.eligible || !configFact.ReplayEligible
 	p.eligible, configFact.ReplayEligible = true, true
 	if changed {

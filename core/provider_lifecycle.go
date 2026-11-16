@@ -117,6 +117,10 @@ func (work *coreShutdownWork) run() {
 	closeGlobalCoreResources()
 	handleForceGC()
 	configMu.Lock()
+	pendingConfig.releaseSourceVersions()
+	if appliedConfig != pendingConfig {
+		appliedConfig.releaseSourceVersions()
+	}
 	stagedCore.Lock()
 	currentConfig, pendingConfig, appliedConfig = nil, nil, nil
 	isInit.Store(false)

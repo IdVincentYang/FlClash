@@ -52,7 +52,7 @@ func TestSourceFileProviderReadsCandidateWhileFailedWithoutNetworkSession(t *tes
 	r.client, r.clientReady = "file-reader", true
 	r.state.Phase, r.state.Reason, r.state.IntentRunning = "failed", "setupFailed", false
 	r.mu.Unlock()
-	request := sourceAcceptanceRequest{Action: "fetchProvider", Key: plan.Key, Kind: plan.Kind, ProviderName: plan.Name, Use: &root, MaterialHash: inputHash([]byte(yaml)), Source: ConfigSourceTicket{Client: r.client, Dataset: r.dataset, Sources: map[string]uint64{plan.Key: r.sources[plan.Key]}}}
+	request := sourceAcceptanceRequest{Action: "fetchProvider", Key: plan.Key, Kind: plan.Kind, ProviderName: plan.Name, Use: &root, MaterialHash: inputHash([]byte(yaml)), Source: ConfigSourceTicket{Client: r.client, Dataset: r.dataset, Sources: map[string]uint64{plan.Key: requestTestSourceVersion(r, plan.Key)}}}
 	permissions, err := os.ReadFile(sourcePermissionsPath(home))
 	if err != nil {
 		t.Fatal(err)
@@ -183,7 +183,7 @@ func TestSourceFileProviderReadsCandidateWhileFailedWithoutNetworkSession(t *tes
 	physicalRequest := request
 	physicalRequest.Use, physicalRequest.MaterialHash = &physicalRoot, inputHash([]byte(physicalYAML))
 	physicalRequest.Key = physicalPlans[0].Key
-	physicalRequest.Source.Sources = map[string]uint64{physicalRequest.Key: r.sources[physicalRequest.Key]}
+	physicalRequest.Source.Sources = map[string]uint64{physicalRequest.Key: requestTestSourceVersion(r, physicalRequest.Key)}
 	if got, err := fetchSourceProviderMaterial(home, physicalRequest); err != nil || string(got) != string(body) {
 		t.Fatal("physical source candidate", string(got), err)
 	}
@@ -204,7 +204,7 @@ func TestSourceFileProviderReadsCandidateWhileFailedWithoutNetworkSession(t *tes
 	}
 	httpRequest := request
 	httpRequest.Key, httpRequest.Use, httpRequest.MaterialHash = httpPlans[0].Key, &httpRoot, inputHash([]byte(httpYAML))
-	httpRequest.Source.Sources = map[string]uint64{httpRequest.Key: r.sources[httpRequest.Key]}
+	httpRequest.Source.Sources = map[string]uint64{httpRequest.Key: requestTestSourceVersion(r, httpRequest.Key)}
 	if _, err := fetchSourceProviderMaterial(home, httpRequest); err == nil {
 		t.Fatal("HTTP provider bypassed real network session")
 	}

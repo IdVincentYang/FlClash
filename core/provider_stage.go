@@ -68,10 +68,15 @@ func cancelProviderOwner(registry *appRequestRegistry, owner uint64) []io.Closer
 		return nil
 	}
 	registry.phase = "retired"
+	registry.pruneCompletionHoldsLocked()
 	registry.permits = map[string]requestscope.Spec{}
 	var closers []io.Closer
 	for _, lease := range registry.leases {
 		lease.closed = true
+		if lease.releaseVersions != nil {
+			lease.releaseVersions()
+			lease.releaseVersions = nil
+		}
 		lease.cancel()
 		for conn := range lease.closers {
 			closers = append(closers, conn)

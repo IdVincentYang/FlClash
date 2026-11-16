@@ -59,7 +59,7 @@ func failConfigBuild(request *ConfigBuildFailure) ConfigApplyResult {
 	qualified := p != nil && p.eligible && configFact.Phase == "ready" && p.dataset == appRequests.dataset && operationRunValidLocked(p.op)
 	if qualified {
 		for key, revision := range p.sources {
-			if appRequests.sources[key] != revision {
+			if !appRequests.sourceVersions.matches(key, revision) {
 				qualified = false
 			}
 		}

@@ -14,6 +14,8 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'request_versions.dart';
+
 final dataMutations = SerialTaskScheduler();
 
 class RequestUnavailable implements Exception {
@@ -97,6 +99,7 @@ class RequestSession {
     this.closeClient,
     this.generation = const {},
     this.ownsDio = true,
+    this.releaseVersion,
     required this.cancellationGeneration,
   });
 
@@ -110,6 +113,7 @@ class RequestSession {
   final bool ownsDio;
   final int cancellationGeneration;
   final void Function()? closeClient;
+  final void Function()? releaseVersion;
   final cancelToken = CancelToken();
   bool _closed = false;
   bool _granted = false;
@@ -123,7 +127,9 @@ class RequestSession {
       runZoned(action, zoneValues: {_zoneKey: this});
 
   void ensureActive() {
-    if (_closed) throw const RequestUnavailable('request_cancelled');
+    if (_closed || owner._cancellations.exhausted) {
+      throw const RequestUnavailable('request_cancelled');
+    }
   }
 
   Future<void> check() async {
@@ -144,6 +150,12 @@ class RequestSession {
 
   Future<bool> lifecycleCurrent({bool sourceInvalidated = false}) async {
     if (id == null) return true;
+    final revision = generation['sourceRevision'] as int;
+    if (revision <= 0 ||
+        revision > requestVersionLimit ||
+        sourceInvalidated && revision == requestVersionLimit) {
+      return false;
+    }
     final snapshot = await owner._control({
       'action': 'inspect',
       'client': client,
@@ -157,8 +169,22 @@ class RequestSession {
         snapshot['owner'] == generation['owner'] &&
         snapshot['dataset'] == generation['dataset'] &&
         snapshot['operation'] == generation['operation'] &&
-        snapshot['sourceRevision'] ==
-            (generation['sourceRevision'] as int) + (sourceInvalidated ? 1 : 0);
+        snapshot['sourceRevision'] == revision + (sourceInvalidated ? 1 : 0);
+  }
+
+  Future<RequestCompletion> retainCompletion() async {
+    ensureActive();
+    final result = id == null
+        ? null
+        : await owner._control({
+            'action': 'retainCompletion',
+            'id': id,
+            'client': client,
+          });
+    if (id != null && (result?['id'] is! String || result!['id'] == '')) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+    return RequestCompletion._(this, result?['id'] as String?);
   }
 
   Future<T> commit<T>(Future<T> Function() action) =>
@@ -186,6 +212,7 @@ class RequestSession {
     if (ownsDio) dio.close(force: true);
     closeClient?.call();
     owner._sessions.remove(this);
+    releaseVersion?.call();
     if (id != null) {
       unawaited(
         owner
@@ -193,6 +220,30 @@ class RequestSession {
             .catchError((Object _) => <String, Object?>{}),
       );
     }
+  }
+}
+
+class RequestCompletion {
+  RequestCompletion._(this._session, this._id);
+  final RequestSession _session;
+  final String? _id;
+  bool _closed = false;
+
+  Future<bool> isCurrent() async =>
+      !_closed &&
+      !_session.owner._cancellations.exhausted &&
+      await _session.lifecycleCurrent(sourceInvalidated: true) &&
+      !_closed;
+
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    if (_id == null) return;
+    await _session.owner._control({
+      'action': 'releaseCompletion',
+      'id': _id,
+      'client': _session.client,
+    });
   }
 }
 
@@ -206,21 +257,31 @@ class _LocalReceipt {
 }
 
 class Request with ServiceListener {
-  Request() : _native = null, _android = null;
-  Request.scoped({required Service native, required bool isAndroid})
-    : _native = native,
-      _android = isAndroid;
+  Request()
+    : _native = null,
+      _android = null,
+      _cancellations = RequestVersions();
+  Request.scoped({
+    required Service native,
+    required bool isAndroid,
+    RequestVersions? versions,
+  }) : _native = native,
+       _android = isAndroid,
+       _cancellations = versions ?? RequestVersions();
   final Service? _native;
   final bool? _android;
   bool get _isAndroid => _android ?? system.isAndroid;
   Service? get _service => _native ?? service;
 
   final _sessions = <RequestSession>{};
-  final _cancellations = <String, int>{};
+  final RequestVersions _cancellations;
+  ({int total, int cold}) get retainedKeyCounts =>
+      (total: _cancellations.length, cold: _cancellations.coldLength);
   int _datasetRevision = 0;
   final _legacyDio = Dio(BaseOptions(headers: {'User-Agent': browserUa}));
   ProviderContainer? _container;
   Future<void>? _attachment;
+  int _attachmentRevision = 0;
   String? _client;
   Map<String, Object?>? _nativeState;
   String? userAgent;
@@ -372,19 +433,34 @@ class Request with ServiceListener {
 
   void attach(ProviderContainer container) {
     if (identical(_container, container) && _attachment != null) return;
+    final revision = ++_attachmentRevision;
+    _datasetRevision++;
+    for (final session in List.of(_sessions)) {
+      session.close();
+    }
+    _cancellations.clearCold();
+    _client = null;
+    _nativeState = null;
     _service?.removeListener(this);
     _container = container;
     _service?.addListener(this);
-    _attachment = _attachNative();
+    _attachment = _attachNative(revision);
   }
 
-  Future<void> _attachNative() async {
+  Future<void> _attachNative(int revision) async {
     if (!_isAndroid) return;
     final result = await _control({'action': 'attach'});
+    if (revision != _attachmentRevision) {
+      throw const RequestUnavailable('request_cancelled');
+    }
     _client = result['client'] as String?;
-    partialCommit = await File(
+    final recovery = await File(
       '${await appPath.homeDirPath}/request-recovery-required',
     ).exists();
+    if (revision != _attachmentRevision) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+    partialCommit = recovery;
     if (_client == null) {
       throw const RequestUnavailable('request_state_unavailable');
     }
@@ -491,10 +567,22 @@ class Request with ServiceListener {
     }
   });
 
-  void cancelKey(String key) {
-    _cancellations[key] = (_cancellations[key] ?? 0) + 1;
+  void cancelKey(String key) => _cancelKey(key);
+
+  void _cancelKey(String key, {Object? intent}) {
+    if (intent != null && !_cancellations.intentCurrent(key, intent)) {
+      throw const RequestUnavailable('request_cancelled');
+    }
+    _cancellations.advance(key, keepIntent: intent != null);
     for (final session in List.of(_sessions)) {
-      if (session.key == key) session.close();
+      if (_cancellations.exhausted || session.key == key) session.close();
+    }
+  }
+
+  void _cancelExhaustedSessions() {
+    if (!_cancellations.exhausted) return;
+    for (final session in List.of(_sessions)) {
+      session.close();
     }
   }
 
@@ -559,34 +647,66 @@ class Request with ServiceListener {
   }
 
   Future<void> detach() async {
+    final client = _client;
+    final revision = ++_attachmentRevision;
     _datasetRevision++;
+    _client = null;
+    _container = null;
+    _attachment = null;
+    _nativeState = null;
+    _service?.removeListener(this);
     for (final session in List.of(_sessions)) {
       session.close();
     }
-    if (_isAndroid && _client != null) {
-      await _control({'action': 'detach', 'client': _client});
+    _cancellations.clearCold();
+    if (_isAndroid && client != null) {
+      try {
+        await _control({'action': 'detach', 'client': client});
+      } on RequestUnavailable catch (error) {
+        if (error.code != 'request_cancelled' ||
+            revision == _attachmentRevision) {
+          rethrow;
+        }
+      }
     }
   }
 
   Future<RequestSource> captureSource(String key) async {
-    await _attachment;
-    final snapshot = _isAndroid
-        ? await _control({'action': 'inspect', 'client': _client, 'key': key})
-        : <String, Object?>{};
-    return RequestSource._(
-      this,
-      key,
-      _datasetRevision,
-      _cancellations[key] ?? 0,
-      _client,
-      snapshot,
-    );
+    final hold = _cancellations.retain(key);
+    final dataset = _datasetRevision;
+    try {
+      if (hold.version == 0) {
+        _cancelExhaustedSessions();
+        throw const RequestUnavailable('request_cancelled');
+      }
+      await _attachment;
+      final client = _client;
+      final snapshot = _isAndroid
+          ? await _control({'action': 'inspect', 'client': client, 'key': key})
+          : <String, Object?>{};
+      if (dataset != _datasetRevision ||
+          client != _client ||
+          _cancellations.read(key) != hold.version) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      return RequestSource._(
+        this,
+        key,
+        dataset,
+        hold.version,
+        client,
+        snapshot,
+      );
+    } finally {
+      hold.release();
+    }
   }
 
   bool _localSourceCurrent(RequestSource source) =>
       identical(source.owner, this) &&
+      source.revision != 0 &&
       source.dataset == _datasetRevision &&
-      source.revision == (_cancellations[source.key] ?? 0) &&
+      source.revision == (_cancellations.read(source.key)) &&
       source.client == _client;
 
   bool _nativeSourceCurrent(
@@ -631,10 +751,11 @@ class Request with ServiceListener {
   }
 
   bool _queuedLocalCurrent(RequestSource source, int generation) =>
+      generation != 0 &&
       identical(source.owner, this) &&
       source.client == _client &&
       source.dataset == _datasetRevision &&
-      (_cancellations[source.key] ?? 0) == generation;
+      (_cancellations.read(source.key)) == generation;
 
   Future<bool> materialSessionCurrent(
     RequestSession session,
@@ -674,207 +795,246 @@ class Request with ServiceListener {
     RequestSource? expectedSource,
     RequestSource? queuedMaterialSource,
   }) async {
-    if (expectedSource != null && queuedMaterialSource != null) {
-      throw ArgumentError('Conflicting request source constraints');
-    }
-    if (queuedMaterialSource != null &&
-        (queuedMaterialSource.key != key ||
-            !_localSourceCurrent(queuedMaterialSource))) {
-      throw const RequestUnavailable('request_cancelled');
-    }
-    if (expectedSource != null &&
-        (expectedSource.key != key || !_localSourceCurrent(expectedSource))) {
-      throw const RequestUnavailable('request_cancelled');
-    }
-    final generation = await dataMutations.run(() async {
-      if (queuedMaterialSource != null &&
-              !_localSourceCurrent(queuedMaterialSource) ||
-          expectedSource != null && !_localSourceCurrent(expectedSource) ||
-          sourceIsCurrent != null && !await sourceIsCurrent()) {
+    final reservation = _cancellations.retain(key);
+    final dataset = _datasetRevision;
+    Object? intent;
+    bool intentCurrent() =>
+        dataset == _datasetRevision &&
+        intent != null &&
+        _cancellations.intentCurrent(key, intent);
+    try {
+      if (reservation.version == 0) {
+        _cancelExhaustedSessions();
         throw const RequestUnavailable('request_cancelled');
       }
-      cancelKey(key);
-      return _cancellations[key] ?? 0;
-    });
-    await _attachment;
-    if (partialCommit) throw const RequestUnavailable('request_partial_commit');
-    final container = _container;
-    if (!_isAndroid) {
-      await dataMutations.run(() async {
-        if ((_cancellations[key] ?? 0) != generation ||
-            queuedMaterialSource != null &&
-                !_queuedLocalCurrent(queuedMaterialSource, generation) ||
-            expectedSource != null &&
-                expectedSource.dataset != _datasetRevision ||
+
+      if (expectedSource != null && queuedMaterialSource != null) {
+        throw ArgumentError('Conflicting request source constraints');
+      }
+      if (queuedMaterialSource != null &&
+          (queuedMaterialSource.key != key ||
+              !_localSourceCurrent(queuedMaterialSource))) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      if (expectedSource != null &&
+          (expectedSource.key != key || !_localSourceCurrent(expectedSource))) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      intent = _cancellations.beginIntent(key);
+      final generation = await dataMutations.run(() async {
+        if (queuedMaterialSource != null &&
+                !_localSourceCurrent(queuedMaterialSource) ||
+            expectedSource != null && !_localSourceCurrent(expectedSource) ||
             sourceIsCurrent != null && !await sourceIsCurrent()) {
           throw const RequestUnavailable('request_cancelled');
         }
+        if (!intentCurrent()) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        _cancelKey(key, intent: intent);
+        return _cancellations.read(key);
+      });
+      await _attachment;
+      if (!intentCurrent() ||
+          generation == 0 ||
+          _cancellations.read(key) != generation) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      if (partialCommit) {
+        throw const RequestUnavailable('request_partial_commit');
+      }
+      final container = _container;
+      if (!_isAndroid) {
+        await dataMutations.run(() async {
+          if ((_cancellations.read(key)) != generation ||
+              queuedMaterialSource != null &&
+                  !_queuedLocalCurrent(queuedMaterialSource, generation) ||
+              expectedSource != null &&
+                  expectedSource.dataset != _datasetRevision ||
+              sourceIsCurrent != null && !await sourceIsCurrent()) {
+            throw const RequestUnavailable('request_cancelled');
+          }
+        });
+        final session = _makeSession(
+          key,
+          null,
+          const {},
+          null,
+          diagnostic: diagnostic,
+          cancellationGeneration: generation,
+        );
+        if (!intentCurrent()) {
+          session.close();
+          throw const RequestUnavailable('request_cancelled');
+        }
+        _sessions.add(session);
+        return session;
+      }
+      if (container == null) {
+        throw const RequestUnavailable('request_not_attached');
+      }
+      final snapshot = await _control({
+        'action': 'inspect',
+        'client': _client,
+        'key': key,
+      });
+      if (expectedSource != null &&
+          !_nativeSourceCurrent(expectedSource, snapshot)) {
+        throw const RequestUnavailable('request_cancelled');
+      }
+      final state = Map<String, Object?>.from(
+        (expectedSource?.snapshot['state'] ?? snapshot['state']) as Map,
+      );
+      onRequestState(state);
+      final maintenance = [
+        'initializedIdle',
+        'userStop',
+        'excludedSsid',
+      ].contains(state['reason']);
+      final running =
+          state['intentRunning'] == true &&
+          state['phase'] == 'started' &&
+          state['paused'] != true &&
+          snapshot['phase'] == 'ready';
+      final managed = (snapshot['policyVersion'] as num? ?? 0) != 0;
+      final defaultProxy = snapshot['maintenanceProxy'] as String? ?? '';
+      if (mode == RequestMode.proxy &&
+          managed &&
+          (proxy == null || proxy.isEmpty || proxy == 'GLOBAL') &&
+          defaultProxy.isEmpty) {
+        throw const RequestUnavailable('managed_maintenance_target_required');
+      }
+      String target;
+      String kind = 'maintenance';
+      String? permit;
+      if (explicitTarget != null) {
+        target = explicitTarget;
+      } else if (!(managed && mode == RequestMode.proxy) &&
+          (allowBootstrap ||
+              bootstrapIfUnconfigured && snapshot['hasProxy'] == false) &&
+          state['phase'] != 'started' &&
+          !running &&
+          !automatic) {
+        final accepted = await dialogs.showMessage(
+          title: currentAppLocalizations.requestDirectRecoveryTitle,
+          message: TextSpan(
+            text:
+                '${label ?? currentAppLocalizations.requestMode}\n${currentAppLocalizations.requestDirectRecoveryMessage(Uri.parse(url).host)}',
+          ),
+        );
+        if (accepted != true) {
+          throw const RequestUnavailable('bootstrap_required');
+        }
+        final permission = await _control({
+          'action': 'permit',
+          'client': _client,
+          'key': key,
+          'url': url,
+          'dataset': snapshot['dataset'],
+          'sourceRevision': snapshot['sourceRevision'],
+          'expectedState': {
+            'epoch': state['processEpoch'],
+            'revision': state['revision'],
+          },
+        });
+        permit = permission['permit'] as String;
+        target = 'DIRECT';
+        kind = 'bootstrap';
+      } else if (mode == RequestMode.direct) {
+        target = 'DIRECT';
+      } else if (mode == RequestMode.proxy) {
+        target = proxy == null || proxy.isEmpty || proxy == 'GLOBAL'
+            ? (managed ? defaultProxy : 'GLOBAL')
+            : proxy;
+      } else if (running) {
+        target = '';
+      } else if (maintenance && !automatic) {
+        target = 'DIRECT';
+      } else {
+        throw const RequestUnavailable('request_blocked');
+      }
+      final auth = container
+          .read(networkSettingProvider)
+          .authentication
+          .credentials;
+      final credential = auth.isEmpty ? '' : auth.first;
+      final separator = credential.indexOf(':');
+      final result = await dataMutations.run(() async {
+        if ((_cancellations.read(key)) != generation ||
+            expectedSource != null &&
+                expectedSource.dataset != _datasetRevision) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        if (queuedMaterialSource != null) {
+          final current = await _control({
+            'action': 'inspect',
+            'client': _client,
+            'key': key,
+          });
+          if (!_queuedLocalCurrent(queuedMaterialSource, generation) ||
+              current['dataset'] != queuedMaterialSource.snapshot['dataset'] ||
+              current['sourceRevision'] !=
+                  queuedMaterialSource.snapshot['sourceRevision']) {
+            throw const RequestUnavailable('request_cancelled');
+          }
+        }
+        if (sourceIsCurrent != null && !await sourceIsCurrent()) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        if (expectedSource != null) {
+          final current = await _control({
+            'action': 'inspect',
+            'client': _client,
+            'key': key,
+          });
+          if (!_nativeSourceCurrent(expectedSource, current)) {
+            throw const RequestUnavailable('request_cancelled');
+          }
+        }
+        if (!intentCurrent() || _cancellations.read(key) != generation) {
+          throw const RequestUnavailable('request_cancelled');
+        }
+        return _control({
+          'action': 'begin',
+          'client': _client,
+          'kind': kind,
+          'trigger': automatic ? 'automatic' : 'manual',
+          'key': key,
+          'url': url,
+          'mode': kind == 'bootstrap' ? 'direct' : mode.name,
+          'proxy': target,
+          'permit': ?permit,
+          'owner': snapshot['owner'],
+          'dataset': snapshot['dataset'],
+          'sourceRevision': snapshot['sourceRevision'],
+          'expectedState': {
+            'epoch': state['processEpoch'],
+            'revision': state['revision'],
+          },
+          'user': separator < 0
+              ? credential
+              : credential.substring(0, separator),
+          'password': separator < 0 ? '' : credential.substring(separator + 1),
+        });
       });
       final session = _makeSession(
         key,
-        null,
-        const {},
-        null,
+        result['id'] as String,
+        state,
+        result,
         diagnostic: diagnostic,
+        cancellationGeneration: generation,
       );
+      if (!intentCurrent() || (_cancellations.read(key)) != generation) {
+        session.close();
+        throw const RequestUnavailable('request_cancelled');
+      }
       _sessions.add(session);
       return session;
+    } finally {
+      if (intent != null) _cancellations.endIntent(key, intent);
+      reservation.release();
     }
-    if (container == null) {
-      throw const RequestUnavailable('request_not_attached');
-    }
-    final snapshot = await _control({
-      'action': 'inspect',
-      'client': _client,
-      'key': key,
-    });
-    if (expectedSource != null &&
-        !_nativeSourceCurrent(expectedSource, snapshot)) {
-      throw const RequestUnavailable('request_cancelled');
-    }
-    final state = Map<String, Object?>.from(
-      (expectedSource?.snapshot['state'] ?? snapshot['state']) as Map,
-    );
-    onRequestState(state);
-    final maintenance = [
-      'initializedIdle',
-      'userStop',
-      'excludedSsid',
-    ].contains(state['reason']);
-    final running =
-        state['intentRunning'] == true &&
-        state['phase'] == 'started' &&
-        state['paused'] != true &&
-        snapshot['phase'] == 'ready';
-    final managed = (snapshot['policyVersion'] as num? ?? 0) != 0;
-    final defaultProxy = snapshot['maintenanceProxy'] as String? ?? '';
-    if (mode == RequestMode.proxy &&
-        managed &&
-        (proxy == null || proxy.isEmpty || proxy == 'GLOBAL') &&
-        defaultProxy.isEmpty) {
-      throw const RequestUnavailable('managed_maintenance_target_required');
-    }
-    String target;
-    String kind = 'maintenance';
-    String? permit;
-    if (explicitTarget != null) {
-      target = explicitTarget;
-    } else if (!(managed && mode == RequestMode.proxy) &&
-        (allowBootstrap ||
-            bootstrapIfUnconfigured && snapshot['hasProxy'] == false) &&
-        state['phase'] != 'started' &&
-        !running &&
-        !automatic) {
-      final accepted = await dialogs.showMessage(
-        title: currentAppLocalizations.requestDirectRecoveryTitle,
-        message: TextSpan(
-          text:
-              '${label ?? currentAppLocalizations.requestMode}\n${currentAppLocalizations.requestDirectRecoveryMessage(Uri.parse(url).host)}',
-        ),
-      );
-      if (accepted != true) {
-        throw const RequestUnavailable('bootstrap_required');
-      }
-      final permission = await _control({
-        'action': 'permit',
-        'client': _client,
-        'key': key,
-        'url': url,
-        'dataset': snapshot['dataset'],
-        'sourceRevision': snapshot['sourceRevision'],
-        'expectedState': {
-          'epoch': state['processEpoch'],
-          'revision': state['revision'],
-        },
-      });
-      permit = permission['permit'] as String;
-      target = 'DIRECT';
-      kind = 'bootstrap';
-    } else if (mode == RequestMode.direct) {
-      target = 'DIRECT';
-    } else if (mode == RequestMode.proxy) {
-      target = proxy == null || proxy.isEmpty || proxy == 'GLOBAL'
-          ? (managed ? defaultProxy : 'GLOBAL')
-          : proxy;
-    } else if (running) {
-      target = '';
-    } else if (maintenance && !automatic) {
-      target = 'DIRECT';
-    } else {
-      throw const RequestUnavailable('request_blocked');
-    }
-    final auth = container
-        .read(networkSettingProvider)
-        .authentication
-        .credentials;
-    final credential = auth.isEmpty ? '' : auth.first;
-    final separator = credential.indexOf(':');
-    final result = await dataMutations.run(() async {
-      if ((_cancellations[key] ?? 0) != generation ||
-          expectedSource != null &&
-              expectedSource.dataset != _datasetRevision) {
-        throw const RequestUnavailable('request_cancelled');
-      }
-      if (queuedMaterialSource != null) {
-        final current = await _control({
-          'action': 'inspect',
-          'client': _client,
-          'key': key,
-        });
-        if (!_queuedLocalCurrent(queuedMaterialSource, generation) ||
-            current['dataset'] != queuedMaterialSource.snapshot['dataset'] ||
-            current['sourceRevision'] !=
-                queuedMaterialSource.snapshot['sourceRevision']) {
-          throw const RequestUnavailable('request_cancelled');
-        }
-      }
-      if (sourceIsCurrent != null && !await sourceIsCurrent()) {
-        throw const RequestUnavailable('request_cancelled');
-      }
-      if (expectedSource != null) {
-        final current = await _control({
-          'action': 'inspect',
-          'client': _client,
-          'key': key,
-        });
-        if (!_nativeSourceCurrent(expectedSource, current)) {
-          throw const RequestUnavailable('request_cancelled');
-        }
-      }
-      return _control({
-        'action': 'begin',
-        'client': _client,
-        'kind': kind,
-        'trigger': automatic ? 'automatic' : 'manual',
-        'key': key,
-        'url': url,
-        'mode': kind == 'bootstrap' ? 'direct' : mode.name,
-        'proxy': target,
-        'permit': ?permit,
-        'owner': snapshot['owner'],
-        'dataset': snapshot['dataset'],
-        'sourceRevision': snapshot['sourceRevision'],
-        'expectedState': {
-          'epoch': state['processEpoch'],
-          'revision': state['revision'],
-        },
-        'user': separator < 0 ? credential : credential.substring(0, separator),
-        'password': separator < 0 ? '' : credential.substring(separator + 1),
-      });
-    });
-    final session = _makeSession(
-      key,
-      result['id'] as String,
-      state,
-      result,
-      diagnostic: diagnostic,
-    );
-    if ((_cancellations[key] ?? 0) != generation) {
-      session.close();
-      throw const RequestUnavailable('request_cancelled');
-    }
-    _sessions.add(session);
-    return session;
   }
 
   Future<bool> recoverMissingGeo(CoreController core) async {
@@ -906,6 +1066,7 @@ class Request with ServiceListener {
     Map<String, Object?> state,
     Map<String, Object?>? grant, {
     bool diagnostic = false,
+    required int cancellationGeneration,
   }) {
     final container = _container;
     if (container == null) {
@@ -918,7 +1079,8 @@ class Request with ServiceListener {
         state,
         _legacyDio,
         ownsDio: false,
-        cancellationGeneration: _cancellations[key] ?? 0,
+        cancellationGeneration: cancellationGeneration,
+        releaseVersion: _cancellations.retain(key).release,
       );
     }
     final client = HttpOverrides.runWithHttpOverrides(
@@ -964,7 +1126,8 @@ class Request with ServiceListener {
       state,
       scopedDio,
       generation: grant ?? const {},
-      cancellationGeneration: _cancellations[key] ?? 0,
+      cancellationGeneration: cancellationGeneration,
+      releaseVersion: _cancellations.retain(key).release,
       closeClient: () => client.close(force: true),
     );
     scopedDio.interceptors.add(

@@ -34,7 +34,11 @@ func rememberSourceReviewBundle(home string, initial, bound SourceUse, hash stri
 	bundle := &sourceReviewBundle{Initial: initial, Bound: bound, BodyHash: hash, Materials: slices.Clone(materials)}
 	if len(localEdit) == 1 && localEdit[0].Client != "" {
 		ticket := localEdit[0]
-		ticket.Sources = map[string]uint64{"application-config": ticket.Sources["application-config"] + 1}
+		next, ok := requestVersionSuccessor(ticket.Sources["application-config"])
+		if !ok {
+			return errSourceSuperseded
+		}
+		ticket.Sources = map[string]uint64{"application-config": next}
 		bundle.LocalEdit = &ticket
 	}
 	grant.Purposes[bound.Kind].ReviewBundle = bundle

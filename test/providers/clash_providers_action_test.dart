@@ -31,6 +31,7 @@ class _RecordingSetupAction extends SetupAction {
     bool force = false,
     Future<bool> Function()? isCurrent,
     bool allowSourceReview = true,
+    RequestCompletion? completion,
   }) {
     applies++;
   }

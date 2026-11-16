@@ -82,7 +82,7 @@ func replayTicketValidLocked(ticket ConfigSourceTicket, keys []string) bool {
 	}
 	for _, key := range keys {
 		value, ok := ticket.Sources[key]
-		if !ok || value != appRequests.sources[key] {
+		if !ok || !appRequests.sourceVersions.matches(key, value) {
 			return false
 		}
 	}
@@ -90,6 +90,7 @@ func replayTicketValidLocked(ticket ConfigSourceTicket, keys []string) bool {
 }
 
 func replayConfigInput(init *InitParams) (ConfigInputRequest, error) {
+	defer appRequests.flushCleanup()
 	checkpointMu.Lock()
 	defer checkpointMu.Unlock()
 	home := init.HomeDir
@@ -104,7 +105,7 @@ func replayConfigInput(init *InitParams) (ConfigInputRequest, error) {
 	defer appRequests.mu.Unlock()
 	ticket := ConfigSourceTicket{Dataset: appRequests.dataset, Sources: make(map[string]uint64)}
 	for _, key := range ref.Dependencies {
-		ticket.Sources[key] = appRequests.sources[key]
+		ticket.Sources[key] = appRequests.sourceVersionLocked(key)
 	}
 	return ConfigInputRequest{InputID: ref.InputID, Source: ticket, Replay: true, Init: init}, nil
 }
@@ -119,7 +120,7 @@ func publishCheckpointLocked(p *preparedConfig) error {
 	appRequests.mu.Lock()
 	valid := appliedConfig == p && configFact.Owner == p.receipt.Owner && configFact.Phase == "ready"
 	for key, version := range p.sources {
-		if appRequests.sources[key] != version {
+		if !appRequests.sourceVersions.matches(key, version) {
 			valid = false
 		}
 	}
@@ -257,7 +258,7 @@ func prepareCheckpointCandidate(params *UpdateParams, picks map[string]string) (
 	dataset := appRequests.dataset
 	sources := make(map[string]uint64, len(p.sources))
 	for key := range p.sources {
-		sources[key] = appRequests.sources[key]
+		sources[key] = appRequests.sourceVersionLocked(key)
 	}
 	appRequests.mu.Unlock()
 	checkpointMu.Unlock()
@@ -334,7 +335,7 @@ func publishCheckpointCandidate(candidate *checkpointCandidate) error {
 	epoch, picksVersion := routeStamp()
 	valid := p == appliedConfig && p.eligible == candidate.eligible && configFact.Version == candidate.version && configFact.Owner == p.receipt.Owner && appRequests.dataset == candidate.dataset && epoch == candidate.routeEpoch && picksVersion == candidate.picksVersion
 	for key, value := range candidate.sources {
-		if value != appRequests.sources[key] {
+		if !appRequests.sourceVersions.matches(key, value) {
 			valid = false
 		}
 	}

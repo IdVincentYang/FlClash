@@ -47,6 +47,37 @@ UI确认回调由普通Provider接入，默认展示同一审查对话框；它�
 受控Dart／Go夹具可提供明确的合成人类选择；自动路径仍在调用回调之前拒绝需要新确认的候选。
 分类在构造出站或控制能力的parser之前；原parser只负责获准投影的真实格式和工厂校验。
 
+## 请求版本与续接寿命
+
+Request cancellation、Core operation／source 表区分活动持有与冷快照，每表最多保留 4096 个冷 key。
+在途 begin／session、Core lease／未完成 receipt 和仍有资格的配置依赖不可因冷容量压力被淘汰。
+failed pending 的残留指针不构成持有；prepare 在发布前失败也不能撤下仍有效的旧 applied 配置。
+配置依赖更新沿 checkpointMu→registry.mu，正常单 key 的冷 LRU 操作为均摊 O(1)，不扫描历史表。
+provider owner 退休释放其 lease pin 并撤销 completion，receipt 继续持有到真实 Complete。
+guarded shutdown 等待真实初始化／关闭退出及物理资源关闭后，在丢弃配置指针前释放 source pin；
+只撤销业务而仍保留配置的阶段不提前释放。
+
+每表使用不回退的高水位；重建 key 的版本高于历史且跳过一值，已有记录的失效仍恰好加一。
+缺项不等于版本零，资格验证不创建记录；取消不存在 key 不留下永久墓碑。
+冷的外部 RequestSource／review 快照可能因容量淘汰而 superseded，必须重新捕获；不自动接受权限或切换出口。
+版本限定为 JSON 可精确表达的正整数至 2^53−1；创建、递增、LocalEdit 后继预测均检查上限。
+任一 Core 表耗尽即关闭 registry 的新旧资格，两表均拒绝比较；Dart 耗尽亦取消其 session。
+撤销、checkpoint 失效和释放继续执行，不回绕或因 detach 重置。
+所有 LRU、pin 和辅助索引随记录释放，内存不再与累计见过的 key 数相关；这不是固定字节上限。
+
+脚本网络更新在写入前，从有效且未 grant 的 lease 取得有限 RequestCompletion，保护原 operation／source
+记录直到 Script→SetupAction 自动应用续接实际结束。session／socket 和 receipt 仍按原时机关闭及 Complete。
+SetupAction 拥有一个 pending 句柄，替换、Stop 或 dispose 释放；执行后由 callback 的 finally 释放，
+覆盖 setup 队列、重试及 deferred cleanup。旧 callback 不得释放新 pending，也不得重捕获来升级旧资格。
+该句柄只延长记录寿命，所有原生版本、owner、dataset、operation 和 source+1 校验继续成立。
+
+私有 requestControl 增加 retainCompletion／releaseCompletion，复用 id／client：前者由有效未 grant lease
+取得随机 hold ID，后者由所属 client 幂等释放。Core 最多 128 个 hold，满额在写入前失败；
+Android ServicePlugin 白名单转发这两条 action；旧 Core 不支持时明确失败。
+同 key 新操作、client／dataset／owner／native 资格变化撤销旧 hold。
+原提交的一次 source invalidate 不撤销其记录持有，但再次失效不能通过原后继校验。
+释放不依赖仍可授予资格，非 Android 不发新增控制请求；不增加持久状态或改变 Spec／ConfigInput 格式。
+
 ## 自动规则与用途投影
 
 节点维护与规则自动准则分别判断：已知纯代理组可在相同协议能力内维护TCP节点，即使这些节点不支持UDP；

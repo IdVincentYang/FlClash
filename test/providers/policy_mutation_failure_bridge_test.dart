@@ -247,14 +247,25 @@ class _Fixture {
   }
 
   Future<void> close() async {
-    await client.clearPartialCommit();
-    for (final input in inputs) {
-      await input.releaseMarker();
+    try {
+      for (final input in inputs) {
+        await input.releaseMarker();
+      }
+    } finally {
+      try {
+        await client.detach();
+      } finally {
+        try {
+          container.dispose();
+        } finally {
+          try {
+            await bridge.close();
+          } finally {
+            await db.close();
+          }
+        }
+      }
     }
-    await client.detach();
-    container.dispose();
-    await bridge.close();
-    await db.close();
   }
 }
 
@@ -266,12 +277,22 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await preferences.isInit;
     await AppLocalizations.load(const Locale('en'));
+  });
+  setUp(() async {
     root = await Directory.systemTemp.createTemp('policy-mutation-failure-');
     AppPath.supportDirectory = () async => root;
     AppPath.temporaryDirectory = () async => root;
     AppPath.cacheDirectory = () async => root;
+    await Future.wait([
+      appPath.dataDir.future,
+      appPath.tempDir.future,
+      appPath.cacheDir.future,
+    ]);
+    appPath.dataDir = Completer<Directory>()..complete(root);
+    appPath.tempDir = Completer<Directory>()..complete(root);
+    appPath.cacheDir = Completer<Directory>()..complete(root);
   });
-  tearDownAll(() => root.delete(recursive: true));
+  tearDown(() => root.delete(recursive: true));
 
   for (final first in [
     PreferenceWrite.failAfterWrite,

@@ -125,6 +125,7 @@ class ScriptsAction extends _$ScriptsAction {
     final updatingKeys = ref.read(updatingKeysProvider.notifier);
     final operation = updatingKeys.start(script.updatingKey);
     RequestSession? session;
+    RequestCompletion? completion;
     RequestFile? staged;
     SourceMaterialApproval? approval;
     try {
@@ -197,44 +198,54 @@ class ScriptsAction extends _$ScriptsAction {
         );
       }
 
+      completion = await session.retainCompletion();
       if (approval != null) {
         await approval.commit(session: session, action: persist);
       } else {
         await session.commit(persist);
       }
-      final completed = session;
-      _applyIfInUse(
-        script.id,
-        isCurrent: () => completed.lifecycleCurrent(sourceInvalidated: true),
-      );
+      if (_applyIfInUse(script.id, completion: completion)) completion = null;
     } finally {
-      await approval?.release();
-      session?.close();
-      await staged?.close();
-      updatingKeys.stop(script.updatingKey, operation);
+      try {
+        await approval?.release();
+      } finally {
+        session?.close();
+        try {
+          await staged?.close();
+        } finally {
+          updatingKeys.stop(script.updatingKey, operation);
+          await completion?.close();
+        }
+      }
     }
   }
 
-  void _applyIfInUse(int scriptId, {Future<bool> Function()? isCurrent}) {
+  bool _applyIfInUse(
+    int scriptId, {
+    Future<bool> Function()? isCurrent,
+    RequestCompletion? completion,
+  }) {
     final profile = ref.read(currentProfileProvider);
     if (profile?.overwriteType != OverwriteType.script ||
         profile?.scriptId != scriptId) {
-      return;
+      return false;
     }
     final profileId = profile!.id;
     ref
         .read(setupActionProvider.notifier)
         .applyProfileDebounce(
           silence: true,
-          isCurrent: isCurrent == null
+          completion: completion,
+          isCurrent: isCurrent == null && completion == null
               ? null
               : () async {
                   final current = ref.read(currentProfileProvider);
                   return current?.id == profileId &&
                       current?.overwriteType == OverwriteType.script &&
                       current?.scriptId == scriptId &&
-                      await isCurrent();
+                      (isCurrent == null || await isCurrent());
                 },
         );
+    return true;
   }
 }

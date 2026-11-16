@@ -35,6 +35,7 @@ class _Setup extends SetupAction {
     bool force = false,
     bool allowSourceReview = true,
     Future<bool> Function()? isCurrent,
+    RequestCompletion? completion,
   }) {
     expect(allowSourceReview, isTrue);
     applications++;

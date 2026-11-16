@@ -60,7 +60,7 @@ func TestAppRequestFixedDirectWithRealConfigMap(t *testing.T) {
 	}
 	r.client, r.clientReady, r.dataset = "fixed direct client", true, 1
 	begin := func(key string) map[string]any {
-		result := r.control(appRequestControl{Action: "begin", Client: r.client, Owner: r.currentOwner().ID, Dataset: 1, Kind: "maintenance", Trigger: "manual", Key: key, Proxy: "DIRECT", Mode: "direct", URL: origin.URL, ExpectedState: &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}})
+		result := r.control(appRequestControl{Action: "begin", Client: r.client, Owner: r.currentOwner().ID, Dataset: 1, Kind: "maintenance", Trigger: "manual", Key: key, SourceRevision: requestTestSourceVersion(r, key), Proxy: "DIRECT", Mode: "direct", URL: origin.URL, ExpectedState: &requestscope.StateVersion{Epoch: r.state.ProcessEpoch, Revision: r.state.Revision}})
 		success, ok := result.(map[string]any)
 		if !ok {
 			t.Fatalf("Direct begin failed: %v", result)
@@ -120,7 +120,7 @@ func TestAppRequestFixedDirectWithRealConfigMap(t *testing.T) {
 	state = r.state
 	state.Revision++
 	r.publish(state)
-	stale := r.control(appRequestControl{Action: "begin", Client: r.client, Owner: r.currentOwner().ID, Dataset: 1, Kind: "maintenance", Trigger: "manual", Key: "old pending native version", Proxy: "DIRECT", Mode: "direct", URL: origin.URL, ExpectedState: oldVersion})
+	stale := r.control(appRequestControl{Action: "begin", Client: r.client, Owner: r.currentOwner().ID, Dataset: 1, Kind: "maintenance", Trigger: "manual", Key: "old pending native version", SourceRevision: requestTestSourceVersion(r, "old pending native version"), Proxy: "DIRECT", Mode: "direct", URL: origin.URL, ExpectedState: oldVersion})
 	if _, rejected := stale.(map[string]string); !rejected {
 		t.Fatal("native begin accepted the pending operation's old ExpectedState", stale)
 	}

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:fl_clash/common/request.dart';
 import 'package:drift/native.dart';
 import 'package:fl_clash/database/database.dart' as db;
 
@@ -982,6 +983,7 @@ class _ApplyRecordingSetupAction extends SetupAction {
     bool force = false,
     Future<bool> Function()? isCurrent,
     bool allowSourceReview = true,
+    RequestCompletion? completion,
   }) {
     applyCount++;
   }
@@ -1132,6 +1134,7 @@ class _RaceSetupAction extends SetupAction {
     bool force = false,
     Future<bool> Function()? isCurrent,
     bool allowSourceReview = true,
+    RequestCompletion? completion,
   }) {
     applyProfileDebounceCount++;
   }

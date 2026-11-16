@@ -136,6 +136,10 @@ Android requires v2 and cannot fall back when permissions, hooks or owner qualif
 Go validates v2 receipts on every platform; controlled host fixtures do not establish Android assembly coverage.
 Dart owns composition, routing selection and review UI; its database does not duplicate the grant authority.
 Request/source tickets, ConfigInput and ServiceState keep their existing distinct ownership.
+The [request lifetime contract](../docs/features/security/source_acceptance_design.md#请求版本与续接寿命)
+retains active holders and at most 4096 cold keys per version table,
+reject missing/expired qualifications and never reuse an old key version. A bounded RequestCompletion protects
+the script-save to debounced-setup continuation after its network session closes; it adds no request or write authority.
 URL imports keep one modal from the name/URL form through preparation, download, bundled source review and saving.
 Their advanced request route fields remain expanded, without changing the collapsible fields on other screens.
 `SourceReviewPresentation` embeds the existing review widget in that surface; its decision callback advances the import

@@ -249,6 +249,23 @@ func TestApplicationInputBridge(t *testing.T) {
 				t.Fatal(err)
 			}
 			result = appRequests.control(params)
+		case "requestKeyChurn":
+			var count int
+			if err := json.Unmarshal(call.Arguments, &count); err != nil || count < 0 || count > 32768 {
+				t.Fatal("invalid key pressure fixture", err)
+			}
+			for i := 0; i < count; i++ {
+				keyTestRound(t, appRequests, appRequests.client, fmt.Sprintf("icon:loopback-r08-%d", i))
+			}
+			result = map[string]bool{"ok": true}
+		case "requestKeyStats":
+			appRequests.mu.Lock()
+			result = map[string]any{
+				"sources": len(appRequests.sources), "sourceEntries": len(appRequests.sourceVersions.entries), "sourceCold": appRequests.sourceVersions.cold.Len(),
+				"operations": len(appRequests.operations), "operationEntries": len(appRequests.operationVersions.entries), "operationCold": appRequests.operationVersions.cold.Len(),
+				"holds": len(appRequests.completionHolds), "leases": len(appRequests.leases), "commits": len(appRequests.commits),
+			}
+			appRequests.mu.Unlock()
 		case "fact":
 			result = configStateSnapshot()
 		case "register":

@@ -81,7 +81,7 @@ func TestSourceDetachedWriterRequiresRealCompletion(t *testing.T) {
 	if _, err := sourceMaterialRPC(t, request); err == nil || err.Code != errRequestWriterUnknown.Error() {
 		t.Fatal("new trust while writer unknown", err)
 	}
-	recovery := sourceAcceptanceRequest{Key: "application-config", Kind: "config", Source: ConfigSourceTicket{Client: client, Dataset: r.dataset, Sources: map[string]uint64{"application-config": 0}}, Recovery: &sourceRecoverySnapshot{}}
+	recovery := sourceAcceptanceRequest{Key: "application-config", Kind: "config", Source: ConfigSourceTicket{Client: client, Dataset: r.dataset, Sources: map[string]uint64{"application-config": requestTestSourceVersion(r, "application-config")}}, Recovery: &sourceRecoverySnapshot{}}
 	if _, err := sourceMaterialRecoverySnapshot(C.Path.HomeDir(), recovery); !errors.Is(err, errRequestWriterUnknown) {
 		t.Fatal("offline check raced writer", err)
 	}
