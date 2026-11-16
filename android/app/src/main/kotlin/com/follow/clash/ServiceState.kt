@@ -9,7 +9,6 @@ import com.follow.clash.common.RequestObservations
 import com.follow.clash.common.RequestProtection
 import com.follow.clash.common.RequestServiceIdentity
 import com.follow.clash.core.Core
-import kotlinx.coroutines.launch
 import io.flutter.embedding.engine.FlutterEngine
 import kotlinx.coroutines.Deferred
 
@@ -58,13 +57,7 @@ object ServiceState {
             override fun onProtectionChanged(service: RequestProtection, identity: RequestServiceIdentity, phase: String, reason: String): Long =
                 machine.observeProtection(service, identity, phase, reason)
             override fun onServiceLost(serviceId: String, requestId: Long) = machine.observeServiceLost(serviceId, requestId)
-            override fun onVpnStartRequested(serviceId: String): Long {
-                if (machine.getRequestState().reason == "exiting") return 0
-                val requestId = machine.prepareRunIntent(running = true, source = "alwaysOn")
-                if (!machine.bindService(serviceId, requestId)) return 0
-                GlobalState.launch { machine.handlePreparedStartAction(requestId) }
-                return requestId
-            }
+            override fun onVpnStartRequested(serviceId: String): Long = machine.handleVpnStartRequest(serviceId)
         }
     }
 

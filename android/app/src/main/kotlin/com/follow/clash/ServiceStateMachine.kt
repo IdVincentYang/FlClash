@@ -114,12 +114,14 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         return published
     }
 
-    fun prepareRunIntent(running: Boolean, source: String = "ui", paused: Boolean = getRequestState().paused): Long {
+    fun prepareRunIntent(running: Boolean, source: String = "ui", paused: Boolean = getRequestState().paused): Long =
+        checkNotNull(tryPrepareRunIntent(running, source, paused)) { "Application is exiting" }
+
+    private fun tryPrepareRunIntent(running: Boolean, source: String, paused: Boolean = getRequestState().paused): Long? {
         require(source in setOf("ui", "tile", "notification", "alwaysOn", "ssid", "bootstrap", "exit"))
-        check(getRequestState().reason != "exiting") { "Application is exiting" }
-        lateinit var token: RunRequest
-        publish { previous ->
-            token = arbiter.request(running && !paused)
+        return publishSnapshot { previous ->
+            if (previous.reason == "exiting") return@publishSnapshot null
+            val token = arbiter.request(running && !paused)
             previous.copy(
                 intentRevision = token.id,
                 intentRunning = running,
@@ -128,8 +130,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
                 phase = if (running && !paused) "preparing" else "stopping",
                 reason = when { source == "exit" -> "exiting"; paused && running -> "excludedSsid"; !running -> "userStop"; else -> "none" },
             )
-        }
-        return token.id
+        }?.intentRevision
     }
 
     fun preparePauseIntent(paused: Boolean): ApplicationRequestState {
@@ -448,14 +449,14 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         if (isRunningRequested()) {
             return
         }
-        val requestId = prepareRunIntent(running = true, source = source)
+        val requestId = tryPrepareRunIntent(running = true, source = source) ?: return
         handlePreparedStartAction(requestId)
     }
 
     suspend fun handleStopAction(source: String = "notification") {
         val previous = getRequestState()
         val idle = !previous.intentRunning && runTimeMillis == 0L && previous.serviceId.isEmpty() && previous.protectPhase == "none"
-        val requestId = prepareRunIntent(running = false, source = source)
+        val requestId = tryPrepareRunIntent(running = false, source = source) ?: return
         if (idle) { requestStop(requestId).await(); return }
         val tile = host.tile()
         if (tile != null) {
@@ -468,6 +469,13 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     suspend fun handleVpnRevokeAction() {
         if (getRequestState().reason == "vpnRevoked") reconcileStopped()
+    }
+
+    fun handleVpnStartRequest(serviceId: String): Long {
+        val requestId = tryPrepareRunIntent(running = true, source = "alwaysOn") ?: return 0
+        if (!bindService(serviceId, requestId)) return 0
+        host.scope.launch { handlePreparedStartAction(requestId) }
+        return requestId
     }
 
     suspend fun handlePreparedStartAction(requestId: Long) {

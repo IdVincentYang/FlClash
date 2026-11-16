@@ -15,6 +15,18 @@ Flutter 发出命令、观察事实，不以计时或成功分配 requestId 推�
 无 Flutter 的通知栏、快捷开关和 Always-on 启动复用已验证的 checkpoint，并明确将恢复输入作为激活请求提交。
 恢复接口返回的 inactive 初始值不代表本次启动意图；实际激活仍受原生 requestId、最新运行意图及暂停状态约束。
 
+运行请求准备在同一 `publicationLock` 内读取当前意图、检查 exiting、创建 arbiter token 并完成 publication。
+退出已经发布时，不分配 token、不推进 revision、不发布替代意图；
+普通 Start、Stop 和重复退出都不能覆盖该进程实例的退出终态。
+
+公开 `prepareRunIntent` 保留 Long／IllegalStateException 协议，Flutter 继续映射为 INVALID_ARGUMENT。
+原生系统动作共用同一个准备实现，仅在 exiting 时正常取消；Always-on 返回 0，且不继续绑定或分派启动。
+Always-on callback 委托 ServiceStateMachine 完成准备、绑定与分派，仍使用现有 host scope；
+准备被拒绝或绑定请求已过期时立即返回，不另建状态或任务所有者。
+
+内部 nullable 准备结果只表示退出拒绝，不将参数错误、publication failure 或其它异常转换为 null。
+已取得的过期 token 仍按原有身份校验拒绝，不改变正常请求及失败回退的语义。
+
 `preparePauseIntent(paused)` 在同一 native publication 内读取当前运行意图、更新 paused，
 分配 intentRevision，返回该次实际发布快照。退出或 publication 失败不返回可分派的成功请求；
 失败回退同步清理 intentRunning，保留 failed 事实并封闭既有请求门。
