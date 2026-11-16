@@ -309,7 +309,8 @@ func resolveApplicationRoute(_ context.Context, lease requestscope.Lease, metada
 		selected.rule, _ = R.ParseRule(kind, selected.rule.Payload(), target, nil, nil)
 	}
 	sourceRuleTraces.Lock()
-	if len(sourceRuleTraces.pending) < 2048 {
+	sweepSourceRuleTracesLocked(time.Now())
+	if sourceTracePendingRoomLocked(metadata) {
 		sourceRuleTraces.pending[metadata] = &sourceTraceFrame{
 			parent: p, state: state, index: -1, time: time.Now(),
 			origin:   SourceRuleOrigin{Origin: "application-rules", Revision: state.applicationRevision},

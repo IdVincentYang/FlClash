@@ -114,13 +114,37 @@ type sourceTraceFrame struct {
 	time                      time.Time
 }
 
+const sourceTraceWorkLimit = 2048
+
 var sourceRuleTraces = struct {
 	sync.Mutex
 	active  map[*C.Metadata]*sourceTraceFrame
 	pending map[*C.Metadata]*sourceTraceFrame
 	frozen  map[string]sourceRuleProvenance
 	order   []string
+	sweepAt time.Time
 }{active: map[*C.Metadata]*sourceTraceFrame{}, pending: map[*C.Metadata]*sourceTraceFrame{}, frozen: map[string]sourceRuleProvenance{}}
+
+func sweepSourceRuleTracesLocked(now time.Time) {
+	if now.Before(sourceRuleTraces.sweepAt) {
+		return
+	}
+	sourceRuleTraces.sweepAt = now.Add(time.Second)
+	for key, frame := range sourceRuleTraces.pending {
+		if now.Sub(frame.time) > time.Minute {
+			delete(sourceRuleTraces.pending, key)
+		}
+	}
+	for key, frame := range sourceRuleTraces.active {
+		if now.Sub(frame.time) > time.Minute {
+			delete(sourceRuleTraces.active, key)
+		}
+	}
+}
+
+func sourceTracePendingRoomLocked(metadata *C.Metadata) bool {
+	return len(sourceRuleTraces.pending) < sourceTraceWorkLimit || sourceRuleTraces.pending[metadata] != nil
+}
 
 type sourceTracedRule struct {
 	C.RuleWrapper
@@ -130,7 +154,7 @@ type sourceTracedRule struct {
 }
 
 func (r *sourceTracedRule) Match(metadata *C.Metadata, helper C.RuleMatchHelper) (bool, string) {
-	frame := &sourceTraceFrame{parent: r.parent, state: r.parent.sourceTrace.Load(), provider: map[string]string{}, origin: r.origin, index: r.index, time: time.Now()}
+	frame := &sourceTraceFrame{parent: r.parent, state: r.parent.sourceTrace.Load(), origin: r.origin, index: r.index, time: time.Now()}
 	if frame.state != nil && r.index < len(frame.state.origins) {
 		frame.origin = frame.state.origins[r.index]
 	}
@@ -139,17 +163,8 @@ func (r *sourceTracedRule) Match(metadata *C.Metadata, helper C.RuleMatchHelper)
 		frame.state = nil
 	}
 	sourceRuleTraces.Lock()
-	for key, pending := range sourceRuleTraces.pending {
-		if frame.time.Sub(pending.time) > time.Minute {
-			delete(sourceRuleTraces.pending, key)
-		}
-	}
-	for key, active := range sourceRuleTraces.active {
-		if frame.time.Sub(active.time) > time.Minute {
-			delete(sourceRuleTraces.active, key)
-		}
-	}
-	if len(sourceRuleTraces.active) >= 2048 || len(sourceRuleTraces.pending) >= 2048 {
+	sweepSourceRuleTracesLocked(time.Now())
+	if len(sourceRuleTraces.active) >= sourceTraceWorkLimit || len(sourceRuleTraces.pending) >= sourceTraceWorkLimit {
 		delete(sourceRuleTraces.pending, metadata)
 		delete(sourceRuleTraces.active, metadata)
 		sourceRuleTraces.Unlock()
@@ -178,7 +193,7 @@ func (r *sourceTracedRule) Match(metadata *C.Metadata, helper C.RuleMatchHelper)
 		return matched, target
 	}
 	delete(sourceRuleTraces.active, metadata)
-	if matched {
+	if matched && sourceTracePendingRoomLocked(metadata) {
 		if r.RuleType() == C.SubRules || strings.Contains(strings.ToUpper(r.Payload()), "SUB-RULE,") {
 			frame.origin = SourceRuleOrigin{}
 			frame.sets, frame.provider = nil, nil
@@ -205,6 +220,9 @@ func recordSourceRuleSetMatch(p *preparedConfig, name string, generation *source
 	if frame.parent != p {
 		frame.state = nil
 		return
+	}
+	if frame.provider == nil {
+		frame.provider = map[string]string{}
 	}
 	frame.provider[generation.use.Key] = generation.digest
 	if strings.Contains(name, "://") || len(name) > 128 {

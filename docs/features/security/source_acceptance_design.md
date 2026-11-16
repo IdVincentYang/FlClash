@@ -249,7 +249,7 @@ DoQ／DoH3、命名DNS、respect-rules、DHCP、私有DNS或本进程曾创建�
 | grant | 父Go私有原子文件，最多1024实体／4MiB，大条件契约用有界不可变引用 |
 | candidate | 每来源最多一份，最多32份，单份16MiB、合计64MiB；在途另持引用 |
 | sealed material | digest不可变，引用合计128MiB，最多128个工作lease，单约束／manifest最多4MiB |
-| provenance | manifest有界；匹配暂存2048项／60秒；tracker标签4096项，驱逐降为Unknown |
+| provenance | manifest有界；active工作表与pending暂存各2048项／60秒；tracker标签4096项，驱逐降为Unknown |
 
 current、prepared、退休未退出stage、pending、checkpoint和有效grant契约均pin，工作lease持有到真实退出。
 接受响应另带父Go生成的材料lease；它只保留确切正文，不授予用途或运行资格。
@@ -269,6 +269,12 @@ ledger按连续范围保存原始规则摘要，避免为大型列表逐行复�
 任意Script无法证明唯一原作者时保留候选，不能仅凭文本相同判断来源。
 父Go观察器只委托实际C.Rule.Match，绑定安装输入，暂存metadata身份及实际返回；
 tracker建立时核最终Rule／RulePayload／出口，排除PASS／REMATCH／UDP淘汰的中间结果。
+普通Match入场与App hook发布共用锁内维护门，获锁后取时，全局每秒最多清理一次
+active／pending；空闲时过期引用可留到下次维护，但两表各不超过2048项。Match完成转入pending时
+另核门限；满额只缺少追溯，不改变业务匹配／转发。60秒证据有效期与frame起始时间保持，
+bind仍独立拒绝过期项，物理清理延迟不延长资格，冻结标签不因当前配置变化重建。
+provider map仅在首个有效命中回调时创建，保留parent／材料digest及最多16项检查；
+不共享或复用frame，未命中／panic沿原所有权清理，sub-rule与重入继续保守归属。
 保留原wrapper的disabled、统计和Unwrap等消费者契约；无法唯一对账显示Unknown／候选。
 request event与getConnections使用同一可选DTO，现有Live connections／Recent requests详情显示匹配规则、来源、采用revision及外层RuleSet。
 providerChains是节点来源，不是规则来源；不承诺RuleSet内部子规则、完整匹配过程或HTTPS路径。

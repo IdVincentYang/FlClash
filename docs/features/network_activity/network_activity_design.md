@@ -90,7 +90,7 @@ processEpoch 是不同字段，不随单次切换订阅或 VPN 重建而充当�
 | observation.application | 本次 socket 查询结果及其识别状态 |
 | observation.capture | vpn 表示进入 TUN；localProxy 表示同机代理 socket；均保留 serviceId／generation，unknown 不等于未接管 |
 | observation.configuration | 已证明的 ConfigInput inputId、模式及可选路由版本；status=known 证明 inputId，不能据此假定每个可选字段都存在 |
-| TrackerInfo.provenance | 原来源追溯；版本已知与规则来源已知是不同结论 |
+| TrackerInfo.provenance | [原来源追溯](../security/source_acceptance_design.md#轻量连接追溯)；版本已知与规则来源已知是不同结论，其工作表与入口身份缓存分开限额 |
 
 配置和路由戳在入口与 Tracker 加入时核对。读取配置使用非阻塞锁：遇到 Core 占用配置边界或
 前后不一致时不阻塞业务连接，缺失版本保留 unknown。实际来源追溯可以证明匹配时的 inputId。
