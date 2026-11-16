@@ -2,7 +2,7 @@
 
 本文汇总 Android 专用分枝相对 `main` 的已确认问题，供后续修复使用。
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
-R01–R08 已修复并完成本地交付；R09–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
+R01–R09 已修复并完成本地交付；R10–R11 尚未解决，按序由 D 修复、M 评审后更新处置。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
 原评审收录 11 项：3 项 P1、7 项 P2、1 项 P3。修复中另确认 F01（P2），作为独立未解决跟进记录，
 不并入 R08 已解决声明，也不改变本轮 R09–R11 的修复顺序。
@@ -424,6 +424,48 @@ Android 上可能终止整个应用。这里确认的是缺少恢复边界，未
 
 处理目标：为新增入口建立符合现有错误协议的恢复／清理边界，不能把失败伪装为成功或
 保留半完成的身份／回调状态；回归注入故障及后续正常调用。具体实现尚未决定。
+
+**处置：已修复，M 复审通过并完成本地交付（2026-11-16）。**
+修复提交为 `1f242fd73b1780e6becb6fc02cb625b0e0d4b67b`，目标分枝为 `security/android`。
+四个实际 export 隔离同步 Go panic，按既有 JSON error 或私有 C status 返回 `request_restart_required`；
+[JNI](../../../android/core/src/main/cpp/core.cpp)将 setter／停止失败传为 Java exception，Kotlin external 签名与 envelope 不变。
+[局部锁 scope](../../../core/request_native.go)只追踪当前调用持有的锁，在 panic 解锁前发布独立进程 fault。
+故障进程拒绝新请求及旧资格续用；attach、Init、Service 重建和 receipt Complete 均不能复位。
+原 owner 的取消、释放和真实写者收尾仍可执行，不清空未知写者计数或耐久恢复责任。
+
+callback 替换排空 reader，并按当前所有者释放 GlobalRef／字符串；身份更新拒绝 foreign／stale generation，
+整对字段失败回滚；Close 未确认时保留捕获的 TUN owner。
+[VpnService](../../../android/service/src/main/java/com/follow/clash/service/VpnService.kt)的停止失败传到
+[Controller](../../../android/app/src/main/kotlin/com/follow/clash/ServiceController.kt)和
+[状态机](../../../android/app/src/main/kotlin/com/follow/clash/ServiceStateMachine.kt)，保留 binding／runtime，
+程序化调用不误报 cleaned，系统 lifecycle callback 捕获失败，启动原错误不被清理异常覆盖。
+实际 adopt 确认前保留旧身份，确认后失败保留新实际 owner；系统启动只提交 intent，不提前重标 owner。
+替换按旧完整身份清理，同 intent／同 options 的正常复用仍保留。
+长期边界见[JNI 同步失败契约](source_acceptance_design.md#jni-同步失败边界)。
+
+[JNI 回归入口](../../../android/tests/jni/README.md)通过编译的生产 Kotlin declarations、生产 JNI 和 Go export
+验证 19 个独立进程场景；原四入口在受控故障下均以 SIGABRT 终止。
+旧版输入从指定 Git revision 完整物化，隔离仓库未暂存、已暂存、干净提交三态共 12 个原版反例符合预期，
+不依赖交付时仍有 dirty diff。Kotlin 最终 8 类 127 项通过，其中 23 项覆盖 native failure 与系统消费链。
+修复前分别有 6 个所有权／清理业务失败及 3 个系统启动业务失败；修复后覆盖真实 machine→Controller→service
+失败反馈、正常替换、cold start、同 intent 复用及迟到旧请求隔离。
+
+Go root 444 个 top-level／683 个 pass 事件、40 skip；no_zerotier 455／706／40，两种 host vet 通过。
+定向 helper-overlay race 3 项通过；Android ARM64／NDK 28.2 的 fresh c-shared／header、生产文件 vet 与
+生产 JNI 链接通过。Flutter 6 文件 67 pass、1 skip；pub get offline／analyze 通过，保留 42 条既有 info。
+标准 Android package vet 在原基线和本项均因既有 CGO helper 排除而失败，不能写成该标准命令通过。
+host JNI 有 Go/JVM signal-handler 共存警告；系统叶子和 config receipt 为受控夹具，未覆盖
+ART、真实 Android 调度、TUN、APK、设备、完整 stock race 或完整 Flutter。
+此修复不保证 native abort、runtime fatal、OOM、异步 panic 或依赖内部锁损坏可恢复；
+也不证明外部输入可触发原故障。原 startTUN 缺口与 F01 未修复。
+
+编译和测试由 D 执行，M 审代码、方案和绑定证据，未代跑。
+本地、未入库证据位于 `.buildlog/r09-jni-failure-20261116/`，设计、首轮与各修订记录冻结；
+最终通过对象为 `revision-03/source.json`，交付绑定为 `delivery/source.json`。
+26 文件交付与获审对象仅 Plan／Result 状态文字不同；D 的 `a799bcb8` 仅由 M amend Details，Tree 与父提交未变。
+完成任务文档已从当前树清理，定稿可用
+`git show 1f242fd:docs/features/security/r09_jni_failure_plan.md` 和
+`git show 1f242fd:docs/features/security/r09_jni_failure_result.md` 取回。
 
 ### R10：Android 退出前置失败跳过保存与 BootGuard 收尾
 
