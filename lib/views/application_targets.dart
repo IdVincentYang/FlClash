@@ -3,6 +3,7 @@ import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/application_activity.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/connection_exit.dart';
 import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -152,8 +153,7 @@ class _ApplicationTargetsViewState
       ),
       menuItems: [
         if (_applicationPackages.isNotEmpty &&
-            !_applicationPackages.contains('com.follow.clash.dev') &&
-            !_applicationPackages.contains('com.follow.clash'))
+            !_applicationPackages.contains(globalState.packageInfo.packageName))
           CommonPopupMenuItem(
             label: l10n.appPolicyCapture,
             glyph: AppGlyphs.vpn,

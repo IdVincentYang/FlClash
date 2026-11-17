@@ -30,6 +30,157 @@ void main() {
     });
 
     test(
+      'Android base package identity is explicit and preserves build intent',
+      () {
+        final parser = setup.createSetupArgParser();
+        expect(parser.parse(['android'])['android-package-id'], isNull);
+        final options = parser.parse([
+          'android',
+          '--android-package-id',
+          'com.idvincentyang.mfc',
+        ]);
+        final packageId = options['android-package-id'] as String;
+        setup.validateAndroidBuildOptions(
+          platform: 'android',
+          packageId: packageId,
+        );
+        expect(
+          setup.createBuildEnvironment(
+            'stable',
+            androidReleaseCandidate: true,
+            androidPackageId: packageId,
+          ),
+          {
+            'APP_ENV': 'stable',
+            'ANDROID_RELEASE_CANDIDATE': 'true',
+            'ANDROID_PACKAGE_ID': 'com.idvincentyang.mfc',
+          },
+        );
+        setup.validateAndroidBuildOptions(
+          platform: 'android',
+          packageId: 'Com.example_2.App',
+        );
+        setup.validateAndroidBuildOptions(
+          platform: 'android',
+          packageId: 'com.follow.clash',
+          managedProfile: 'dev',
+        );
+        for (final invalid in [
+          '',
+          'single',
+          '.com.app',
+          'com..app',
+          'com.2app',
+          'com.app-',
+          ' com.app',
+          'com.app\n',
+          'com.应用',
+        ]) {
+          expect(
+            () => setup.validateAndroidBuildOptions(
+              platform: 'android',
+              packageId: invalid,
+            ),
+            throwsArgumentError,
+          );
+        }
+        expect(
+          () => setup.validateAndroidBuildOptions(
+            platform: 'macos',
+            packageId: packageId,
+          ),
+          throwsArgumentError,
+        );
+        expect(
+          () => setup.validateAndroidBuildOptions(
+            platform: 'android',
+            packageId: packageId,
+            managedProfile: 'dev',
+          ),
+          throwsStateError,
+        );
+      },
+    );
+
+    test('Android appearance options are explicit and validated', () {
+      final parser = setup.createSetupArgParser();
+      final defaults = parser.parse(['android']);
+      expect(defaults['android-app-name'], isNull);
+      expect(defaults['android-system-icon'], false);
+      final options = parser.parse([
+        'android',
+        '--android-app-name',
+        'MFC',
+        '--android-system-icon',
+      ]);
+      expect(options['android-app-name'], 'MFC');
+      expect(options['android-system-icon'], true);
+      expect(
+        setup.createBuildEnvironment(
+          'stable',
+          androidAppName: 'MFC',
+          androidSystemIcon: true,
+        ),
+        {
+          'APP_ENV': 'stable',
+          'ANDROID_APP_NAME': 'MFC',
+          'ANDROID_SYSTEM_ICON': 'true',
+        },
+      );
+      for (final name in ['MFC', '应用 & "Friends"', r"@MFC's \ name", '?MFC']) {
+        setup.validateAndroidBuildOptions(platform: 'android', appName: name);
+      }
+      for (final name in [
+        '',
+        '  ',
+        'MFC\n',
+        'MFC\u0000',
+        'MFC\u0085',
+        'MFC\u2028',
+      ]) {
+        expect(
+          () => setup.validateAndroidBuildOptions(
+            platform: 'android',
+            appName: name,
+          ),
+          throwsArgumentError,
+        );
+      }
+      for (final platform in ['macos', 'windows', 'linux']) {
+        expect(
+          () => setup.validateAndroidBuildOptions(
+            platform: platform,
+            appName: 'MFC',
+          ),
+          throwsArgumentError,
+        );
+        expect(
+          () => setup.validateAndroidBuildOptions(
+            platform: platform,
+            systemIcon: true,
+          ),
+          throwsArgumentError,
+        );
+      }
+      expect(
+        () => setup.validateAndroidBuildOptions(
+          platform: 'android',
+          managedProfile: 'dev',
+          appName: 'MFC',
+        ),
+        throwsStateError,
+      );
+      expect(
+        () => setup.validateAndroidBuildOptions(
+          platform: 'android',
+          managedProfile: 'dev',
+          systemIcon: true,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test(
       'release candidate is explicit and cannot mix with dev or another platform',
       () {
         final options = setup.createSetupArgParser().parse([

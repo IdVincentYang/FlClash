@@ -34,6 +34,23 @@ class CrashReportManagementTest {
 
     @After fun clean() { base.deleteRecursively() }
 
+    @Test fun mainProcessSummaryUsesOnlyTheCurrentVariantIdentity() {
+        val cases = listOf(
+            BuildConfig.APPLICATION_ID to BuildConfig.APPLICATION_ID,
+            BuildConfig.APPLICATION_ID to "${BuildConfig.APPLICATION_ID}:service",
+            "com.private.foreign" to "com.private.foreign",
+        )
+        for ((index, pair) in cases.withIndex()) {
+            val local = CrashReportStore(File(base, "process-$index"), clock = { clock })
+            assertEquals("metadata_only", local.save(CrashMaterial(id(1), "startup",
+                mapOf("package" to pair.first, "processName" to pair.second), emptyMap()), 1500))
+            val summary = rows(local.manage("inventory", emptyMap<Any, Any>(), 1500)).single()["summary"] as Map<*, *>
+            assertEquals(if (index == 0) "main" else null, summary["process"])
+            assertFalse(summary.toString().contains(pair.first))
+            assertFalse(summary.toString().contains(pair.second))
+        }
+    }
+
     @Test fun sandboxExposesTheMinimumAndroidPosixContract() {
         assertEquals(android.system.StructStat::class.java, android.system.Os::class.java.getMethod("lstat", String::class.java).returnType)
         assertEquals(java.io.FileDescriptor::class.java, android.system.Os::class.java.getMethod("open", String::class.java,

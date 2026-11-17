@@ -2,6 +2,13 @@
 
 ## Building
 
+Before building a user Android release on `security/android`, follow the
+[current branch Android release defaults][android-user-release].
+Use that recipe unless the user explicitly overrides it for this delivery;
+generic tool defaults are not the user recipe.
+
+[android-user-release]: ../docs/development/android_build_guide.md#当前分支-android-release-默认配置
+
 Update submodules first. The ClashMeta Go core lives in `core/Clash.Meta/`.
 
 ```bash

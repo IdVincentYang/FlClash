@@ -152,7 +152,7 @@ internal class CrashReportManagement(
             hex(text(identity, "apkSha256"), 64)?.let { result["apkSha256"] = it }
             val process = text(identity, "processName")
             val pkg = text(identity, "package")
-            if (pkg in setOf("com.follow.clash", "com.follow.clash.dev") && process == pkg) result["process"] = "main"
+            if (pkg == BuildConfig.APPLICATION_ID && process == pkg) result["process"] = "main"
             val ids = identity["buildIds"]?.takeIf { it.isJsonObject }?.asJsonObject
             for (library in listOf("libclash.so", "libcore.so", "librust_api.so", "libapp.so", "libflutter.so")) {
                 hex(ids?.let { text(it, "$library:gnu") }, null)?.let { result["$library:gnu"] = it }

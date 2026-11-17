@@ -129,6 +129,10 @@ EasyTier原声明源码及生成关系仍未闭合。获审的一次独立WASI�
 
 此入口只覆盖macOS ARM64宿主到Android ARM64 dev release，其它host／ABI先拒绝；不能据此升级旧APK结论，action固定不代表CI工具已核。
 源码从受信仓库当前HEAD及入口明确允许的任务WIP物化；其它未提交改动拒绝，不把任意工作目录或旧受管source当作已接受输入。
+受管 dev profile 的基础 applicationId 固定为 `com.follow.clash`，预期最终值为 `com.follow.clash.dev`；
+setup 与 Gradle 拒绝自定义基础值及名称／系统图标覆盖。构建记录中的 identity intent 是期望值，不冒充 APK 已观察事实。
+普通本地 setup 的构建参数见 [Android build guide](../../development/android_build_guide.md#android-构建参数)，
+不扩大本 profile 或官方 CI 的身份范围。
 本profile的规范化工作位置（含父路径）须为可打印ASCII，允许空格，但拒绝`:`、`,`及反斜杠。
 这是PATH、Gradle路径列表及Java properties的共同序列化前提；不通过引号、改宿主路径或全局工具绕过。
 

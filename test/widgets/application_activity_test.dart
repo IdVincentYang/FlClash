@@ -41,6 +41,7 @@ import 'package:flutter/services.dart';
 import 'package:fl_clash/common/shape.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../helpers/application_activity.dart';
 import '../helpers/test_app.dart';
@@ -111,6 +112,12 @@ ApplicationActivityState _activity({
 void main() {
   final fontPath = Platform.environment['FLCLASH_ACTIVITY_FONT'];
   setUpAll(() async {
+    globalState.packageInfo = PackageInfo(
+      appName: 'FlClash',
+      packageName: 'com.idvincentyang.mfc.dev',
+      version: '0.8.99',
+      buildNumber: '1',
+    );
     if (fontPath == null) return;
     final loader = FontLoader('ActivityPreview')
       ..addFont(
@@ -667,6 +674,31 @@ void main() {
     label: 'Browser A',
     packageName: 'test.app.a',
   );
+
+  for (final package in [
+    'com.idvincentyang.mfc.dev',
+    'com.follow.clash',
+    'test.app.a',
+  ]) {
+    testWidgets('VPN menu excludes only the installed app identity: $package', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        child: ApplicationTargetsView(
+          appKey: 'package:$package',
+          label: package,
+          packageName: package,
+        ),
+      );
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Include in VPN'),
+        package == 'com.idvincentyang.mfc.dev' ? findsNothing : findsOneWidget,
+      );
+    });
+  }
 
   Future<void> activeTargets(WidgetTester tester) async {
     await tester.tap(find.byTooltip('More'));

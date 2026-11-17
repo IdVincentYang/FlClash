@@ -53,6 +53,16 @@ Future<void> main(List<String> args) async {
   }
 
   final env = results['env'] as String;
+  final androidPackageId = results['android-package-id'] as String?;
+  final androidAppName = results['android-app-name'] as String?;
+  final androidSystemIcon = results['android-system-icon'] as bool;
+  validateAndroidBuildOptions(
+    platform: platform,
+    packageId: androidPackageId,
+    appName: androidAppName,
+    systemIcon: androidSystemIcon,
+    managedProfile: Platform.environment['FLCLASH_ANDROID_PROFILE'],
+  );
   final candidate = results['android-release-candidate'] as bool;
   validateReleaseCandidate(
     platform: platform,
@@ -85,6 +95,9 @@ Future<void> main(List<String> args) async {
     rootDir,
     arch,
     androidArch: androidArch,
+    androidPackageId: androidPackageId,
+    androidAppName: androidAppName,
+    androidSystemIcon: androidSystemIcon,
     androidReleaseCandidate: candidate,
     verbose: verbose,
   );
@@ -116,6 +129,22 @@ ArgParser createSetupArgParser() {
       help:
           'Build a developer-signed Android pre/stable candidate for isolated CI signing',
     )
+    ..addOption(
+      'android-package-id',
+      valueHelp: 'com.example.app',
+      help:
+          'Android base applicationId (default: com.follow.clash; suffix rules still apply)',
+    )
+    ..addOption(
+      'android-app-name',
+      valueHelp: 'name',
+      help: 'Android system display name (default: existing variant label)',
+    )
+    ..addFlag(
+      'android-system-icon',
+      negatable: false,
+      help: 'Use the Android launcher fallback instead of the app icon',
+    )
     ..addFlag(
       'verbose',
       abbr: 'v',
@@ -143,11 +172,58 @@ List<String> createFlutterBuildArgs({
 Map<String, String> createBuildEnvironment(
   String env, {
   bool androidReleaseCandidate = false,
+  String? androidPackageId,
+  String? androidAppName,
+  bool androidSystemIcon = false,
 }) {
   return {
     'APP_ENV': env,
     if (androidReleaseCandidate) 'ANDROID_RELEASE_CANDIDATE': 'true',
+    'ANDROID_PACKAGE_ID': ?androidPackageId,
+    'ANDROID_APP_NAME': ?androidAppName,
+    if (androidSystemIcon) 'ANDROID_SYSTEM_ICON': 'true',
   };
+}
+
+void validateAndroidBuildOptions({
+  required String platform,
+  String? packageId,
+  String? appName,
+  bool systemIcon = false,
+  String? managedProfile,
+}) {
+  if (packageId == null && appName == null && !systemIcon) return;
+  if (platform != 'android') {
+    throw ArgumentError('Android build options require the Android platform');
+  }
+  if (packageId != null) {
+    final match = RegExp(
+      r'[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+',
+    ).matchAsPrefix(packageId);
+    if (match?.end != packageId.length) {
+      throw ArgumentError(
+        'Android base applicationId requires at least two letter-led alphanumeric/underscore segments',
+      );
+    }
+  }
+  if (appName != null &&
+      (appName.trim().isEmpty ||
+          appName.runes.any(
+            (c) =>
+                c < 32 || (c >= 127 && c <= 159) || c == 0x2028 || c == 0x2029,
+          ))) {
+    throw ArgumentError(
+      'Android app name must be nonblank and contain no control characters or line breaks',
+    );
+  }
+  if (managedProfile != null &&
+      ((packageId != null && packageId != 'com.follow.clash') ||
+          appName != null ||
+          systemIcon)) {
+    throw StateError(
+      'The managed Android profile requires its default identity and appearance',
+    );
+  }
 }
 
 void validateReleaseCandidate({
@@ -231,6 +307,9 @@ Future<int> _package(
   String rootDir,
   String arch, {
   String? androidArch,
+  String? androidPackageId,
+  String? androidAppName,
+  bool androidSystemIcon = false,
   required bool verbose,
   bool androidReleaseCandidate = false,
 }) async {
@@ -258,6 +337,9 @@ Future<int> _package(
       createBuildEnvironment(
         env,
         androidReleaseCandidate: androidReleaseCandidate,
+        androidPackageId: androidPackageId,
+        androidAppName: androidAppName,
+        androidSystemIcon: androidSystemIcon,
       ),
     ),
   );

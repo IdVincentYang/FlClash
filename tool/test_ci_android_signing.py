@@ -198,7 +198,8 @@ class AndroidSigningTest(unittest.TestCase):
                     self.verified()
 
     def test_actual_manifest_package_version_and_elf_abi_are_enforced(self):
-        for changes in [{'package': 'com.follow.clash.dev'}, {'version': '1.2.4'}, {'code': 8}, {'bad_abi': True}]:
+        for changes in [{'package': 'com.follow.clash.dev'}, {'package': 'com.idvincentyang.mfc'},
+                        {'version': '1.2.4'}, {'code': 8}, {'bad_abi': True}]:
             with self.subTest(changes=changes):
                 self.candidates(**changes)
                 with self.assertRaises(ReleaseError): self.verified()

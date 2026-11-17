@@ -992,11 +992,23 @@ build_config.yaml file, including its absence, without making the entire reposit
 Current behavior and compatibility limits belong to
 [the business data contract](../docs/features/security/business_data_design.md); older APKs do not acquire this protection.
 
-`setup.dart` is the release build orchestrator: it validates package-only distributor configuration, filters known
-publication credentials, writes `env.json` (`APP_ENV`, plus an explicit Android release-candidate intent when selected),
-and activates `flutter_distributor` from
-the `chen08209/flutter_distributor` fork pinned to a `v<version>-flclash.<n>` tag (cut a new tag there and bump
-`--git-ref` when the fork changes), and leaves the Core artifacts to the build hook.
+`setup.dart` is the release build orchestrator: it validates package-only
+distributor configuration, filters known publication credentials, writes
+`env.json` (`APP_ENV`, plus explicit Android release-candidate and base
+applicationId intents when selected), and activates `flutter_distributor` from
+the `chen08209/flutter_distributor` fork pinned to a `v<version>-flclash.<n>` tag
+(cut a new tag there and bump `--git-ref` when the fork changes), and leaves
+the Core artifacts to the build hook.
+Android's optional `--android-package-id` reaches Gradle as `ANDROID_PACKAGE_ID`;
+Gradle validates the base value and preserves its buildType/signing suffix rules.
+Namespace, JNI and channel identities stay fixed; runtime self-identity uses
+PackageInfo and the variant's BuildConfig.APPLICATION_ID. The managed dev profile
+and official CI retain their fixed installation identities.
+Optional `--android-app-name` and `--android-system-icon` similarly reach Gradle's
+resource/Manifest configuration; an explicit name includes the debug label,
+while the icon option leaves launcher fallback to Android. Usage, input rules
+and the user release recipe belong to the
+[Android build guide](../docs/development/android_build_guide.md#当前分支-android-release-默认配置).
 
 The Go core and the Rust helper are built by a Dart build hook. `plugins/setup/hook/build.dart` only constructs
 `CoreBuilder`, a `package:hooks` `Builder` in `plugins/setup/setup_hooks/`, the same shape `rust_api` uses. Flutter

@@ -31,9 +31,9 @@
 
     <application
         android:name=".FlClashApplication"
-        android:banner="@mipmap/ic_banner"
+        android:banner="${androidAppBanner}"
         android:hardwareAccelerated="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="${androidAppIcon}"
         android:label="@string/app_name">
         <service android:name="com.google.android.gms.metadata.ModuleDependencies">
             <meta-data

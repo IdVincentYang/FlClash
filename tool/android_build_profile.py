@@ -146,7 +146,9 @@ class ManagedAndroidBuild:
         self.indices = {}
         self.generated = {}
         self.results = {'status': 'preparing', 'profile_ready': False,
-                        'workspace': str(self.root)}
+                        'workspace': str(self.root),
+                        'android_identity_intent': {'base_application_id': 'com.follow.clash',
+                                                    'expected_application_id': 'com.follow.clash.dev'}}
         self.record()
 
     def record(self):

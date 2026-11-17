@@ -103,6 +103,10 @@ class WorkspacePathTest(unittest.TestCase):
                 builder = self.construct(destination)
                 self.assertEqual(builder.root, destination.resolve(strict=True))
                 self.assertFalse(builder.results['profile_ready'])
+                self.assertEqual(builder.results['android_identity_intent'], {
+                    'base_application_id': 'com.follow.clash',
+                    'expected_application_id': 'com.follow.clash.dev',
+                })
 
 
 if __name__ == '__main__':

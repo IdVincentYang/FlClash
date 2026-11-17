@@ -3,6 +3,7 @@ import 'package:fl_clash/providers/application_routing.dart';
 import '../helpers/test_profiles.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:fl_clash/common/application_activity.dart';
 import 'package:fl_clash/common/datetime.dart';
@@ -170,6 +171,12 @@ TrackerInfo connection(
 void main() {
   final font = Platform.environment['FLCLASH_ACTIVITY_FONT'];
   setUpAll(() async {
+    globalState.packageInfo = PackageInfo(
+      appName: 'FlClash',
+      packageName: 'com.idvincentyang.mfc.dev',
+      version: '0.8.99',
+      buildNumber: '1',
+    );
     if (font == null) return;
     final loader = FontLoader('ActivityPreview')
       ..addFont(

@@ -166,6 +166,47 @@ Pages包装沿原未gzip的artifact.tar，改项目helper加固定upload-artifac
 `setup.dart`会生成忽略的env.json。旧直接入口按项目唯一[distributor声明](../../tool/android_bootstrap/distributor.pubspec.yaml)进行global activation；
 受管分支消费已经核验的源码／配置。直接入口与其它host尚未因此获得本profile的验证结论。
 
+### 当前分支 Android release 默认配置
+
+在 `security/android` 为用户构建 Android release 时，除非用户本次明确覆盖，始终选用：
+
+- 基础 applicationId：`com.idvincentyang.mfc`。
+- 系统显示名称：`MFC`。
+- 系统／launcher 通用占位图标，不指定 FlClash 应用图标。
+
+使用现有个人 release 签名配置后执行：
+
+```sh
+dart setup.dart android --env stable --arch arm64 \
+  --android-package-id com.idvincentyang.mfc \
+  --android-app-name MFC --android-system-icon
+```
+
+这套显式配方与通用入口无参数默认值分开，不修改官方 CI／其它平台／受管 dev 的默认身份。
+`APP_ENV`、签名条件和 `.dev` 后缀逻辑继续生效；未配置 release key 时不能将带 `.dev` 的包当作签名 release 交付。
+系统图标由 launcher 决定，具体外观可能不同；独立 splash、磁贴图标和应用内品牌资源保留。
+验收时从最终 APK 读取包名、名称及应用／launcher icon，确认 icon 无项目资源（解析值为 0），
+再在目标设备观察名称、通用占位图标与可启动性；不以源 Manifest 的 `@null` 字面代替产物验证。
+新包独立安装，保留旧 `com.follow.clash` 应用及数据，不做迁移。
+
+### Android 构建参数
+
+本地打包可传 `dart setup.dart android --env stable --arch arm64 --android-package-id com.idvincentyang.mfc`。
+参数经 `env.json` 的 `ANDROID_PACKAGE_ID` 进入 Gradle；直接 Flutter 构建也可传同名 dart-define。
+未传时为 `com.follow.clash`。值遵循 [Android applicationId 规则](https://developer.android.com/build/configure-app-module#set-application-id)：
+至少两段，各段以 ASCII 字母开头，其余仅字母、数字和下划线；空值或非法值失败。
+它是基础值，原 debug／无 release key 的 `.dev` 后缀、candidate、APP_ENV 和签名条件继续适用。
+源码 namespace、JNI／MethodChannel 不随之更名；新 applicationId 是独立应用，不迁移旧数据。
+官方 CI 仍只接受原身份；受管 dev profile 固定 `com.follow.clash` → `com.follow.clash.dev`，
+不接受自定义基础值。构建记录的请求值与从实际 APK 读取的最终值应分别记录。
+
+`--android-app-name <name>` 经 `ANDROID_APP_NAME` 设置共享 app_name、系统应用 label、磁贴、
+VPN session 和文件提供器名称；显式 debug 名称同样一致。名称允许 Unicode／标点，
+拒绝空白名称、控制字符和换行。未传时保留原 release 与 debug 标签。
+`--android-system-icon` 经 `ANDROID_SYSTEM_ICON=true` 将应用 icon／banner 设置为无资源；
+未传则保留项目图标，直接 Flutter define 还可显式传 `false`。两个参数只用于 Android；
+受管 dev profile 不接受名称或系统图标覆盖。它们不提供自定义图片文件入口。
+
 ### 核心源码恢复与官方同步契约
 
 当前父仓库携带未单独发布的核心 gitlink，其源码通过

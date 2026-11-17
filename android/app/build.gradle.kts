@@ -23,6 +23,25 @@ providers.gradleProperty("dart-defines").orNull?.split(",")?.filter { it.isNotEm
     }
 }
 val releaseCandidate = buildDefines["ANDROID_RELEASE_CANDIDATE"] == "true"
+val baseApplicationId = buildDefines["ANDROID_PACKAGE_ID"] ?: "com.follow.clash"
+val androidAppName = buildDefines["ANDROID_APP_NAME"]
+val androidSystemIcon = when (buildDefines["ANDROID_SYSTEM_ICON"]) {
+    null, "false" -> false
+    "true" -> true
+    else -> throw GradleException("Invalid ANDROID_SYSTEM_ICON; expected true or false")
+}
+if (!baseApplicationId.matches(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+"))) {
+    throw GradleException("Invalid Android base applicationId")
+}
+if (androidAppName != null && (androidAppName.isBlank() || androidAppName.any {
+        it.code < 32 || it.code in 127..159 || it == '\u2028' || it == '\u2029'
+    })) {
+    throw GradleException("Invalid Android app name")
+}
+if (System.getenv("FLCLASH_ANDROID_PROFILE") != null &&
+    (baseApplicationId != "com.follow.clash" || androidAppName != null || androidSystemIcon)) {
+    throw GradleException("The managed Android profile requires its default identity and appearance")
+}
 if (buildDefines.containsKey("ANDROID_RELEASE_CANDIDATE") &&
     (buildDefines["ANDROID_RELEASE_CANDIDATE"] != "true" ||
         buildDefines["APP_ENV"] !in setOf("pre", "stable") ||
@@ -50,11 +69,23 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.follow.clash"
+        applicationId = baseApplicationId
         minSdk = flutter.minSdkVersion
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["androidAppIcon"] = if (androidSystemIcon) "@null" else "@mipmap/ic_launcher"
+        manifestPlaceholders["androidAppBanner"] = if (androidSystemIcon) "@null" else "@mipmap/ic_banner"
+        manifestPlaceholders["androidDebugLabel"] = if (androidAppName != null) "@string/app_name" else "FlClash Debug"
+        if (androidAppName != null) {
+            resValue("string", "app_name", "\"" + androidAppName
+                .replace("\\", "\\\\").replace("\"", "\\\"").replace("'", "\\'") + "\"")
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+        resValues = true
     }
 
     signingConfigs {
