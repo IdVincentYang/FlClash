@@ -4,8 +4,8 @@
 评审者为 [R] FLClash Review（M），每项均与 FlClash D2（D）讨论核验后收录。
 R01–R11 均已修复、经 M 评审并完成 `security/android` 本地交付，本轮逐项修复已结束。
 下文问题事实绑定原评审基线；修复版本与验证边界见对应条目的处置记录，不升级整体阶段验收状态。
-原评审收录 11 项：3 项 P1、7 项 P2、1 项 P3。修复中另确认 F01（P2），作为独立未解决跟进记录，
-不包含在本轮 R01–R11 已完成声明中，仍待独立安排。
+原评审收录 11 项：3 项 P1、7 项 P2、1 项 P3。修复中另确认 F01（P2），
+已按用户后续授权独立修复并完成本地交付；范围与验证限制见 F01 处置，不扩大既有阶段验收结论。
 
 ## 对象与覆盖
 
@@ -557,7 +557,7 @@ D 的 `cb2ea0f9` 仅由 M amend Details，Tree 与父提交未变；完成 Plan 
 
 ### F01：配置 collector 与重新初始化并发访问 HomeDir
 
-**状态：已确认，未修复；P2，独立于本轮 R01–R11 的修复范围。**
+**状态：已解决；P2，按后续授权独立修复，M 已复审并完成本地交付（2026-11-17）。**
 D 在 R08 生命周期回归中发现，M 核对原基线生产 overlay 与竞争堆栈后确认。
 复现基线为 `ee6b7f559a921f97232fbd6f40671db9e4ee6c18`；R08 未修改此竞争的读写路径。
 
@@ -573,12 +573,48 @@ D 在 R08 生命周期回归中发现，M 核对原基线生产 overlay 与竞�
 D 在原生产代码上运行真实 apply→shutdown→init 循环，race detector 报告这两个具体访问竞争；
 未证明文件被误删、用户数据丢失或设备崩溃，不将这些可能后果写成已发生事实。
 
-后续应在 FlClash 侧明确 collector 的目录快照／生命周期和同步边界，避免把等待条件仅放在测试中；
+处理目标是在 FlClash 侧明确 collector 的目录／生命周期和同步边界，避免把等待条件仅放在测试中；
 保留现有请求资格、回收锁顺序与 shutdown 隔离，不直接扩大到修改 Core 子模块。
-验收应包含无需测试预先等待 collector 的真实循环、迟到旧任务及目录切换，具体方案尚未决定。
+验收包含无需测试预先等待 collector 的真实循环、迟到旧任务及目录切换，具体落实见下文。
 本地证据位于 R08 的 `revision-02/`：`baseline-home-race-source.json`、
 `baseline-home-race-probe_test.go`、`baseline-home-race-overlay.json` 和 `go-race-home-baseline.jsonl`。
 overlay 恢复原基线生产，只增加独立 probe 并移除 IPC 测试 helper 的 `!cgo` 标签；不是原仓库完整 race。
+
+**处置版本：`b230e428691445580cb8c8eddb57ad6e155ee6d4`。**
+[共享队列](../../../core/config_inputs.go)在 configMu 内、启动 goroutine 前登记完成责任，
+回收及队列占位清理完成后才释放登记。[guarded shutdown](../../../core/provider_lifecycle.go)
+经过既有关闭 admission 和 configMu 边界后，在不持 collector 所需锁时等待，再执行物理清理并报告成功。
+旧任务未退出时，关闭超时仍返回未完成并拒绝 Init；不将逻辑取消或捕获旧目录当作退出证明。
+
+设计复核补齐了原先遗漏的第二个生产入口：[accepted checkpoint 发布](../../../core/config_checkpoint.go)
+也会排队，其 updateConfig 与代理选择消费者均持 configMu；配置采用与 checkpoint 共用登记。
+关闭时的 retired／version 更新及 checkpoint 原 ready／version／owner 校验阻止关闭边界后的迟到登记，
+没有增加目录镜像、平行生命周期状态或放宽请求资格和活材料引用保护。
+长期契约见[全局生命周期与就地重建](business_data_design.md#全局生命周期与就地重建)。
+
+验证由 D 执行，M 审查代码、测试方案、断言和冻结证据，未代跑编译或产品测试：
+
+- 当前父版本 `65fd20e` 的真实 apply→shutdown→Init 八轮再次报告 HomeDir race；相同无 gate probe
+  在修复后通过。另一个相同迟到断言在父版本失败，证明旧任务暂停时关闭错误地报告成功。
+- [生命周期测试](../../../core/config_collection_lifecycle_test.go)覆盖同目录重启、目录切换、activate／
+  updateConfig／代理选择排队、超时与重复关闭、新旧 checkpoint 拒绝，以及资格／IO／panic 释放。
+  受控选集有 11 个子场景、14 个含组 pass events；无生产暂停点的生命周期选集有 5 个顶层 test、
+  7 个含子场景 pass events，均无失败／跳过。断言同时核对自有垃圾、活引用、新目录文件及 Init 结果。
+- 普通 Go wrapper 为 444 个顶层 test、683 个含 subtest pass events、40 个既有 skip，host vet 默认及
+  no_zerotier 配置通过。refine 未改生产／测试，沿用 Go 结果；补充 Flutter 消费者 39 pass、0 fail／skip，
+  analyze 保留原 42 条 info，无新增问题。
+
+受控 gate overlay 只在共享队列的完成 defer 注册后加入测试暂停调用；race helper overlay 只去测试标签。
+父版本、相同断言、无生产 gate 循环及最终源码分别绑定，不能将插桩选集当作全仓 race 证明。
+修复只覆盖 no_zerotier guarded 生命周期中的共享异步 collector，不声称所有 HomeDir 入口或旧非 guarded
+路径均已同步；回收错误不保证垃圾清完，挂起不保证终止 goroutine。Core 子模块／gitlink／carrier 未改，
+未进行 APK、JNI／真实 Android 存储或设备验收，也未证明既有用户曾遭遇误删或数据丢失。
+
+本地冻结证据位于 `.buildlog/f01-collector-lifecycle-20261117/` 的 `implementation-01/` 与 `delivery/`；
+原 R08 证据继续保留。D 的 `4335a7b0` 仅由 M amend Details，Tree 与父提交未变。
+完成 Plan／Result 已从当前树清理，定稿及重放步骤可用
+`git show b230e42:docs/features/security/f01_collector_lifecycle_plan.md` 和
+`git show b230e42:docs/features/security/f01_collector_lifecycle_result.md` 取回。
 
 ## 验证证据与限制
 
