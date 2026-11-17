@@ -209,7 +209,12 @@ This section describes approved work in progress, not verified production behavi
 For `no_zerotier` builds: moving staged Apply outside configMu also requires the same resource admission
 boundary for Go Shutdown, initClash and prepareConfig's direct initializeCore call. Logical Stop and Android service
 unbind do not prove global cleanup or process exit. Pending cleanup must fence new initialization until the owned
-Apply/provider work has exited and real shutdown has succeeded; the contract is maintained in
+Apply/provider work and automatically queued configuration-input collection have exited and real shutdown has succeeded.
+Collection is registered under configMu before worker launch; shutdown fences new registrations and joins outside
+the collector's locks before physical cleanup can finish or Init can change HomeDir. This covers the guarded
+configuration-activation and accepted-checkpoint collection queue, not every HomeDir reader or the legacy non-guarded path.
+Both queue callers hold configMu; checkpoint publication also rechecks ready phase and version/owner across shutdown.
+The contract is maintained in
 [the business data design](../docs/features/security/business_data_design.md#全局生命周期与就地重建).
 ServiceState remains the Android intent authority. Host verification and an ARM64 build are complete; device installation has not been tested.
 

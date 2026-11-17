@@ -327,6 +327,10 @@ current、prepared、退休未退出stage、pending、checkpoint和有效grant�
 Dart在正文已交给本地快照、实际输入marker或热采用完成后释放，取消／失败亦沿finally释放；旧client失效后其lease不可继续供候选使用。
 collector将这些lease、待审候选上下文和上述运行／恢复引用一并核对，材料引用不能用年龄或“最新两份”替代。
 collector在原读／提交屏障捕获引用，删除前重核，仅删自有hash文件；超预算拒新，不能删除活引用腾位。
+no_zerotier guarded 关闭还等待配置采用／accepted checkpoint 发布派生的共享异步 collector 实际退出，再允许关闭成功及重新 Init；
+任务在 configMu 内、goroutine 启动前登记，关闭在锁外等待，回收和队列占位清理后才释放完成责任。
+捕获旧目录不等于生命周期隔离；回收错误不等于已清完，挂起也不能放行新目录初始化。
+两个生产排队入口均持 configMu；checkpoint 还以 ready／version／owner 核验，关闭 fence 后不能迟到发布并新增回收。
 候选／代码接受标记及文件存在不能在重启后自动升级为采用。
 Stop automatic maintenance关闭未来自动委托并增revision，精确已接受内容可继续使用／重放。
 Stop using this source/capability增use epoch，同步撤受影响scope和重放，native条件清理；当前配置需另选替代输入。

@@ -797,7 +797,7 @@ func activateConfig(receipt ConfigReceipt) ConfigApplyResult {
 	for _, provider := range p.sourceProviders {
 		provider.start()
 	}
-	queueInputCollection()
+	queueInputCollectionLocked()
 	sendMessage(Message{Type: ConfigStateMessage, Data: configFact})
 	return configResult(status, receipt, nil)
 }

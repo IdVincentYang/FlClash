@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	C "github.com/metacubex/mihomo/constant"
@@ -14,6 +15,7 @@ import (
 )
 
 var inputCollectionQueued atomic.Bool
+var inputCollectionWorkers sync.WaitGroup
 
 type inputCandidateMarker struct {
 	YAMLSHA256   string `json:"yamlSha256"`
@@ -32,12 +34,14 @@ func candidateInputID(name string) (string, bool) {
 	return parts[0], true
 }
 
-func queueInputCollection() {
+func queueInputCollectionLocked() {
 	if !inputCollectionQueued.CompareAndSwap(false, true) {
 		return
 	}
+	inputCollectionWorkers.Add(1)
 	home := C.Path.HomeDir()
 	safeGoDetached("collect configuration inputs", func() {
+		defer inputCollectionWorkers.Done()
 		defer inputCollectionQueued.Store(false)
 		_ = collectConfigInputsAt(home, "")
 	})

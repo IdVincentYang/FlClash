@@ -359,6 +359,6 @@ func publishCheckpointCandidate(candidate *checkpointCandidate) error {
 		}
 	}
 	sendMessage(Message{Type: ConfigStateMessage, Data: configFact})
-	queueInputCollection()
+	queueInputCollectionLocked()
 	return nil
 }

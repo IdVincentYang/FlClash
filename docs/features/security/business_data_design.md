@@ -193,11 +193,19 @@ Android `Service.shutdown()` 实际经 ServicePlugin／ServiceController 解绑�
 Go Init 的实际应用调用方是 CoreController.init／CoreAction.initCore，不能绕过同一关闭边界。
 
 在关闭请求到达时封闭新 prepare（分配 owner 前）、install、activate 和 Init，取消所捕获 owner 的请求，
-在 configMu 外等原 Apply／Initial／provider 清理真正退出，再独占执行原 Go 全局清理。
+在 configMu 外等原 Apply／Initial／provider 清理及配置采用／accepted checkpoint 发布派生的异步 collector 真正退出，再独占执行原 Go 全局清理。
 原 worker 未退出或物理关闭仍未返回时，不提前 isInit=false；currentConfig 即便因逻辑失效被撤下，原 cfg 仍归退出工作持有，
 内部初始化值只随真实 Init／Shutdown 结果改变，关闭期间 RPC 通过现有 MethodError 表达生命周期不可用，
 避免应用把 getIsInit 的捷径或 init 的 bool 结果当成重建许可。
 只有清理成功并重核本关闭工作的所有权后才报告成功，随后新的 Init 才能创建资源。
+
+配置采用与 accepted checkpoint 发布均在 configMu 内向共享 collector 排队，先占用合并标记并登记完成责任，再启动 goroutine；
+回收及合并标记收尾完成后才能释放该登记。shutdown 到达封闭新 activate／Init，再经过 configMu，
+使已经进入采用的任务先完成登记；等待时不持 configMu、checkpoint、stagedCore 或 registry 锁。
+因此同目录重启与目录切换都须等旧回收退出，不能把捕获旧 home 或逻辑取消当作完成。
+回收失败仍按原资格／文件错误结束，不保证垃圾已回收；挂起沿原关闭预算返回未完成，保留 Init fence。
+checkpoint 的 ready／version／owner 校验与 shutdown 在 configMu 内推进 retired／version 配合，禁止 fence 后发布并迟到登记。
+此保证限 no_zerotier 的 guarded 生命周期和上述共享异步队列，不覆盖所有 HomeDir 访问或旧非 guarded 路径。
 
 关闭期间排队的 Init／旧 registration 不在关闭完成后自动执行；利用现有 RPC 到达顺序限定其资格，
 迟到 Shutdown 回调只完成原工作，不能清新 owner。重复关闭共享同次结果，

@@ -101,6 +101,7 @@ func (work *coreShutdownWork) run() {
 	if stage != nil {
 		<-stage.done
 	}
+	inputCollectionWorkers.Wait()
 	configMu.Lock()
 	stagedCore.Lock()
 	if stagedCore.shutdown != work {
