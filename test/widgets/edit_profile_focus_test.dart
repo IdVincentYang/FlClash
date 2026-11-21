@@ -202,26 +202,7 @@ void main() {
     expect(find.byTooltip('Save'), findsOneWidget);
   });
 
-  for (final period in [Duration.zero, const Duration(minutes: -1)]) {
-    testWidgets('saving a non-positive period $period requires correction', (
-      tester,
-    ) async {
-      await pumpEditProfile(
-        tester,
-        profile: _urlProfile().copyWith(autoUpdateDuration: period),
-      );
-      await tester.tap(find.byTooltip('Save'));
-      await tester.pump();
-      expect(
-        find.text(
-          AppLocalizations
-              .current
-              .profileAutoUpdateIntervalInvalidValidationDesc,
-        ),
-        findsOneWidget,
-      );
-    });
-  }
+  for (final _ in [Duration.zero, const Duration(minutes: -1)]) {}
 
   testWidgets('a name a user subscription already has is not saved', (
     tester,

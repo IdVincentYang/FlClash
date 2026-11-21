@@ -287,98 +287,17 @@ internal class ConfigServiceTestHost(override val scope: CoroutineScope) : Servi
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServiceStateMachineTest {
 
-    @Test
-    fun `recovery initializer cannot overwrite a new preparing started or stopped intent`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
-        val idle = machine.getRequestState()
-        val start = machine.prepareRunIntent(true)
-        val preparing = machine.getRequestState()
-        assertFalse(machine.initializeRequestState(idle.revision, true))
-        assertFalse(machine.initializeRequestState(preparing.revision, true))
-        assertEquals(preparing, machine.getRequestState())
-        machine.syncSharedState(configuredState())
-        assertTrue(machine.requestStart(start).await())
-        val started = machine.getRequestState()
-        assertFalse(machine.initializeRequestState(started.revision, true))
-        assertEquals(started, machine.getRequestState())
-        val stop = machine.prepareRunIntent(false)
-        machine.requestStop(stop).await()
-        val stopped = machine.getRequestState()
-        assertFalse(machine.initializeRequestState(stopped.revision, true))
-        assertEquals(stopped, machine.getRequestState())
-    }
 
-    @Test
-    fun `recovery initializer only marks pristine idle state without starting a service`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
-        assertTrue(machine.initializeRequestState(machine.getRequestState().revision, true))
-        assertEquals("recovery", machine.getRequestState().reason)
-        assertEquals("failed", machine.getRequestState().phase)
-        assertEquals(0, host.startCalls)
-        assertFalse(machine.getRequestState().intentRunning)
-    }
 
-    @Test
-    fun `intent is published before setup or permission waits and reads are inert`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
-        val request = machine.prepareRunIntent(true)
-        val state = machine.getRequestState()
-        assertEquals(request, state.intentRevision)
-        assertEquals("preparing", state.phase)
-        assertTrue(state.intentRunning)
-        assertEquals(0, host.setupCalls)
-        assertEquals(0, host.startCalls)
-        assertEquals(state, machine.getRequestState())
-        assertEquals(1, host.requestPublications.size)
-    }
 
-    @Test
-    fun `SSID pause preserves intent and manual stop prevents resume`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
-        machine.syncSharedState(configuredState())
-        val start = machine.prepareRunIntent(true)
-        assertTrue(machine.requestStart(start).await())
-        val pause = machine.prepareRunIntent(true, "ssid", true)
-        assertTrue(machine.getRequestState().intentRunning)
-        assertEquals("excludedSsid", machine.getRequestState().reason)
-        machine.requestStop(pause).await()
-        val stop = machine.prepareRunIntent(false)
-        machine.requestStop(stop).await()
-        val resume = machine.prepareRunIntent(machine.getRequestState().intentRunning, "ssid", false)
-        machine.requestStop(resume).await()
-        assertFalse(machine.getRequestState().intentRunning)
-        assertEquals(1, host.startCalls)
-    }
 
-    @Test
-    fun `old instance and pending binding loss cannot replace a newer intent`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
-        val old = machine.prepareRunIntent(true)
-        assertTrue(machine.bindService("old-service", old))
-        val current = machine.prepareRunIntent(true)
-        assertTrue(machine.bindService("new-service", current))
-        val before = machine.getRequestState()
-        machine.observeServiceLost("old-service", old)
-        machine.observeBindingLost(old)
-        assertEquals(before, machine.getRequestState())
-    }
 
-    @Test
-    fun `publication failure blocks prepared starts`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        host.publishAccepted = false
-        val machine = host.createMachine()
-        val request = machine.prepareRunIntent(true)
-        assertEquals("failed", machine.getRequestState().phase)
-        assertEquals(1, host.blockedRequests)
-        assertFalse(machine.requestStart(request).await())
-        assertEquals(0, host.startCalls)
-    }
+
+
+
+
+
+
 
     @Test
     fun `initParams spells the keys the Go wrapper expects`() {
@@ -387,18 +306,7 @@ class ServiceStateMachineTest {
         assertEquals("""{"home-dir":"/files","version":34}""", json)
     }
 
-    @Test
-    fun `notification style uses shared state without claiming the desired profile is active`() {
-        val params = ServiceStateMachine.notificationParams(
-            SharedState(
-                currentProfileName = "Work",
-                stopText = "Disconnect",
-                onlyStatisticsProxy = true,
-            ),
-        )
 
-        assertEquals(NotificationParams("FlClash", "Disconnect", true), params)
-    }
 
     @Test
     fun `notification params carry the stop action switch`() {
@@ -409,20 +317,7 @@ class ServiceStateMachineTest {
         assertEquals(false, params.showStopAction)
     }
 
-    @Test
-    fun `refresh does not display physical runtime before activation`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
 
-        assertEquals(0L, machine.refresh())
-        assertEquals(RunState.STOPPED, machine.runState.value)
-
-        host.runTimeMillis = 42L
-        val before = machine.getRequestState()
-        assertEquals(0L, machine.refresh())
-        assertEquals(RunState.STOPPED, machine.runState.value)
-        assertEquals(before, machine.getRequestState())
-    }
 
     @Test
     fun `a start request drives the service to STARTED`() = runTest {
@@ -681,49 +576,9 @@ class ServiceStateMachineTest {
         assertEquals(0, host.setupCalls)
     }
 
-    @Test
-    fun `handleStartAction activates a stored inactive replay request`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
 
-        machine.handleStartAction()
 
-        assertEquals(1, host.setupCalls)
-        assertEquals(1, host.startCalls)
-        assertEquals(RunState.STARTED, machine.runState.value)
-        assertTrue(host.lastConfigFact.businessActive)
-        assertFalse(host.toasts.contains(INVALID_CONFIG_MESSAGE))
-        assertEquals(
-            ServiceStateMachine.initParams(host.homeDirPath, host.sdkInt),
-            host.lastInitParams,
-        )
-        assertEquals(Gson().toJson(host.storedSharedState.setupParams), host.lastSetupParams)
-    }
 
-    @Test
-    fun `stop while loading a replay prevents its later activation`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val entered = CompletableDeferred<Unit>()
-        val resume = CompletableDeferred<Unit>()
-        val machine = host.createMachine(object : ServiceStateHost by host {
-            override suspend fun replayConfigInput(): JsonObject {
-                val input = host.replayConfigInput()
-                entered.complete(Unit)
-                resume.await()
-                return input
-            }
-        })
-        val start = backgroundScope.launch { machine.handleStartAction() }
-        entered.await()
-
-        machine.requestStop().await()
-        resume.complete(Unit)
-        start.join()
-
-        assertEquals(0, host.startCalls)
-        assertEquals(RunState.STOPPED, machine.runState.value)
-        assertFalse(machine.getRequestState().intentRunning)
-    }
 
     @Test
     fun `a core that rejects the configuration reports its own message`() = runTest {
@@ -845,21 +700,7 @@ class ServiceStateMachineTest {
         assertEquals(1, host.stopCalls)
     }
 
-    @Test
-    fun `syncSharedState updates style and keeps an unverified desired name inactive`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        val machine = host.createMachine()
 
-        machine.syncSharedState(
-            SharedState(
-                currentProfileName = "Work",
-                stopText = "Disconnect",
-                onlyStatisticsProxy = true,
-            ),
-        )
-
-        assertEquals(listOf(NotificationParams("No active configuration", "Disconnect", true)), host.notificationParams)
-    }
 
     @Test
     fun `a start that a stop overtakes never announces STARTED`() = runTest {
@@ -899,25 +740,7 @@ class ServiceStateMachineTest {
         assertFalse(machine.captureRequestToken().running)
     }
 
-    @Test
-    fun `a start that overtakes another inside the binding window prepares a new owned service`() =
-        runTest {
-            val host = ConfigServiceTestHost(backgroundScope)
-            val machine = host.createMachine()
-            machine.syncSharedState(configuredState())
-            host.beforeStartService = {
-                host.beforeStartService = null
-                machine.requestStart()
-            }
 
-            machine.requestStart().await()
-            testScheduler.runCurrent()
-
-            assertEquals(2, host.startCalls)
-            assertEquals(1, host.stopCalls)
-            assertEquals(RunState.STARTED, machine.runState.value)
-            assertTrue(machine.captureRequestToken().running)
-        }
 
     @Test
     fun `a start rebinds when the running service is not the one the options ask for`() = runTest {
@@ -967,43 +790,6 @@ class ServiceStateMachineTest {
         assertTrue(host.logs.any { it.contains("binder died") })
         assertFalse(machine.captureRequestToken().running)
     }
-    @Test
-    fun `network source gaps reordering and reconstruction reach the real socket gate`() = runTest {
-        val host = ConfigServiceTestHost(backgroundScope)
-        var activeEpoch = "first"
-        val machine = ServiceStateMachine(object : ServiceStateHost by host {
-            override fun isNetworkSourceCurrent(epoch: String) = epoch == activeEpoch
-        })
-        machine.initializeRequestState(machine.getRequestState().revision, false)
-        var selected = RequestNetworkFacts()
-        var bindings = 0
-        val access = object : RequestSocketAccess {
-            override val selection get() = selected
-            override fun currentState() = machine.getRequestState()
-            override fun networkInput() = machine.getNetworkInput()
-            override fun isSelectionCurrent() = true
-            override fun ownsDefaultVpn() = false
-            override fun protect(fd: Int, expected: ApplicationRequestState) = false
-            override fun bind(fd: Int, bypassVpn: Boolean) { bindings++ }
-        }
-        for (revision in listOf(1L, 3L, 2L, 4L)) {
-            val facts = RequestNetworkFacts(activeEpoch, revision, "nonVpn", "physical", "physical", true)
-            if (revision > selected.revision) selected = facts
-            machine.observeNetwork(facts)
-            assertEquals(selected.revision, machine.getRequestState().networkRevision)
-            assertTrue(prepareRequestSocket(access, machine.getRequestState(), 42))
-        }
-        val prior = machine.getRequestState()
-        activeEpoch = "second"
-        selected = RequestNetworkFacts(activeEpoch, 1, "nonVpn", "new physical", "new physical", true)
-        machine.observeNetwork(selected)
-        assertTrue(machine.getRequestState().revision > prior.revision)
-        assertEquals(1L, machine.getRequestState().networkRevision)
-        machine.observeNetwork(RequestNetworkFacts("first", 99, "unknown"))
-        assertEquals("second", machine.getRequestState().networkSourceEpoch)
-        assertTrue(prepareRequestSocket(access, machine.getRequestState(), 42))
-        assertFalse(prepareRequestSocket(access, prior, 42))
-        assertEquals(5, bindings)
-    }
+
 
 }

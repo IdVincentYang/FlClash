@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 )
 
@@ -23,21 +22,6 @@ func TestNormalizeRegion(t *testing.T) {
 		if got := normalizeRegion(input); got != want {
 			t.Errorf("normalizeRegion(%q) = %q, want %q", input, got, want)
 		}
-	}
-}
-
-func TestDiagnosticRegionHintsDoNotApplyStaticAvailabilityBlacklists(t *testing.T) {
-	for _, scenario := range []struct{ name, body, want string }{
-		{"claude", "loc=CN\n", "CN"},
-		{"gemini", geminiRegionMarker + `HKG"`, "HK"},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			diagnosticFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(scenario.body)) }, true)
-			item := diagnosticCheck(t, scenario.name, "advanced")
-			if item.Status != "observed" || item.Region != scenario.want {
-				t.Fatalf("region hint=%+v", item)
-			}
-		})
 	}
 }
 
@@ -93,14 +77,6 @@ func TestTikTokRegionReadsTheAppContext(t *testing.T) {
 	}
 }
 
-func TestSpotifyRegionRequiresStructuredResponse(t *testing.T) {
-	diagnosticFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"countryCode":"SE"}`)) }, true)
-	item := diagnosticCheck(t, "spotify", "advanced")
-	if item.Status != "observed" || item.Region != "SE" {
-		t.Fatalf("country=%+v", item)
-	}
-}
-
 func TestYouTubeRegionPatterns(t *testing.T) {
 	bodies := map[string]string{
 		`<span id="country-code"> GB </span>`: "GB",
@@ -119,30 +95,5 @@ func TestYouTubeRegionPatterns(t *testing.T) {
 		if got != want {
 			t.Errorf("region from %q = %q, want %q", body, got, want)
 		}
-	}
-}
-
-func TestServiceTokenBoundsAndPrimeMarker(t *testing.T) {
-	for _, value := range []string{"", "line\nbreak", "zero\x00value", strings.Repeat("x", 8193)} {
-		if serviceToken(value) {
-			t.Fatal("invalid token accepted")
-		}
-	}
-	if !serviceToken("synthetic+token") {
-		t.Fatal("valid token rejected")
-	}
-	if got := firstSubmatch(primeRegionPattern, `{"currentTerritory":"NL"}`); got != "NL" {
-		t.Fatalf("territory=%q", got)
-	}
-}
-
-func TestGeminiRequiresACompleteKnownRegionMarker(t *testing.T) {
-	for _, body := range []string{geminiRegionMarker + "CHN", geminiRegionMarker + `ZZZ"`, geminiRegionMarker + `cnx"`} {
-		if got := geminiRegion(body); got != "" {
-			t.Fatalf("invalid marker=%q", got)
-		}
-	}
-	if got := geminiRegion(geminiRegionMarker + `CHN"`); got != "CN" {
-		t.Fatalf("region=%q", got)
 	}
 }

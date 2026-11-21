@@ -189,7 +189,7 @@ class ApplicationPolicySwitch extends ConsumerWidget {
             ? l.appPolicyApplied
             : l.disabled);
     return SizedBox(
-      width: 112,
+      width: 96,
       child: Tooltip(
         message: '$name\n$reason',
         child: Column(
@@ -219,7 +219,7 @@ class ApplicationPolicySwitch extends ConsumerWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
+                        textAlign: TextAlign.end,
                         style: context.textTheme.labelSmall?.copyWith(
                           color: color,
                         ),
@@ -231,55 +231,58 @@ class ApplicationPolicySwitch extends ConsumerWidget {
             ),
             SizedBox(
               height: 40,
-              child: Switch(
-                value: rule.enabled,
-                activeTrackColor: color,
-                trackColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? color
-                      : failed
-                      ? color.withValues(alpha: 0.3)
-                      : null,
-                ),
-                onChanged: global || pending || settings == null
-                    ? null
-                    : (enabled) async {
-                        if (!await confirmApplicationPackages(
-                              context,
-                              packages,
-                            ) ||
-                            !context.mounted) {
-                          return;
-                        }
-                        if (enabled &&
-                            rule.hasDefault &&
-                            rule.action == ApplicationRouteAction.proxy &&
-                            !target.available) {
-                          await BaseNavigator.push(
-                            context,
-                            ApplicationPolicyView(
-                              packages: packages,
-                              label: label,
-                              enableOnSave: true,
-                            ),
-                          );
-                          return;
-                        }
-                        try {
-                          await ref
-                              .read(
-                                applicationRoutingControllerProvider.notifier,
-                              )
-                              .setEnabled(packages, enabled);
-                        } catch (error) {
-                          if (context.mounted) {
-                            context.showNotifier(
-                              userFacingErrorMessage(error, l),
-                              level: MessageLevel.error,
-                            );
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Switch(
+                  value: rule.enabled,
+                  activeTrackColor: color,
+                  trackColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? color
+                        : failed
+                        ? color.withValues(alpha: 0.3)
+                        : null,
+                  ),
+                  onChanged: global || pending || settings == null
+                      ? null
+                      : (enabled) async {
+                          if (!await confirmApplicationPackages(
+                                context,
+                                packages,
+                              ) ||
+                              !context.mounted) {
+                            return;
                           }
-                        }
-                      },
+                          if (enabled &&
+                              rule.hasDefault &&
+                              rule.action == ApplicationRouteAction.proxy &&
+                              !target.available) {
+                            await BaseNavigator.push(
+                              context,
+                              ApplicationPolicyView(
+                                packages: packages,
+                                label: label,
+                                enableOnSave: true,
+                              ),
+                            );
+                            return;
+                          }
+                          try {
+                            await ref
+                                .read(
+                                  applicationRoutingControllerProvider.notifier,
+                                )
+                                .setEnabled(packages, enabled);
+                          } catch (error) {
+                            if (context.mounted) {
+                              context.showNotifier(
+                                userFacingErrorMessage(error, l),
+                                level: MessageLevel.error,
+                              );
+                            }
+                          }
+                        },
+                ),
               ),
             ),
           ],

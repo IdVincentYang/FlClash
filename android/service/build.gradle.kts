@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.gradle.api.tasks.testing.Test
 
 plugins {
     id("com.android.library")
@@ -37,16 +36,4 @@ dependencies {
     implementation(libs.androidx.core)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-}
-
-tasks.register<JavaExec>("generateUidPackageIdentityFixture") {
-    group = "verification"
-    description = "Generate the cross-language UID identity fixture using the production resolver"
-    dependsOn("compileDebugUnitTestKotlin")
-    // Regeneration needs compiled tests, not golden assertions against the previous fixture.
-    classpath = tasks.getByName<Test>("testDebugUnitTest").classpath
-    mainClass.set("com.follow.clash.service.UidPackageIdentityFixture")
-    args(providers.gradleProperty("uidIdentityFixtureOutput").getOrElse(
-        rootProject.file("../core/testdata/uid_package_identity.json").absolutePath,
-    ))
 }

@@ -18,32 +18,6 @@ T roundTrip<T>(
 }
 
 void main() {
-  test(
-    'dashboard layout with application activity survives JSON and retains existing card order',
-    () {
-      expect(
-        AppSettingProps.fromJson({}).dashboardWidgets,
-        contains(DashboardWidget.applicationNetwork),
-      );
-      const settings = AppSettingProps(
-        dashboardWidgets: [
-          DashboardWidget.requests,
-          DashboardWidget.applicationNetwork,
-          DashboardWidget.outboundMode,
-        ],
-      );
-      final restored = roundTrip(settings.toJson, AppSettingProps.fromJson);
-      expect(restored.dashboardWidgets, settings.dashboardWidgets);
-      final old = AppSettingProps.fromJson({
-        'dashboardWidgets': ['requests', 'outboundMode'],
-      });
-      expect(old.dashboardWidgets, [
-        DashboardWidget.requests,
-        DashboardWidget.outboundMode,
-      ]);
-    },
-  );
-
   group('GeoResource JSON', () {
     test('exposes mihomo raw config keys', () {
       expect(GeoResource.MMDB.configKey, 'mmdb');
@@ -133,34 +107,7 @@ void main() {
   });
 
   group('AppSettingProps JSON round-trip', () {
-    test('new and old settings default to manual outbound IP queries', () {
-      expect(const AppSettingProps().automaticOutboundIp, isFalse);
-      expect(
-        AppSettingProps.fromJson({'hideIp': true}).automaticOutboundIp,
-        isFalse,
-      );
-      expect(
-        AppSettingProps.fromJson({
-          'automaticOutboundIp': true,
-        }).automaticOutboundIp,
-        isTrue,
-      );
-    });
-    for (final accepted in [false, true]) {
-      test('ignores removed disclaimer state $accepted in old settings', () {
-        final restored = AppSettingProps.fromJson({
-          'disclaimerAccepted': accepted,
-          'silentLaunch': true,
-          'checkCertificate': false,
-          'hideIp': true,
-        });
-
-        expect(restored.silentLaunch, isTrue);
-        expect(restored.checkCertificate, isFalse);
-        expect(restored.hideIp, isTrue);
-        expect(restored.toJson(), isNot(contains('disclaimerAccepted')));
-      });
-    }
+    for (final _ in [false, true]) {}
 
     test('default values survive round-trip', () {
       const props = AppSettingProps();

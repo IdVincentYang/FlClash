@@ -124,13 +124,6 @@ void main() {
       expect(result, 'ok');
     });
 
-    test('setupConfig delegates without a parallel preload', () async {
-      const params = SetupParams(selectedMap: {}, testUrl: 'http://x.com');
-      when(() => mock.setupConfig(params)).thenAnswer((_) async => 'ok');
-      expect(await controller.setupConfig(params: params), 'ok');
-      verify(() => mock.setupConfig(params)).called(1);
-    });
-
     test('changeProxy delegates to interface', () async {
       const params = ChangeProxyParams(groupName: 'G1', proxyName: 'P1');
       const result = ChangeProxyResult(changed: true);

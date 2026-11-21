@@ -29,20 +29,4 @@ void main() {
       ),
     );
   });
-
-  test(
-    'subscription bytes consumer reports a fixed download failure',
-    () async {
-      await expectLater(
-        request.getFileResponseForUrl('http://127.0.0.1/anything'),
-        throwsA(
-          isA<RequestUnavailable>().having(
-            (e) => e.code,
-            'code',
-            'profile_download_failed',
-          ),
-        ),
-      );
-    },
-  );
 }

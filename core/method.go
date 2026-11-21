@@ -288,9 +288,6 @@ var methodHandlers = map[CoreMethod]methodHandler{
 			response.success(handleServiceCheck(params))
 		})
 	}),
-	getHostTrafficMethod: withoutArguments(func(response MethodResponse) {
-		response.success(hostTraffic.snapshot(configRuntimeEpoch))
-	}),
 	getConnectionsMethod: withoutArguments(func(response MethodResponse) {
 		response.success(handleGetConnectionsData())
 	}),

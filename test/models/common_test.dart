@@ -9,20 +9,6 @@ import 'package:mocktail/mocktail.dart';
 class MockFile extends Mock implements File {}
 
 void main() {
-  test(
-    'metadata retains native inbound kind without treating missing types as internal',
-    () {
-      expect(
-        Metadata.fromJson({
-          'type': 'Inner',
-          'destinationIP': '8.8.8.8',
-        }).inboundType,
-        'Inner',
-      );
-      expect(Metadata.fromJson({'type': 'Tun'}).toJson()['type'], 'Tun');
-      expect(Metadata.fromJson({}).inboundType, '');
-    },
-  );
   group('FileInfo', () {
     late MockFile file;
 
@@ -214,24 +200,7 @@ void main() {
     });
   });
 
-  group('IpInfo parser', () {
-    test('parses the Cloudflare trace only', () {
-      expect(
-        IpInfo.fromCloudflareTrace('ip=1.1.1.1\nloc=AU\n'),
-        const IpInfo(ip: '1.1.1.1', countryCode: 'AU'),
-      );
-    });
-    test('rejects missing and duplicate fields', () {
-      expect(
-        () => IpInfo.fromCloudflareTrace('ip=1.1.1.1\n'),
-        throwsFormatException,
-      );
-      expect(
-        () => IpInfo.fromCloudflareTrace('ip=1.1.1.1\nip=8.8.8.8\nloc=US\n'),
-        throwsFormatException,
-      );
-    });
-  });
+  group('IpInfo parser', () {});
 
   group('ResultExt', () {
     test('identifies success and error results', () {

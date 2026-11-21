@@ -66,14 +66,33 @@ class ActivityConnection {
   );
 }
 
+class _ActivityGroup {
+  final connections = <ActivityConnection>[];
+  int _upload = 0, _download = 0;
+
+  void add(ActivityConnection connection) {
+    connections.add(connection);
+    _upload += connection.upload;
+    _download += connection.download;
+  }
+
+  ActivityTotals totals({required bool fresh}) => ActivityTotals._(
+    List.unmodifiable(connections),
+    fresh: fresh,
+    retainedTraffic: Traffic(up: _upload, down: _download),
+  );
+}
+
 class ActivityTotals {
-  ActivityTotals(
-    Iterable<ActivityConnection> connections, {
+  const ActivityTotals._(
+    this.connections, {
     required this.fresh,
-  }) : connections = List.unmodifiable(connections);
+    required this.retainedTraffic,
+  });
 
   final List<ActivityConnection> connections;
   final bool fresh;
+  final Traffic? retainedTraffic;
 
   int get connectionCount => connections.length;
   int get confirmedActiveCount =>
@@ -136,16 +155,16 @@ class ApplicationActivityState {
   bool get fresh => observing && hasSnapshot && !snapshotFailed;
 
   List<AppActivity> _apps(Iterable<ActivityConnection> records) {
-    final groups = <String, List<ActivityConnection>>{};
+    final groups = <String, _ActivityGroup>{};
     for (final record in records) {
-      (groups[record.appKey] ??= []).add(record);
+      (groups[record.appKey] ??= _ActivityGroup()).add(record);
     }
     final result = [
       for (final entry in groups.entries)
         AppActivity(
           key: entry.key,
-          application: entry.value.first.application,
-          totals: ActivityTotals(entry.value, fresh: fresh),
+          application: entry.value.connections.first.application,
+          totals: entry.value.totals(fresh: fresh),
         ),
     ];
     result.sort(
@@ -157,15 +176,15 @@ class ApplicationActivityState {
   List<AppActivity> get apps => _apps(connections);
 
   List<HostActivity> hostsForApp(String appKey) {
-    final groups = <String, List<ActivityConnection>>{};
+    final groups = <String, _ActivityGroup>{};
     for (final record in connections.where((item) => item.appKey == appKey)) {
-      (groups[record.hostKey] ??= []).add(record);
+      (groups[record.hostKey] ??= _ActivityGroup()).add(record);
     }
     final result = [
       for (final entry in groups.entries)
         HostActivity(
           key: entry.key,
-          totals: ActivityTotals(entry.value, fresh: fresh),
+          totals: entry.value.totals(fresh: fresh),
         ),
     ];
     result.sort(

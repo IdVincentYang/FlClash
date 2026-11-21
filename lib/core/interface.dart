@@ -5,7 +5,6 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/models/config_state.dart';
 
 import 'desktop/model.dart';
-import 'host_traffic.dart';
 import 'method.dart';
 
 mixin CoreInterface {
@@ -81,8 +80,6 @@ mixin CoreInterface {
   FutureOr<void> stopLog();
 
   Future<bool> crash();
-
-  Future<HostTrafficSnapshot> getHostTraffic();
 
   FutureOr<List<TrackerInfo>> getConnections();
 
@@ -394,15 +391,6 @@ abstract class CoreHandlerInterface with CoreInterface {
       method: CoreMethod.updateExternalProvider,
       arguments: providerName,
     );
-  }
-
-  @override
-  Future<HostTrafficSnapshot> getHostTraffic() async {
-    final data = await _invokeMethod<Map<String, dynamic>>(
-      method: CoreMethod.getHostTraffic,
-    );
-    if (data == null) throw StateError('Host traffic unavailable');
-    return HostTrafficSnapshot.fromJson(data);
   }
 
   @override

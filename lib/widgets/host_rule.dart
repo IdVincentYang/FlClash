@@ -122,6 +122,7 @@ class HostRuleButton extends ConsumerWidget {
           message: '${label == detail ? detail : '$label · $detail'}\n$reason',
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (failed) ...[
                 GlyphIcon(AppGlyphs.warning, size: 14, color: color),
@@ -130,13 +131,14 @@ class HostRuleButton extends ConsumerWidget {
               Expanded(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
                   child: SizedBox(
                     width: 56,
                     child: Text(
                       label,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
+                      textAlign: TextAlign.end,
                       style: context.textTheme.labelSmall?.copyWith(
                         color: color,
                       ),

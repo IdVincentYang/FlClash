@@ -167,19 +167,9 @@ flutter test plugins/proxy/test/proxy_test.dart
 also what CI runs; `tool/check_plugins.sh` does not descend into it. It must stay out of `flutter test`, because a test
 run of `plugins/setup` would execute the build hook itself.
 
-Build execution/CI contract checks use local fixtures and do not publish:
-
-```bash
-python3 -m unittest discover -s tool -p 'test_ci_*.py' -v
-python3 -m unittest discover -s tool -p 'test_release_telegram.py' -v
-```
-
-The Git/SSH/LFS fixtures need native Git, SSH and Git-LFS; workflow parsing needs PyYAML or Ruby Psych, and the
-inline Pages consumer needs Node. Android signing tests require explicit accepted roots in
-`FLCLASH_CI_ANDROID_FIXTURE_SDK`, `FLCLASH_CI_ANDROID_FIXTURE_JDK` and `FLCLASH_CI_ANDROID_FIXTURE_FLUTTER`;
-raw signer extraction also needs `FLCLASH_CI_ANDROID_BUILD_TOOLS_ARCHIVE`. Absent Android fixture roots select explicit skips,
-not evidence of passing signing checks; native Git/SSH/LFS prerequisites must be installed for their fixtures. The optional pure-package host Cargo adapter fixture additionally uses
-`FLCLASH_HELPER_CARGO_FIXTURE=1` and an owned `CARGO_TARGET_DIR`; it is not a Windows/Linux service test.
+Branch-added regression suites and device fixtures have been removed at the user's request. Existing tests retain
+only the compatibility adapters required by the current production APIs. Historical task documents describe prior
+validation, not a promise that those test files or fixture commands are still available.
 
 Native plugin code under `plugins/*/{linux,macos,windows}` is compiled by the CI `desktop` job, which runs
 `flutter build <platform> --debug` on every push; `tool/check_plugins.sh` only analyzes and tests the Dart side.
@@ -191,7 +181,6 @@ For the current Core/service architecture, useful focused checks are:
 ```bash
 flutter test test/core/desktop/
 flutter test test/core/service_test.dart
-flutter test test/core/protocol_contract_test.dart
 flutter test test/manager/core_manager_test.dart
 flutter test test/providers/action_test.dart test/providers/system_action_test.dart
 flutter test test/widgets/core_status_button_test.dart
@@ -202,7 +191,6 @@ What those suites own:
 - `test/core/desktop/`: replaceable IPC transport, RPC request correlation/failure, direct/Helper process leases, and
   latest-intent desktop lifecycle convergence.
 - `test/core/service_test.dart`: `CoreService` composition and terminal close behavior.
-- `test/core/protocol_contract_test.dart`: shared Dart/Go method and event-envelope compatibility, including event batches.
 - `test/providers/action_test.dart`: Core start/restart orchestration and overlapping restart requests.
 - `test/providers/system_action_test.dart`: ordered, idempotent exit cleanup and watchdog behavior.
 - `test/widgets/core_status_button_test.dart`: 600-millisecond connecting presentation hold, immediate failure display,

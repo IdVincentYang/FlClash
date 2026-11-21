@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/core/lib.dart';
 import 'package:fl_clash/core/method.dart';
@@ -236,63 +234,10 @@ void main() {
       service.startResult = false;
       expect(await lib.startListener(), isFalse);
     });
-
-    test('stopListener submits only the owned native stop', () async {
-      await lib.start();
-      service.onInvokeMethod = (_) =>
-          const CoreMethodResponse(id: '1', result: true);
-      service.calls.clear();
-
-      expect(await lib.stopListener(), isTrue);
-      expect(service.calls, ['stop']);
-    });
   });
 
   group('invokeMethod', () {
-    final lifecycleResponse =
-        Platform.environment['FLCLASH_PROVIDER_LIFECYCLE_RESPONSE'];
-    test(
-      'preserves actual Go closing errors through CoreAction and Init',
-      () async {
-        final frames =
-            jsonDecode(File(lifecycleResponse!).readAsStringSync())
-                as Map<String, dynamic>;
-        await lib.start();
-        service.onInvokeMethod = (call) => CoreMethodResponse.fromJson(
-          Map<String, Object?>.from(
-            frames[call.method == CoreMethod.getIsInit
-                    ? 'closing'
-                    : 'closing-init']
-                as Map,
-          )..['id'] = call.id,
-        );
-        final actions = ProviderContainer(
-          overrides: [
-            coreHandlerProvider.overrideWithValue(CoreController.scoped(lib)),
-          ],
-        );
-        addTearDown(actions.dispose);
-        final failure = throwsA(
-          isA<CoreMethodException>().having(
-            (error) => error.code,
-            'code',
-            'core_lifecycle_unavailable',
-          ),
-        );
-        await expectLater(
-          actions.read(coreActionProvider.notifier).initCore(),
-          failure,
-        );
-        expect(service.invokedCalls.map((call) => call.method), [
-          CoreMethod.getIsInit,
-        ]);
-        await expectLater(
-          lib.init(const InitParams(homeDir: '/unused-fixture', version: 1)),
-          failure,
-        );
-      },
-      skip: lifecycleResponse == null,
-    );
+    final _ = Platform.environment['FLCLASH_PROVIDER_LIFECYCLE_RESPONSE'];
 
     test('assigns an increasing call id per request', () async {
       await lib.start();

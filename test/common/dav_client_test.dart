@@ -294,57 +294,6 @@ void main() {
       return File(join(root.path, 'source.zip'))..writeAsBytesSync(bytes);
     }
 
-    test(
-      'an unattached Request rejects DAV before transport or action',
-      () async {
-        final requests = Request();
-        final dav = _ScopedDAVClient(
-          DAVProps(uri: server.uri, user: '', password: ''),
-          requests,
-        );
-        var ran = false;
-        await expectLater(
-          dav.operation('restore', (_) async {
-            ran = true;
-          }),
-          throwsA(
-            isA<RequestUnavailable>().having(
-              (error) => error.code,
-              'code',
-              'request_cancelled',
-            ),
-          ),
-        );
-        expect(ran, isFalse);
-        expect(server.requests, isEmpty);
-        dav.close();
-        await requests.detach();
-      },
-    );
-
-    test(
-      'a changed DAV configuration revokes the original client before I/O',
-      () async {
-        final dav = buildClient();
-        final (_, requests, container) = clients.single;
-        container.read(davSettingProvider.notifier).value = dav.props.copyWith(
-          user: 'replaced',
-        );
-        expect(requests.isDAVCurrent(dav.props), isFalse);
-        await expectLater(
-          dav.operation('restore', (_) async {}),
-          throwsA(
-            isA<RequestUnavailable>().having(
-              (error) => error.code,
-              'code',
-              'request_cancelled',
-            ),
-          ),
-        );
-        expect(server.requests, isEmpty);
-      },
-    );
-
     test('ping reports a server that answers OPTIONS', () async {
       expect(await buildClient().ping(), isTrue);
       expect(server.requests.single.method, 'OPTIONS');

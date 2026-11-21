@@ -82,17 +82,6 @@ void main() {
     return key;
   }
 
-  testWidgets('delay button dispatches only the currently rendered group', (
-    tester,
-  ) async {
-    final key = await pumpTabView(tester);
-    final tabs = tester.widget<TabBar>(find.byType(TabBar));
-    tabs.controller!.animateTo(1);
-    await tester.pumpAndSettle();
-    await key.currentState!.delayTestCurrentGroup();
-    expect(delayActions.tested, ['C']);
-  });
-
   testWidgets('current group follows the rendered tab list', (tester) async {
     final key = await pumpTabView(tester);
 

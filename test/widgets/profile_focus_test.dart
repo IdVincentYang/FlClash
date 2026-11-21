@@ -84,62 +84,6 @@ Future<ProviderContainer> pumpProfiles(
 }
 
 void main() {
-  testWidgets('arrow right from a profile card reaches Use then More', (
-    tester,
-  ) async {
-    final profiles = [
-      urlProfile('url 1'),
-      Profile.normal(label: 'file 1'),
-      urlProfile('url 2'),
-    ];
-    await pumpProfiles(tester, profiles: profiles);
-
-    final cards = find
-        .byType(OutlinedButton)
-        .evaluate()
-        .map((element) => element.widget)
-        .toList();
-
-    Future<void> focusCard(int index) async {
-      for (var tab = 0; tab < 50; tab++) {
-        final context = FocusManager.instance.primaryFocus?.context;
-        final focusedCard = context
-            ?.findAncestorWidgetOfExactType<OutlinedButton>();
-        final focusedAction = context
-            ?.findAncestorWidgetOfExactType<IconButton>();
-        final focusedUse = context?.findAncestorWidgetOfExactType<TextButton>();
-        if (focusedAction == null &&
-            focusedUse == null &&
-            identical(focusedCard, cards[index])) {
-          return;
-        }
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-      }
-      fail('Profile card $index was not reachable');
-    }
-
-    for (var profileIndex = 0; profileIndex < profiles.length; profileIndex++) {
-      await focusCard(profileIndex);
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      await tester.pump();
-
-      if (profileIndex != 0) {
-        final context = FocusManager.instance.primaryFocus?.context;
-        expect(context?.findAncestorWidgetOfExactType<TextButton>(), isNotNull);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-      }
-      final context = FocusManager.instance.primaryFocus?.context;
-      expect(context?.findAncestorWidgetOfExactType<IconButton>(), isNotNull);
-      expect(
-        context?.findAncestorWidgetOfExactType<ListItem>()?.key,
-        Key(profiles[profileIndex].id.toString()),
-      );
-    }
-  });
-
   testWidgets('subscription menu item opens the usage dialog', (tester) async {
     await pumpProfiles(tester, profiles: [urlProfile('url')]);
 

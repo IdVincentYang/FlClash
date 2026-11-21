@@ -106,6 +106,14 @@ class _ApplicationTargetsViewState
         package.packageName: package,
     };
     final hosts = activity.hostsForApp(widget.appKey);
+    num upload = 0, download = 0;
+    for (final host in hosts) {
+      if (host.totals.retainedTraffic case final traffic?) {
+        upload += traffic.up;
+        download += traffic.down;
+      }
+    }
+    final retainedTraffic = Traffic(up: upload, down: download);
     final canFilter =
         activity.fresh &&
         hosts.every((item) => item.totals.activeCount != null);
@@ -232,6 +240,7 @@ class _ApplicationTargetsViewState
                     identity: widget.identity,
                     packageName: widget.packageName,
                     packages: packages,
+                    retainedTraffic: retainedTraffic,
                   );
                 }
                 if (visible.isEmpty) {
@@ -307,11 +316,13 @@ class _ApplicationIdentity extends StatelessWidget {
     required this.identity,
     required this.packageName,
     required this.packages,
+    required this.retainedTraffic,
   });
 
   final ApplicationIdentity identity;
   final String? packageName;
   final Map<String, Package> packages;
+  final Traffic? retainedTraffic;
 
   Future<void> _copy(BuildContext context, String value) async {
     try {
@@ -348,12 +359,18 @@ class _ApplicationIdentity extends StatelessWidget {
           shape: AppShape.xl,
           collapsedShape: AppShape.xl,
           trailing: const _ActivityExpansionIcon(),
-          title: uid == null
-              ? Text(l10n.activitySharedUid)
-              : Align(
-                  alignment: Alignment.centerLeft,
-                  child: _value(context, '$uid', label: l10n.activityUid(uid)),
-                ),
+          title: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            children: [
+              if (uid == null)
+                Text(l10n.activitySharedUid)
+              else
+                _value(context, '$uid', label: l10n.activityUid(uid)),
+              if (retainedTraffic case final traffic?)
+                ActivityTrafficSummary(traffic: traffic, compact: true),
+            ],
+          ),
           subtitle: Text(l10n.activitySharedIdentityHelp),
           children: [
             for (final name in identity.packages)
@@ -371,13 +388,19 @@ class _ApplicationIdentity extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
       child: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 4,
         children: [
           if (packageName case final String name) _value(context, name),
           if (uid != null)
             _value(context, '$uid', label: l10n.activityUid(uid)),
+          if (retainedTraffic case final traffic?)
+            ActivityTrafficSummary(traffic: traffic, compact: true),
           if (packageName == null)
             Text(
-              l10n.activityIdentityUncertain,
+              identity.status == 'notFound'
+                  ? l10n.activityUidNoPackage
+                  : l10n.activityIdentityUncertain,
               style: context.textTheme.bodySmall,
             ),
         ],
@@ -396,6 +419,9 @@ class _TargetActivityRow extends StatelessWidget {
     required this.onRulePressed,
     required this.packages,
   });
+
+  static const _iconWidth = 36.0;
+  static const _actionsWidth = 72.0;
 
   final HostActivity host;
   final VoidCallback onRulePressed;
@@ -418,25 +444,65 @@ class _TargetActivityRow extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: AppShape.xl,
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
+      child: InkWell(
         onTap: onPressed,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: ConnectionExitIcon(info: latestConnection, active: active),
-        title: Text(
-          host.target.isEmpty ? l10n.activityUnknownTarget : host.target,
-        ),
-        subtitle: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ActivityConnectionSummary(totals: host.totals),
-            Text(route, style: context.textTheme.bodySmall),
-          ],
-        ),
-        trailing: HostRuleButton(
-          host: host.target,
-          packages: packages,
-          onPressed: onRulePressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              SizedBox(
+                width: _iconWidth,
+                child: ConnectionExitIcon(
+                  info: latestConnection,
+                  active: active,
+                  size: _iconWidth,
+                  emojiSize: 28,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      host.target.isEmpty
+                          ? l10n.activityUnknownTarget
+                          : host.target,
+                      style: context.textTheme.titleMedium,
+                    ),
+                    ActivityConnectionSummary(totals: host.totals),
+                    Text(route, style: context.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: _actionsWidth,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (host.totals.retainedTraffic case final traffic?)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: ActivityTrafficSummary(
+                          traffic: traffic,
+                          compact: true,
+                          small: true,
+                        ),
+                      ),
+                    HostRuleButton(
+                      host: host.target,
+                      packages: packages,
+                      onPressed: onRulePressed,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

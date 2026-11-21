@@ -54,9 +54,10 @@ commit true 且仍有效才报告成功；超时后 Dart 不恢复该 engine 的
 SystemAction 在收到退出请求时即调用 close，清理阶段等待同一 Future；
 不等托盘等资源清理完成才终止启动许可，迟到 status 响应也不能恢复许可。
 
-BootGuard.evaluate、Bootstrap.attach 各自合并并发 Future。旧 engine／退出使旧 attach aborted，
-Application 不继续其刷新唤醒、App Links、shortcuts。记录损坏、busy、false／异常写入只限制本次自动初始化，
-界面仍可手动操作；错误提示一次，不包含原始 JSON、description 或异常文本。非 Android guard 无存储 IO。
+`BootGuard.evaluate` 和 `Bootstrap.attach` 分别合并并发调用。只读 `status` 查询失败时重试一次；迟到回复不生效，
+会话失效、退出或连续失败仍停止 attach。这样单次查询失败不会中断订阅所需的请求初始化，也不恢复已撤销的写许可。
+attach 中止后不启动自动刷新、App Links 或 shortcuts。记录不可写时保留手动操作，错误只提示一次且不暴露原始数据。
+非 Android guard 不读写启动记录。
 
 ## 与运行及自动维护协作
 

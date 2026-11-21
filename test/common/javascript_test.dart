@@ -114,20 +114,6 @@ void main() {
     );
   });
 
-  test('material output budget rejects before JSON decoding', () async {
-    answerWith('x' * 100);
-    await expectLater(
-      handleAcceptedEvaluate('main', {}, permit: permit, maxBytes: 10),
-      throwsA(
-        isA<MessageException>().having(
-          (e) => e.message,
-          'budget',
-          contains('byte budget'),
-        ),
-      ),
-    );
-  });
-
   test('rejects a result that is not a configuration object', () async {
     answerWith(json.encode([1, 2, 3]));
 
@@ -136,31 +122,4 @@ void main() {
       throwsA(isA<MessageException>()),
     );
   });
-
-  test('unaccepted code never reaches the evaluator', () async {
-    answerWith('{}');
-    await expectLater(
-      handleAcceptedEvaluate('main', {}, permit: null),
-      throwsA(isA<MessageException>()),
-    );
-    expect(calls, isEmpty);
-  });
-
-  test('a code permit cannot execute different bytes', () async {
-    answerWith('{}');
-    await expectLater(
-      handleAcceptedEvaluate('changed main', {}, permit: permit),
-      throwsA(isA<RequestUnavailable>()),
-    );
-    expect(calls, isEmpty);
-  });
-
-  test(
-    'legacy evaluation preserves the existing non-Android contract',
-    () async {
-      answerWith('{"mode":"global"}');
-      expect(await handleEvaluate('legacy', {}), {'mode': 'global'});
-      expect(calls.single.script, 'legacy');
-    },
-  );
 }

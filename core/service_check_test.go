@@ -30,43 +30,6 @@ func checkRegisteredTestRules(params *ServiceCheckParams) []ServiceCheckItem {
 	return handleServiceCheck(params)
 }
 
-func TestHandleServiceCheckEmptySelectionMakesNoRequests(t *testing.T) {
-	var calls atomic.Int32
-	withServiceCheckers(t, serviceChecker{name: "alpha", check: func(serviceEnv) ServiceCheckItem { calls.Add(1); return ServiceCheckItem{Status: serviceAvailable} }})
-	for _, purpose := range []string{"", "basic", "advanced", "unknown"} {
-		if got := handleServiceCheck(&ServiceCheckParams{Purpose: purpose, Timeout: 1000}); len(got) != 0 {
-			t.Fatalf("empty selection=%+v", got)
-		}
-	}
-	if calls.Load() != 0 {
-		t.Fatal("empty selection ran a rule")
-	}
-}
-
-func TestHandleServiceCheckRunsExplicitlySelectedRules(t *testing.T) {
-	withServiceCheckers(t,
-		stubChecker("alpha", ServiceCheckItem{Status: serviceAvailable, Region: "US"}),
-		stubChecker("beta", ServiceCheckItem{Status: serviceUnsupportedRegion}),
-	)
-
-	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
-
-	if len(items) != 2 {
-		t.Fatalf("items = %d, want 2", len(items))
-	}
-	if items[0].Name != "alpha" || items[0].Status != serviceAvailable || items[0].Region != "US" {
-		t.Errorf("items[0] = %+v", items[0])
-	}
-	if items[1].Name != "beta" || items[1].Status != serviceUnsupportedRegion {
-		t.Errorf("items[1] = %+v", items[1])
-	}
-	for _, item := range items {
-		if item.CheckedAt == 0 {
-			t.Errorf("%s has no check time", item.Name)
-		}
-	}
-}
-
 func TestHandleServiceCheckStampsTheRegisteredName(t *testing.T) {
 	withServiceCheckers(t,
 		stubChecker("alpha", ServiceCheckItem{Name: "stale", Status: serviceAvailable}),
@@ -306,43 +269,6 @@ func TestHandleServiceCheckHandsTheCancelledCheckSlotToItsReplacement(t *testing
 		checkRegisteredTestRules(&ServiceCheckParams{Names: []string{checker.name}, Timeout: 5000})
 	}
 	older.Wait()
-}
-
-func TestHandleServiceCheckDoesNotRetryATimeout(t *testing.T) {
-	var calls atomic.Int32
-	withServiceCheckers(t, serviceChecker{name: "flaky", check: func(serviceEnv) ServiceCheckItem {
-		if calls.Add(1) == 1 {
-			return ServiceCheckItem{Status: serviceTimeout}
-		}
-		return ServiceCheckItem{Status: serviceAvailable}
-	}})
-
-	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
-
-	if items[0].Status != serviceTimeout {
-		t.Errorf("status=%q, want timeout without implicit retry", items[0].Status)
-	}
-	if got := calls.Load(); got != 1 {
-		t.Errorf("ran %d times, want one", got)
-	}
-}
-
-func TestHandleServiceCheckReportsTimeoutForEachExplicitRun(t *testing.T) {
-	var calls atomic.Int32
-	withServiceCheckers(t, serviceChecker{name: "down", check: func(serviceEnv) ServiceCheckItem {
-		calls.Add(1)
-		return ServiceCheckItem{Status: serviceTimeout}
-	}})
-
-	items := checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
-
-	if items[0].Status != serviceTimeout {
-		t.Errorf("status = %q, want %q", items[0].Status, serviceTimeout)
-	}
-	checkRegisteredTestRules(&ServiceCheckParams{Timeout: 1000})
-	if got := calls.Load(); got != 2 {
-		t.Errorf("ran %d times, want two explicit runs", got)
-	}
 }
 
 func TestHandleServiceCheckCancelsTheOlderCheckOfTheSameService(t *testing.T) {

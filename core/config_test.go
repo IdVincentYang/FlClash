@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,11 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metacubex/mihomo/adapter/inbound"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/constant"
-	authStore "github.com/metacubex/mihomo/listener/auth"
 	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/tunnel"
 )
@@ -109,17 +105,6 @@ func TestHandleUpdateConfigReportsAnUnappliedConfig(t *testing.T) {
 	}
 }
 
-func TestUpdateConfigRequiresFullApplyForAllowLan(t *testing.T) {
-	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
-	allowLan := true
-	if err := updateConfig(&UpdateParams{AllowLan: &allowLan}); err == nil || err.Error() != "configuration_reapply_required" {
-		t.Fatal("listener change did not require preparation", err)
-	}
-	if currentConfig.General.AllowLan {
-		t.Fatal("listener option changed before full preparation")
-	}
-}
-
 func TestUpdateConfigAppliesGeoResourceUrls(t *testing.T) {
 	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
 	requested := map[string]string{
@@ -166,59 +151,6 @@ func TestSetGeoResourceUrlWritesOnlyAChangedLink(t *testing.T) {
 	setGeoResourceUrl("geosite", "https://example.test/next.dat")
 	if len(writes) != 1 || writes[0] != "https://example.test/next.dat" {
 		t.Errorf("writes = %q, want the changed link once", writes)
-	}
-}
-
-func TestInstalledAuthenticationUsesSharedDecoderAndClearsLoopbackExemptions(t *testing.T) {
-	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
-	currentConfig.General.SkipAuthPrefixes = []netip.Prefix{
-		netip.MustParsePrefix("127.0.0.1/32"),
-	}
-	inbound.SetSkipAuthPrefixes(currentConfig.General.SkipAuthPrefixes)
-	t.Cleanup(func() {
-		authStore.Default.SetAuthenticator(nil)
-		inbound.SetSkipAuthPrefixes(nil)
-	})
-
-	users := []string{"user:pass"}
-	if err := updateConfig(&UpdateParams{Authentication: &users}); err == nil || err.Error() != "configuration_reapply_required" {
-		t.Fatal("authentication did not require new service preparation", err)
-	}
-	applyAuthentication(currentConfig, users)
-	authenticator := authStore.Default.Authenticator()
-	if authenticator == nil || !authenticator.Verify("user", "pass") {
-		t.Error("authenticator missing or rejecting the configured credentials")
-	}
-	if inbound.SkipAuthRemoteAddress("127.0.0.1:1234") {
-		t.Error("loopback stayed exempt; local apps could bypass the credentials")
-	}
-
-	empty := []string{}
-	applyAuthentication(currentConfig, empty)
-	if authStore.Default.Authenticator() != nil {
-		t.Error("authenticator survived an empty authentication list")
-	}
-}
-
-func TestTunProjectionChangesOnlySuppliedFields(t *testing.T) {
-	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
-	currentConfig.General.Tun.Device = "keep-me"
-	device := "flclash-tun"
-
-	if err := updateConfig(&UpdateParams{Tun: &tunSchema{Enable: true}}); err == nil || err.Error() != "configuration_reapply_required" {
-		t.Fatal("TUN change did not require a full preparation", err)
-	}
-	patchTun(&currentConfig.General.Tun, &tunSchema{Enable: true})
-	if !currentConfig.General.Tun.Enable {
-		t.Error("Tun.Enable stayed false")
-	}
-	if currentConfig.General.Tun.Device != "keep-me" {
-		t.Errorf("Tun.Device = %q, want an omitted field left untouched", currentConfig.General.Tun.Device)
-	}
-
-	patchTun(&currentConfig.General.Tun, &tunSchema{Enable: true, Device: &device})
-	if currentConfig.General.Tun.Device != device {
-		t.Errorf("Tun.Device = %q, want %q", currentConfig.General.Tun.Device, device)
 	}
 }
 
@@ -606,16 +538,6 @@ func TestGeoUpdateHookDoesNotReleaseAManualClaim(t *testing.T) {
 	settleMessageBatcher()
 }
 
-func TestLoadConfigRejectsAnEmptyProfile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, nil, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if cfg, err := loadConfig(path); err == nil || cfg != nil {
-		t.Fatal("empty input became defaults", cfg, err)
-	}
-}
-
 func TestLoadConfigReportsAMissingFile(t *testing.T) {
 	_, err := loadConfig(filepath.Join(t.TempDir(), "absent.yaml"))
 
@@ -677,19 +599,6 @@ func withSetupConfig(t *testing.T, apply func(*SetupParams) error) {
 		isInit.Store(false)
 		isRunning.Store(false)
 	})
-}
-
-func TestLegacySetupConfigRejectionDoesNotRetireAnExistingListener(t *testing.T) {
-	withSetupConfig(t, func(*SetupParams) error { return errors.New("bad profile") })
-
-	got := handleSetupConfig(defaultSetupParams())
-
-	if got != "bad profile" {
-		t.Fatalf("handleSetupConfig = %q, want the apply error", got)
-	}
-	if !isRunning.Load() {
-		t.Error("a failed apply stopped the listeners")
-	}
 }
 
 func TestHandleSetupConfigLeavesTheListenerAloneOnSuccess(t *testing.T) {

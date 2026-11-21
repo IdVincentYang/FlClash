@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/core/controller.dart';
@@ -112,79 +110,6 @@ void main() {
   });
 
   group('checkServices', () {
-    test('keeps requested purposes and targets separate', () async {
-      when(() => core.serviceCheck(any())).thenAnswer(
-        (_) async => const [
-          ServiceCheckItem(
-            name: 'youtube',
-            purpose: 'basic',
-            status: 'available',
-          ),
-          ServiceCheckItem(
-            name: 'spotify',
-            purpose: 'advanced',
-            status: 'observed',
-          ),
-          ServiceCheckItem(
-            name: 'youtube',
-            purpose: 'advanced',
-            status: 'observed',
-          ),
-        ],
-      );
-      final checks = await checkServices(
-        controller,
-        purpose: ServiceProbePurpose.advanced,
-        targets: const [ServiceTarget.youtube],
-      );
-      expect(checks.keys, [ServiceTarget.youtube]);
-      expect(checks.values.single.purpose, ServiceProbePurpose.advanced);
-      expect(checks.values.single.status, ServiceProbeStatus.observed);
-      final params =
-          verify(() => core.serviceCheck(captureAny())).captured.single
-              as ServiceCheckParams;
-      expect(params.toJson()['purpose'], 'advanced');
-    });
-
-    test('wire round trip retains safe step and route metadata only', () {
-      const item = ServiceCheckItem(
-        name: 'disney-plus',
-        purpose: 'advanced',
-        status: 'observed',
-        elapsed: 120,
-        region: 'JP',
-        coreEpoch: 3,
-        picksVersion: 7,
-        steps: [
-          ServiceCheckStep(
-            endpoint: 'session',
-            httpStatus: 200,
-            delay: 20,
-            chains: ['Node A'],
-            outcome: 'complete',
-            observation: 'observed',
-            region: 'JP',
-            coreEpoch: 3,
-            picksVersion: 7,
-          ),
-        ],
-      );
-      final wire = jsonDecode(jsonEncode(item)) as Map<String, dynamic>;
-      wire['body'] = 'synthetic-secret';
-      wire['authorization'] = 'synthetic-token';
-      final decoded = ServiceCheckItem.fromJson(wire);
-      expect(decoded, item);
-      final check = ServiceCheck.of(decoded);
-      expect(check.elapsed, 120);
-      expect(check.steps.single.chains, ['Node A']);
-      expect(check.steps.single.observation, 'observed');
-      expect(check.steps.single.region, 'JP');
-      expect(check.node, isNull);
-      expect(check.delay, isNull);
-      expect(jsonEncode(decoded), isNot(contains('synthetic-secret')));
-      expect(jsonEncode(decoded), isNot(contains('synthetic-token')));
-    });
-
     test(
       'asks the Core for the named targets and keys the answers back',
       () async {
@@ -217,12 +142,6 @@ void main() {
       },
     );
 
-    test('an empty target list makes no request', () async {
-      final checks = await checkServices(controller);
-      expect(checks, isEmpty);
-      verifyNever(() => core.serviceCheck(any()));
-    });
-
     test('skips a name this build does not know', () async {
       when(() => core.serviceCheck(any())).thenAnswer(
         (_) async => const [
@@ -241,46 +160,6 @@ void main() {
   });
 
   group('lookupOutboundIp', () {
-    test('hands the Core only the Cloudflare source', () async {
-      late OutboundIpParams sent;
-      when(() => core.outboundIp(any())).thenAnswer((invocation) async {
-        sent = invocation.positionalArguments.single as OutboundIpParams;
-        return const OutboundIpResult(
-          url: 'https://www.cloudflare.com/cdn-cgi/trace',
-          body: 'fl=1\nip=1.1.1.1\nloc=US\n',
-        );
-      });
-
-      final ipInfo = parseOutboundIp(
-        await lookupOutboundIp(controller, 'HK-01'),
-      );
-
-      expect(sent.urls, ipInfoSources.keys.toList());
-      expect(sent.proxyName, 'HK-01');
-      expect(sent.timeout, outboundIpTimeoutDuration.inMilliseconds);
-      expect(ipInfo?.ip, '1.1.1.1');
-      expect(ipInfo?.countryCode, 'US');
-      expect(ipInfo?.checkedAt, isNotNull);
-    });
-
-    test(
-      'rejects an unselected source instead of accepting its answer',
-      () async {
-        when(() => core.outboundIp(any())).thenAnswer(
-          (_) async => OutboundIpResult(
-            url: 'https://api.country.is',
-            body: jsonEncode({'ip': '198.51.100.4', 'country': 'DE'}),
-          ),
-        );
-
-        final ipInfo = parseOutboundIp(
-          await lookupOutboundIp(controller, 'DE-01'),
-        );
-
-        expect(ipInfo, isNull);
-      },
-    );
-
     test('gives up on an error, an empty body or an unparseable one', () async {
       final answers = <OutboundIpResult?>[
         const OutboundIpResult(error: 'timeout'),

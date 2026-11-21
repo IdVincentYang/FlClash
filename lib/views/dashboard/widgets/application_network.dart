@@ -4,6 +4,7 @@ import 'package:fl_clash/providers/application_routing.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/views/application_activity.dart';
 import 'package:fl_clash/views/dashboard/widget_metrics.dart';
+import 'package:fl_clash/widgets/activity_summary.dart';
 import 'package:fl_clash/widgets/application_activity_item.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,6 +56,7 @@ class _ApplicationNetworkCardState
             child: Row(
               children: [
                 Expanded(
+                  flex: 3,
                   child: InfoHeader(
                     info: Info(
                       label: l.applicationNetwork,
@@ -63,6 +65,19 @@ class _ApplicationNetworkCardState
                     padding: DashboardWidgetMetrics.paddingOf(context),
                   ),
                 ),
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Consumer(
+                      builder: (_, ref, _) => ActivityTrafficSummary(
+                        traffic: ref.watch(totalTrafficProvider),
+                        showScope: false,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 const Padding(
                   padding: EdgeInsets.only(right: 16),
                   child: GlyphIcon(AppGlyphs.chevronForward, size: 20),

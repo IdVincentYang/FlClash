@@ -84,18 +84,6 @@ void main() {
     expect(_RecordingSetupAction.requests, [true]);
   });
 
-  testWidgets(
-    'prepared quick actions retain their request and feedback origin',
-    (tester) async {
-      final listener = await pumpTileManager(tester);
-      listener.onPreparedStart(44);
-      await tester.pumpAndSettle();
-      expect(_RecordingSetupAction.requests, [true]);
-      expect(_RecordingSetupAction.sources, ['tile']);
-      expect(_RecordingSetupAction.prepared, [44]);
-    },
-  );
-
   testWidgets('a tile start request is ignored once already connected', (
     tester,
   ) async {

@@ -135,10 +135,6 @@ android {
         getByName("test").java.setSrcDirs(listOf("../tests/app"))
     }
 
-    testOptions.unitTests {
-        isIncludeAndroidResources = true
-        all { it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2") }
-    }
 }
 
 kotlin {
@@ -149,10 +145,6 @@ kotlin {
 
 flutter {
     source = "../.."
-}
-
-tasks.matching { it.name == "packageDebugUnitTestForUnitTest" }.configureEach {
-    dependsOn("copyFlutterAssetsDebug")
 }
 
 dependencies {
@@ -166,5 +158,4 @@ dependencies {
     }
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation("org.robolectric:robolectric:4.16.1")
 }

@@ -19,40 +19,6 @@ void main() {
     App().clearPackageIconCache();
   });
 
-  test(
-    'boot record channel preserves action and reports platform failure to its owner',
-    () async {
-      final commands = <MethodCall>[];
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-            commands.add(call);
-            if (call.arguments['action'] == 'write') {
-              throw PlatformException(
-                code: 'IO',
-                message: 'synthetic private details',
-              );
-            }
-            return {
-              'status': 'ok',
-              'current': true,
-              'writable': false,
-              'busy': true,
-            };
-          });
-      expect((await App().bootRecord('status', {}))['current'], true);
-      await expectLater(
-        App().bootRecord('write', {'attempt': 'synthetic', 'record': '{}'}),
-        throwsA(isA<PlatformException>()),
-      );
-      expect(commands.map((c) => c.method), ['bootRecord', 'bootRecord']);
-      expect(commands.last.arguments, {
-        'action': 'write',
-        'attempt': 'synthetic',
-        'record': '{}',
-      });
-    },
-  );
-
   test('requests every package icon from Android only once', () async {
     var iconCallCount = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

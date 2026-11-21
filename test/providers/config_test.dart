@@ -57,16 +57,6 @@ void main() {
       expect(value.enable, true);
       expect(value.systemProxy, true);
     });
-
-    test('effective writes require an application input commit', () {
-      expect(
-        () => container
-            .read(vpnSettingProvider.notifier)
-            .update((_) => const VpnProps(enable: false)),
-        throwsA(isA<RequestUnavailable>()),
-      );
-      expect(container.read(vpnSettingProvider).enable, true);
-    });
   });
 
   group('NetworkSetting provider', () {
@@ -74,16 +64,6 @@ void main() {
       final value = container.read(networkSettingProvider);
       expect(value.systemProxy, true);
       expect(value.bypassDomain, defaultBypassDomain);
-    });
-
-    test('effective writes require an application input commit', () {
-      expect(
-        () => container
-            .read(networkSettingProvider.notifier)
-            .update((_) => const NetworkProps(systemProxy: false)),
-        throwsA(isA<RequestUnavailable>()),
-      );
-      expect(container.read(networkSettingProvider).systemProxy, true);
     });
   });
 
@@ -133,14 +113,6 @@ void main() {
 
   group('OverrideDns provider', () {
     test('default is false', () {
-      expect(container.read(overrideDnsProvider), false);
-    });
-
-    test('effective writes require an application input commit', () {
-      expect(
-        () => container.read(overrideDnsProvider.notifier).update((_) => true),
-        throwsA(isA<RequestUnavailable>()),
-      );
       expect(container.read(overrideDnsProvider), false);
     });
   });

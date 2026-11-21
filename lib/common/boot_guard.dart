@@ -148,11 +148,16 @@ class BootGuard {
   Future<bool> isCurrent() async {
     if (_closed || _lostSession) return false;
     if (!_supported) return true;
-    try {
-      final status = await _call('status');
-      if (status['current'] == true && !_closed && !_lostSession) return true;
-    } catch (_) {
-      _unavailable();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final status = await _call('status');
+        if (_closed || _lostSession) return false;
+        if (status['current'] == true) return true;
+        break;
+      } catch (_) {
+        if (_closed || _lostSession) return false;
+        if (attempt == 1) _unavailable();
+      }
     }
     _lostSession = true;
     return false;

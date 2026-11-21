@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:material_ui/material_ui.dart';
@@ -21,6 +22,54 @@ String activityRuleText(BuildContext context, TrackerInfo info) {
           (config?.mode == 'global' || config?.mode == 'direct')
       ? context.appLocalizations.activityRulesBypassed
       : context.appLocalizations.unknown;
+}
+
+class ActivityTrafficSummary extends StatelessWidget {
+  const ActivityTrafficSummary({
+    super.key,
+    required this.traffic,
+    this.showScope = true,
+    this.compact = false,
+    this.small = false,
+  });
+
+  final Traffic traffic;
+  final bool showScope, compact, small;
+
+  String _shortTraffic(num bytes) {
+    var value = bytes.toDouble();
+    var index = 0;
+    while (value >= 1024 && index < TrafficUnit.values.length - 1) {
+      value /= 1024;
+      index++;
+    }
+    return '${value.truncate()}${TrafficUnit.values[index].name[0]}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.appLocalizations;
+    final up = _shortTraffic(traffic.up);
+    final down = _shortTraffic(traffic.down);
+    final scope = showScope ? '${l10n.activityRetainedTraffic} · ' : '';
+    final description =
+        '$scope${l10n.upload} ${traffic.up.traffic.show} · '
+        '${l10n.download} ${traffic.down.traffic.show}';
+    final text = Text(
+      '${compact ? '' : scope}↑$up ↓$down',
+      maxLines: compact ? 1 : null,
+      overflow: compact ? TextOverflow.ellipsis : null,
+      softWrap: compact ? false : null,
+      textAlign: TextAlign.end,
+      semanticsLabel: description,
+      style:
+          (small ? context.textTheme.labelSmall : context.textTheme.bodySmall)
+              ?.copyWith(color: context.colorScheme.onSurfaceVariant),
+    );
+    return compact
+        ? Tooltip(message: description, excludeFromSemantics: true, child: text)
+        : text;
+  }
 }
 
 class ActivityConnectionSummary extends StatelessWidget {

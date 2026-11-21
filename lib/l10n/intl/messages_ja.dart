@@ -365,6 +365,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "activityProxyServerCountry": m8,
     "activityRecent": MessageLookupByLibrary.simpleMessage("最近の通信"),
+    "activityRetainedTraffic": MessageLookupByLibrary.simpleMessage(
+      "保持中の接続の通信量",
+    ),
     "activityRetention": m9,
     "activityRouteCounts": m10,
     "activityRules": MessageLookupByLibrary.simpleMessage("観測したルール"),
@@ -389,6 +392,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "更新できません・接続状況は未確認",
     ),
     "activityUid": m11,
+    "activityUidNoPackage": MessageLookupByLibrary.simpleMessage(
+      "この UID に対応するアプリのパッケージ名はありません",
+    ),
     "activityUnknownApp": MessageLookupByLibrary.simpleMessage("不明なアプリ"),
     "activityUnknownTarget": MessageLookupByLibrary.simpleMessage("不明な接続先"),
     "activityVpnObserved": MessageLookupByLibrary.simpleMessage(
@@ -498,7 +504,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "appPolicyVpnScope": MessageLookupByLibrary.simpleMessage("VPN の対象アプリ"),
     "appPolicyVpnStopped": MessageLookupByLibrary.simpleMessage("VPN は停止中"),
     "appendSystemDns": MessageLookupByLibrary.simpleMessage("システムDNSを追加"),
-    "applicationNetwork": MessageLookupByLibrary.simpleMessage("アプリのネットワーク"),
+    "applicationNetwork": MessageLookupByLibrary.simpleMessage("アプリの通信量"),
     "appliedProfile": MessageLookupByLibrary.simpleMessage("適用中の設定"),
     "authentication": MessageLookupByLibrary.simpleMessage("認証"),
     "authenticationDesc": MessageLookupByLibrary.simpleMessage(
@@ -848,24 +854,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "前回の遅延テストがタイムアウトしたノードを表示しない",
     ),
     "host": MessageLookupByLibrary.simpleMessage("ホスト"),
-    "hostTrafficLimited": MessageLookupByLibrary.simpleMessage(
-      "ホスト数が上限に達したため、追加の宛先は「その他の宛先」に集計します。",
-    ),
-    "hostTrafficOther": MessageLookupByLibrary.simpleMessage("その他の宛先"),
-    "hostTrafficPeriod": MessageLookupByLibrary.simpleMessage("今回の Core 実行"),
-    "hostTrafficRecentDetails": MessageLookupByLibrary.simpleMessage(
-      "今回の Core 実行で保持されている接続のみ表示します。明細の合計はホストの累計と一致しない場合があります。",
-    ),
-    "hostTrafficScope": MessageLookupByLibrary.simpleMessage(
-      "すべてのアプリ · Core が追跡したプロキシ接続と直接接続",
-    ),
-    "hostTrafficStopped": MessageLookupByLibrary.simpleMessage(
-      "現在は転送していません。表示される集計は最後に取得できた値です。",
-    ),
-    "hostTrafficTitle": MessageLookupByLibrary.simpleMessage("ホスト別通信量"),
-    "hostTrafficUnavailable": MessageLookupByLibrary.simpleMessage(
-      "更新できませんでした。表示される集計は最後に取得できた値です。",
-    ),
     "hotkeyConflictWith": m35,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "グローバルホットキーはウィンドウが非表示でも有効です。アクションをタップしてキーの組み合わせを記録します。",

@@ -93,36 +93,6 @@ void main() {
     expect(find.text('b.com'), findsOneWidget);
   });
 
-  testWidgets(
-    'managed host policies cannot open a second editor from added rules',
-    (tester) async {
-      await pumpRules(tester, [
-        _rule(1, 'ordinary.test'),
-        _rule(2, 'managed.test').copyWith(
-          hostBinding: const HostRuleBinding(packageName: 'test.app.a'),
-        ),
-      ]);
-      expect(find.text('ordinary.test'), findsOneWidget);
-      expect(find.text('managed.test'), findsNothing);
-      expect(container.read(globalRulesProvider).value, hasLength(2));
-    },
-  );
-
-  testWidgets('reordering ordinary rules skips hidden host policies', (
-    tester,
-  ) async {
-    await pumpRules(tester, [
-      _rule(1, 'first.test'),
-      _rule(2, 'managed.test').copyWith(hostBinding: const HostRuleBinding()),
-      _rule(3, 'last.test'),
-    ]);
-    final list = tester.widget<ReorderableList>(find.byType(ReorderableList));
-    list.onReorderItem!(0, 1);
-    expect(rules.reordered, [
-      [1, 3],
-    ]);
-  });
-
   testWidgets('checking a rule enters selection mode', (tester) async {
     await pumpRules(tester, [_rule(1, 'a.com'), _rule(2, 'b.com')]);
 

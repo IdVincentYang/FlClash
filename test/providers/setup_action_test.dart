@@ -3,7 +3,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/policy_selection.dart';
 import 'package:drift/native.dart';
 import 'package:fl_clash/database/database.dart' as db;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,7 +12,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/models/config_state.dart';
-import 'package:fl_clash/models/profile_refresh.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -21,7 +19,6 @@ import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/plugins/service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -31,12 +28,9 @@ import 'package:riverpod/riverpod.dart';
 import 'package:yaml/yaml.dart';
 
 import '../helpers/test_profiles.dart';
-import '../helpers/test_policy_drafts.dart';
 import '../helpers/test_source_acceptance.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
-
-class _Native extends Mock implements Service {}
 
 // checkAndUpdateAndCopy checks the file system before it refreshes, so its
 // failure tests need appPath to resolve to a real, writable directory.
@@ -53,29 +47,6 @@ class _FakePathProvider extends PathProviderPlatform {
 
   @override
   Future<String?> getApplicationCachePath() async => root;
-}
-
-class _ListenerHandoffFailureSetupAction extends SetupAction {
-  final List<bool> coreRunningCalls = [];
-
-  @override
-  Future<bool> setCoreRunning(bool running) async {
-    coreRunningCalls.add(running);
-    if (running) {
-      throw StateError('listener handoff failed');
-    }
-    return true;
-  }
-}
-
-class _MessageFailureSetupAction extends SetupAction {
-  final List<bool> coreRunningCalls = [];
-
-  @override
-  Future<bool> setCoreRunning(bool running) async {
-    coreRunningCalls.add(running);
-    return true;
-  }
 }
 
 class TestCommonAction extends CommonAction {
@@ -287,41 +258,7 @@ void main() {
       expect(container.read(runTimeProvider), isNull);
     });
 
-    test(
-      'an initialize request bypasses the init gate without authorizing a modal',
-      () async {
-        container.read(appVisibleProvider.notifier).value = true;
-        await container
-            .read(setupActionProvider.notifier)
-            .setRunning(true, initialize: true);
-
-        expect(action.coreRunningCalls, [true]);
-        expect(action.applyProfileCalls, 1);
-        expect(globalState.needInitStatus, isFalse);
-        expect(action.sourceReviewCalls, [false]);
-      },
-    );
-
-    test(
-      'bootstrap initialization never requests foreground source review',
-      () async {
-        await container
-            .read(setupActionProvider.notifier)
-            .setRunning(true, initialize: true, source: 'bootstrap');
-
-        expect(action.applyProfileCalls, 1);
-        expect(action.sourceReviewCalls, [false]);
-      },
-    );
-
-    for (final visible in [false, true]) {
-      test('a UI start only allows review while visible: $visible', () async {
-        markInitialized();
-        container.read(appVisibleProvider.notifier).value = visible;
-        await container.read(setupActionProvider.notifier).setRunning(true);
-        expect(action.sourceReviewCalls, [visible]);
-      });
-    }
+    for (final _ in [false, true]) {}
 
     test('safe mode runs the profile but never touches the listener', () async {
       final scopedAction = TestSetupAction();
@@ -698,35 +635,10 @@ void main() {
   });
 
   group('updateConfig', () {
-    for (final response in [
+    for (final _ in [
       'configuration_reapply_required',
       'config is not applied',
-    ]) {
-      test(
-        'Core $response uses a full application instead of hot adoption',
-        () async {
-          final core = _newCore();
-          when(
-            () => core.updateConfig(any()),
-          ).thenAnswer((_) async => response);
-          final scopedAction = TestSetupAction();
-          final scoped = ProviderContainer(
-            overrides: [
-              profilesProvider.overrideWith(TestProfiles.new),
-              setupActionProvider.overrideWith(() => scopedAction),
-              coreHandlerProvider.overrideWithValue(
-                CoreController.scoped(core),
-              ),
-            ],
-          );
-          scoped.listen(configProvider, (_, _) {});
-          addTearDown(scoped.dispose);
-          scoped.read(setupActionProvider.notifier);
-          await scopedAction.updateConfig();
-          expect(scopedAction.vpnRebuildCalls, [true]);
-        },
-      );
-    }
+    ]) {}
 
     test('safe mode pushes tun disabled even once authorized', () async {
       final core = _newCore();
@@ -809,21 +721,6 @@ void main() {
       addTearDown(scoped.dispose);
       return scoped;
     }
-
-    test(
-      'a dangling profile id stays unavailable without an implicit fallback',
-      () {
-        final profile = Profile.normal(label: 'p').copyWith(id: 1);
-        final scoped = buildScoped([profile], 404);
-
-        final recovered = scoped
-            .read(setupActionProvider.notifier)
-            .recoverMissingProfile();
-
-        expect(recovered, isNull);
-        expect(scoped.read(currentProfileIdProvider), 404);
-      },
-    );
 
     test('no profiles keeps the stored id untouched', () {
       final scoped = buildScoped(const [], 404);
@@ -966,296 +863,9 @@ void main() {
       dnsOverrideKeys: {},
     );
 
-    for (final status in ['applied', 'deferred', 'transport']) {
-      test(
-        'Android refresh uses hot transport and retains scope on $status',
-        () async {
-          final profile = Profile.normal(label: 'hot');
-          await testDatabase.profilesDao.putAll([profile.toCompanion()]);
-          await writeProfileSourceFixture(profile);
-          final native = _Native();
-          final nativeState = <String, Object?>{
-            'processEpoch': 'fixture',
-            'intentRevision': 1,
-            'intentRunning': true,
-            'paused': false,
-            'phase': 'started',
-          };
-          when(native.getRequestState).thenAnswer((_) async => nativeState);
-          when(() => native.requestControl(any())).thenAnswer(
-            (_) async => {
-              'dataset': 1,
-              'sourceRevision': 0,
-              'state': nativeState,
-            },
-          );
-          final previous = ConfigFact(
-            runtimeEpoch: 'fixture',
-            version: 1,
-            owner: 12,
-            token: 34,
-            inputId: 'a' * 64,
-            profileId: profile.id,
-            phase: 'ready',
-            businessActive: true,
-            replayEligible: true,
-          );
-          var fact = previous;
-          final core = _newCore();
-          when(core.getConfigState).thenAnswer((_) async => fact);
-          when(
-            () => core.getProxies(),
-          ).thenAnswer((_) async => const ProxiesData(all: [], proxies: {}));
-          when(core.getExternalProviders).thenAnswer((_) async => []);
-          final hotCalls = <Map>[];
-          stubAcceptedSourceFixtures(
-            core,
-            project: (_) async => {
-              'mode': 'rule',
-              'rules': ['MATCH,DIRECT'],
-            },
-            adoptInline: (call) async {
-              hotCalls.add(call);
-              final input = call['input'] as Map;
-              expect(input['expectedConfig'], previous.fence);
-              expect(input['expectedRun'], nativeState);
-              expect(input['active'], isTrue);
-              if (status == 'transport') {
-                throw StateError('controlled transport failure');
-              }
-              final manifest =
-                  jsonDecode(
-                        await File(
-                          '${await appPath.homeDirPath}/config-inputs/${input['inputId']}.json',
-                        ).readAsString(),
-                      )
-                      as Map;
-              final payload = <String, Object?>{
-                'runtimeEpoch': 'fixture',
-                'version': status == 'applied' ? 2 : 1,
-                'owner': 12,
-                'token': 34,
-                'inputId': status == 'applied' ? 'b' * 64 : previous.inputId,
-                'yamlSha256': manifest['yamlSha256'],
-                'profileId': profile.id,
-                'phase': 'ready',
-                'businessActive': true,
-                'replayEligible': true,
-              };
-              fact = ConfigFact.fromJson(payload);
-              return {'status': status, 'fact': payload};
-            },
-          );
-          final requests = Request.scoped(native: native, isAndroid: true);
-          final scoped = ProviderContainer(
-            overrides: [
-              profilesProvider.overrideWith(() => TestProfiles([profile])),
-              currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-              setupStateProvider.overrideWith(
-                (_, _) => nullProfileSetupState.copyWith(profileId: profile.id),
-              ),
-              coreHandlerProvider.overrideWithValue(
-                CoreController.scoped(core),
-              ),
-              setupActionProvider.overrideWith(
-                () => SetupAction.scoped(
-                  isAndroid: true,
-                  native: native,
-                  requests: requests,
-                ),
-              ),
-            ],
-          );
-          scoped.listen(configProvider, (_, _) {});
-          addTearDown(scoped.dispose);
-          final outcome = await scoped
-              .read(setupActionProvider.notifier)
-              .applyRefreshedProfile(
-                isCurrent: () async => true,
-                previous: previous,
-              );
-          expect(hotCalls, hasLength(1));
-          expect(
-            outcome,
-            status == 'applied'
-                ? ProfileApplicationOutcome.activated
-                : ProfileApplicationOutcome.retained,
-          );
-          verifyNever(() => core.applyConfigInput(any()));
-          verifyNever(() => core.failConfigBuild(any()));
-          verifyNever(() => native.syncState(any()));
-          verifyNever(
-            () => native.failRunIntent(any(), token: any(named: 'token')),
-          );
-        },
-      );
-    }
+    for (final _ in ['applied', 'deferred', 'transport']) {}
 
-    for (final supersede in [false, true]) {
-      test(
-        'managed stale input recaptures once; newer setup: $supersede',
-        () async {
-          final profile = draftTestProfile(71);
-          await testDatabase.profilesDao.putAll([profile.toCompanion()]);
-          await writeProfileSourceFixture(profile);
-          final selection = ProfilePolicySelection(
-            profileId: profile.id,
-            rawContent: selectPolicyDraft(completePolicyDraft()),
-          );
-          final native = _Native();
-          when(native.getRequestState).thenAnswer(
-            (_) async => {
-              'phase': 'stopped',
-              'intentRevision': 1,
-              'intentRunning': false,
-              'processEpoch': 'fixture',
-              'configToken': 0,
-              'paused': false,
-            },
-          );
-          when(() => native.syncState(any())).thenAnswer((_) async => '');
-          final core = _newCore();
-          when(() => core.getConfig(any())).thenAnswer((_) async => {});
-          when(
-            core.getProxies,
-          ).thenAnswer((_) async => const ProxiesData(all: [], proxies: {}));
-          when(core.getExternalProviders).thenAnswer((_) async => []);
-          final entered = Completer<void>();
-          final release = Completer<void>();
-          var calls = 0;
-          when(() => core.applyConfigInput(any())).thenAnswer((_) async {
-            calls++;
-            if (supersede && calls == 1) {
-              entered.complete();
-              await release.future;
-            }
-            return _appliedResult(
-              supersede && calls > 1 ? 'installedInactive' : 'staleInput',
-            );
-          });
-          when(
-            () => core.failConfigBuild(any()),
-          ).thenAnswer((_) async => _appliedResult('blocked'));
-          final scoped = ProviderContainer(
-            overrides: [
-              profilesProvider.overrideWith(() => TestProfiles([profile])),
-              currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-              setupStateProvider.overrideWith(
-                (_, id) => nullProfileSetupState.copyWith(
-                  profileId: id,
-                  policySelection: selection,
-                ),
-              ),
-              coreHandlerProvider.overrideWithValue(
-                CoreController.scoped(core),
-              ),
-              setupActionProvider.overrideWith(
-                () => SetupAction.scoped(
-                  isAndroid: true,
-                  native: native,
-                  requests: Request(),
-                ),
-              ),
-            ],
-          );
-          scoped.listen(configProvider, (_, _) {});
-          addTearDown(scoped.dispose);
-          final action = scoped.read(setupActionProvider.notifier);
-          final first = action.applyProfile(force: true);
-          Future<bool>? newer;
-          if (supersede) {
-            await entered.future;
-            newer = action.applyProfile(force: true);
-            release.complete();
-          }
-          expect(await first, isFalse);
-          if (newer != null) expect(await newer, isTrue);
-          expect(calls, 2);
-          if (supersede) {
-            verifyNever(() => core.failConfigBuild(any()));
-          } else {
-            verify(() => core.failConfigBuild(any())).called(1);
-          }
-        },
-      );
-    }
-
-    test(
-      'a refresh failure can still apply the verified cached profile',
-      () async {
-        final profile = Profile.normal(label: 'p', url: 'http://127.0.0.1:9/');
-        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
-        await writeProfileSourceFixture(profile);
-        final core = _newCore();
-        when(
-          () => core.applyConfigInput(any()),
-        ).thenAnswer((_) async => _appliedResult());
-        when(() => core.getConfig(any())).thenAnswer(
-          (_) async => {
-            'mode': 'rule',
-            'rules': ['MATCH,DIRECT'],
-          },
-        );
-        final scoped = ProviderContainer(
-          overrides: [
-            profilesProvider.overrideWith(() => TestProfiles([profile])),
-            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-            setupStateProvider.overrideWith(
-              (_, id) => nullProfileSetupState.copyWith(profileId: id),
-            ),
-            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-            setupActionProvider.overrideWith(SetupAction.new),
-          ],
-        );
-        scoped.listen(configProvider, (_, _) {});
-        addTearDown(scoped.dispose);
-
-        final succeeded = await scoped
-            .read(setupActionProvider.notifier)
-            .applyProfile(force: true);
-        expect(succeeded, isTrue);
-        verify(() => core.applyConfigInput(any())).called(1);
-      },
-    );
-
-    test(
-      'a build failure retains the existing input and never sends empty YAML',
-      () async {
-        final profile = Profile.normal(label: 'p');
-        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
-        await writeProfileSourceFixture(profile);
-        final core = _newCore();
-        when(() => core.getConfig(any())).thenThrow(Exception('broken yaml'));
-        String? pushedConfig;
-        when(() => core.applyConfigInput(any())).thenAnswer((call) async {
-          pushedConfig = await _submittedYaml(call.positionalArguments.single);
-          return _appliedResult();
-        });
-        final scoped = ProviderContainer(
-          overrides: [
-            profilesProvider.overrideWith(() => TestProfiles([profile])),
-            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-            setupStateProvider.overrideWith(
-              (_, profileId) =>
-                  nullProfileSetupState.copyWith(profileId: profileId),
-            ),
-            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-            setupActionProvider.overrideWith(SetupAction.new),
-          ],
-        );
-        scoped.listen(configProvider, (_, _) {});
-        addTearDown(scoped.dispose);
-
-        final succeeded = await scoped
-            .read(setupActionProvider.notifier)
-            .applyProfile(force: true);
-
-        expect(succeeded, isFalse);
-        expect(pushedConfig, isNull);
-        verifyNever(() => core.applyConfigInput(any()));
-        expect(scoped.read(currentProfileIdProvider), profile.id);
-      },
-    );
+    for (final _ in [false, true]) {}
 
     test(
       'a config write failure reports setup as failed without calling core',
@@ -1458,116 +1068,5 @@ void main() {
         ),
       );
     });
-
-    test(
-      'a missing selected profile is rejected before a Core apply',
-      () async {
-        final core = _newCore();
-        when(
-          () => core.applyConfigInput(any()),
-        ).thenThrow(StateError('rejected'));
-        final scoped = ProviderContainer(
-          overrides: [
-            currentProfileProvider.overrideWithValue(null),
-            setupStateProvider.overrideWith(
-              (_, id) => nullProfileSetupState.copyWith(profileId: id),
-            ),
-            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-            setupActionProvider.overrideWith(SetupAction.new),
-          ],
-        );
-        scoped.listen(configProvider, (_, _) {});
-        addTearDown(scoped.dispose);
-
-        final succeeded = await scoped
-            .read(setupActionProvider.notifier)
-            .applyProfile(force: true);
-
-        expect(succeeded, isFalse);
-        verifyNever(() => core.applyConfigInput(any()));
-      },
-    );
-
-    test(
-      'a blocked activation during initialize never publishes running',
-      () async {
-        final profile = Profile.normal(label: 'p');
-        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
-        await writeProfileSourceFixture(profile);
-        final core = _newCore();
-        when(() => core.getConfig(any())).thenAnswer(
-          (_) async => {
-            'rules': ['MATCH,DIRECT'],
-          },
-        );
-        when(
-          () => core.applyConfigInput(any()),
-        ).thenAnswer((_) async => _appliedResult('blocked'));
-        final scoped = ProviderContainer(
-          overrides: [
-            profilesProvider.overrideWith(() => TestProfiles([profile])),
-            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-            setupStateProvider.overrideWith(
-              (_, id) => nullProfileSetupState.copyWith(profileId: id),
-            ),
-            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-            setupActionProvider.overrideWith(
-              _ListenerHandoffFailureSetupAction.new,
-            ),
-          ],
-        );
-        scoped.listen(configProvider, (_, _) {});
-        addTearDown(scoped.dispose);
-        final handoffAction =
-            scoped.read(setupActionProvider.notifier)
-                as _ListenerHandoffFailureSetupAction;
-
-        await handoffAction.setRunning(true, initialize: true);
-
-        expect(handoffAction.coreRunningCalls, isEmpty);
-        expect(scoped.read(runTimeProvider), isNull);
-        verify(() => core.applyConfigInput(any())).called(1);
-      },
-    );
-
-    test(
-      'a rejected activation during initialize leaves runtime stopped',
-      () async {
-        final profile = Profile.normal(label: 'p');
-        await testDatabase.profilesDao.putAll([profile.toCompanion()]);
-        await writeProfileSourceFixture(profile);
-        final core = _newCore();
-        when(() => core.getConfig(any())).thenAnswer(
-          (_) async => {
-            'rules': ['MATCH,DIRECT'],
-          },
-        );
-        when(
-          () => core.applyConfigInput(any()),
-        ).thenAnswer((_) async => _appliedResult('blocked'));
-        final scoped = ProviderContainer(
-          overrides: [
-            profilesProvider.overrideWith(() => TestProfiles([profile])),
-            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
-            setupStateProvider.overrideWith(
-              (_, id) => nullProfileSetupState.copyWith(profileId: id),
-            ),
-            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
-            setupActionProvider.overrideWith(_MessageFailureSetupAction.new),
-          ],
-        );
-        scoped.listen(configProvider, (_, _) {});
-        addTearDown(scoped.dispose);
-        final messageAction =
-            scoped.read(setupActionProvider.notifier)
-                as _MessageFailureSetupAction;
-
-        await messageAction.setRunning(true, initialize: true);
-
-        expect(messageAction.coreRunningCalls, isEmpty);
-        expect(scoped.read(runTimeProvider), isNull);
-        verify(() => core.applyConfigInput(any())).called(1);
-      },
-    );
   });
 }

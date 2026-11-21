@@ -1,10 +1,6 @@
-tree 34713a1a7fad98d9068cb24b97acef5a404ed012
+tree 1a87127e939542ee40c211b1a051485d9c9b5401
 parent 8597778c7df410ebe88c57e59eaab32d203156df
-author Vincent <idvincentyang@gmail.com> 1795246143 +0800
-committer Vincent <idvincentyang@gmail.com> 1795246143 +0800
+author Vincent <idvincentyang@gmail.com> 1795272446 +0800
+committer Vincent <idvincentyang@gmail.com> 1795272446 +0800
 
-feat: expose business tracker byte accounting for Host traffic
-
-Preserve the existing cumulative isolation and immutable proxy cache patch.
-Host totals need the tracker byte paths, including short connections and
-unwrap callbacks, which are not visible through the snapshot interface.
+chore: remove branch-added regression tests from the source carrier

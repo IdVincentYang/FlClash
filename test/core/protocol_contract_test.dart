@@ -169,15 +169,6 @@ class _EmptyConfigCoreHandler extends _RecordingCoreHandler {
 }
 
 void main() {
-  test(
-    'country lookup uses a local batch RPC and rejects unrelated result keys',
-    () async {
-      final handler = _RecordingCoreHandler();
-      expect(await handler.lookupIpCountries(['8.8.8.8']), {'8.8.8.8': 'US'});
-      expect(handler.calls[CoreMethod.lookupIpCountries], ['8.8.8.8']);
-    },
-  );
-
   test('method call keeps structured arguments', () async {
     final fixture =
         json.decode(

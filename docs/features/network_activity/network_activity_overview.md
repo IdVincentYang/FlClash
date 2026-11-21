@@ -8,11 +8,11 @@
 应用接管、默认分流、Host 例外和快捷入口已交付；整体验收由 09 接续，实际边界见[Tasks](network_activity_tasks.md)。
 现有能力见[实现基础](#实现基础)，功能依赖与顺序见[Plan](network_activity_plan.md)，实现分解见[Tasks](network_activity_tasks.md)。
 已实现的连接观测、汇总、三层页面及覆盖边界见 [Design](network_activity_design.md)，Host 例外修改已由 07 交付。
-Android 可从 Dashboard 的 Traffic usage 查看跨 App 的本次 Core 运行 Host 流量排行，见 [Host 流量统计 Design](host_traffic_design.md)。
+Android 的「应用流量」沿用应用活动入口，按 App 和 Host 显示当前保留连接记录的上传、下载量，见 [统计口径](network_activity_design.md#流量统计口径)。
 
 ## 入口与三层 UI
 
-功能与主页面统一命名为“应用网络”：Tools 提供完整入口，Dashboard 的应用活动卡片提供快捷入口。
+功能入口命名为「应用流量」：Tools 提供完整入口，Dashboard 的应用活动卡片提供快捷入口。
 点击卡片中的 App 可直接进入第二层；现有连接详情也可按 App、Host 跳入对应层级。
 Dashboard 的应用 item 与完整应用列表共用 UI 及操作逻辑，
 包括主体跳转、右侧策略控件和状态反馈；实现状态以 Tasks 为准。

@@ -3,6 +3,7 @@ import 'package:fl_clash/common/application_routing.dart';
 import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/models/application_activity.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/application_activity.dart';
 import 'package:fl_clash/providers/application_routing.dart';
@@ -24,8 +25,15 @@ String applicationActivityLabel(
   BuildContext context,
   ApplicationActivityEntry entry,
 ) {
-  if (entry.package case final package?) return package.label;
   final identity = entry.activity?.application;
+  final packageName = entry.package?.packageName ?? identity?.packageName;
+  if (packageName == globalState.packageInfo.packageName) {
+    return globalState.packageInfo.appName;
+  }
+  if (entry.package case final package?) return package.label;
+  if (identity?.status == 'notFound' && identity?.uid != null) {
+    return context.appLocalizations.activityUid(identity!.uid!);
+  }
   return identity?.packageName ??
       (identity?.status == 'ambiguous'
           ? context.appLocalizations.activitySharedUid
@@ -163,7 +171,7 @@ class ApplicationActivityItem extends ConsumerWidget {
             identity: activity?.application ?? const ApplicationIdentity(),
           ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
         minVerticalPadding: 8,
         horizontalTitleGap: 12,
         subtitleTextStyle: context.textTheme.bodySmall?.copyWith(
@@ -187,11 +195,37 @@ class ApplicationActivityItem extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.textTheme.titleMedium,
+                    LayoutBuilder(
+                      builder: (context, constraints) => Row(
+                        spacing: 8,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.textTheme.titleMedium,
+                            ),
+                          ),
+                          if (totals?.retainedTraffic case final traffic?)
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: (constraints.maxWidth - 8).clamp(
+                                  0.0,
+                                  double.infinity,
+                                ),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: ActivityTrafficSummary(
+                                  traffic: traffic,
+                                  compact: true,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                     if (totals == null)
                       Text(l10n.activityNoObserved)

@@ -16,9 +16,12 @@ class ConnectionExitIcon extends ConsumerStatefulWidget {
     super.key,
     required this.info,
     required this.active,
+    this.size,
+    this.emojiSize,
   });
   final TrackerInfo info;
   final bool? active;
+  final double? size, emojiSize;
   @override
   ConsumerState<ConnectionExitIcon> createState() => _ConnectionExitIconState();
 }
@@ -144,15 +147,16 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
     final Widget icon;
     if (known) {
       icon = SizedBox(
-        width: 32,
-        height: 32,
+        width: widget.size ?? 32,
+        height: widget.size ?? 32,
         child: Stack(
           alignment: Alignment.center,
           children: [
             Text(
               value.countryCode.countryFlagEmoji,
-              style: const TextStyle(
-                fontSize: 24,
+              style: TextStyle(
+                fontSize: widget.emojiSize ?? widget.size ?? 24,
+                height: 1,
                 fontFamily: 'Apple Color Emoji',
                 fontFamilyFallback: ['Noto Color Emoji'],
               ),
@@ -194,7 +198,7 @@ class _ConnectionExitIconState extends ConsumerState<ConnectionExitIcon> {
             : _wanted == null
             ? AppGlyphs.block
             : AppGlyphs.proxies,
-        size: 22,
+        size: widget.size ?? 22,
         color: context.colorScheme.onSurfaceVariant,
       );
     }

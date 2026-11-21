@@ -349,6 +349,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "activityProxyServerCountry": m8,
     "activityRecent": MessageLookupByLibrary.simpleMessage("近期活动"),
+    "activityRetainedTraffic": MessageLookupByLibrary.simpleMessage("保留连接流量"),
     "activityRetention": m9,
     "activityRouteCounts": m10,
     "activityRules": MessageLookupByLibrary.simpleMessage("实际命中规则"),
@@ -371,6 +372,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "刷新失败 · 活跃状态待确认",
     ),
     "activityUid": m11,
+    "activityUidNoPackage": MessageLookupByLibrary.simpleMessage(
+      "此 UID 未关联可用的应用包名",
+    ),
     "activityUnknownApp": MessageLookupByLibrary.simpleMessage("未知应用"),
     "activityUnknownTarget": MessageLookupByLibrary.simpleMessage("未知目标"),
     "activityVpnObserved": MessageLookupByLibrary.simpleMessage(
@@ -468,7 +472,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "appPolicyVpnScope": MessageLookupByLibrary.simpleMessage("VPN 应用范围"),
     "appPolicyVpnStopped": MessageLookupByLibrary.simpleMessage("VPN 未运行"),
     "appendSystemDns": MessageLookupByLibrary.simpleMessage("追加系统DNS"),
-    "applicationNetwork": MessageLookupByLibrary.simpleMessage("应用网络"),
+    "applicationNetwork": MessageLookupByLibrary.simpleMessage("应用流量"),
     "appliedProfile": MessageLookupByLibrary.simpleMessage("实际生效配置"),
     "authentication": MessageLookupByLibrary.simpleMessage("认证"),
     "authenticationDesc": MessageLookupByLibrary.simpleMessage(
@@ -774,24 +778,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "不显示上次延迟测试超时的节点",
     ),
     "host": MessageLookupByLibrary.simpleMessage("主机"),
-    "hostTrafficLimited": MessageLookupByLibrary.simpleMessage(
-      "已达到 Host 数量上限，额外目标的流量归入「其他目标」。",
-    ),
-    "hostTrafficOther": MessageLookupByLibrary.simpleMessage("其他目标"),
-    "hostTrafficPeriod": MessageLookupByLibrary.simpleMessage("本次 Core 运行"),
-    "hostTrafficRecentDetails": MessageLookupByLibrary.simpleMessage(
-      "仅显示本次 Core 运行中仍保留的连接，明细之和可能不等于 Host 累计流量。",
-    ),
-    "hostTrafficScope": MessageLookupByLibrary.simpleMessage(
-      "全部应用 · Core 跟踪的代理及直连流量",
-    ),
-    "hostTrafficStopped": MessageLookupByLibrary.simpleMessage(
-      "当前未在转发。如有汇总，显示最后一次成功读取的数值。",
-    ),
-    "hostTrafficTitle": MessageLookupByLibrary.simpleMessage("Host 流量"),
-    "hostTrafficUnavailable": MessageLookupByLibrary.simpleMessage(
-      "无法刷新。如有汇总，显示最后一次成功读取的数值。",
-    ),
     "hotkeyConflictWith": m35,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "全局快捷键在窗口隐藏时依然生效，点击操作即可录制组合键。",

@@ -5,7 +5,6 @@ import 'package:fl_clash/icons/icons.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/dashboard/widget_metrics.dart';
-import 'package:fl_clash/views/host_traffic.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,9 +27,7 @@ class TrafficUsage extends StatelessWidget {
             label: appLocalizations.trafficUsage,
             glyph: AppGlyphs.dataUsage,
           ),
-          onPressed: system.isAndroid
-              ? () => BaseNavigator.push(context, const HostTrafficView())
-              : null,
+          onPressed: () {},
           child: Consumer(
             builder: (_, ref, _) {
               final totalTraffic = ref.watch(totalTrafficProvider);

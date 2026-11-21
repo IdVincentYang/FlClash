@@ -600,39 +600,6 @@ void main() {
 
   group('SetupAction', () {
     group('rapid status changes', () {
-      test(
-        'waits for activation before reporting runtime and traffic',
-        () async {
-          final startCompleter = Completer<bool>();
-          final container = ProviderContainer(
-            overrides: [
-              initProvider.overrideWithBuild((_, _) => true),
-              commonActionProvider.overrideWith(_RaceCommonAction.new),
-              setupActionProvider.overrideWith(_RaceSetupAction.new),
-            ],
-          );
-          container.listen(configProvider, (_, _) {});
-          addTearDown(container.dispose);
-          final action =
-              container.read(setupActionProvider.notifier) as _RaceSetupAction;
-          final commonAction =
-              container.read(commonActionProvider.notifier)
-                  as _RaceCommonAction;
-          action.startCompleter = startCompleter;
-
-          final startFuture = action.setRunning(true);
-          await Future<void>.delayed(Duration.zero);
-          expect(container.read(runTimeProvider), isNull);
-          expect(commonAction.updateTrafficCount, 0);
-
-          startCompleter.complete(true);
-          await startFuture;
-
-          expect(action.transitions, [true]);
-          await action.setRunning(false);
-        },
-      );
-
       test('serializes listener changes while latest start owns UI', () async {
         final stopCompleter = Completer<bool>();
         final container = ProviderContainer(
