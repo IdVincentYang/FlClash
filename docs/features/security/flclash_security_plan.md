@@ -27,3 +27,5 @@
 应用网络：[需求概要](../network_activity/network_activity_overview.md)及[后续计划](../network_activity/network_activity_plan.md)。
 
 [来源接受与轻量追溯](source_acceptance_design.md)及[指南](source_acceptance_guide.md)：L2-T05 Android已完成本地交付与M对账；剩余风险保留。
+
+[Android 备份与离线恢复计划](backup_restore_plan.md)记录换包迁移、逐订阅离线审核及自动备份需求，待开发。

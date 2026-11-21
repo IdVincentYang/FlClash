@@ -873,6 +873,7 @@ directives, so consumers continue to import the same public API:
   goes (local save, WebDAV upload) or comes from. The archive format lives in `lib/common/backup.dart`, which stages a
   restore without touching the data directory; files, database rows and settings are applied only after the whole
   archive has been read and validated.
+  See the [Android backup plan](../docs/features/security/backup_restore_plan.md) for the pending offline review and auto backup work.
 - `CoreAction`: core lifecycle, initialization, coalesced restart, and post-restart profile/running-state application.
 - `SystemAction`: system integration, tray, coordinated resource cleanup, terminal Core close, exit, and brightness.
 - `StoreAction`: profile storage operations.
