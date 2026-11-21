@@ -9713,6 +9713,86 @@ class AppLocalizations {
     );
   }
 
+  /// `Host traffic`
+  String get hostTrafficTitle {
+    return Intl.message(
+      'Host traffic',
+      name: 'hostTrafficTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This Core run`
+  String get hostTrafficPeriod {
+    return Intl.message(
+      'This Core run',
+      name: 'hostTrafficPeriod',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `All apps · Proxy and direct connections tracked by Core`
+  String get hostTrafficScope {
+    return Intl.message(
+      'All apps · Proxy and direct connections tracked by Core',
+      name: 'hostTrafficScope',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Forwarding is inactive. Any totals shown are from the last successful read.`
+  String get hostTrafficStopped {
+    return Intl.message(
+      'Forwarding is inactive. Any totals shown are from the last successful read.',
+      name: 'hostTrafficStopped',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not refresh. Any totals shown are from the last successful read.`
+  String get hostTrafficUnavailable {
+    return Intl.message(
+      'Could not refresh. Any totals shown are from the last successful read.',
+      name: 'hostTrafficUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Other targets`
+  String get hostTrafficOther {
+    return Intl.message(
+      'Other targets',
+      name: 'hostTrafficOther',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The Host limit was reached. Traffic for additional targets is grouped under Other targets.`
+  String get hostTrafficLimited {
+    return Intl.message(
+      'The Host limit was reached. Traffic for additional targets is grouped under Other targets.',
+      name: 'hostTrafficLimited',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only retained connections from this Core run are shown. Their traffic may not add up to the Host total.`
+  String get hostTrafficRecentDetails {
+    return Intl.message(
+      'Only retained connections from this Core run are shown. Their traffic may not add up to the Host total.',
+      name: 'hostTrafficRecentDetails',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Search domain or IP address`
   String get activitySearchTargets {
     return Intl.message(

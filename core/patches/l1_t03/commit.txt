@@ -1,8 +1,10 @@
-tree 9df3b9d4fc95bff70a8ef60651e6b9e191ed23e0
+tree 34713a1a7fad98d9068cb24b97acef5a404ed012
 parent 8597778c7df410ebe88c57e59eaab32d203156df
-author Vincent <idvincentyang@gmail.com> 1794581376 +0800
-committer Vincent <idvincentyang@gmail.com> 1794624989 +0800
+author Vincent <idvincentyang@gmail.com> 1795246143 +0800
+committer Vincent <idvincentyang@gmail.com> 1795246143 +0800
 
-feat: retain cumulative isolation and immutable proxy cache identities
+feat: expose business tracker byte accounting for Host traffic
 
-The proxy identity is a feature captured at ParseProxy, before adapters discard raw authentication and transport options. This is the single factory shared by configuration and provider reloads, including controller reloads; app-side snapshots cannot recover the same immutable connection identity.
+Preserve the existing cumulative isolation and immutable proxy cache patch.
+Host totals need the tracker byte paths, including short connections and
+unwrap callbacks, which are not visible through the snapshot interface.

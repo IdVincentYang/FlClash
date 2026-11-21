@@ -1081,6 +1081,30 @@ class MessageLookup extends MessageLookupByLibrary {
       "Не показывать узлы, у которых последний тест задержки завершился таймаутом",
     ),
     "host": MessageLookupByLibrary.simpleMessage("Хост"),
+    "hostTrafficLimited": MessageLookupByLibrary.simpleMessage(
+      "Достигнут лимит хостов. Трафик остальных назначений включён в «Другие назначения».",
+    ),
+    "hostTrafficOther": MessageLookupByLibrary.simpleMessage(
+      "Другие назначения",
+    ),
+    "hostTrafficPeriod": MessageLookupByLibrary.simpleMessage(
+      "Текущий запуск Core",
+    ),
+    "hostTrafficRecentDetails": MessageLookupByLibrary.simpleMessage(
+      "Показаны только сохранённые соединения текущего запуска Core. Их сумма может отличаться от трафика по хосту.",
+    ),
+    "hostTrafficScope": MessageLookupByLibrary.simpleMessage(
+      "Все приложения · Прямые и прокси-соединения, учтённые Core",
+    ),
+    "hostTrafficStopped": MessageLookupByLibrary.simpleMessage(
+      "Перенаправление неактивно. Показаны последние успешно полученные данные, если они есть.",
+    ),
+    "hostTrafficTitle": MessageLookupByLibrary.simpleMessage(
+      "Трафик по хостам",
+    ),
+    "hostTrafficUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Не удалось обновить данные. Показаны последние успешно полученные данные, если они есть.",
+    ),
     "hotkeyConflictWith": m35,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "Глобальные горячие клавиши работают, даже когда окно скрыто. Нажмите на действие, чтобы записать сочетание клавиш.",

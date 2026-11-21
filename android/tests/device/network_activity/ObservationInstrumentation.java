@@ -124,7 +124,8 @@ public final class ObservationInstrumentation extends Instrumentation {
 
     private JSONObject accept(String key, String kind, String yaml, JSONArray uses) throws Exception {
         String origin = "config".equals(kind) ? "application-config" : key;
-        JSONObject source = new JSONObject(ticket.toString()).put("sources", new JSONObject().put(origin, 0));
+        long revision = ticket.getJSONObject("sources").getLong(origin);
+        JSONObject source = new JSONObject(ticket.toString()).put("sources", new JSONObject().put(origin, revision));
         JSONObject request = new JSONObject().put("action", "review").put("key", key).put("kind", kind)
             .put("identity", hash(key.getBytes(StandardCharsets.UTF_8))).put("settings", hash(new byte[0]))
             .put("body", yaml).put("routing", "source").put("source", source).put("uses", uses);
@@ -143,9 +144,12 @@ public final class ObservationInstrumentation extends Instrumentation {
         rpc("initClash", new JSONObject().put("home-dir", getTargetContext().getFilesDir().getPath()).put("version", android.os.Build.VERSION.SDK_INT));
         String client = control(new JSONObject().put("action", "attach")).getString("client");
         control(new JSONObject().put("action", "ready").put("client", client));
-        long dataset = control(new JSONObject().put("action", "inspect").put("client", client)).getLong("dataset");
-        ticket = new JSONObject().put("client", client).put("dataset", dataset)
-            .put("sources", new JSONObject().put("profile:1", 0).put("application-config", 0));
+        JSONObject inspect = new JSONObject().put("action", "inspect").put("client", client);
+        JSONObject profileSource = control(inspect.put("key", "profile:1"));
+        JSONObject configSource = control(inspect.put("key", "application-config"));
+        ticket = new JSONObject().put("client", client).put("dataset", profileSource.getLong("dataset"))
+            .put("sources", new JSONObject().put("profile:1", profileSource.getLong("sourceRevision"))
+                .put("application-config", configSource.getLong("sourceRevision")));
         String yaml = new String(Base64.decode(arguments.getString("profile"), Base64.DEFAULT), StandardCharsets.UTF_8);
         JSONArray uses = new JSONArray().put(accept("profile:1", "profile", yaml, new JSONArray()));
         uses.put(accept("config:1", "config", yaml, uses));
@@ -227,6 +231,7 @@ public final class ObservationInstrumentation extends Instrumentation {
                 if ("stop".equals(action)) break;
                 Object data;
                 if ("snapshot".equals(action)) data = rpc("getConnections", JSONObject.NULL);
+                else if ("hostTraffic".equals(action)) data = rpc("getHostTraffic", JSONObject.NULL);
                 else if ("fact".equals(action)) data = rpc("getConfigState", JSONObject.NULL);
                 else if ("benchmark".equals(action)) data = benchmarkIdentity(command.getJSONObject("metadata"));
                 else if ("cpu".equals(action)) data = new JSONObject().put("cpuMillis", android.os.Process.getElapsedCpuTime())

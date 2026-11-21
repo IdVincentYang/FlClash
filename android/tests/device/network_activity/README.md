@@ -32,6 +32,8 @@ python3 android/tests/device/network_activity/run_device.py \
   --out build/verification/na-t01-01/device-candidate
 ```
 
+验证支持 Host 流量排行的 APK 时，可加 `--host-traffic`，通过生产 RPC 检查四个客户端的短连接是否增加同一目标 IP 的累计值，以及重复读取是否保持不变。夹具不启动 Flutter，计量不依赖界面轮询。
+
 serial 与 AVD 名替换为已获准实例。若原来安装的是更高版本、不可降级的发行版，
 须在已授权清理的前提下移除 com.follow.clash.dev 后再运行；不要移除其它包来绕过安装错误。
 

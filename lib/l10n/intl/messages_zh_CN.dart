@@ -774,6 +774,24 @@ class MessageLookup extends MessageLookupByLibrary {
       "不显示上次延迟测试超时的节点",
     ),
     "host": MessageLookupByLibrary.simpleMessage("主机"),
+    "hostTrafficLimited": MessageLookupByLibrary.simpleMessage(
+      "已达到 Host 数量上限，额外目标的流量归入「其他目标」。",
+    ),
+    "hostTrafficOther": MessageLookupByLibrary.simpleMessage("其他目标"),
+    "hostTrafficPeriod": MessageLookupByLibrary.simpleMessage("本次 Core 运行"),
+    "hostTrafficRecentDetails": MessageLookupByLibrary.simpleMessage(
+      "仅显示本次 Core 运行中仍保留的连接，明细之和可能不等于 Host 累计流量。",
+    ),
+    "hostTrafficScope": MessageLookupByLibrary.simpleMessage(
+      "全部应用 · Core 跟踪的代理及直连流量",
+    ),
+    "hostTrafficStopped": MessageLookupByLibrary.simpleMessage(
+      "当前未在转发。如有汇总，显示最后一次成功读取的数值。",
+    ),
+    "hostTrafficTitle": MessageLookupByLibrary.simpleMessage("Host 流量"),
+    "hostTrafficUnavailable": MessageLookupByLibrary.simpleMessage(
+      "无法刷新。如有汇总，显示最后一次成功读取的数值。",
+    ),
     "hotkeyConflictWith": m35,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "全局快捷键在窗口隐藏时依然生效，点击操作即可录制组合键。",

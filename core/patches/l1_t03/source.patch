@@ -4618,6 +4618,165 @@ index 3a66a76e545826ecaba8a938ba7d199a58e676d0..38e41947fc56331446b3f7c03f56628d
  	select {
  	case <-s.ctx.Done():
  		packet.Drop() // sender closed before Send()
+diff --git a/tunnel/statistic/patch.go b/tunnel/statistic/patch.go
+index 3f170ee8731139b0aa5fa66294cad34a9b6bf1c6..37eb7eafa1d9fde794181ba16aa906b898555960 100644
+--- a/tunnel/statistic/patch.go
++++ b/tunnel/statistic/patch.go
+@@ -1,9 +1,14 @@
+ package statistic
+ 
++import C "github.com/metacubex/mihomo/constant"
++
+ type RequestNotify func(c Tracker)
+ 
+ var DefaultRequestNotify RequestNotify
+ 
++// DefaultTrafficAccount binds the byte sink before a business tracker is published.
++var DefaultTrafficAccount func(*C.Metadata) func(upload, download int64)
++
+ func (m *Manager) TotalTraffic(onlyProxy bool) (up, down int64) {
+ 	if onlyProxy {
+ 		return m.proxyUploadTotal.Load(), m.proxyDownloadTotal.Load()
+diff --git a/tunnel/statistic/tracker.go b/tunnel/statistic/tracker.go
+index fa9860a04c2dc4bb37ba791569d86c56583a11d7..17d36e10be58da059023fa2a7c385e2e1f800326 100644
+--- a/tunnel/statistic/tracker.go
++++ b/tunnel/statistic/tracker.go
+@@ -38,7 +38,8 @@ type tcpTracker struct {
+ 	*TrackerInfo
+ 	manager *Manager
+ 
+-	pushToManager bool `json:"-"`
++	pushToManager  bool `json:"-"`
++	accountTraffic func(upload, download int64)
+ }
+ 
+ func (tt *tcpTracker) ID() string {
+@@ -56,6 +57,9 @@ func (tt *tcpTracker) Read(b []byte) (int, error) {
+ 		tt.manager.PushDownloaded(tt.Conn.Chains().Last(), download)
+ 	}
+ 	tt.DownloadTotal.Add(download)
++	if tt.accountTraffic != nil {
++		tt.accountTraffic(0, download)
++	}
+ 	return n, err
+ }
+ 
+@@ -66,6 +70,9 @@ func (tt *tcpTracker) ReadBuffer(buffer *buf.Buffer) (err error) {
+ 		tt.manager.PushDownloaded(tt.Chains().Last(), download)
+ 	}
+ 	tt.DownloadTotal.Add(download)
++	if tt.accountTraffic != nil {
++		tt.accountTraffic(0, download)
++	}
+ 	return
+ }
+ 
+@@ -75,6 +82,9 @@ func (tt *tcpTracker) UnwrapReader() (io.Reader, []N.CountFunc) {
+ 			tt.manager.PushDownloaded(tt.Chains().Last(), download)
+ 		}
+ 		tt.DownloadTotal.Add(download)
++		if tt.accountTraffic != nil {
++			tt.accountTraffic(0, download)
++		}
+ 	}}
+ }
+ 
+@@ -85,6 +95,9 @@ func (tt *tcpTracker) Write(b []byte) (int, error) {
+ 		tt.manager.PushUploaded(tt.Chains().Last(), upload)
+ 	}
+ 	tt.UploadTotal.Add(upload)
++	if tt.accountTraffic != nil {
++		tt.accountTraffic(upload, 0)
++	}
+ 	return n, err
+ }
+ 
+@@ -95,6 +108,9 @@ func (tt *tcpTracker) WriteBuffer(buffer *buf.Buffer) (err error) {
+ 		tt.manager.PushUploaded(tt.Chains().Last(), upload)
+ 	}
+ 	tt.UploadTotal.Add(upload)
++	if tt.accountTraffic != nil {
++		tt.accountTraffic(upload, 0)
++	}
+ 	return
+ }
+ 
+@@ -104,6 +120,9 @@ func (tt *tcpTracker) UnwrapWriter() (io.Writer, []N.CountFunc) {
+ 			tt.manager.PushUploaded(tt.Chains().Last(), upload)
+ 		}
+ 		tt.UploadTotal.Add(upload)
++		if tt.accountTraffic != nil {
++			tt.accountTraffic(upload, 0)
++		}
+ 	}}
+ }
+ 
+@@ -149,6 +168,12 @@ func NewTCPTracker(conn C.Conn, manager *Manager, metadata *C.Metadata, rule C.R
+ 		tt.TrackerInfo.RulePayload = rule.Payload()
+ 	}
+ 
++	if pushToManager && DefaultTrafficAccount != nil {
++		tt.accountTraffic = DefaultTrafficAccount(metadata)
++		if tt.accountTraffic != nil {
++			tt.accountTraffic(uploadTotal, downloadTotal)
++		}
++	}
+ 	manager.Join(tt)
+ 	return tt
+ }
+@@ -158,7 +183,8 @@ type udpTracker struct {
+ 	*TrackerInfo
+ 	manager *Manager
+ 
+-	pushToManager bool `json:"-"`
++	pushToManager  bool `json:"-"`
++	accountTraffic func(upload, download int64)
+ }
+ 
+ func (ut *udpTracker) ID() string {
+@@ -176,6 +202,9 @@ func (ut *udpTracker) ReadFrom(b []byte) (int, net.Addr, error) {
+ 		ut.manager.PushDownloaded(ut.Chains().Last(), download)
+ 	}
+ 	ut.DownloadTotal.Add(download)
++	if ut.accountTraffic != nil {
++		ut.accountTraffic(0, download)
++	}
+ 	return n, addr, err
+ }
+ 
+@@ -186,6 +215,9 @@ func (ut *udpTracker) WaitReadFrom() (data []byte, put func(), addr net.Addr, er
+ 		ut.manager.PushDownloaded(ut.Chains().Last(), download)
+ 	}
+ 	ut.DownloadTotal.Add(download)
++	if ut.accountTraffic != nil {
++		ut.accountTraffic(0, download)
++	}
+ 	return
+ }
+ 
+@@ -196,6 +228,9 @@ func (ut *udpTracker) WriteTo(b []byte, addr net.Addr) (int, error) {
+ 		ut.manager.PushUploaded(ut.Chains().Last(), upload)
+ 	}
+ 	ut.UploadTotal.Add(upload)
++	if ut.accountTraffic != nil {
++		ut.accountTraffic(upload, 0)
++	}
+ 	return n, err
+ }
+ 
+@@ -241,6 +276,12 @@ func NewUDPTracker(conn C.PacketConn, manager *Manager, metadata *C.Metadata, ru
+ 		ut.TrackerInfo.RulePayload = rule.Payload()
+ 	}
+ 
++	if pushToManager && DefaultTrafficAccount != nil {
++		ut.accountTraffic = DefaultTrafficAccount(metadata)
++		if ut.accountTraffic != nil {
++			ut.accountTraffic(uploadTotal, downloadTotal)
++		}
++	}
+ 	manager.Join(ut)
+ 	return ut
+ }
 diff --git a/tunnel/tunnel.go b/tunnel/tunnel.go
 index 92afa7066da57ebdfd9477337f3c7b5000c9d1cf..46a15252a71697970376f41f148d1c4304ccb47e 100644
 --- a/tunnel/tunnel.go

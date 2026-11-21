@@ -158,6 +158,14 @@ def main(args):
                 if args.variant == 'candidate' and report['configurationKnown'] == known_before:
                     report['errors'].append({'reason': 'no verified configuration version in mode', 'mode': mode})
                 print(mode + ': ' + json.dumps(report['modes'][mode]), flush=True)
+            def host_traffic(label):
+                value = send('hostTraffic', 'host-traffic-' + label)
+                (out / ('host-traffic-' + label + '.json')).write_text(json.dumps(value), encoding='utf-8')
+                target, = (row for row in value['rows'] if row['key'] == 'ip:10.0.2.2')
+                return value['runtimeEpoch'], target['upload'], target['download']
+
+            if args.host_traffic:
+                epoch, up, down = host_traffic('before-short')
             short_facts = []
             for name in CLIENTS:
                 command('shell', 'am', 'start', '-W', '--activity-single-top', '-n', CLIENT + name + '/com.follow.clash.observationclient.ConnectionClientActivity',
@@ -169,6 +177,13 @@ def main(args):
                     and all(v.get('case') == run_id + '-short-' + name for v in value)))
             facts.extend(short_facts)
             snapshots['short'] = send('snapshot', 'snapshot-short')
+            if args.host_traffic:
+                after = host_traffic('after-short')
+                repeated = host_traffic('repeated')
+                if after[0] != epoch or after[1] <= up or after[2] <= down or after != repeated:
+                    report['errors'].append({'reason': 'Host traffic missed short sockets or changed on reread'})
+                else:
+                    report['hostTraffic'] = {'shortUpload': after[1] - up, 'shortDownload': after[2] - down}
             print('short: ' + str(len(short_facts)) + ' controlled sockets closed after echo', flush=True)
             command('shell', 'am', 'start', '-W', '--activity-single-top', '-n', CLIENT + 'a/com.follow.clash.observationclient.ConnectionClientActivity',
                     '--es', 'case', run_id + '-bulk', '--ei', 'directPort', fixture.direct, '--ei', 'proxyPort', fixture.proxy_target,
@@ -245,5 +260,6 @@ if __name__ == '__main__':
     parser.add_argument('--apk', type=Path, default=ROOT / 'build/verification/na-t01-01/clients/app-under-test.apk')
     parser.add_argument('--variant', choices=('baseline', 'candidate'), default='candidate')
     parser.add_argument('--count', type=int, default=4)
+    parser.add_argument('--host-traffic', action='store_true', help='Check the Host traffic RPC on a supporting APK')
     parser.add_argument('--out', type=Path, default=ROOT / 'build/verification/na-t01-01/device-candidate')
     main(parser.parse_args())

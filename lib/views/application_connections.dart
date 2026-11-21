@@ -18,9 +18,19 @@ class ApplicationConnectionsView extends ConsumerStatefulWidget {
     required this.hostKey,
     required this.appLabel,
     this.onOpenApplication,
-  });
+  }) : _runtimeEpoch = null;
+
+  const ApplicationConnectionsView.forHost({
+    super.key,
+    required this.hostKey,
+    required String runtimeEpoch,
+  }) : _runtimeEpoch = runtimeEpoch,
+       appKey = '',
+       appLabel = '',
+       onOpenApplication = null;
 
   final String appKey, hostKey, appLabel;
+  final String? _runtimeEpoch;
   final VoidCallback? onOpenApplication;
 
   @override
@@ -30,7 +40,10 @@ class ApplicationConnectionsView extends ConsumerStatefulWidget {
 
 class _ApplicationConnectionsViewState
     extends ConsumerState<ApplicationConnectionsView> {
-  bool _allApps = false, _onlyActive = false;
+  bool _expandedToAllApps = false, _onlyActive = false;
+
+  bool get _fromRanking => widget._runtimeEpoch != null;
+  bool get _allApps => _fromRanking || _expandedToAllApps;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +53,8 @@ class _ApplicationConnectionsViewState
         activity.connections
             .where(
               (item) =>
+                  (!_fromRanking ||
+                      activity.runtimeEpoch == widget._runtimeEpoch) &&
                   item.hostKey == widget.hostKey &&
                   (_allApps || item.appKey == widget.appKey),
             )
@@ -64,12 +79,14 @@ class _ApplicationConnectionsViewState
     return CommonScaffold(
       title: target.isEmpty ? l.activityUnknownTarget : target,
       menuItems: [
-        CommonPopupMenuItem(
-          label: l.activityAllAppsForTarget,
-          glyph: AppGlyphs.application,
-          checked: _allApps,
-          onPressed: () => setState(() => _allApps = !_allApps),
-        ),
+        if (!_fromRanking)
+          CommonPopupMenuItem(
+            label: l.activityAllAppsForTarget,
+            glyph: AppGlyphs.application,
+            checked: _allApps,
+            onPressed: () =>
+                setState(() => _expandedToAllApps = !_expandedToAllApps),
+          ),
         CommonPopupMenuItem(
           label: l.activityOnlyActiveConnections,
           glyph: AppGlyphs.networkCheck,
@@ -115,6 +132,14 @@ class _ApplicationConnectionsViewState
                     style: context.textTheme.bodySmall,
                   ),
                 ),
+                if (_fromRanking)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 4,
+                    ),
+                    child: Text(l.hostTrafficRecentDetails),
+                  ),
                 _ObservedAddresses(records: records),
                 if (activity.observing && activity.snapshotFailed)
                   Padding(
@@ -159,6 +184,7 @@ class _ApplicationConnectionsViewState
               'connection:${activity.runtimeEpoch}:${record.info.id}',
             ),
             record: record,
+            showExitProbe: !_fromRanking,
             onOpenApplication: record.appKey == widget.appKey
                 ? widget.onOpenApplication
                 : null,
@@ -269,12 +295,14 @@ class _ConnectionRow extends StatelessWidget {
     super.key,
     required this.record,
     required this.active,
+    required this.showExitProbe,
     this.appLabel,
     this.onOpenApplication,
     this.onOpenHost,
   });
   final ActivityConnection record;
   final bool? active;
+  final bool showExitProbe;
   final String? appLabel;
   final VoidCallback? onOpenApplication, onOpenHost;
 
@@ -309,7 +337,9 @@ class _ConnectionRow extends StatelessWidget {
             ),
           ),
         ),
-        leading: ConnectionExitIcon(info: info, active: active),
+        leading: showExitProbe
+            ? ConnectionExitIcon(info: info, active: active)
+            : null,
         title: RecordHeader(
           trailing: Semantics(
             label:

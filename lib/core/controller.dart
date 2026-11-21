@@ -12,6 +12,8 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 
+import 'host_traffic.dart';
+
 class CoreController {
   static CoreController? _instance;
   late CoreHandlerInterface _interface;
@@ -201,6 +203,8 @@ class CoreController {
   Future<RouteSnapshot?> watchRoute(bool watch) {
     return _interface.watchRoute(watch);
   }
+
+  Future<HostTrafficSnapshot> getHostTraffic() => _interface.getHostTraffic();
 
   Future<List<TrackerInfo>> getConnections() async {
     return _interface.getConnections();

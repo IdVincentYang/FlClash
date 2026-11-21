@@ -1005,6 +1005,9 @@ func handleSetupConfig(params *SetupParams) string {
 
 func init() {
 	installAppRequests()
+	if features.Android {
+		statistic.DefaultTrafficAccount = hostTraffic.account
+	}
 	adapter.UrlTestHook = func(url string, name string, delay uint16) {
 		sendMessage(Message{
 			Type: DelayMessage,

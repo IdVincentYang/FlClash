@@ -1042,6 +1042,24 @@ class MessageLookup extends MessageLookupByLibrary {
       "Leave out nodes whose last delay test timed out",
     ),
     "host": MessageLookupByLibrary.simpleMessage("Host"),
+    "hostTrafficLimited": MessageLookupByLibrary.simpleMessage(
+      "The Host limit was reached. Traffic for additional targets is grouped under Other targets.",
+    ),
+    "hostTrafficOther": MessageLookupByLibrary.simpleMessage("Other targets"),
+    "hostTrafficPeriod": MessageLookupByLibrary.simpleMessage("This Core run"),
+    "hostTrafficRecentDetails": MessageLookupByLibrary.simpleMessage(
+      "Only retained connections from this Core run are shown. Their traffic may not add up to the Host total.",
+    ),
+    "hostTrafficScope": MessageLookupByLibrary.simpleMessage(
+      "All apps · Proxy and direct connections tracked by Core",
+    ),
+    "hostTrafficStopped": MessageLookupByLibrary.simpleMessage(
+      "Forwarding is inactive. Any totals shown are from the last successful read.",
+    ),
+    "hostTrafficTitle": MessageLookupByLibrary.simpleMessage("Host traffic"),
+    "hostTrafficUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Could not refresh. Any totals shown are from the last successful read.",
+    ),
     "hotkeyConflictWith": m35,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "Global hotkeys work even while the window is hidden. Tap an action to record its key combination.",

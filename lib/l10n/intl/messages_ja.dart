@@ -848,6 +848,24 @@ class MessageLookup extends MessageLookupByLibrary {
       "前回の遅延テストがタイムアウトしたノードを表示しない",
     ),
     "host": MessageLookupByLibrary.simpleMessage("ホスト"),
+    "hostTrafficLimited": MessageLookupByLibrary.simpleMessage(
+      "ホスト数が上限に達したため、追加の宛先は「その他の宛先」に集計します。",
+    ),
+    "hostTrafficOther": MessageLookupByLibrary.simpleMessage("その他の宛先"),
+    "hostTrafficPeriod": MessageLookupByLibrary.simpleMessage("今回の Core 実行"),
+    "hostTrafficRecentDetails": MessageLookupByLibrary.simpleMessage(
+      "今回の Core 実行で保持されている接続のみ表示します。明細の合計はホストの累計と一致しない場合があります。",
+    ),
+    "hostTrafficScope": MessageLookupByLibrary.simpleMessage(
+      "すべてのアプリ · Core が追跡したプロキシ接続と直接接続",
+    ),
+    "hostTrafficStopped": MessageLookupByLibrary.simpleMessage(
+      "現在は転送していません。表示される集計は最後に取得できた値です。",
+    ),
+    "hostTrafficTitle": MessageLookupByLibrary.simpleMessage("ホスト別通信量"),
+    "hostTrafficUnavailable": MessageLookupByLibrary.simpleMessage(
+      "更新できませんでした。表示される集計は最後に取得できた値です。",
+    ),
     "hotkeyConflictWith": m35,
     "hotkeyDesc": MessageLookupByLibrary.simpleMessage(
       "グローバルホットキーはウィンドウが非表示でも有効です。アクションをタップしてキーの組み合わせを記録します。",

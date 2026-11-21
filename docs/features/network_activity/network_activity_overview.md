@@ -8,6 +8,7 @@
 应用接管、默认分流、Host 例外和快捷入口已交付；整体验收由 09 接续，实际边界见[Tasks](network_activity_tasks.md)。
 现有能力见[实现基础](#实现基础)，功能依赖与顺序见[Plan](network_activity_plan.md)，实现分解见[Tasks](network_activity_tasks.md)。
 已实现的连接观测、汇总、三层页面及覆盖边界见 [Design](network_activity_design.md)，Host 例外修改已由 07 交付。
+Android 可从 Dashboard 的 Traffic usage 查看跨 App 的本次 Core 运行 Host 流量排行，见 [Host 流量统计 Design](host_traffic_design.md)。
 
 ## 入口与三层 UI
 

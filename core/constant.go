@@ -167,6 +167,7 @@ const (
 	outboundIpMethod               CoreMethod = "outboundIp"
 	lookupIpCountriesMethod        CoreMethod = "lookupIpCountries"
 	serviceCheckMethod             CoreMethod = "serviceCheck"
+	getHostTrafficMethod           CoreMethod = "getHostTraffic"
 	getConnectionsMethod           CoreMethod = "getConnections"
 	getConnectionCountMethod       CoreMethod = "getConnectionCount"
 	closeConnectionsMethod         CoreMethod = "closeConnections"
